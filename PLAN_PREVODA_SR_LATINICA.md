@@ -26,9 +26,14 @@ i povezane menije u dva aktivna CUIX paketa. Izvršni makroi ostaju isti;
 vidi `PREVOD_TOOLBAROVA.md`.
 
 Izvan obuhvata: komandna linija AutoCAD-a, instalater, izvršni nazivi
-komandi, prevod crteža,
-korisničkih vrijednosti i sadržaja generisanih specifikacija. Njih treba
+komandi, prevod postojećih crteža i korisničkih vrijednosti. Njih treba
 evidentirati ako se pojave, ali ne mijenjati u ovoj fazi.
+
+Na naknadni zahtjev korisnika prevedena su i zaglavlja, automatski nazivi
+elemenata, jedinice i zbirni natpisi novih specifikacija za AutoCAD i Excel.
+Ranije sačuvani šabloni se pri čitanju prikazuju s prevedenim prepoznatim
+zaglavljima; širine, funkcionalne oznake i prilagođeni naslovi ostaju sačuvani.
+Detalji: `PREVOD_SPECIFIKACIJA.md`.
 
 ## Nalazi pregleda
 

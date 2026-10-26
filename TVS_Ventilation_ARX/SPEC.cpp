@@ -88,12 +88,12 @@ bool SPEC::add(AcDbEntity * pEnt)
 				SizeA=pPipe->get_SizeA();
 				SizeB=pPipe->get_SizeB();
 				Length=pPipe->get_Length();
-				setUnit1(_T("м"));
-				setUnit2(_T("м2"));
+				setUnit1(_T("m"));
+				setUnit2(_T("m²"));
 				if (pPipe->DuctType==DuctTypeFlex)
 				{
 					status=PipeRound;
-					setName(_T("Воздуховод гибкий"));
+					setName(_T("Fleksibilni kanal"));
 					setLable(d);
 					appendLable(SizeA);
 					Area=Length*M_PI*SizeA/1000000;
@@ -105,7 +105,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 					if (SizeB==0) 
 					{
 						status=PipeRound;
-						setName(_T("Воздуховод круглый"));
+						setName(_T("Okrugli kanal"));
 						setLable(d);
 						appendLable(SizeA);
 						Area=Length*M_PI*SizeA/1000000;
@@ -114,7 +114,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 					else 
 					{ 
 						status=PipeRect;
-						setName(_T("Воздуховод прямоугольный"));
+						setName(_T("Pravougaoni kanal"));
 						if (SizeB>SizeA)
 						{
 							SizeB=pPipe->SizeA;
@@ -143,11 +143,11 @@ bool SPEC::add(AcDbEntity * pEnt)
 					SizeA=pTap->get_SizeA();
 					SizeB=pTap->get_SizeB();
 
-					setUnit1(_T("м"));
-					setUnit2(_T("м2"));
+					setUnit1(_T("m"));
+					setUnit2(_T("m²"));
 
 					status=PipeRound;
-					setName(_T("Воздуховод гибкий"));
+					setName(_T("Fleksibilni kanal"));
 					setLable(d);
 					appendLable(SizeA);
 					Length=M_PI*pTap->Radius*pTap->Swectangle/2/M_PI/1000;
@@ -164,13 +164,13 @@ bool SPEC::add(AcDbEntity * pEnt)
 					SizeA=pTap->get_SizeA();
 					SizeB=pTap->get_SizeB();
 
-					setUnit1(_T("шт"));
-					setUnit2(_T("м2"));
+					setUnit1(_T("kom"));
+					setUnit2(_T("m²"));
 
 					if (SizeB==0) 
 					{
 						status=TapRound;
-						setName(_T("Отвод круглый"));
+						setName(_T("Okruglo koljeno"));
 						setLable(d);
 						appendLable(SizeA);
 						Area=M_PI*2*SizeA*pTap->Radius/1000000*pTap->Swectangle;
@@ -193,7 +193,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 							SizeA=pTap->get_SizeB();
 						}
 						status=TapRect;
-						setName(_T("Отвод прямоугольный"));
+						setName(_T("Pravougaono koljeno"));
 						setLable(SizeA);
 						appendLable(_T("x"));
 						appendLable(SizeB);
@@ -221,19 +221,19 @@ bool SPEC::add(AcDbEntity * pEnt)
 				SizeA2=pWye->get_SizeAotv();
 				SizeA3=pWye->get_SizeBotv();
 				Swectangle=pWye->LengthPl;
-				setUnit1(_T("шт"));
-				setUnit2(_T("м2"));
+				setUnit1(_T("kom"));
+				setUnit2(_T("m²"));
 
 				if (SizeB==0) 
 				{
-					setName(_T("Тройник"));
+					setName(_T("T-komad"));
 					setLable(d);
 					appendLable(SizeA);
 					Area=(SizeA2+pWye->LengthPl*2)*M_PI*SizeA/1000000;
 				}
 				else 
 				{ 
-					setName(_T("Тройник"));
+					setName(_T("T-komad"));
 					setLable(SizeA);
 					appendLable(_T("x"));
 					appendLable(SizeB);
@@ -248,7 +248,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 				}
 				else 
 				{ 
-					setName(_T("Тройник"));
+					setName(_T("T-komad"));
 					appendLable(SizeA2);
 					appendLable(_T("x"));
 					appendLable(SizeA3);
@@ -257,7 +257,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 
 				appendLable(_T(" (L="));
 				appendLable(pWye->LengthPl);
-				appendLable(_T(" мм)"));
+				appendLable(_T(" mm)"));
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);
 			}
@@ -297,19 +297,19 @@ bool SPEC::add(AcDbEntity * pEnt)
 
 				}
 
-				setUnit1(_T("шт"));
-				setUnit2(_T("м2"));
+				setUnit1(_T("kom"));
+				setUnit2(_T("m²"));
 				double radp1, radp2;
 				if (SizeB==0) 
 				{
-					setName(_T("Переход"));
+					setName(_T("Prelaz"));
 					setLable(d);
 					appendLable(SizeA);
 					radp1=SizeA/2;
 				}
 				else 
 				{ 
-					setName(_T("Переход"));
+					setName(_T("Prelaz"));
 					setLable(SizeA);
 					appendLable(_T("x"));
 					appendLable(SizeB);
@@ -336,7 +336,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 				Area=M_PI*(radp1+radp2)*dobr/1000000;
 				appendLable(_T(" (L="));
 				appendLable(pTrans->LengthTr);
-				appendLable(_T(" мм)"));
+				appendLable(_T(" mm)"));
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);
 			}
@@ -528,7 +528,7 @@ bool SPEC::addBlock(AcDbEntity * pEnt)
 		wcscpy_s(sTypeSize,_T(""));
 		wcscpy_s(sArticle,_T(""));
 		wcscpy_s(sManufacture,_T(""));
-		wcscpy_s(sUnit,_T("шт"));
+		wcscpy_s(sUnit,_T("kom"));
 		wcscpy_s(sValue,_T(""));
 		wcscpy_s(sMass,_T(""));
 		wcscpy_s(sCommit,_T(""));
@@ -806,12 +806,12 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 	pos4=AcGePoint3d(curcnt.x+columndistanse[3]+otstupX,curcnt.y+otstupY,curcnt.z);
 	pos5=AcGePoint3d(curcnt.x+columndistanse[4]+otstupX,curcnt.y+otstupY,curcnt.z);
 	pos6=AcGePoint3d(curcnt.x+columndistanse[5]+otstupX,curcnt.y+otstupY,curcnt.z);
-	printText(pos1,_T("Наименование"));
-	printText(pos2,_T("Размер"));
-	printText(pos3,_T("Единица"));
-	printText(pos4,_T("Кол-во"));
-	printText(pos5,_T("Единица2"));
-	printText(pos6,_T("Кол-во"));
+	printText(pos1,_T("Naziv"));
+	printText(pos2,_T("Dimenzije"));
+	printText(pos3,_T("Jed. mjere"));
+	printText(pos4,_T("Količina"));
+	printText(pos5,_T("Jed. mjere 2"));
+	printText(pos6,_T("Količina"));
 	curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 
 	//print all table text
@@ -849,11 +849,11 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 	//pos4=AcGePoint3d(curcnt.x+columndistanse[3]+otstupX,curcnt.y+otstupY,curcnt.z);
 	pos5=AcGePoint3d(curcnt.x+columndistanse[4]+otstupX,curcnt.y+otstupY,curcnt.z);
 	pos6=AcGePoint3d(curcnt.x+columndistanse[5]+otstupX,curcnt.y+otstupY,curcnt.z);
-	printText(pos5,_T("Итого:"));
-	//printText(pos2,_T("Размер"));
-	//printText(pos3,_T("Единица"));
-	//printText(pos4,_T("Кол-во"));
-	//printText(pos5,_T("Единица2"));
+	printText(pos5,_T("Ukupno:"));
+	//printText(pos2,_T("Dimenzije"));
+	//printText(pos3,_T("Jed. mjere"));
+	//printText(pos4,_T("Količina"));
+	//printText(pos5,_T("Jed. mjere 2"));
 	printText(pos6,sA);
 	curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 
@@ -880,7 +880,7 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 	}
 	cent=AcGePoint3d(cent.x,cent.y-rowhight*(length+3),cent.z);
 	print();
-	acutPrintf(_T("\nИтого м2: %s"),sA);
+	acutPrintf(_T("\nUkupno m²: %s"),sA);
 }
 
 void SPEClist::printText( AcGePoint3d cent, const ACHAR * pAchar )
@@ -952,15 +952,15 @@ bool SPEClist::printToExel(CMSExcel* m_msExcel,long &idx)
 
 
 
-	m_msExcel->printExelText(col2,idx,_T("Наименование"));
-	m_msExcel->printExelText(col3,idx,_T("Размер"));
-	m_msExcel->printExelText(col6,idx,_T("Единица"));
-	m_msExcel->printExelText(col7,idx,_T("Кол-во"));
-	m_msExcel->printExelText(col8,idx,_T("Единица2"));
-	m_msExcel->printExelText(col9,idx,_T("Кол-во"));
+	m_msExcel->printExelText(col2,idx,_T("Naziv"));
+	m_msExcel->printExelText(col3,idx,_T("Dimenzije"));
+	m_msExcel->printExelText(col6,idx,_T("Jed. mjere"));
+	m_msExcel->printExelText(col7,idx,_T("Količina"));
+	m_msExcel->printExelText(col8,idx,_T("Jed. mjere 2"));
+	m_msExcel->printExelText(col9,idx,_T("Količina"));
 
 
- acedSetStatusBarProgressMeter(_T("Экспорт данных в Excel"),0,length);
+ acedSetStatusBarProgressMeter(_T("Izvoz podataka u Excel"),0,length);
 	idx++;
 	//print all table text
 	for (int i =0; i<length;i++)
@@ -993,7 +993,7 @@ bool SPEClist::printToExel(CMSExcel* m_msExcel,long &idx)
 	}
 	acdbRToS(summArea,2,2,sA);
 
-	m_msExcel->printExelText(col8,idx,_T("Итого:"));
+	m_msExcel->printExelText(col8,idx,_T("Ukupno:"));
 	m_msExcel->printExelText(col9,idx,sA);
 
 	idx++;
@@ -1063,15 +1063,15 @@ void SpecWithAttrlist::printSPDSForm(AcGePoint3d &cent)
 	pos7=AcGePoint3d(curcnt.x+columndistanse[6]+otstupX,curcnt.y+otstupY,curcnt.z);
 	pos8=AcGePoint3d(curcnt.x+columndistanse[7]+otstupX,curcnt.y+otstupY,curcnt.z);
 	pos9=AcGePoint3d(curcnt.x+columndistanse[8]+otstupX,curcnt.y+otstupY,curcnt.z);
-	printText(pos1,_T("Позиция"));
-	printText(pos2,_T("Наименование"));
-	printText(pos3,_T("Типоразмер"));
-	printText(pos4,_T("Артикул"));
-	printText(pos5,_T("Изготовитель"));
-	printText(pos6,_T("Единица"));
-	printText(pos7,_T("Кол-во"));
-	printText(pos8,_T("Масса"));
-	printText(pos9,_T("Примечание"));
+	printText(pos1,_T("Pozicija"));
+	printText(pos2,_T("Naziv"));
+	printText(pos3,_T("Tip i dimenzije"));
+	printText(pos4,_T("Šifra"));
+	printText(pos5,_T("Proizvođač"));
+	printText(pos6,_T("Jed. mjere"));
+	printText(pos7,_T("Količina"));
+	printText(pos8,_T("Masa"));
+	printText(pos9,_T("Napomena"));
 	curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 
 	//print all table text
@@ -1119,11 +1119,11 @@ void SpecWithAttrlist::printSPDSForm(AcGePoint3d &cent)
 	// 		//pos4=AcGePoint3d(curcnt.x+columndistanse[3]+otstupX,curcnt.y+otstupY,curcnt.z);
 	// 		pos5=AcGePoint3d(curcnt.x+columndistanse[4]+otstupX,curcnt.y+otstupY,curcnt.z);
 	// 		pos6=AcGePoint3d(curcnt.x+columndistanse[5]+otstupX,curcnt.y+otstupY,curcnt.z);
-	// 		printText(pos5,_T("Итого:"));
-	// 		//printText(pos2,_T("Размер"));
-	// 		//printText(pos3,_T("Единица"));
-	// 		//printText(pos4,_T("Кол-во"));
-	// 		//printText(pos5,_T("Единица2"));
+	// 		printText(pos5,_T("Ukupno:"));
+	// 		//printText(pos2,_T("Dimenzije"));
+	// 		//printText(pos3,_T("Jed. mjere"));
+	// 		//printText(pos4,_T("Količina"));
+	// 		//printText(pos5,_T("Jed. mjere 2"));
 	// 		printText(pos6,sA);
 	// 		curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 
@@ -1150,7 +1150,7 @@ void SpecWithAttrlist::printSPDSForm(AcGePoint3d &cent)
 	}
 	cent=AcGePoint3d(cent.x,cent.y-rowhight*(length+3),cent.z);
 	print();
-	//acutPrintf(_T("\nИтого м2: %s"),sA);
+	//acutPrintf(_T("\nUkupno m²: %s"),sA);
 }
 
 
@@ -1171,18 +1171,18 @@ bool SpecWithAttrlist::printToExel(CMSExcel* m_msExcel,long &idx)
 	int length = specList.logicalLength();
 
 
-	m_msExcel->printExelText(col1,idx,_T("Позиция"));
-	m_msExcel->printExelText(col2,idx,_T("Наименование"));
-	m_msExcel->printExelText(col3,idx,_T("Типоразмер"));
-	m_msExcel->printExelText(col4,idx,_T("Артикул"));
-	m_msExcel->printExelText(col5,idx,_T("Изготовитель"));
-	m_msExcel->printExelText(col6,idx,_T("Единица"));
-	m_msExcel->printExelText(col7,idx,_T("Кол-во"));
-	m_msExcel->printExelText(col8,idx,_T("Масса"));
-	m_msExcel->printExelText(col9,idx,_T("Примечание"));
+	m_msExcel->printExelText(col1,idx,_T("Pozicija"));
+	m_msExcel->printExelText(col2,idx,_T("Naziv"));
+	m_msExcel->printExelText(col3,idx,_T("Tip i dimenzije"));
+	m_msExcel->printExelText(col4,idx,_T("Šifra"));
+	m_msExcel->printExelText(col5,idx,_T("Proizvođač"));
+	m_msExcel->printExelText(col6,idx,_T("Jed. mjere"));
+	m_msExcel->printExelText(col7,idx,_T("Količina"));
+	m_msExcel->printExelText(col8,idx,_T("Masa"));
+	m_msExcel->printExelText(col9,idx,_T("Napomena"));
 
 	int status;
-	 acedSetStatusBarProgressMeter(_T("Экспорт данных в Excel"),0,length);
+	 acedSetStatusBarProgressMeter(_T("Izvoz podataka u Excel"),0,length);
 	 
 	idx++;
 	//print all table text

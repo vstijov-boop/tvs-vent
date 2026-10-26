@@ -1,4 +1,4 @@
-# Status prevoda dijaloga i Properties palete — srpski latinicom
+# Status prevoda TVS interfejsa i specifikacija — srpski latinicom
 
 Datum: 26.10.2026. Grana: `srpski-prevod`. Osnova: `master` na `5aa1ac5`.
 
@@ -81,10 +81,43 @@ CUIX fajlove u AutoCAD-u i vizuelno provjeriti hintove i ribbon. Prevod dijaloga
 i Properties palete i dalje zahtijeva novu ARX/DBX izgradnju. Detalji i rječnik:
 `PREVOD_TOOLBAROVA.md`.
 
+## Dodatno: specifikacije u AutoCAD-u i Excelu
+
+Na zahtjev korisnika prevedene su i nove generisane specifikacije:
+
+- Devet zaglavlja podrazumijevanog šablona zajedničkog za AutoCAD i Excel.
+- Prepoznata ruska zaglavlja u ranije sačuvanim šablonima, bez promjene
+  širina kolona, oznaka svojstava, izraza, razmaka i korisničkih naslova.
+- Zaglavlja i zbirni redovi oba starija načina izrade specifikacija (`SPEC.cpp`).
+- Automatski nazivi elemenata: Kanal, Fleksibilni kanal, Koljeno, T-komad i
+  Prelaz; u staroj specifikaciji i oznake okruglog/pravougaonog oblika.
+- Automatske jedinice `m`, `m²` i `kom`. U novom izvozu se prepoznate ruske
+  oznake jedinica iz postojećih podataka prikazuju na latinici; izvorni podaci
+  nijesu prepisani. Proizvoljne jedinice ostaju sačuvane.
+- Poruke o napretku izvoza koje se nalaze u kodu specifikacije.
+
+Promjena `commonDef.h` utiče i na prikaz automatskih naziva i jedinica TVS
+objekata u Properties paleti. Nazivi i opisi koje je korisnik upisao u blokove,
+šifre, proizvođači i napomene ne prevode se automatski.
+
+Novi pomoćni kod `SpecificationText.h` ima nezavisne C++ testove u
+`tests/test_specification_text.cpp`. Testovi su kompajlirani i izvršeni uz
+`g++ -std=c++98 -Wall -Wextra -Werror -pedantic`. Prošli su slučajevi fabričkog
+šablona, prilagođenih širina i naslova, očuvanja funkcionalnih oznaka,
+kombinovanih završetaka redova, praznih ulaza i ponovljenog poziva prevoda.
+Dodatno je kompajliran test koji poredi stvarni stari fabrički šablon iz Git-a
+s novim šablonom u izvoru. Statički je potvrđeno da proračuni u `SPEC.cpp`,
+kontroler XData i nazivi/tagovi atributa nijesu promijenjeni.
+
+Ovo ne potvrđuje cijelu Windows/ObjectARX izgradnju ni Excel COM izvoz.
+Preostalo: kompajlirati ARX/DBX i provjeriti oba izlaza na istom skupu
+objekata. Postojeće nacrtane tabele i ranije izvezeni Excel fajlovi se ne
+mijenjaju; potrebno ih je ponovo generisati. Vidi `PREVOD_SPECIFIKACIJA.md`.
+
 ## Kompatibilnost
 
 Interni nazivi `CTVSProperty_*`, XData identifikatori, ID-jevi resursa i
-podrazumijevani funkcionalni šabloni nijesu mijenjani. Proračunski kod nije
+oznake svojstava unutar funkcionalnih šablona nijesu mijenjani. Proračunski kod nije
 mijenjan. Nazivi i vrijednosti atributa blokova, slojeva i podaci korisnika
 ostaju kakvi su bili. Funkcionalne oznake kao `[Тип]` i `[Размер]` ostaju na
 ruskom, a uputstvo objašnjava njihov smisao na srpskom. Njihov prevod bi zahtijevao
@@ -92,7 +125,8 @@ poseban rad na kompatibilnosti i nije dio ovog prevoda dijaloga.
 
 U resursima je sačuvana referenca `ВСН`. Oznake dimenzija u natpisima su
 transliterisane (`Dpr`, `Hpr`, `Dotv`, `Hotv`), bez promjene pripadajućih polja
-ili formula. Podrazumijevani sadržaj specifikacije i crteža nije preveden.
+ili formula. Zaglavlja i automatski tekstovi novih specifikacija sada su
+prevedeni. Postojeće tabele u crtežima nijesu prepravljane.
 
 ## Obavljena provjera izvora
 
@@ -102,8 +136,8 @@ ili formula. Podrazumijevani sadržaj specifikacije i crteža nije preveden.
 - U tekstovima dijaloga nema preostale ćirilice osim reference `ВСН`.
 - Interni `TVSProperty.h`, `TVSPropertyController.cpp` i `resource.h` su
   bajt-po-bajt identični polaznoj verziji.
-- Potvrđeno je da su u `MLeaderSettings.h` i `TVSSpecTable.h` promijenjena
-  samo objašnjenja; podrazumijevani šabloni i ostali kod su sačuvani.
+- U `MLeaderSettings.h` promijenjena su samo objašnjenja. U `TVSSpecTable.h`
+  prevedena su objašnjenja i zaglavlja šablona, uz iste širine i funkcionalne oznake.
 - `git diff --check` prolazi.
 
 Ovo su statičke provjere, ne potvrda kompajliranja ili rada dodatka.
@@ -120,6 +154,7 @@ Ovo su statičke provjere, ne potvrda kompajliranja ili rada dodatka.
 - [ ] Vizuelna provjera na 100%, 125% i 150% skaliranja ekrana.
 - [ ] Provjera U redu/Otkaži i čuvanja podešavanja na kopiji DWG-a.
 - [ ] Potvrda da postojeći šabloni, atributi i proračuni daju iste rezultate.
+- [ ] Poređenje nove i stare specifikacije u AutoCAD-u i Excelu: iste količine, dimenzije i zbirovi.
 
 Prvi praktični test pripremiti za korisnikovu ciljnu verziju AutoCAD-a
 (2017 ili 2022). U ovom Linux okruženju nema Windows/ObjectARX alata ni

@@ -4,6 +4,7 @@
 #include "graphicHelper.h"
 #include "MSExcel.h"	
 #include "dgSpecProperty.h"
+#include "SpecificationText.h"
 TVSSpecTable::TVSSpecTable() :
 	rowsPerList(21),
 	titleHeight(3200),
@@ -26,6 +27,8 @@ bool TVSSpecTable::getRowSettings(CString &rowSettings)
 	else {
 		rowSettings = CTVSDefaultTableProperty;
 	}
+	// Localize the returned view; do not overwrite saved custom settings.
+	rowSettings = specificationText::translateTemplate((LPCTSTR)rowSettings).c_str();
 	return true;
 }
 
@@ -146,15 +149,15 @@ bool TVSSpecTable::toSimpleTable(const AcGePoint3d &startPoint)
 bool TVSSpecTable::toExcel()
 {
 	CMSExcel m_msExcel;
-	acedSetStatusBarProgressMeter(_T("Cоздание документа Excel"), 0, 100);
+	acedSetStatusBarProgressMeter(_T("Kreiranje Excel dokumenta"), 0, 100);
 	if (FAILED(m_msExcel.NewExcelBook(false) == E_FAIL))
 	{
 		acedRestoreStatusBar();
-		acutPrintf(_T("\n Ошибка"));
+		acutPrintf(_T("\n Greška pri kreiranju Excel dokumenta."));
 		return false;
 	}
 
-	acedSetStatusBarProgressMeter(_T("Экспорт в Excel"), 0, 100);
+	acedSetStatusBarProgressMeter(_T("Izvoz u Excel"), 0, 100);
 	const ACHAR* excelColumns = L"ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	//title;
 	int curRowIdx = 1;
@@ -173,7 +176,7 @@ bool TVSSpecTable::toExcel()
 			m_msExcel.printExelText(curCol.AllocSysString(), curRowIdx, column);
 			curColIdx++;
 		}
-		acedSetStatusBarProgressMeter(_T("Экспорт данных в Excel"), curRowIdx, tableData.size());
+		acedSetStatusBarProgressMeter(_T("Izvoz podataka u Excel"), curRowIdx, tableData.size());
 		curRowIdx++;
 	}
 
@@ -200,7 +203,8 @@ bool TVSSpecTable::getRowData(const TVSPropertySpecRow &row, const TVSSpecTableC
 	data.Replace(CTVSProperty_size_val, row.tvsPropery.size);
 	data.Replace(CTVSProperty_article_val, row.tvsPropery.article);
 	data.Replace(CTVSProperty_manufacturer_val, row.tvsPropery.manufacturer);
-	data.Replace(CTVSProperty_units_val, row.tvsPropery.units);
+	CString displayUnits = specificationText::translateUnit((LPCTSTR)row.tvsPropery.units).c_str();
+	data.Replace(CTVSProperty_units_val, displayUnits);
 	CString temp;
 	temp.Format(L"%g", row.tvsPropery.count);
 	data.Replace(CTVSProperty_count_val, temp);

@@ -5,15 +5,15 @@
 
 #define CTVSTablePropertyName L"CTVSTableProperty"
 #define CTVSDefaultTableProperty L"\
-Поз.; 2000;[Позиция]\r\n\
-Наименование и техническая характеристика; 13000; [Имя]\r\n\
-Тип, марка, обозначение документа, опросного листа; 6000; [Тип] [Размер]\r\n\
-Код продукции; 3500; [Артикул]\r\n\
-Поставщик; 4500; [Производитель]\r\n\
-Ед. изме - ре - ния; 2000; [Ед.Изм]\r\n\
-Кол.; 2000;[Количество]\r\n\
-Масса 1 ед., кг; 2500; [Масса]\r\n\
-Приме- чание; 4000; [Примечание]\r\n\
+Pozicija; 2000;[Позиция]\r\n\
+Naziv i tehničke karakteristike; 13000; [Имя]\r\n\
+Tip, model i oznaka dokumentacije; 6000; [Тип] [Размер]\r\n\
+Šifra proizvoda; 3500; [Артикул]\r\n\
+Dobavljač; 4500; [Производитель]\r\n\
+Jed. mjere; 2000; [Ед.Изм]\r\n\
+Količina; 2000;[Количество]\r\n\
+Masa/jed., kg; 2500; [Масса]\r\n\
+Napomena; 4000; [Примечание]\r\n\
 "
 
 #define CTVSInstructionTableProperty L"\
