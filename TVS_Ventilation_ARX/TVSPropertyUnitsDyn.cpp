@@ -1,4 +1,4 @@
-#include "StdAfx.h"
+﻿#include "StdAfx.h"
 #include "TVSPropertyUnitsDyn.h"
 #include "TVSController.h"
 
@@ -30,7 +30,7 @@ STDMETHODIMP CTVSPropertyUnitsDyn::GetDisplayName(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(CTVSProperty_units);
+	*pBstrName = ::SysAllocString(L"Jedinica mjere");
 
 	return (S_OK);
 }
@@ -59,7 +59,7 @@ STDMETHODIMP CTVSPropertyUnitsDyn::GetDescription(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(L"Description for My Property (CTVSPropertyUnitsDyn)");
+	*pBstrName = ::SysAllocString(L"Jedinica mjere elementa.");
 
 	return (S_OK);
 }
@@ -159,7 +159,7 @@ STDMETHODIMP CTVSPropertyUnitsDyn::GetCategoryName(PROPCAT propcat, LCID lcid, B
 	// TODO: add your code here (and comment the 3 lines below)
 	if (propcat != 0)
 		return (E_INVALIDARG);
-	*pBstrName = ::SysAllocString(CTVSPropertyCategoryName);
+	*pBstrName = ::SysAllocString(L"TVS svojstva");
 
 	return (S_OK);
 }

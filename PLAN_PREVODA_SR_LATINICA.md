@@ -17,8 +17,12 @@ Obuhvat: naslovi prozora, dugmad, natpisi polja, grupe, opcije, zaglavlja
 tabela, objašnjenja i poruke koje pripadaju dijalozima. Prevesti i postojeća
 engleska dugmad radi ujednačenog interfejsa.
 
-Izvan obuhvata: komandna linija AutoCAD-a, paleta Properties izvan ovih
-dijaloga, instalater, meniji i alatne trake, nazivi komandi, prevod crteža,
+Obuhvat je naknadno proširen na TVS svojstva u AutoCAD Properties paleti
+(`Ctrl+1`), na izričit zahtjev korisnika. Prevedeni su nazivi, kategorije
+i opisi za prikaz, uz očuvanje internih ključeva. Vidi `PREVOD_STATUS.md`.
+
+Izvan obuhvata: komandna linija AutoCAD-a, instalater, meniji i alatne trake,
+nazivi komandi, prevod crteža,
 korisničkih vrijednosti i sadržaja generisanih specifikacija. Njih treba
 evidentirati ako se pojave, ali ne mijenjati u ovoj fazi.
 

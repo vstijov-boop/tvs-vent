@@ -1,4 +1,4 @@
-# Status prevoda dijaloga — srpski latinicom
+# Status prevoda dijaloga i Properties palete — srpski latinicom
 
 Datum: 26.10.2026. Grana: `srpski-prevod`. Osnova: `master` na `5aa1ac5`.
 
@@ -17,6 +17,42 @@ Datum: 26.10.2026. Grana: `srpski-prevod`. Osnova: `master` na `5aa1ac5`.
 `IDD_DGALLEDIT1` je preveden kao postojeći resurs; u pregledanim C++/H fajlovima
 nije pronađen njegov aktivni poziv. Ostalih sedam ID-jeva povezano je s klasama
 odgovarajućih dijaloga. Dostupnost iz komandi provjeriti u AutoCAD-u.
+
+## Dodatno: AutoCAD Properties paleta (Ctrl+1)
+
+Na zahtjev korisnika obuhvat je proširen i na TVS svojstva u Properties paleti.
+Prevedeno u izvoru:
+
+- Deset dinamičkih svojstava: Pozicija, Naziv, Tip, Dimenzije, Šifra,
+  Proizvođač, Jedinica mjere, Količina, Masa i Napomena; prevedeni su i njihovi opisi.
+- Grupa svojstava prikazuje se kao `TVS svojstva`, bez promjene internog
+  `CTVSPropertyCategoryName` ili numeričkog identifikatora kategorije.
+- MLeader svojstvo: `Format teksta`, sa opisom na srpskom.
+- Natpisi svojstava kanala, koljena, prelaza i T-komada u DBX COM omotačima:
+  dimenzije, protok, brzina, dužina, ugao, kote, maskiranje, ivice i oznake.
+- Zajednički natpisi koje TVS prikazuje za Boju, Sloj, Tip linije, Razmjeru
+  tipa linije, Stil štampe, Debljinu linije, Hipervezu i Materijal.
+- Opisi svojstava (`helpstring`) u izvornom DBX IDL fajlu. Opisi gornje/donje
+  kote usklađeni su s postojećim natpisima `GetDisplayName`; u starom IDL-u
+  ti opisi bili su međusobno zamijenjeni. Povezivanje s podacima nije mijenjano.
+
+U `GetDisplayName`, `GetDescription` i `GetCategoryName` korišćeni su posebni
+tekstovi za prikaz. Interni ruski ključevi ostaju u `TVSProperty.h` i koriste
+se kao i ranije. Ne mijenjaju se standardni nazivi u drugim AutoCAD objektima
+niti jezik ostatka AutoCAD interfejsa.
+
+Statička provjera ovog proširenja potvrđuje da je u 16 C++ fajlova promijenjen
+samo tekst dodijeljen za prikaz (97 provjerenih poziva `SysAllocString`,
+uključujući postojeće komentarisane primjere), uz BOM i završne razmake.
+U IDL fajlu promijenjeni su samo `helpstring` tekstovi: GUID-ovi, DISPID-jevi,
+imena metoda i tipovi podataka identični su prethodnom commitu.
+Interni ključevi, kontroler podataka i funkcionalni šabloni su nepromijenjeni.
+
+Dodatna provjera u Windows-u ostaje obavezna: ponovo izgraditi i ARX i DBX,
+uključujući MIDL generisanje biblioteke tipova iz IDL izvora. Generisani
+`*_i.h`/`*_i.c` i postojeći binarni fajlovi nijesu ručno mijenjani. U AutoCAD-u
+provjeriti prikaz i uređivanje TVS svojstava na kanalu, koljenu, prelazu,
+T-komadu, bloku sa TVS svojstvima i MLeader oznaci, te izbor više objekata.
 
 ## Kompatibilnost
 
@@ -50,6 +86,8 @@ Ovo su statičke provjere, ne potvrda kompajliranja ili rada dodatka.
 - [ ] Kompajliranje u Windows-u uz odgovarajući Visual Studio/MFC i ObjectARX SDK.
 - [ ] Potvrda da Windows Resource Compiler ispravno obrađuje UTF-8 resurs.
 - [ ] Otvaranje sedam aktivnih dijaloga i provjera svih stanja i opcija.
+- [ ] Provjera Properties palete, opisa svojstava i uređivanja vrijednosti.
+- [ ] MIDL izgradnja i provjera slova u opisima DBX svojstava.
 - [ ] Provjera `č ć š ž đ`, preloma redova, dugih natpisa i tabela.
 - [ ] Vizuelna provjera na 100%, 125% i 150% skaliranja ekrana.
 - [ ] Provjera U redu/Otkaži i čuvanja podešavanja na kopiji DWG-a.

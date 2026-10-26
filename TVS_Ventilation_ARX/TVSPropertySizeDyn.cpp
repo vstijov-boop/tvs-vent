@@ -1,4 +1,4 @@
-#include "StdAfx.h"
+﻿#include "StdAfx.h"
 #include "TVSPropertySizeDyn.h"
 #include "TVSController.h"
 
@@ -30,7 +30,7 @@ STDMETHODIMP CTVSPropertySizeDyn::GetDisplayName(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(CTVSProperty_size);
+	*pBstrName = ::SysAllocString(L"Dimenzije");
 
 	return (S_OK);
 }
@@ -59,7 +59,7 @@ STDMETHODIMP CTVSPropertySizeDyn::GetDescription(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(L"Description for My Property (CTVSPropertySizeDyn)");
+	*pBstrName = ::SysAllocString(L"Dimenzije elementa.");
 
 	return (S_OK);
 }
@@ -154,7 +154,7 @@ STDMETHODIMP CTVSPropertySizeDyn::GetCategoryName(PROPCAT propcat, LCID lcid, BS
 	// TODO: add your code here (and comment the 3 lines below)
 	if (propcat != 0)
 		return (E_INVALIDARG);
-	*pBstrName = ::SysAllocString(CTVSPropertyCategoryName);
+	*pBstrName = ::SysAllocString(L"TVS svojstva");
 
 	return (S_OK);
 }

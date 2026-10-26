@@ -186,7 +186,7 @@ STDMETHODIMP CMLeaderDynProp::GetDisplayName(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(L"Текстовый формат");
+	*pBstrName = ::SysAllocString(L"Format teksta");
 
 	return (S_OK);
 }
@@ -217,7 +217,7 @@ STDMETHODIMP CMLeaderDynProp::GetDescription(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(L"Текстовый формат выносок");
+	*pBstrName = ::SysAllocString(L"Format teksta višestruke oznake.");
 
 	return (S_OK);
 }
@@ -307,7 +307,7 @@ STDMETHODIMP CMLeaderDynProp::GetCategoryName(PROPCAT propcat, LCID lcid, BSTR *
 	// TODO: add your code here (and comment the 3 lines below)
 	if (propcat != 0)
 		return (E_INVALIDARG);
-	*pBstrName = ::SysAllocString(CTVSPropertyCategoryName);
+	*pBstrName = ::SysAllocString(L"TVS svojstva");
 	return (S_OK);
 }
 

@@ -63,38 +63,38 @@ library TVSTVS_Ventilation_DBXLib
 		pointer_default(unique)
 	]
 	interface IComPipe : IAcadEntity	{
-		[propget, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([out, retval] double *pVal);
-        [propput, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([in] double newVal);
-	    [propget, id(2), helpstring("Высота прохода")] HRESULT SizeB([out, retval] double *pVal);
-        [propput, id(2), helpstring("Высота прохода")] HRESULT SizeB([in] double newVal);
-		[propget, id(3), helpstring("Расход м3/ч")] HRESULT Flow([out, retval] double *pVal);
-        [propput, id(3), helpstring("Расход м3/ч")] HRESULT Flow([in] double newVal);
-		[propget, id(4), helpstring("Cкорость м/с")] HRESULT Speed([out, retval] double *pVal);
-		[propput, id(4), helpstring("Cкорость м/с")] HRESULT Speed([in] double newVal);
-		[propget, id(5), helpstring("Длина воздуховода")] HRESULT Length([out, retval] double *pVal);
-        [propput, id(5), helpstring("Длина воздуховода")] HRESULT Length([in] double  newVal);
-		[propget, id(6), helpstring("Угол поворота")] HRESULT Rotation([out, retval] double *pVal);
-		[propput, id(6), helpstring("Угол поворота")] HRESULT Rotation([in] double newVal);
-	    [propget, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
-        [propput, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([in] int  newVal);
-		[propget, id(8), helpstring("Удельные потери давления Па/м")] HRESULT Parami([out, retval] double *pVal);
-		[propput, id(8), helpstring("Удельные потери давления Па/м")] HRESULT Parami([in] double newVal);
-		[propget, id(9), helpstring("Потери давления на участке Па")] HRESULT ParamdP([out, retval] double *pVal);
-		[propput, id(9), helpstring("Потери давления на участке Па")] HRESULT ParamdP([in] double newVal);
-		[propget, id(10), helpstring("Маскировка")] HRESULT Wipeout([out, retval] int *pVal);
-		[propput, id(10), helpstring("Маскировка")] HRESULT Wipeout([in] int newVal);
-		[propget, id(11), helpstring("Грани")] HRESULT Grani([out, retval] int *pVal);
-		[propput, id(11), helpstring("Грани")] HRESULT Grani([in] int newVal);
-		[propget, id(12), helpstring("Отм. низ")] HRESULT ElevUp([out, retval] double *pVal);
-		[propput, id(12), helpstring("Отм. низ")] HRESULT ElevUp([in] double newVal);
-		[propget, id(13), helpstring("Отм. центр")] HRESULT Elev([out, retval] double *pVal);
-		[propput, id(13), helpstring("Отм. центр")] HRESULT Elev([in] double newVal);
-		[propget, id(14), helpstring("Отм. верх")] HRESULT ElevDown([out, retval] double *pVal);
-		[propput, id(14), helpstring("Отм. верх")] HRESULT ElevDown([in] double newVal);
-		//[propget, id(15), helpstring("Тэг 1")] HRESULT Tag1([out, retval]  BSTR *pVal);
-		//[propput, id(15), helpstring("Тэг 1")] HRESULT Tag1([in] BSTR newVal);
-		//[propget, id(16), helpstring("Тэг 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
-		//[propput, id(16), helpstring("Тэг 2")] HRESULT Tag2 ([in] BSTR newVal);
+		[propget, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([out, retval] double *pVal);
+        [propput, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([in] double newVal);
+	    [propget, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([out, retval] double *pVal);
+        [propput, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([in] double newVal);
+		[propget, id(3), helpstring("Protok, m³/h")] HRESULT Flow([out, retval] double *pVal);
+        [propput, id(3), helpstring("Protok, m³/h")] HRESULT Flow([in] double newVal);
+		[propget, id(4), helpstring("Brzina, m/s")] HRESULT Speed([out, retval] double *pVal);
+		[propput, id(4), helpstring("Brzina, m/s")] HRESULT Speed([in] double newVal);
+		[propget, id(5), helpstring("Dužina kanala")] HRESULT Length([out, retval] double *pVal);
+        [propput, id(5), helpstring("Dužina kanala")] HRESULT Length([in] double  newVal);
+		[propget, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([out, retval] double *pVal);
+		[propput, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([in] double newVal);
+	    [propget, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
+        [propput, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([in] int  newVal);
+		[propget, id(8), helpstring("Specifični pad pritiska, Pa/m")] HRESULT Parami([out, retval] double *pVal);
+		[propput, id(8), helpstring("Specifični pad pritiska, Pa/m")] HRESULT Parami([in] double newVal);
+		[propget, id(9), helpstring("Pad pritiska na dionici, Pa")] HRESULT ParamdP([out, retval] double *pVal);
+		[propput, id(9), helpstring("Pad pritiska na dionici, Pa")] HRESULT ParamdP([in] double newVal);
+		[propget, id(10), helpstring("Maskiranje")] HRESULT Wipeout([out, retval] int *pVal);
+		[propput, id(10), helpstring("Maskiranje")] HRESULT Wipeout([in] int newVal);
+		[propget, id(11), helpstring("Ivice")] HRESULT Grani([out, retval] int *pVal);
+		[propput, id(11), helpstring("Ivice")] HRESULT Grani([in] int newVal);
+		[propget, id(12), helpstring("Kota gornje ivice")] HRESULT ElevUp([out, retval] double *pVal);
+		[propput, id(12), helpstring("Kota gornje ivice")] HRESULT ElevUp([in] double newVal);
+		[propget, id(13), helpstring("Kota ose")] HRESULT Elev([out, retval] double *pVal);
+		[propput, id(13), helpstring("Kota ose")] HRESULT Elev([in] double newVal);
+		[propget, id(14), helpstring("Kota donje ivice")] HRESULT ElevDown([out, retval] double *pVal);
+		[propput, id(14), helpstring("Kota donje ivice")] HRESULT ElevDown([in] double newVal);
+		//[propget, id(15), helpstring("Oznaka 1")] HRESULT Tag1([out, retval]  BSTR *pVal);
+		//[propput, id(15), helpstring("Oznaka 1")] HRESULT Tag1([in] BSTR newVal);
+		//[propget, id(16), helpstring("Oznaka 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
+		//[propput, id(16), helpstring("Oznaka 2")] HRESULT Tag2 ([in] BSTR newVal);
 		//[propget, id(1), helpstring("property StartPoint"),helpcontext(IDH_STARTPOINT)] HRESULT StartPoint([out, retval] VARIANT *pVal);
 		//[propput, id(1), helpstring("property StartPoint"),helpcontext(IDH_STARTPOINT)] HRESULT StartPoint([in] VARIANT newVal);
 	};
@@ -119,28 +119,28 @@ library TVSTVS_Ventilation_DBXLib
 		pointer_default(unique)
 	]
 	interface ICom_TAP : IAcadEntity	{
-		[propget, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([out, retval] double *pVal);
-        [propput, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([in] double newVal);
-	    [propget, id(2), helpstring("Высота прохода")] HRESULT SizeB([out, retval] double *pVal);
-        [propput, id(2), helpstring("Высота прохода")] HRESULT SizeB([in] double newVal);
-		[propget, id(3), helpstring("Расход м3/ч")] HRESULT Flow([out, retval] double *pVal);
-        [propput, id(3), helpstring("Расход м3/ч")] HRESULT Flow([in] double newVal);
-		[propget, id(4), helpstring("Cкорость м/с")] HRESULT Speed([out, retval] double *pVal);
-		[propput, id(4), helpstring("Cкорость м/с")] HRESULT Speed([in] double newVal);
-		//[propget, id(5), helpstring("Длина воздуховода")] HRESULT Length([out, retval] double *pVal);
-        //[propput, id(5), helpstring("Длина воздуховода")] HRESULT Length([in] double  newVal);
-		[propget, id(5), helpstring("Угол отвода")] HRESULT Angle([out, retval] double *pVal);
-		[propput, id(5), helpstring("Угол отвода")] HRESULT Angle([in] double newVal);
-		[propget, id(6), helpstring("Угол поворота")] HRESULT Rotation([out, retval] double *pVal);
-		[propput, id(6), helpstring("Угол поворота")] HRESULT Rotation([in] double newVal);
-		[propget, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
-        [propput, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([in] int  newVal);
-		[propget, id(8), helpstring("Маскировка")] HRESULT Wipeout([out, retval] int *pVal);
-		[propput, id(8), helpstring("Маскировка")] HRESULT Wipeout([in] int newVal);
-		[propget, id(9), helpstring("Отм. центр")] HRESULT Elev([out, retval] double *pVal);
-		[propput, id(9), helpstring("Отм. центр")] HRESULT Elev([in] double newVal);
-		[propget, id(10), helpstring("Форма отвода")] HRESULT Form([out, retval] int *pVal);
-		[propput, id(10), helpstring("Форма отвода")] HRESULT Form([in] int  newVal);
+		[propget, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([out, retval] double *pVal);
+        [propput, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([in] double newVal);
+	    [propget, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([out, retval] double *pVal);
+        [propput, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([in] double newVal);
+		[propget, id(3), helpstring("Protok, m³/h")] HRESULT Flow([out, retval] double *pVal);
+        [propput, id(3), helpstring("Protok, m³/h")] HRESULT Flow([in] double newVal);
+		[propget, id(4), helpstring("Brzina, m/s")] HRESULT Speed([out, retval] double *pVal);
+		[propput, id(4), helpstring("Brzina, m/s")] HRESULT Speed([in] double newVal);
+		//[propget, id(5), helpstring("Dužina kanala")] HRESULT Length([out, retval] double *pVal);
+        //[propput, id(5), helpstring("Dužina kanala")] HRESULT Length([in] double  newVal);
+		[propget, id(5), helpstring("Ugao koljena")] HRESULT Angle([out, retval] double *pVal);
+		[propput, id(5), helpstring("Ugao koljena")] HRESULT Angle([in] double newVal);
+		[propget, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([out, retval] double *pVal);
+		[propput, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([in] double newVal);
+		[propget, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
+        [propput, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([in] int  newVal);
+		[propget, id(8), helpstring("Maskiranje")] HRESULT Wipeout([out, retval] int *pVal);
+		[propput, id(8), helpstring("Maskiranje")] HRESULT Wipeout([in] int newVal);
+		[propget, id(9), helpstring("Kota ose")] HRESULT Elev([out, retval] double *pVal);
+		[propput, id(9), helpstring("Kota ose")] HRESULT Elev([in] double newVal);
+		[propget, id(10), helpstring("Oblik koljena")] HRESULT Form([out, retval] int *pVal);
+		[propput, id(10), helpstring("Oblik koljena")] HRESULT Form([in] int  newVal);
 
 	};
 	//- Library section of interface ICom_TAP
@@ -163,36 +163,36 @@ library TVSTVS_Ventilation_DBXLib
 		pointer_default(unique)
 	]
 	interface IComTrans : IAcadEntity	{
-		[propget, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([out, retval] double *pVal);
-        [propput, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([in] double newVal);
-	    [propget, id(2), helpstring("Высота прохода")] HRESULT SizeB([out, retval] double *pVal);
-        [propput, id(2), helpstring("Высота прохода")] HRESULT SizeB([in] double newVal);
-		[propget, id(3), helpstring("Диаметр или ширина прохода 2")] HRESULT Dpr2([out, retval] double *pVal);
-        [propput, id(3), helpstring("Диаметр или ширина прохода 2")] HRESULT Dpr2([in] double newVal);
-	    [propget, id(4), helpstring("Высота прохода 2")] HRESULT SizeB2([out, retval] double *pVal);
-        [propput, id(4), helpstring("Высота прохода 2")] HRESULT SizeB2([in] double newVal);
-		//[propget, id(3), helpstring("Расход м3/ч")] HRESULT Flow([out, retval] double *pVal);
-        //[propput, id(3), helpstring("Расход м3/ч")] HRESULT Flow([in] double newVal);
-		//[propget, id(4), helpstring("Cкорость м/с")] HRESULT Speed([out, retval] double *pVal);
-		//[propput, id(4), helpstring("Cкорость м/с")] HRESULT Speed([in] double newVal);
-		[propget, id(5), helpstring("Длина воздуховода")] HRESULT Length([out, retval] double *pVal);
-        [propput, id(5), helpstring("Длина воздуховода")] HRESULT Length([in] double  newVal);
-		[propget, id(6), helpstring("Угол поворота")] HRESULT Rotation([out, retval] double *pVal);
-		[propput, id(6), helpstring("Угол поворота")] HRESULT Rotation([in] double newVal);
-	    [propget, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
-        [propput, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([in] int  newVal);
-		[propget, id(8), helpstring("Маскировка")] HRESULT Wipeout([out, retval] int *pVal);
-		[propput, id(8), helpstring("Маскировка")] HRESULT Wipeout([in] int newVal);
-		[propget, id(9), helpstring("Тип")] HRESULT TransType([out, retval] int *pVal);
-		[propput, id(9), helpstring("Тип")] HRESULT TransType([in] int newVal);
+		[propget, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([out, retval] double *pVal);
+        [propput, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([in] double newVal);
+	    [propget, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([out, retval] double *pVal);
+        [propput, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([in] double newVal);
+		[propget, id(3), helpstring("Prečnik ili širina drugog presjeka")] HRESULT Dpr2([out, retval] double *pVal);
+        [propput, id(3), helpstring("Prečnik ili širina drugog presjeka")] HRESULT Dpr2([in] double newVal);
+	    [propget, id(4), helpstring("Visina drugog presjeka")] HRESULT SizeB2([out, retval] double *pVal);
+        [propput, id(4), helpstring("Visina drugog presjeka")] HRESULT SizeB2([in] double newVal);
+		//[propget, id(3), helpstring("Protok, m³/h")] HRESULT Flow([out, retval] double *pVal);
+        //[propput, id(3), helpstring("Protok, m³/h")] HRESULT Flow([in] double newVal);
+		//[propget, id(4), helpstring("Brzina, m/s")] HRESULT Speed([out, retval] double *pVal);
+		//[propput, id(4), helpstring("Brzina, m/s")] HRESULT Speed([in] double newVal);
+		[propget, id(5), helpstring("Dužina kanala")] HRESULT Length([out, retval] double *pVal);
+        [propput, id(5), helpstring("Dužina kanala")] HRESULT Length([in] double  newVal);
+		[propget, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([out, retval] double *pVal);
+		[propput, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([in] double newVal);
+	    [propget, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
+        [propput, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([in] int  newVal);
+		[propget, id(8), helpstring("Maskiranje")] HRESULT Wipeout([out, retval] int *pVal);
+		[propput, id(8), helpstring("Maskiranje")] HRESULT Wipeout([in] int newVal);
+		[propget, id(9), helpstring("Tip")] HRESULT TransType([out, retval] int *pVal);
+		[propput, id(9), helpstring("Tip")] HRESULT TransType([in] int newVal);
 
-		[propget, id(10), helpstring("Отм. центр")] HRESULT Elev([out, retval] double *pVal);
-		[propput, id(10), helpstring("Отм. центр")] HRESULT Elev([in] double newVal);
+		[propget, id(10), helpstring("Kota ose")] HRESULT Elev([out, retval] double *pVal);
+		[propput, id(10), helpstring("Kota ose")] HRESULT Elev([in] double newVal);
 
-// 		[propget, id(11), helpstring("Тэг 1")] HRESULT Tag1([out, retval]  BSTR *pVal);
-// 		[propput, id(11), helpstring("Тэг 1")] HRESULT Tag1([in] BSTR newVal);
-// 		[propget, id(12), helpstring("Тэг 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
-// 		[propput, id(12), helpstring("Тэг 2")] HRESULT Tag2 ([in] BSTR newVal);
+// 		[propget, id(11), helpstring("Oznaka 1")] HRESULT Tag1([out, retval]  BSTR *pVal);
+// 		[propput, id(11), helpstring("Oznaka 1")] HRESULT Tag1([in] BSTR newVal);
+// 		[propget, id(12), helpstring("Oznaka 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
+// 		[propput, id(12), helpstring("Oznaka 2")] HRESULT Tag2 ([in] BSTR newVal);
 	};
 	//- Library section of interface IComTrans
 	[
@@ -214,33 +214,33 @@ library TVSTVS_Ventilation_DBXLib
 		pointer_default(unique)
 	]
 	interface IComWye : IAcadEntity	{
-		[propget, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([out, retval] double *pVal);
-        [propput, id(1), helpstring("Диаметр или ширина прохода")] HRESULT Dpr([in] double newVal);
-	    [propget, id(2), helpstring("Высота прохода")] HRESULT SizeB([out, retval] double *pVal);
-        [propput, id(2), helpstring("Высота прохода")] HRESULT SizeB([in] double newVal);
-		[propget, id(3), helpstring("Диаметр или ширина ответвления")] HRESULT Dpr2([out, retval] double *pVal);
-        [propput, id(3), helpstring("Диаметр или ширина ответвления")] HRESULT Dpr2([in] double newVal);
-	    [propget, id(4), helpstring("Высота ответвления")] HRESULT SizeB2([out, retval] double *pVal);
-        [propput, id(4), helpstring("Высота ответвления")] HRESULT SizeB2([in] double newVal);
-		//[propget, id(3), helpstring("Расход м3/ч")] HRESULT Flow([out, retval] double *pVal);
-        //[propput, id(3), helpstring("Расход м3/ч")] HRESULT Flow([in] double newVal);
-		//[propget, id(4), helpstring("Cкорость м/с")] HRESULT Speed([out, retval] double *pVal);
-		//[propput, id(4), helpstring("Cкорость м/с")] HRESULT Speed([in] double newVal);
-		[propget, id(5), helpstring("Длина плеча")] HRESULT Length([out, retval] double *pVal);
-        [propput, id(5), helpstring("Длина плеча")] HRESULT Length([in] double  newVal);
-		[propget, id(6), helpstring("Угол поворота")] HRESULT Rotation([out, retval] double *pVal);
-		[propput, id(6), helpstring("Угол поворота")] HRESULT Rotation([in] double newVal);
-	    [propget, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
-        [propput, id(7), helpstring("Отображение 1D/2D")] HRESULT _1D2D([in] int  newVal);
-		[propget, id(8), helpstring("Маскировка")] HRESULT Wipeout([out, retval] int *pVal);
-		[propput, id(8), helpstring("Маскировка")] HRESULT Wipeout([in] int newVal);
-		[propget, id(9), helpstring("Отм. центр")] HRESULT Elev([out, retval] double *pVal);
-		[propput, id(9), helpstring("Отм. центр")] HRESULT Elev([in] double newVal);
+		[propget, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([out, retval] double *pVal);
+        [propput, id(1), helpstring("Prečnik ili širina glavnog kanala")] HRESULT Dpr([in] double newVal);
+	    [propget, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([out, retval] double *pVal);
+        [propput, id(2), helpstring("Visina glavnog kanala")] HRESULT SizeB([in] double newVal);
+		[propget, id(3), helpstring("Prečnik ili širina ogranka")] HRESULT Dpr2([out, retval] double *pVal);
+        [propput, id(3), helpstring("Prečnik ili širina ogranka")] HRESULT Dpr2([in] double newVal);
+	    [propget, id(4), helpstring("Visina ogranka")] HRESULT SizeB2([out, retval] double *pVal);
+        [propput, id(4), helpstring("Visina ogranka")] HRESULT SizeB2([in] double newVal);
+		//[propget, id(3), helpstring("Protok, m³/h")] HRESULT Flow([out, retval] double *pVal);
+        //[propput, id(3), helpstring("Protok, m³/h")] HRESULT Flow([in] double newVal);
+		//[propget, id(4), helpstring("Brzina, m/s")] HRESULT Speed([out, retval] double *pVal);
+		//[propput, id(4), helpstring("Brzina, m/s")] HRESULT Speed([in] double newVal);
+		[propget, id(5), helpstring("Dužina kraka")] HRESULT Length([out, retval] double *pVal);
+        [propput, id(5), helpstring("Dužina kraka")] HRESULT Length([in] double  newVal);
+		[propget, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([out, retval] double *pVal);
+		[propput, id(6), helpstring("Ugao rotacije")] HRESULT Rotation([in] double newVal);
+	    [propget, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([out, retval] int *pVal);
+        [propput, id(7), helpstring("Prikaz 1D/2D")] HRESULT _1D2D([in] int  newVal);
+		[propget, id(8), helpstring("Maskiranje")] HRESULT Wipeout([out, retval] int *pVal);
+		[propput, id(8), helpstring("Maskiranje")] HRESULT Wipeout([in] int newVal);
+		[propget, id(9), helpstring("Kota ose")] HRESULT Elev([out, retval] double *pVal);
+		[propput, id(9), helpstring("Kota ose")] HRESULT Elev([in] double newVal);
 
-// 		[propget, id(10), helpstring("Тэг 1")] HRESULT Tag1([out, retval]  BSTR *pVal);
-// 		[propput, id(10), helpstring("Тэг 1")] HRESULT Tag1([in] BSTR newVal);
-// 		[propget, id(11), helpstring("Тэг 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
-// 		[propput, id(11), helpstring("Тэг 2")] HRESULT Tag2([in] BSTR newVal);
+// 		[propget, id(10), helpstring("Oznaka 1")] HRESULT Tag1([out, retval]  BSTR *pVal);
+// 		[propput, id(10), helpstring("Oznaka 1")] HRESULT Tag1([in] BSTR newVal);
+// 		[propget, id(11), helpstring("Oznaka 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
+// 		[propput, id(11), helpstring("Oznaka 2")] HRESULT Tag2([in] BSTR newVal);
 	};
 	//- Library section of interface IComWye
 	[

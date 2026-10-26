@@ -156,40 +156,40 @@ STDMETHODIMP CCom_TAP::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 		// стандартное 
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Отвод")); 
+		*propName  = ::SysAllocString(_T("Koljeno"));
 		break; 
 
 	case (DISPID_A): 
-		*propName  = ::SysAllocString(L"Dпр"); 
+		*propName  = ::SysAllocString(L"Dpr");
 		break; 
 
 	case (DISPID_SizeB): 
-		*propName  = ::SysAllocString(L"Hпр"); 
+		*propName  = ::SysAllocString(L"Hpr");
 		break; 
 	case (DISPID_Flow): 
-		*propName  = ::SysAllocString(L"L="); 
+		*propName  = ::SysAllocString(L"Protok, m³/h");
 		break; 
 	case (DISPID_Speed): 
-		*propName  = ::SysAllocString(L"v="); 
+		*propName  = ::SysAllocString(L"Brzina, m/s");
 		break; 
 
 	case (DISPID_1D2D): 
-		*propName  = ::SysAllocString(L"1D"); 
+		*propName  = ::SysAllocString(L"Prikaz 1D");
 		break; 
 	case (DISPID_Rotation): 
-		*propName  = ::SysAllocString(L"Угол"); 
+		*propName  = ::SysAllocString(L"Ugao rotacije");
 		break; 
 	case (DISPID_Angle): 
-		*propName  = ::SysAllocString(L"Угол отвода"); 
+		*propName  = ::SysAllocString(L"Ugao koljena");
 		break; 
 	case (DISPID_Wipeout): 
-		*propName  = ::SysAllocString(L"Маскировка"); 
+		*propName  = ::SysAllocString(L"Maskiranje");
 		break; 
 	case (DISPID_Elev): 
-		*propName  = ::SysAllocString(L"Отм. Центр"); 
+		*propName  = ::SysAllocString(L"Kota ose");
 		break; 
 	case (DISPID_Form):
-		*propName = ::SysAllocString(L"Форма отв");
+		*propName = ::SysAllocString(L"Oblik koljena");
 		break;
 
 	} 

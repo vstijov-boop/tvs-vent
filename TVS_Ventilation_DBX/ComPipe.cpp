@@ -111,7 +111,7 @@ STDMETHODIMP CComPipe::GetCategoryName(PROPCAT propcat, LCID lcid, BSTR* pbstrNa
 	switch ( propcat )
 	{
 	case PROPCAT_Data:
-		*pbstrName = ::SysAllocString(L"Face");
+		*pbstrName = ::SysAllocString(L"Podaci o kanalu");
 		break;
 
 	default:
@@ -130,62 +130,62 @@ STDMETHODIMP CComPipe::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 		// стандартное 
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Воздуховод")); 
+		*propName  = ::SysAllocString(_T("Kanal"));
 		break; 
 
 	case (DISPID_A): 
-		*propName  = ::SysAllocString(L"Dпр"); 
+		*propName  = ::SysAllocString(L"Dpr");
 		break; 
 
 	case (DISPID_SizeB): 
-		*propName  = ::SysAllocString(L"Hпр"); 
+		*propName  = ::SysAllocString(L"Hpr");
 		break; 
 	case (DISPID_Flow): 
-		*propName  = ::SysAllocString(L"L="); 
+		*propName  = ::SysAllocString(L"Protok, m³/h");
 		break; 
 	case (DISPID_Speed): 
-		*propName  = ::SysAllocString(L"v="); 
+		*propName  = ::SysAllocString(L"Brzina, m/s");
 		break; 
 
 
 
 
 	case (DISPID_Length): 
-		*propName  = ::SysAllocString(L"Длина"); 
+		*propName  = ::SysAllocString(L"Dužina");
 		break; 
 	case (DISPID_1D2D): 
-		*propName  = ::SysAllocString(L"1D"); 
+		*propName  = ::SysAllocString(L"Prikaz 1D");
 		break; 
 	case (DISPID_Rotation): 
-		*propName  = ::SysAllocString(L"Угол"); 
+		*propName  = ::SysAllocString(L"Ugao rotacije");
 		break; 
 	case (DISPID_i): 
-		*propName  = ::SysAllocString(L"i, Па/м"); 
+		*propName  = ::SysAllocString(L"i, Pa/m");
 		break; 
 	case (DISPID_dP): 
-		*propName  = ::SysAllocString(L"dP, Па"); 
+		*propName  = ::SysAllocString(L"dP, Pa");
 		break; 
 	case (DISPID_Wipeout): 
-		*propName  = ::SysAllocString(L"Маскировка"); 
+		*propName  = ::SysAllocString(L"Maskiranje");
 		break; 
 
 	case (DISPID_Grani): 
-		*propName  = ::SysAllocString(L"Грани"); 
+		*propName  = ::SysAllocString(L"Ivice");
 		break; 
 	case (DISPID_Elev): 
-		*propName  = ::SysAllocString(L"Отм. Центр"); 
+		*propName  = ::SysAllocString(L"Kota ose");
 		break; 
 	case (DISPID_ElevUp): 
-		*propName  = ::SysAllocString(L"Отм. Верх"); 
+		*propName  = ::SysAllocString(L"Kota gornje ivice");
 		break; 
 	case (DISPID_ElevDown): 
-		*propName  = ::SysAllocString(L"Отм. Низ"); 
+		*propName  = ::SysAllocString(L"Kota donje ivice");
 		break; 
 	case (DISPID_Tag1): 
-		*propName  = ::SysAllocString(L"Тэг 1"); 
+		*propName  = ::SysAllocString(L"Oznaka 1");
 		break;
 	case (DISPID_Tag2): 
-		*propName  = ::SysAllocString(L"Тэг 2"); 
+		*propName  = ::SysAllocString(L"Oznaka 2");
 		break;
 	} 
 	return S_OK; 
