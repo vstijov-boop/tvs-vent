@@ -8,13 +8,15 @@ class MLeaderSettings
 public:
 	MLeaderSettings(void) {
 		instructionMessage = L"\
-[L]-Расход м3/ч\r\n\
-[V]-Скорость м/с\r\n\
-[D]-Размер мм\r\n\
-[P]-Потери давления P\r\n\
-[BN]-Имя блока P\r\n\
-[N]-Имя слоя\r\n\
-[Название Атрибута]-Значение\r\n\ Аттрибута (Для блоков)\r\n\
+[L] - Protok, m³/h\r\n\
+[V] - Brzina, m/s\r\n\
+[D] - Dimenzije, mm\r\n\
+[P] - Pad pritiska, Pa\r\n\
+[BN] - Naziv bloka\r\n\
+[N] - Naziv sloja\r\n\
+[Naziv atributa] - Vrijednost\r\n\
+atributa bloka. Koristite stvarni\r\n\
+naziv postojećeg atributa.\r\n\
 ";
 		pipeLeader = L"[D]";
 		blockLeader = L"[Тип]-[Размер]";

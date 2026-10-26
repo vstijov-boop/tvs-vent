@@ -83,20 +83,20 @@ void dgTVSPropertyManager::OnShowWindow(BOOL bShow, UINT nStatus)
 	mGrid.SetColumnWidth(8, wide);
 	mGrid.SetColumnWidth(9, wide);
 	mGrid.SetColumnWidth(10, wide * 2);
-	mGrid.SetColumnWidth(11, wide);
+	mGrid.SetColumnWidth(11, wide * 2);
 
-	mGrid.SetItemText(0, 0, _T("№"));
-	mGrid.SetItemText(0, 1, CTVSProperty_position);
-	mGrid.SetItemText(0, 2, CTVSProperty_name);
-	mGrid.SetItemText(0, 3, CTVSProperty_type);
-	mGrid.SetItemText(0, 4, CTVSProperty_size);
-	mGrid.SetItemText(0, 5, CTVSProperty_article);
-	mGrid.SetItemText(0, 6, CTVSProperty_manufacturer);
-	mGrid.SetItemText(0, 7, CTVSProperty_units);
-	mGrid.SetItemText(0, 8, CTVSProperty_count);
-	mGrid.SetItemText(0, 9, CTVSProperty_mass);
-	mGrid.SetItemText(0, 10, CTVSProperty_note);
-	mGrid.SetItemText(0, 11, L"Выбрано");
+	mGrid.SetItemText(0, 0, _T("Br."));
+	mGrid.SetItemText(0, 1, _T("Poz."));
+	mGrid.SetItemText(0, 2, _T("Naziv"));
+	mGrid.SetItemText(0, 3, _T("Tip"));
+	mGrid.SetItemText(0, 4, _T("Dimenzije"));
+	mGrid.SetItemText(0, 5, _T("Šifra"));
+	mGrid.SetItemText(0, 6, _T("Proizvođač"));
+	mGrid.SetItemText(0, 7, _T("Jed. mj."));
+	mGrid.SetItemText(0, 8, _T("Kol."));
+	mGrid.SetItemText(0, 9, _T("Masa"));
+	mGrid.SetItemText(0, 10, _T("Napomena"));
+	mGrid.SetItemText(0, 11, _T("Izabrano"));
 
 	int i = 1;
 	for (auto &row : propertySpec.rows)

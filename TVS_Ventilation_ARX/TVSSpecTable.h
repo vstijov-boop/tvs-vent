@@ -17,16 +17,21 @@
 "
 
 #define CTVSInstructionTableProperty L"\
-Таблица описывается следующим шаблоном\r\n\
-Название Столбца1; Ширина1; [Название свойства1]\r\n\
-Название Столбца2; Ширина2; [Название свойства2]-[cвойство3]\r\n\
-где каждая строчка это столбец спецификации, а символом';'\r\nразделены свойства столбца, где: \r\n\
-Название Столбца1 - это имя столбца в шапке таблицы;\r\n\
-Ширина1 - это ширина таблицы в единицах autocad;\r\n\
-[Название свойства1] - это шаблон записи свойств обьекта. в этот\r\nшаблон можно помещать несколько свойств например [Тип]-[Размер]\r\n\
-Поддерживаемые свойства:\r\n\
-[Позиция],[Имя],[Тип],[Размер],[Артикул],[Производитель],[Ед.Изм]\r\n[Количество],[Масса],[Примечание]\
+Svaki red šablona određuje jednu kolonu specifikacije:\r\n\
+Naziv kolone; Širina; [Oznaka svojstva]\r\n\
+Primjer: Tip i dimenzije; 6000; [Тип]-[Размер]\r\n\
+Tačka-zarez (;) razdvaja naziv, širinu i sadržaj.\r\n\
+Naziv kolone - tekst u zaglavlju tabele.\r\n\
+Širina - širina kolone u jedinicama AutoCAD-a.\r\n\
+Sadržaj - tekst i jedna ili više oznaka svojstava.\r\n\
+Oznake u uglastim zagradama ostaju na ruskom:\r\n\
+[Позиция] - Pozicija; [Имя] - Naziv\r\n\
+[Тип] - Tip; [Размер] - Dimenzije\r\n\
+[Артикул] - Šifra; [Производитель] - Proizvođač\r\n\
+[Ед.Изм] - Jedinica mjere; [Количество] - Količina\r\n\
+[Масса] - Masa; [Примечание] - Napomena\
 "
+
 
 using namespace std;
 class TVSSpecTable

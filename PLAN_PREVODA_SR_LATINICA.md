@@ -10,7 +10,8 @@ Polazna grana: `master`; polazni commit: `5aa1ac5` (`Update Radme`).
 Prevesti korisnički tekst dijaloga na srpski jezik, latinicom i ijekavicom,
 uz stručnu terminologiju za ventilaciju. Ova faza ne mijenja proračune,
 geometriju, komande, format DWG podataka ili ponašanje programa.
-Sada se izrađuje samo plan; prevod izvornog koda još nije započet.
+Plan je izrađen; prvi prevod izvornog koda je unesen. Detaljan status i
+preostale provjere nalaze se u `PREVOD_STATUS.md`.
 
 Obuhvat: naslovi prozora, dugmad, natpisi polja, grupe, opcije, zaglavlja
 tabela, objašnjenja i poruke koje pripadaju dijalozima. Prevesti i postojeća
@@ -152,7 +153,9 @@ Prevod je završen kada su svi dostupni dijalozi pregledani, sav obuhvaćeni
 tekst preveden, znakovi i raspored ispravni i osnovne funkcije provjerene u
 ciljnoj verziji AutoCAD-a. Neprovjereni slučajevi moraju biti jasno evidentirani.
 
-Trenutni status: repo kloniran; lokalna grana napravljena; pregled i plan
-završeni. Izvorni program nije mijenjan. Prvi pokušaj objavljivanja grane na
-GitHub-u nije uspio jer nedostaje autentifikacija. Dok `push` ne uspije,
-lokalni commit nije sačuvan na GitHub-u.
+Trenutni status: grana `srpski-prevod` objavljena je na GitHub-u, zajedno s
+planom. Unesen je prvi prevod osam definicija dijaloga, zaglavlja tabela i
+objašnjenja šablona. Resursi su prebačeni na UTF-8 sa BOM-om i direktivama
+`#pragma code_page(65001)`; potvrda Windows Resource Compiler-om je preostala.
+Obavljene su statičke provjere; Windows/ObjectARX izgradnja i test u AutoCAD-u
+još nisu obavljeni. Glavna grana `master` ostaje nepromijenjena.
