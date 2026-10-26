@@ -54,6 +54,33 @@ uključujući MIDL generisanje biblioteke tipova iz IDL izvora. Generisani
 provjeriti prikaz i uređivanje TVS svojstava na kanalu, koljenu, prelazu,
 T-komadu, bloku sa TVS svojstvima i MLeader oznaci, te izbor više objekata.
 
+## Dodatno: toolbarovi, hintovi i ribbon
+
+Na zahtjev korisnika prevedeni su aktivni CUIX paketi:
+
+- `Installer/TVS_VENT/TVS_VENT.cuix`: 119 tekstualnih polja.
+- `Installer/TVS_TOOLS/TVS_TOOLS.cuix`: 75 tekstualnih polja.
+
+Obuhvaćeni su nazivi dugmadi, tekstovi pomoći pri prelasku mišem, naslovi
+hintova, povezani naslovi ribbon panela i komande u menijima. Prevedeni su
+prikazani nazivi komandi; stvarni izvršni makroi (`Command`) nijesu mijenjani.
+
+Potvrđeni su ispravnost ZIP paketa i parsiranje XML sadržaja, nepromijenjena
+XML struktura, identifikatori, reference i svih 38 izvršnih makroa. Svih 38
+ugrađenih slika ikona, kao i ostali netekstualni resursi, identični su prethodnoj
+verziji. Mijenjani su samo dozvoljeni tekstovi u `MenuGroup.cui`,
+`ToolbarRoot.cui`, `RibbonRoot.cui` i `PopMenuRoot.cui`.
+
+Interni aliasi toolbarova, naziv grupe makroa, nazivi fajlova i ruski nazivi
+komandi unutar izvršnih makroa ostaju sačuvani radi kompatibilnosti. Ruski
+komentari u XML-u nijesu tekst interfejsa. Arhivske kopije u `Installer/Versions`
+i postojeći EXE instalateri nijesu mijenjani.
+
+Za ovaj dio prevoda nije potrebna C++ izgradnja. Potrebno je učitati prevedene
+CUIX fajlove u AutoCAD-u i vizuelno provjeriti hintove i ribbon. Prevod dijaloga
+i Properties palete i dalje zahtijeva novu ARX/DBX izgradnju. Detalji i rječnik:
+`PREVOD_TOOLBAROVA.md`.
+
 ## Kompatibilnost
 
 Interni nazivi `CTVSProperty_*`, XData identifikatori, ID-jevi resursa i
@@ -87,6 +114,7 @@ Ovo su statičke provjere, ne potvrda kompajliranja ili rada dodatka.
 - [ ] Potvrda da Windows Resource Compiler ispravno obrađuje UTF-8 resurs.
 - [ ] Otvaranje sedam aktivnih dijaloga i provjera svih stanja i opcija.
 - [ ] Provjera Properties palete, opisa svojstava i uređivanja vrijednosti.
+- [ ] Učitavanje prevedenih CUIX paketa i provjera toolbar/ribbon hintova i menija.
 - [ ] MIDL izgradnja i provjera slova u opisima DBX svojstava.
 - [ ] Provjera `č ć š ž đ`, preloma redova, dugih natpisa i tabela.
 - [ ] Vizuelna provjera na 100%, 125% i 150% skaliranja ekrana.

@@ -21,8 +21,12 @@ Obuhvat je naknadno proširen na TVS svojstva u AutoCAD Properties paleti
 (`Ctrl+1`), na izričit zahtjev korisnika. Prevedeni su nazivi, kategorije
 i opisi za prikaz, uz očuvanje internih ključeva. Vidi `PREVOD_STATUS.md`.
 
-Izvan obuhvata: komandna linija AutoCAD-a, instalater, meniji i alatne trake,
-nazivi komandi, prevod crteža,
+Obuhvat je potom proširen i na nazive i hintove toolbarova, ribbon panela
+i povezane menije u dva aktivna CUIX paketa. Izvršni makroi ostaju isti;
+vidi `PREVOD_TOOLBAROVA.md`.
+
+Izvan obuhvata: komandna linija AutoCAD-a, instalater, izvršni nazivi
+komandi, prevod crteža,
 korisničkih vrijednosti i sadržaja generisanih specifikacija. Njih treba
 evidentirati ako se pojave, ali ne mijenjati u ovoj fazi.
 
