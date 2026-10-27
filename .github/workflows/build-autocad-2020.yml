@@ -81,6 +81,10 @@ jobs:
             $source = [IO.File]::ReadAllText((Resolve-Path $idl))
             [IO.File]::WriteAllText((Resolve-Path $idl), $source.Replace('axdb20enu.tlb', 'axdb23enu.tlb'), [Text.UTF8Encoding]::new($true))
           }
+          # The older resource compiler needs a Unicode resource script.
+          $resourceFile = (Resolve-Path 'TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc').Path
+          $resourceText = [IO.File]::ReadAllText($resourceFile)
+          [IO.File]::WriteAllText($resourceFile, $resourceText, [Text.Encoding]::Unicode)
           $env:LIB = "$typeLibDir;$env:LIB"
           "LIB=$env:LIB" >> $env:GITHUB_ENV
           # Add SDK include directories to MIDL's search path in both property sheets.
