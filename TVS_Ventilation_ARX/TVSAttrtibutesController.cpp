@@ -57,18 +57,18 @@ bool TVSAttrtibutesController::CheckAtt(const ACHAR* pName, const ACHAR* tag)
 					}
 				}
 				else {
-					acutPrintf(_T("\nНе удалось открыть примитив в блоке! Ошибка: %s",
+					acutPrintf(_T("\nNije moguće otvoriti element u bloku! Greška: %s",
 						LPCTSTR(acadErrorStatusText(es))));
 				}
 			}
 			else {
-				acutPrintf(_T("\nНе удалось получить AcDbObjectId примитва в блоке! Ошибка: %s",
+				acutPrintf(_T("\nNije moguće dobiti AcDbObjectId elementa u bloku! Greška: %s",
 					LPCTSTR(acadErrorStatusText(es))));
 			}
 		}
 	}
 	else {
-		acutPrintf(_T("\nНе удалось создать итератор для записи таблицы блоков! Ошибка: %s", LPCTSTR(acadErrorStatusText(es))));
+		acutPrintf(_T("\nNije moguće napraviti iterator zapisa tabele blokova! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 	}
 
 	//pAttDef->close();
@@ -93,7 +93,7 @@ void TVSAttrtibutesController::AddNewAtt(const ACHAR* pName, const ACHAR* tag)
 	// specify the text,tag and prompt
 	ACHAR text[] = { L"" };
 
-	ACHAR prompt[] = { L"Введите значение" };
+	ACHAR prompt[] = { L"Unesite vrijednost" };
 
 	pCurDb =
 		acdbHostApplicationServices()->workingDatabase();
@@ -130,11 +130,11 @@ bool TVSAttrtibutesController::getBlockName(const AcDbObjectId &objId, CString &
 	Acad::ErrorStatus es;
 	AcDbObjectPointer<AcDbBlockReference> pBlkRef(objId, AcDb::kForRead);
 	if ((es = pBlkRef.openStatus()) != Acad::eOk) {
-		acutPrintf(_T("\nОшибка открытия BlockReference: %s"), acadErrorStatusText(es)); return false;
+		acutPrintf(_T("\nGreška pri otvaranju BlockReference: %s"), acadErrorStatusText(es)); return false;
 	}
 	AcDbBlockTableRecordPointer pBTR(pBlkRef->blockTableRecord(), AcDb::kForRead);
 	if ((es = pBTR.openStatus()) != Acad::eOk) {
-		acutPrintf(_T("\nОшибка открытия BlockTableRecord: %s"), acadErrorStatusText(es)); return false;
+		acutPrintf(_T("\nGreška pri otvaranju BlockTableRecord: %s"), acadErrorStatusText(es)); return false;
 	}
 	const ACHAR* sBTRName = NULL;
 	pBTR->getName(sBTRName);
@@ -309,18 +309,18 @@ bool TVSAttrtibutesController::RemoveAttr(const AcDbObjectId &objId, const CStri
 					}
 				}
 				else {
-					acutPrintf(_T("\nНе удалось открыть примитив в блоке! Ошибка: %s",
+					acutPrintf(_T("\nNije moguće otvoriti element u bloku! Greška: %s",
 						LPCTSTR(acadErrorStatusText(es))));
 				}
 			}
 			else {
-				acutPrintf(_T("\nНе удалось получить AcDbObjectId примитва в блоке! Ошибка: %s",
+				acutPrintf(_T("\nNije moguće dobiti AcDbObjectId elementa u bloku! Greška: %s",
 					LPCTSTR(acadErrorStatusText(es))));
 			}
 		}
 	}
 	else {
-		acutPrintf(_T("\nНе удалось создать итератор для записи таблицы блоков! Ошибка: %s", LPCTSTR(acadErrorStatusText(es))));
+		acutPrintf(_T("\nNije moguće napraviti iterator zapisa tabele blokova! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 	}
 
 	//pAttDef->close();

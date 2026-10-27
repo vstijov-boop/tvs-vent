@@ -62,7 +62,7 @@ if ( isOperationActive() )
 	else
 		{
 			
-			 acutPrintf(_T("\nУсе"));
+			 acutPrintf(_T("\nZavršeno"));
 		}
 		return stat;
 }

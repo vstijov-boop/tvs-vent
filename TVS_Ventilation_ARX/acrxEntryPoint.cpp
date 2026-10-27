@@ -387,13 +387,13 @@ public:
 		//Проверка
 		if (TVSClassCheck(pEnt1) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
 		if (TVSClassCheck(pEnt2) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
@@ -411,9 +411,9 @@ public:
 		dop.setEqualPoint(0.01);
 		int LineStatus = TVSisIntersection;
 		int SizeStatus;
-		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Параллельны")); }
-		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Линейны")); }
-		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Перпендикулярны")); }
+		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
+		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Kolinearni")); }
+		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Upravni")); }
 		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeA == pPipe2->SizeA)) SizeStatus = TVSisSameSize;
 		else SizeStatus = TVSisNoSameSize;
 		int GroseStatus = whyIsGrose(pPipe1, pPipe2);
@@ -545,13 +545,13 @@ public:
 		//Проверка
 		if (TVSClassCheck(pEnt1) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
 		if (TVSClassCheck(pEnt2) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
@@ -569,9 +569,9 @@ public:
 		dop.setEqualPoint(0.01);
 		int LineStatus = TVSisIntersection;
 		int SizeStatus;
-		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Параллельны")); }
-		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Линейны")); }
-		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Перпендикулярны")); }
+		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
+		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Kolinearni")); }
+		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Upravni")); }
 		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeA == pPipe2->SizeA)) SizeStatus = TVSisSameSize;
 		else SizeStatus = TVSisNoSameSize;
 		int GroseStatus = whyIsGrose(pPipe1, pPipe2);
@@ -840,7 +840,7 @@ public:
 		}
 		else
 		{
-			acutPrintf(_T("\n Обьект блокирован: невозможно копировать свойства"));
+			acutPrintf(_T("\n Objekat je zaključan: svojstva se ne mogu kopirati"));
 		}
 	}
 	static void InstallGlobalProperty(TVS_Entity *pEnt)
@@ -1245,7 +1245,7 @@ public:
 		{
 			while (lt == false)
 			{
-				stat = acedEntSel(_T("\nВыберете воздуховод:"), vozd, pt1);
+				stat = acedEntSel(_T("\nIzaberite kanal:"), vozd, pt1);
 
 				switch (stat)
 				{
@@ -1276,7 +1276,7 @@ public:
 					}
 
 					else {
-						consoleprint(0, _T("\nОбьект заблокирован"));
+						consoleprint(0, _T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -1553,8 +1553,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р h"));
-			Astat = acedGetPoint(NULL, _T("\nУкажите первую точку или [Размер]:"), pt1);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = acedGetPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1565,7 +1565,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1591,8 +1591,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р "));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1603,7 +1603,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1633,7 +1633,7 @@ public:
 		}
 		else
 		{
-			acutPrintf(_T("\nСлой блокирован"));
+			acutPrintf(_T("\nSloj je zaključan"));
 			return false;
 		}
 
@@ -1665,8 +1665,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Размер Р h соедОтвод о j соедТройник n т Z z я вВерх d в вНиз н y"));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер/соедОтвод/соедТройник/Z/вВерх/вНиз]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
+			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1682,7 +1682,7 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				oldsizeA = globSizeA;
@@ -1695,7 +1695,7 @@ public:
 				Astat2 = false;
 				acdbRToS(0, 2, 2, resultss);
 			}
-			if ((wcscmp(resultss, _T("соедОтвод")) == 0) || (wcscmp(resultss, _T("j")) == 0) || (wcscmp(resultss, _T("о")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Koljeno")) == 0 || _wcsicmp(resultss, _T("K")) == 0))
 			{
 				reg = dCONNECTT;
 				connect2(pipi, reg);
@@ -1703,14 +1703,14 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("соедТройник")) == 0) || (wcscmp(resultss, _T("т")) == 0) || (wcscmp(resultss, _T("n")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Račva")) == 0 || _wcsicmp(resultss, _T("R")) == 0))
 			{
 				reg = dCONNECTW;
 				connect2(pipi, reg);
 				return false;
 			}
 
-			if ((wcscmp(resultss, _T("Z")) == 0) || (wcscmp(resultss, _T("z")) == 0) || (wcscmp(resultss, _T("я")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
 				changeZ(pipi);
@@ -1722,14 +1722,14 @@ public:
 				acdbRToS(0, 2, 2, resultss);
 			}
 
-			if ((wcscmp(resultss, _T("вВерх")) == 0) || (wcscmp(resultss, _T("в")) == 0) || (wcscmp(resultss, _T("d")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Gore")) == 0 || _wcsicmp(resultss, _T("G")) == 0))
 			{
 				reg = dUP;
 				UpDown(pipi, Form_Up);
 				return false;
 			}
 
-			if ((wcscmp(resultss, _T("вНиз")) == 0) || (wcscmp(resultss, _T("н")) == 0) || (wcscmp(resultss, _T("y")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Nadolje")) == 0 || _wcsicmp(resultss, _T("N")) == 0))
 			{
 				reg = dDOWN;
 				UpDown(pipi, Form_Down);
@@ -1756,8 +1756,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р h"));
-			Astat = acedGetPoint(NULL, _T("\nУкажите первую точку или [Размер]:"), pt1);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = acedGetPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1768,7 +1768,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1785,8 +1785,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р "));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1797,7 +1797,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1826,7 +1826,7 @@ public:
 		}
 		else
 		{
-			acutPrintf(_T("\nСлой блокирован"));
+			acutPrintf(_T("\nSloj je zaključan"));
 			return;
 		}
 
@@ -1843,8 +1843,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Размер Р h соедОтвод о j соедТройник n т Z z я вВерх d в вНиз н y"));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер/соедОтвод/соедТройник/Z/вВерх/вНиз]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
+			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1860,7 +1860,7 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				oldsizeA = globSizeA;
@@ -1873,7 +1873,7 @@ public:
 				Astat2 = false;
 				acdbRToS(0, 2, 2, resultss);
 			}
-			if ((wcscmp(resultss, _T("соедОтвод")) == 0) || (wcscmp(resultss, _T("j")) == 0) || (wcscmp(resultss, _T("о")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Koljeno")) == 0 || _wcsicmp(resultss, _T("K")) == 0))
 			{
 				reg = dCONNECTT;
 				connect2(pipi, reg);
@@ -1881,14 +1881,14 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("соедТройник")) == 0) || (wcscmp(resultss, _T("т")) == 0) || (wcscmp(resultss, _T("n")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Račva")) == 0 || _wcsicmp(resultss, _T("R")) == 0))
 			{
 				reg = dCONNECTW;
 				connect2(pipi, reg);
 				return;
 			}
 
-			if ((wcscmp(resultss, _T("Z")) == 0) || (wcscmp(resultss, _T("z")) == 0) || (wcscmp(resultss, _T("я")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
 				changeZ(pipi);
@@ -1900,14 +1900,14 @@ public:
 				acdbRToS(0, 2, 2, resultss);
 			}
 
-			if ((wcscmp(resultss, _T("вВерх")) == 0) || (wcscmp(resultss, _T("в")) == 0) || (wcscmp(resultss, _T("d")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Gore")) == 0 || _wcsicmp(resultss, _T("G")) == 0))
 			{
 				reg = dUP;
 				UpDown(pipi, Form_Up);
 				return;
 			}
 
-			if ((wcscmp(resultss, _T("вНиз")) == 0) || (wcscmp(resultss, _T("н")) == 0) || (wcscmp(resultss, _T("y")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Nadolje")) == 0 || _wcsicmp(resultss, _T("N")) == 0))
 			{
 				reg = dDOWN;
 				UpDown(pipi, Form_Down);
@@ -1944,7 +1944,7 @@ public:
 		bool pThis1D = false;
 		TVS_TRANS transie;
 
-		if (acedGetPoint(NULL, _T("Set the first point:\n"), pt1) != RTNORM)
+		if (acedGetPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
 			return;
 		if (acedGetPoint(pt1, _T("Set the second point:\n"), pt2) != RTNORM)
 			return;
@@ -1991,12 +1991,12 @@ public:
 		bool pThisRoundotv = true;
 		bool pThis1D = false;
 
-		if (acedGetPoint(NULL, _T("Set the first point:\n"), pt1) != RTNORM)
+		if (acedGetPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
 			return;
-		if (acedGetReal(_T("\nВведите ширину прохода: "), &aSizeApr) != RTNORM)
+		if (acedGetReal(_T("\nUnesite širinu glavnog kanala: "), &aSizeApr) != RTNORM)
 			return;
 		pSizeApr = aSizeApr;
-		if (acedGetReal(_T("\nВведите ширину ответвления: "), &aSizeAotv) != RTNORM)
+		if (acedGetReal(_T("\nUnesite širinu ogranka: "), &aSizeAotv) != RTNORM)
 			return;
 		pSizeAotv = aSizeAotv;
 
@@ -2070,7 +2070,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете 1-ый воздуховод:"), vozd1, pt1) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2093,7 +2093,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2107,7 +2107,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nВыберете 2-ый воздуховод:"), vozd2, pt2) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id, vozd2) == eOk)
@@ -2128,7 +2128,7 @@ public:
 							}
 							else
 							{
-								acutPrintf(_T("\nВыбоан тот же воздуховод"));
+								acutPrintf(_T("\nIzabran je isti kanal"));
 
 							}
 
@@ -2136,7 +2136,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2175,7 +2175,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете 1-ый воздуховод:"), vozd1, pt1) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2198,7 +2198,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2212,7 +2212,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nВыберете 2-ый воздуховод:"), vozd2, pt2) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id, vozd2) == eOk)
@@ -2233,7 +2233,7 @@ public:
 							}
 							else
 							{
-								acutPrintf(_T("\nВыбоан тот же воздуховод"));
+								acutPrintf(_T("\nIzabran je isti kanal"));
 
 							}
 
@@ -2241,7 +2241,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2280,7 +2280,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете 1-ый воздуховод:"), vozd1, pt1) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2304,7 +2304,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2318,7 +2318,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nВыберете 2-ый воздуховод:"), vozd2, pt2) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id2, vozd2) == eOk)
@@ -2339,7 +2339,7 @@ public:
 							}
 							else
 							{
-								acutPrintf(_T("\nВыбоан тот же воздуховод"));
+								acutPrintf(_T("\nIzabran je isti kanal"));
 
 							}
 
@@ -2347,7 +2347,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2405,11 +2405,11 @@ public:
 		AcGeVector3d pnormvect, pstartvect;
 		bool pThisRound = false;
 
-		if (acedGetReal(_T("\nВведите ширину:"), &sa) != RTNORM)
+		if (acedGetReal(_T("\nUnesite širinu: "), &sa) != RTNORM)
 		{
 			return;
 		}
-		if (acedGetReal(_T("\nВведите высоту:"), &sb) != RTNORM)
+		if (acedGetReal(_T("\nUnesite visinu: "), &sb) != RTNORM)
 		{
 			return;
 		}
@@ -2418,10 +2418,10 @@ public:
 
 
 
-		if (acedGetPoint(NULL, _T("\nУкажите первую точку: "), pt1) != RTNORM)
+		if (acedGetPoint(NULL, _T("\nZadajte prvu tačku: "), pt1) != RTNORM)
 			return;
 		A1 = asPnt3d(pt1);
-		if (acedGetPoint(pt1, _T("\nУкажите следующую точку: "), pt2) != RTNORM)
+		if (acedGetPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
 			return;
 		A2 = asPnt3d(pt2);
 		pipi = pipie.add_new(A1, A2, pSizeA, pSizeB, false, pThisRound);
@@ -2435,7 +2435,7 @@ public:
 		///////////
 		for (; ;)
 		{
-			if (acedGetPoint(pt1, _T("\nУкажите следующую точку: "), pt2) != RTNORM)
+			if (acedGetPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
 				return;
 			A3 = asPnt3d(pt2);
 			if (pThisRound == true)
@@ -2527,7 +2527,7 @@ public:
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
 		acedInitGet(RSG_NOZERO, _T("1 2 1d 2d"));
-		if (acedGetKword(_T("\nПреобразовать в [1d/2d]<2d>:"), resultss) != RTNORM)
+		if (acedGetKword(_T("\nPretvorite u [1d/2d]<2d>: "), resultss) != RTNORM)
 			return;
 
 		if (wcscmp(resultss, results1) == 0 || wcscmp(resultss, results2) == 0)
@@ -2649,7 +2649,7 @@ public:
 			return;
 
 		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
-		if (acedGetPoint(NULL, _T("\nУкажите точку вставки спецификации:"), pt1) != RTNORM)
+		if (acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM)
 			return;
 		pb = asPnt3d(pt1);
 		Int32 len = 0;
@@ -4414,7 +4414,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете воздуховод:"), vozd1, pt1) == RTCAN)
+			if (acedEntSel(_T("\nIzaberite kanal:"), vozd1, pt1) == RTCAN)
 				return;
 
 			pCut = asPnt3d(pt1);
@@ -4484,7 +4484,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 
 					}
@@ -4542,17 +4542,17 @@ public:
 			->getSymbolTable(pBtbl, AcDb::kForRead);
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to open block table");
+			acutPrintf(L"\nNije moguće otvoriti tabelu blokova");
 			return es;
 		}
 		es = pBtbl->getAt(ACDB_MODEL_SPACE, pBtblr, AcDb::kForWrite);
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to open block table record");
+			acutPrintf(L"\nNije moguće otvoriti zapis tabele blokova");
 			es = pBtbl->close();
 			if (es != Acad::eOk)
 			{
-				acutPrintf(L"\nFailed to close block table");
+				acutPrintf(L"\nNije moguće zatvoriti tabelu blokova");
 			}
 			return es;
 		}
@@ -4560,7 +4560,7 @@ public:
 		es = pBtbl->close();
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to close block table");
+			acutPrintf(L"\nNije moguće zatvoriti tabelu blokova");
 			return es;
 		}
 
@@ -4571,20 +4571,20 @@ public:
 			es = pBtblr->appendAcDbEntity(ObjId, pNewEnt);
 			if (es != Acad::eOk)
 			{
-				acutPrintf(L"\nFailed to append entity");
+				acutPrintf(L"\nNije moguće dodati objekat");
 			}
 
 			es = pNewEnt->close();
 			if (es != Acad::eOk)
 			{
-				acutPrintf(L"\nFailed to close entity");
+				acutPrintf(L"\nNije moguće zatvoriti objekat");
 			}
 		}
 
 		es = pBtblr->close();
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to close block table record");
+			acutPrintf(L"\nNije moguće zatvoriti zapis tabele blokova");
 		}
 		return es;
 	}
@@ -4735,7 +4735,7 @@ public:
 		while (status == false)
 		{
 
-			Astat = acedEntSel(_T("\nВыберете линию: "), ent, pt1);
+			Astat = acedEntSel(_T("\nIzaberite liniju: "), ent, pt1);
 			if (Astat == true)
 			{
 
@@ -4761,7 +4761,7 @@ public:
 			}
 		}
 		int * quantity = new int;
-		if (acedGetInt(_T("\nКоличество сегментов: "), quantity) != RTNORM) return;
+		if (acedGetInt(_T("\nBroj segmenata: "), quantity) != RTNORM) return;
 		double pDist = pstart.distanceTo(pend);
 		for (int i = 1; i < *quantity + 1; i++)
 		{
@@ -4981,7 +4981,7 @@ public:
 			return;
 		ads_point pt1;
 		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
-		if (acedGetPoint(NULL, _T("\nУкажите точку вставки спецификации:"), pt1) != RTNORM)
+		if (acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM)
 			return;
 		pb = asPnt3d(pt1);
 
@@ -5025,9 +5025,9 @@ public:
 
 		fillspecification(sset, speclist, speclistflex, specatrlist, L"°", L"⌀");
 		CMSExcel* m_msExcel = new CMSExcel;
-		acedSetStatusBarProgressMeter(_T("Экспорт в Excel"), 0, 100);
+		acedSetStatusBarProgressMeter(_T("Izvoz u Excel"), 0, 100);
 
-		if (FAILED(m_msExcel->NewExcelBook(false) == E_FAIL)) { acutPrintf(_T("\n Ошибка")); acedRestoreStatusBar(); delete m_msExcel; return; }
+		if (FAILED(m_msExcel->NewExcelBook(false) == E_FAIL)) { acutPrintf(_T("\n Greška")); acedRestoreStatusBar(); delete m_msExcel; return; }
 		acedRestoreStatusBar();
 		if (speclist.specList.physicalLength() != 0)
 		{
@@ -5082,7 +5082,7 @@ public:
 
 		if (!pBlkTbl->has(pName))
 		{
-			acutPrintf(L"\nBlock definition TEST does not exist");
+			acutPrintf(L"\nDefinicija bloka TEST ne postoji");
 			pBlkTbl->close();
 			return false;
 		}
@@ -5129,18 +5129,18 @@ public:
 						}
 					}
 					else {
-						acutPrintf(_T("\nНе удалось открыть примитив в блоке! Ошибка: %s",
+						acutPrintf(_T("\nNije moguće otvoriti element u bloku! Greška: %s",
 							LPCTSTR(acadErrorStatusText(es))));
 					}
 				}
 				else {
-					acutPrintf(_T("\nНе удалось получить AcDbObjectId примитва в блоке! Ошибка: %s",
+					acutPrintf(_T("\nNije moguće dobiti AcDbObjectId elementa u bloku! Greška: %s",
 						LPCTSTR(acadErrorStatusText(es))));
 				}
 			}
 		}
 		else {
-			acutPrintf(_T("\nНе удалось создать итератор для записи таблицы блоков! Ошибка: %s", LPCTSTR(acadErrorStatusText(es))));
+			acutPrintf(_T("\nNije moguće napraviti iterator zapisa tabele blokova! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 		}
 
 
@@ -5166,7 +5166,7 @@ public:
 		// specify the text,tag and prompt
 		ACHAR text[] = { L"" };
 
-		ACHAR prompt[] = { L"Введите значение" };
+		ACHAR prompt[] = { L"Unesite vrijednost" };
 
 		pCurDb =
 			acdbHostApplicationServices()->workingDatabase();
@@ -5176,7 +5176,7 @@ public:
 
 		if (!pBlkTbl->has(pName))
 		{
-			acutPrintf(L"\nBlock definition TEST does not exist");
+			acutPrintf(L"\nDefinicija bloka TEST ne postoji");
 			pBlkTbl->close();
 			return;
 
@@ -5331,7 +5331,7 @@ public:
 		Astat2 = false;
 		while (Astat2 == false)
 		{
-			Astat = acedEntSel(_T("\nВыберете блок для добавления атрибутов: "), ent, pt1);
+			Astat = acedEntSel(_T("\nIzaberite blok za dodavanje atributa: "), ent, pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -5451,7 +5451,7 @@ public:
 		isOk = false;
 		while (isOk == false)
 		{
-			acadStatus = acedEntSel(_T("\nВыбирите контрольную линию: "), ent, pt1);
+			acadStatus = acedEntSel(_T("\nIzaberite referentnu liniju: "), ent, pt1);
 			switch (acadStatus)
 			{
 			case RTCAN:
@@ -5480,7 +5480,7 @@ public:
 		{
 			double newLength;
 
-			acadStatus = acedGetReal(_T("\nВведите Требуемую длину: "), &len);
+			acadStatus = acedGetReal(_T("\nUnesite potrebnu dužinu: "), &len);
 			switch (acadStatus)
 			{
 			case RTCAN:
@@ -5517,7 +5517,7 @@ public:
 		isOk = false;
 		while (isOk == false)
 		{
-			acadStatus = acedEntSel(_T("\nВыбирите полилинию для построения ТП: "), ent, pt1);
+			acadStatus = acedEntSel(_T("\nIzaberite poliliniju za crtanje podnog grijanja: "), ent, pt1);
 			switch (acadStatus)
 			{
 			case RTCAN:

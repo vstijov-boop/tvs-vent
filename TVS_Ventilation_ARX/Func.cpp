@@ -1297,7 +1297,7 @@ void func::Change(ads_name &sset)
 		&& firstTrans == false
 		&& firstWye == false)
 	{
-		acutPrintf(_T("\nНичего не выбрано"));
+		acutPrintf(_T("\nNišta nije izabrano"));
 		return;
 	}
 	{
@@ -1796,7 +1796,7 @@ void func::Change(AcDbEntity *pEnt)
 		&& firstTrans == false
 		&& firstWye == false)
 	{
-		acutPrintf(_T("\nНичего не выбрано"));
+		acutPrintf(_T("\nNišta nije izabrano"));
 		return;
 	}
 	{
@@ -2955,7 +2955,7 @@ int func::TVSClassCheck(AcDbEntity* pEnt)
 	else
 	{
 
-		acutPrintf(_T("Объект блокирован"));
+		acutPrintf(_T("Objekat je zaključan"));
 		return isBlocked;
 	}
 }

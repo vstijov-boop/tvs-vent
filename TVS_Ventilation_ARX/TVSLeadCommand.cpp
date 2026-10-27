@@ -124,8 +124,8 @@ void TVSCommandLead::execute(void)
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Настройки Н y"));
-			Astat = acedEntSel(_T("\nВыберете Блок или Воздуховод или Настройки  [Н]: "), vozd1, pt1);
+			acedInitGet(RSG_NONULL, _T("Podešavanja P"));
+			Astat = acedEntSel(_T("\nIzaberite blok ili kanal ili [Podešavanja]: "), vozd1, pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -211,7 +211,7 @@ void TVSCommandLead::execute(void)
 
 				}
 				else {
-					acutPrintf(_T("\nОбьект заблокирован"));
+					acutPrintf(_T("\nObjekat je zaključan"));
 				}
 			}
 			if (ft) {
@@ -225,7 +225,7 @@ void TVSCommandLead::execute(void)
 	pt1[0] = pCut.x;
 	pt1[1] = pCut.y;
 	pt1[2] = pCut.z;
-	if (acedGetPoint(pt1, _T("\nУкажите 2 точку:"), pt2) == RTCAN)
+	if (acedGetPoint(pt1, _T("\nZadajte drugu tačku: "), pt2) == RTCAN)
 		return;
 	createMLeader(resultMessage, pCut, asPnt3d(pt2), id);
 	return;

@@ -496,7 +496,7 @@ bool SPEC::GetAtt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 
 						pAttr->close();
 					} else {
-						acutPrintf(_T("\nНе удалось открыть атрибут блока! Ошибка: %s", LPCTSTR(acadErrorStatusText(es))));
+						acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 					}
 				}
 			}
@@ -569,7 +569,7 @@ bool SPEC::setAtribToEnt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 
 		AcDbObjectPointer<AcDbBlockReference> pBlkRef(pEnt->id(),AcDb::kForWrite);
 		if ((es = pBlkRef.openStatus()) != Acad::eOk) {
-			acutPrintf(_T("\nОшибка открытия BlockReference: %s"), acadErrorStatusText(es)); return false;
+			acutPrintf(_T("\nGreška pri otvaranju BlockReference: %s"), acadErrorStatusText(es)); return false;
 		}
 		AcDbObjectIterator *pAttrIter = pBlkRef->attributeIterator();
 		if (pAttrIter) {
@@ -590,7 +590,7 @@ bool SPEC::setAtribToEnt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 					}
 
 				} else {
-					acutPrintf(_T("\nНе удалось открыть атрибут блока! Ошибка: %s", LPCTSTR(acadErrorStatusText(es))));
+					acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 				}
 			}
 		}
@@ -623,11 +623,11 @@ bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 
 	AcDbObjectPointer<AcDbBlockReference> pBlkRef(pEnt->id(),AcDb::kForRead);
 	if ((es = pBlkRef.openStatus()) != Acad::eOk) {
-		acutPrintf(_T("\nОшибка открытия BlockReference: %s"), acadErrorStatusText(es)); return false;
+		acutPrintf(_T("\nGreška pri otvaranju BlockReference: %s"), acadErrorStatusText(es)); return false;
 	}
 	AcDbBlockTableRecordPointer pBTR(pBlkRef->blockTableRecord(),AcDb::kForRead);
 	if ((es = pBTR.openStatus()) != Acad::eOk) {
-		acutPrintf(_T("\nОшибка открытия BlockTableRecord: %s"), acadErrorStatusText(es)); return false;
+		acutPrintf(_T("\nGreška pri otvaranju BlockTableRecord: %s"), acadErrorStatusText(es)); return false;
 	}
 	const ACHAR* sBTRName = NULL; pBTR->getName(sBTRName); 
 	if (sBTRName) wcscpy_s(pName,512,sBTRName);
@@ -641,7 +641,7 @@ bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 	AcDbDynBlockReference dynblkRef(pEnt->id());
 	if (!dynblkRef.isDynamicBlock()) {
 
-		acutPrintf(_T("\nЭто не динамический блок!")); return true;
+		acutPrintf(_T("\nOvo nije dinamički blok!")); return true;
 
 	}
 
@@ -649,7 +649,7 @@ bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 
 	if ((es = pDynBTR.openStatus()) != Acad::eOk) {
 
-		acutPrintf(_T("\nОшибка открытия Dyn BlockTableRecord: %s"), acadErrorStatusText(es)); return true;
+		acutPrintf(_T("\nGreška pri otvaranju dinamičkog BlockTableRecord: %s"), acadErrorStatusText(es)); return true;
 
 	}
 

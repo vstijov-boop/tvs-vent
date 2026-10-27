@@ -25,11 +25,11 @@ void TVSCommandSpecification::execute(void)
 	
 	ads_point pt1;
 	TVSSpecTable table;
-	acedInitGet(RSG_NONULL, _T("Настройки Н н Y y"));
 	int status = 0;
 
 	while (status != RTNORM) {
-		status = acedGetPoint(NULL, _T("\nУкажите точку вставки спецификации или [Настройки]:"), pt1);
+		acedInitGet(RSG_NONULL, _T("Podešavanja P"));
+		status = acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije ili [Podešavanja]: "), pt1);
 		switch (status)
 		{
 		case RTCAN:
