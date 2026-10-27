@@ -224,6 +224,7 @@ STDMETHODIMP CComTrans::get_Dpr(double *pVal)
 	size = pSq->SizeAp1;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -236,6 +237,8 @@ STDMETHODIMP CComTrans::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeAp1(newVal);
 	Fire_Notification(DISPID_A);
@@ -254,6 +257,7 @@ STDMETHODIMP CComTrans::get_SizeB(double *pVal)
 	size = pSq->SizeBp1;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -266,6 +270,8 @@ STDMETHODIMP CComTrans::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBp1(newVal);
@@ -287,6 +293,7 @@ STDMETHODIMP CComTrans::get_Dpr2(double *pVal)
 	size = pSq->SizeAp2;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -299,6 +306,8 @@ STDMETHODIMP CComTrans::put_Dpr2(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeAp2(newVal);
 	Fire_Notification(DISPID_A2);
@@ -317,6 +326,7 @@ STDMETHODIMP CComTrans::get_SizeB2(double *pVal)
 	size = pSq->SizeBp2;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -329,6 +339,8 @@ STDMETHODIMP CComTrans::put_SizeB2(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBp2(newVal);
@@ -353,6 +365,7 @@ STDMETHODIMP CComTrans::get_Length(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -365,6 +378,8 @@ STDMETHODIMP CComTrans::put_Length(double  newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Length(newVal);
@@ -558,6 +573,7 @@ STDMETHODIMP CComTrans::get_Elev(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -570,6 +586,8 @@ STDMETHODIMP CComTrans::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);

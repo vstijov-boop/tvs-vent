@@ -1002,8 +1002,9 @@ public:
 
 
 
-	static bool changesize()
+	static bool changesize(bool allowUnits = false)
 	{
+		syncTVSGlobalUnits();
 
 		//	ads_real sa,sb;
 		double a, b;
@@ -1022,6 +1023,7 @@ public:
 		// 		else globRound=false;
 
 		dgPipeSize dg;
+		dg.allowDrawingUnitsChange = allowUnits;
 		a = dg.SizeA = globSizeA;
 		b = dg.SizeB = globSizeB;
 		dg.Flow = globalFlow;
@@ -1053,7 +1055,8 @@ public:
 
 
 
-		dg.DoModal();
+		if (dg.DoModal() != IDOK) return false;
+		syncTVSGlobalUnits();
 		//acDocManager->unlockDocument(pDoc);
 		globSizeA = dg.SizeA;
 		globSizeB = dg.SizeB;
@@ -1347,7 +1350,7 @@ public:
 			p4 = shortlength(pPipe->FirstPoint, p2, plecho2 - dLx);
 			p5 = shortlength(pPipe->FirstPoint, p2, -dLx);
 			p6 = shortlength(pPipe->FirstPoint, p2, -dLx - plecho1);
-			p7 = shortlength(pPipe->FirstPoint, p2, -dLx - plecho1 - 300);
+			p7 = shortlength(pPipe->FirstPoint, p2, -dLx - plecho1 - 300 / tvsUnits::factor());
 
 
 			if (startZ > nextZ)
@@ -1479,12 +1482,14 @@ public:
 	static void Ventilation_ARXTVS_SETTINGS(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
-		changesize();
+		syncTVSGlobalUnits();
+		changesize(true);
 	}
 
 	static void Ventilation_ARXTVS_DRAW(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		int index;
 		AcDbObjectId id;
 		TVS_Pipe::GetParamsForDraw(id, index);
@@ -1744,6 +1749,7 @@ public:
 	{
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 
 		ads_point pt1, pt2;
 		int reg;
@@ -1928,12 +1934,13 @@ public:
 	static void Ventilation_ARXTVS_TRANS(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_point pt1, pt2;
-		double pSizeAp1 = 500;
-		double pSizeBp1 = 0;
-		double pSizeAp2 = 300;
-		double pSizeBp2 = 0;
-		double pLengthTr = 300;
+		double pSizeAp1 = 500 / tvsUnits::factor();
+		double pSizeBp1 = 0 / tvsUnits::factor();
+		double pSizeAp2 = 300 / tvsUnits::factor();
+		double pSizeBp2 = 0 / tvsUnits::factor();
+		double pLengthTr = 300 / tvsUnits::factor();
 		AcGeVector3d pVectTr = AcGeVector3d(1, 1, 0);
 		AcGePoint3d pFirstPoint;
 		AcGePoint3d pLastPoint;
@@ -1976,14 +1983,15 @@ public:
 	static void Ventilation_ARXTVS_WYE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_point pt1;
 		TVS_WYE wyeie;
 		ads_real aSizeAotv, aSizeApr;
-		double pSizeApr = 200;
-		double pSizeBpr = 0;
-		double pSizeAotv = 100;
-		double pSizeBotv = 0;
-		double pLengthPl = 150;
+		double pSizeApr = 200 / tvsUnits::factor();
+		double pSizeBpr = 0 / tvsUnits::factor();
+		double pSizeAotv = 100 / tvsUnits::factor();
+		double pSizeBotv = 0 / tvsUnits::factor();
+		double pLengthPl = 150 / tvsUnits::factor();
 		AcGeVector3d pVectpr = AcGeVector3d(1, 0, 0);
 		AcGeVector3d pVectotv = AcGeVector3d(0, 1, 0);
 		AcGePoint3d pBasepoint;
@@ -1995,10 +2003,10 @@ public:
 			return;
 		if (acedGetReal(_T("\nUnesite širinu glavnog kanala: "), &aSizeApr) != RTNORM)
 			return;
-		pSizeApr = aSizeApr;
+		pSizeApr = aSizeApr / tvsUnits::factor();
 		if (acedGetReal(_T("\nUnesite širinu ogranka: "), &aSizeAotv) != RTNORM)
 			return;
-		pSizeAotv = aSizeAotv;
+		pSizeAotv = aSizeAotv / tvsUnits::factor();
 
 		pBasepoint = asPnt3d(pt1);
 		wyeie.add_new(pSizeApr,
@@ -2052,6 +2060,7 @@ public:
 	static void Ventilation_ARXTVS_CONNECTW(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -2157,6 +2166,7 @@ public:
 	static void Ventilation_ARXTVS_CONNECTT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -2262,6 +2272,7 @@ public:
 	static void Ventilation_ARXTVS_CONNECTTest(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -2387,6 +2398,7 @@ public:
 	static void Ventilation_ARXTVS_DUCT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 
 		// Add your code for command TVSTVS_Vent_ARX.MyCommand1 here
 
@@ -2413,8 +2425,8 @@ public:
 		{
 			return;
 		}
-		pSizeA = sa;
-		pSizeB = sb;
+		pSizeA = sa / tvsUnits::factor();
+		pSizeB = sb / tvsUnits::factor();
 
 
 
@@ -2505,6 +2517,7 @@ public:
 	{
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 
 		ads_name sset, eName;
 		ACHAR  resultss[512];
@@ -2608,6 +2621,7 @@ public:
 	static void Ventilation_ARXTVS_SpecificationOld(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 		AcGeDoubleArray PipPar;
 		AcGeDoubleArray PipArr;
@@ -4382,6 +4396,7 @@ public:
 	static void Ventilation_ARXTVS_Show(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		acutRelRb(acutBuildList(RTSTR, _T("(TVS_TEST2)"), RTNONE, RTNONE));
 		//acedCommand(RTSTR,_T("(TVS_TEST2)"),RTNONE,RTNONE);
 		// Add your code for command Ventilation_ARX.TVS_Show here
@@ -4391,6 +4406,7 @@ public:
 	static void Ventilation_ARXTVS_CUT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		AcGePoint3d pCut;
 		double Lx, Ly, startangle;
 		ads_name vozd1, vozd2, eName;
@@ -4510,6 +4526,7 @@ public:
 	static void Ventilation_ARXTVS_Change(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -4598,6 +4615,7 @@ public:
 	static void Ventilation_ARXTVS_ERASE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 		ACHAR  resultss[512];
 		ACHAR  results1[512] = _T("2");
@@ -4724,6 +4742,7 @@ public:
 	static void Ventilation_ARXTVSSomeParts(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name ent;
 		bool  Astat = false, status = false;
 		//acedInitGet(RSG_NONULL);
@@ -4818,6 +4837,7 @@ public:
 	static void Ventilation_ARXTVS_Flex(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		TVS_Pipe* pEnt = new TVS_Pipe();
 
 		pEnt->FirstPoint = AcGePoint3d(0, 0, 0);
@@ -4975,6 +4995,7 @@ public:
 	static void Ventilation_ARXTVS_SPEC(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -5012,6 +5033,7 @@ public:
 	static void Ventilation_ARXTVS_EXCELSPEC(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -5203,6 +5225,7 @@ public:
 
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -5239,6 +5262,7 @@ public:
 
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -5317,6 +5341,7 @@ public:
 	static void Ventilation_ARXTVS_AddAtrib(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_point pt1;
 		ads_name ent;
 		Acad::ErrorStatus es;
@@ -5438,6 +5463,7 @@ public:
 	static void Ventilation_ARXTVS_SCALE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName, ent;
 		ads_point pt1;
 		bool isOk = false;
@@ -5505,6 +5531,7 @@ public:
 	static void Ventilation_ARXTVS_HEATFLOOR(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name eName, ent;
 		ads_point pt1;
 		bool isOk = false;

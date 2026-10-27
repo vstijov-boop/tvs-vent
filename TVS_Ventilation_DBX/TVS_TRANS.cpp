@@ -49,21 +49,21 @@ TVS_TRANS::~TVS_TRANS () {
 void TVS_TRANS::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 {
 
-	if (SizeBp1==0)
+	if (tvsUnits::mm(SizeBp1, this)==0)
 	{
-		sizeStr.Format(L"%%%%c%g", SizeAp1);
+		sizeStr.Format(L"%%%%c%g", tvsUnits::mm(SizeAp1, this));
 	
 	}else{
-		sizeStr.Format(L"%gx%g", SizeAp1,SizeBp1);
+		sizeStr.Format(L"%gx%g", tvsUnits::mm(SizeAp1, this),tvsUnits::mm(SizeBp1, this));
 	}
 	CString strSize2;
-	if (SizeBp2==0)
+	if (tvsUnits::mm(SizeBp2, this)==0)
 	{
-		strSize2.Format(L"-%%%%c%g", SizeAp2);
+		strSize2.Format(L"-%%%%c%g", tvsUnits::mm(SizeAp2, this));
 		sizeStr += strSize2;
 
 	}else{
-		strSize2.Format(L"-%gx%g", SizeAp2,SizeBp2);
+		strSize2.Format(L"-%gx%g", tvsUnits::mm(SizeAp2, this),tvsUnits::mm(SizeBp2, this));
 		sizeStr += strSize2;
 	}
 }

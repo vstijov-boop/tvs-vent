@@ -223,6 +223,7 @@ STDMETHODIMP CComWye::get_Dpr(double *pVal)
 	size = pSq->SizeApr;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -235,6 +236,8 @@ STDMETHODIMP CComWye::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeApr(newVal);
 	Fire_Notification(DISPID_A);
@@ -253,6 +256,7 @@ STDMETHODIMP CComWye::get_SizeB(double *pVal)
 	size = pSq->SizeBpr;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -265,6 +269,8 @@ STDMETHODIMP CComWye::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBpr(newVal);
@@ -286,6 +292,7 @@ STDMETHODIMP CComWye::get_Dpr2(double *pVal)
 	size = pSq->SizeAotv;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -298,6 +305,8 @@ STDMETHODIMP CComWye::put_Dpr2(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeAotv(newVal);
 	Fire_Notification(DISPID_A2);
@@ -316,6 +325,7 @@ STDMETHODIMP CComWye::get_SizeB2(double *pVal)
 	size = pSq->SizeBotv;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -328,6 +338,8 @@ STDMETHODIMP CComWye::put_SizeB2(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBotv(newVal);
@@ -352,6 +364,7 @@ STDMETHODIMP CComWye::get_Length(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -364,6 +377,8 @@ STDMETHODIMP CComWye::put_Length(double  newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 
@@ -513,6 +528,7 @@ STDMETHODIMP CComWye::get_Elev(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -525,6 +541,8 @@ STDMETHODIMP CComWye::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);

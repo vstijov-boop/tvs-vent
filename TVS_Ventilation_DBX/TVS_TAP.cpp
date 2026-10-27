@@ -51,12 +51,12 @@ void TVS_TAP::getSizeString(CString &sizeStr, const bool &sortSize/*=false*/)
 {
 	double SA, SB;
 	if (Form == Form_Direct || SizeB==0) {
-		SA = get_SizeA();
-		SB = get_SizeB();
+		SA = tvsUnits::mm(get_SizeA(), this);
+		SB = tvsUnits::mm(get_SizeB(), this);
 	}
 	else {
-		SB = get_SizeA();
-		SA = get_SizeB();
+		SB = tvsUnits::mm(get_SizeA(), this);
+		SA = tvsUnits::mm(get_SizeB(), this);
 	}
 
 	if (SB == 0)
@@ -950,9 +950,9 @@ Adesk::Boolean TVS_TAP::subWorldDraw(AcGiWorldDraw *mode) {
 				double flanez = 0;
 
 
-				if (SizeA < 630)
+				if (tvsUnits::mm(SizeA, this) < 630)
 				{
-					flanez = 45;
+					flanez = tvsUnits::drawing(45.0, this);
 				}
 				AcGePoint3d pM16, pM25;
 				double bigRl = atan(flanez / (Radius + SizeA));
@@ -2188,7 +2188,7 @@ void TVS_TAP::getCount(double &count)
 
 	if (DuctType == DuctTypeFlex)
 	{
-		count = M_PI*Radius*Swectangle / 2 / M_PI / 1000;
+		count = tvsUnits::metres(M_PI*Radius*Swectangle / 2 / M_PI, this);
 	}
 	else {
 
@@ -2253,13 +2253,13 @@ TVS_TAP *TVS_TAP::add_new(double &pSizeA,
 	pEnt->RadiusTypeRect = RadiusTypeRect_RadiusConstant;
 	pEnt->RadiusTypeRound = RadiusTypeRound_RadiusSpecific;
 	pEnt->RadiusVariableParameter = 1;
-	pEnt->RadiusConst = 150;
+	pEnt->RadiusConst = tvsUnits::drawing(150.0, pEnt);
 	pEnt->Form = Form_Direct;
 	pEnt->setNewParameters();
 
 	if (pThisRound == true)
 	{
-		if (pSizeA < 355)
+		if (tvsUnits::mm(pSizeA, pEnt) < 355)
 		{
 			pEnt->Radius = pSizeA;
 		}
@@ -2920,7 +2920,7 @@ void TVS_TAP::setRadius()
 			Radius = RadiusConst;
 			return;
 		case RadiusTypeRound_RadiusSpecific:
-			if (SizeA < 355)
+			if (tvsUnits::mm(SizeA, this) < 355)
 			{
 				Radius = SizeA;
 			}
@@ -2942,7 +2942,7 @@ void TVS_TAP::setRadius()
 			Radius = RadiusConst;
 			return;
 		case RadiusTypeRect_RadiusSpecific:
-			if (SizeA < 355)
+			if (tvsUnits::mm(SizeA, this) < 355)
 			{
 				Radius = SizeA;
 			}
@@ -2987,7 +2987,7 @@ void TVS_TAP::checkRadiusTypeRound()
 		return;
 	default:
 		RadiusTypeRound = RadiusTypeRound_RadiusSpecific;
-		RadiusConst = 150;
+		RadiusConst = tvsUnits::drawing(150.0, this);
 		return;
 	}
 
@@ -3006,7 +3006,7 @@ void TVS_TAP::checkRadiusTypeRect()
 		return;
 	default:
 		RadiusTypeRect = RadiusTypeRect_RadiusConstant;
-		RadiusConst = 150;
+		RadiusConst = tvsUnits::drawing(150.0, this);
 		return;
 	}
 

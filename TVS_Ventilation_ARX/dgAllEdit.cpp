@@ -25,6 +25,23 @@
 #include "StdAfx.h"
 #include "resource.h"
 #include "dgAllEdit.h"
+
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
+static void DDX_MillimetreString(CDataExchange* dx, int id, CString& value) {
+    const double factor = tvsUnits::factor();
+    CString display = value;
+    wchar_t* end = NULL;
+    double number = wcstod(value, &end);
+    if (!dx->m_bSaveAndValidate && end != (LPCTSTR)value && end && *end == 0)
+        display.Format(L"%.15g", number * factor);
+    DDX_Text(dx, id, display);
+    if (dx->m_bSaveAndValidate) {
+        number = wcstod(display, &end);
+        if (end != (LPCTSTR)display && end && *end == 0) value.Format(L"%.15g", number / factor);
+        else value = display;
+    }
+}
+
 #include "Calculate.h"
 
 //-----------------------------------------------------------------------------
@@ -120,21 +137,21 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 
 
 
-	DDX_Text(pDX, IDC_SizeA, SizeA);
-	DDX_Text(pDX, IDC_SizeB, SizeB);
+	DDX_MillimetreString(pDX, IDC_SizeA, SizeA);
+	DDX_MillimetreString(pDX, IDC_SizeB, SizeB);
 	DDX_Text(pDX, IDC_Flow, Flow);
-	DDX_Text(pDX, IDC_SizeA2, SizeA2);
-	DDX_Text(pDX, IDC_SizeB2, SizeB2);
-	DDX_Text(pDX, IDC_TransLength, LengthTr);
-	DDX_Text(pDX, IDC_LengthWye, LengthW);
-	DDX_Text(pDX, IDC_ElevVal, Elev);
+	DDX_MillimetreString(pDX, IDC_SizeA2, SizeA2);
+	DDX_MillimetreString(pDX, IDC_SizeB2, SizeB2);
+	DDX_MillimetreString(pDX, IDC_TransLength, LengthTr);
+	DDX_MillimetreString(pDX, IDC_LengthWye, LengthW);
+	DDX_MillimetreString(pDX, IDC_ElevVal, Elev);
 	DDX_Text(pDX, IDC_Speed, Speed);
 	DDX_Text(pDX, IDC_i, I);
 	DDX_Text(pDX, IDC_dP, Dp);
 
 	DDX_Text(pDX, IDC_Swectangle, Swectangle);
 	DDX_Text(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
-	DDX_Text(pDX, IDC_TapRadiusConst, TapRadiusConst);
+	DDX_MillimetreString(pDX, IDC_TapRadiusConst, TapRadiusConst);
 
 
 
@@ -166,7 +183,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 
 
 	DDX_Control(pDX, IDC_WipeoutLength, fWipeoutLength);
-	DDX_Text(pDX, IDC_WipeoutLength, WipeoutLength);
+	DDX_MillimetreString(pDX, IDC_WipeoutLength, WipeoutLength);
 
 	DDX_Control(pDX, IDC_DuctFlex, fDuctFlex);
 	DDX_Check(pDX, IDC_DuctFlex, DuctFlex);

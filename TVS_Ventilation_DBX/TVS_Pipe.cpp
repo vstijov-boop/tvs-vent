@@ -891,22 +891,22 @@ Acad::ErrorStatus TVS_Pipe::put_FirstPoint(AcGePoint3d newVal)
 void TVS_Pipe::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 {
  
-	if (SizeB==0)
+	if (tvsUnits::mm(SizeB, this)==0)
 	{
-		sizeStr.Format(L"%%%%c%g", SizeA);
+		sizeStr.Format(L"%%%%c%g", tvsUnits::mm(SizeA, this));
 		return;
 	}
 	if (sortSize){
-		sizeStr.Format(L"%gx%g", min(SizeA,SizeB),max(SizeA,SizeB));
+		sizeStr.Format(L"%gx%g", min(tvsUnits::mm(SizeA, this),tvsUnits::mm(SizeB, this)),max(tvsUnits::mm(SizeA, this),tvsUnits::mm(SizeB, this)));
 		return;
 	}else{
-		sizeStr.Format(L"%gx%g", SizeA,SizeB);
+		sizeStr.Format(L"%gx%g", tvsUnits::mm(SizeA, this),tvsUnits::mm(SizeB, this));
 	}
 }
 
 void TVS_Pipe::getCount(double &count)
 {
-	count = get_Length() / 1000;
+	count = tvsUnits::metres(FirstPoint.distanceTo(LastPoint), this);
 }
 
 void TVS_Pipe::getCountUnit(CString &unit)
@@ -981,8 +981,8 @@ void TVS_Pipe::Gimme4PipePointsWipe ()
 	X1=LastPoint.x-FirstPoint.x;
 	Y1=LastPoint.y-FirstPoint.y;
 
-	X2=Y1*(SizeA+200)/Length/2;
-	Y2=X1*(SizeA+200)/Length/2;
+	X2=Y1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
+	Y2=X1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
 	//AW=AcGePoint3d(FirstPoint.x-X2,FirstPoint.y+Y2,FirstPoint.z);
 	//BW=AcGePoint3d(LastPoint.x-X2,LastPoint.y+Y2,FirstPoint.z);
 	//CW=AcGePoint3d(LastPoint.x+X2,LastPoint.y-Y2,FirstPoint.z);
@@ -1199,7 +1199,7 @@ Acad::ErrorStatus TVS_Pipe::subExplode(AcDbVoidPtrArray & entitySet) const
 double TVS_Pipe::get_Length(void) const
 {
 	assertReadEnabled () ;
-	return (Length) ;
+	return (FirstPoint.distanceTo(LastPoint)) ;
 }
 
 AcGePoint3d TVS_Pipe::get_Lastpoint(void) const

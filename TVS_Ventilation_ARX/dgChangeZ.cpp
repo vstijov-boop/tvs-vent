@@ -25,6 +25,7 @@
 #include "StdAfx.h"
 #include "resource.h"
 #include "dgChangeZ.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
 
 //-----------------------------------------------------------------------------
 IMPLEMENT_DYNAMIC(dgChangeZ, CAdUiBaseDialog)
@@ -40,8 +41,12 @@ dgChangeZ::dgChangeZ(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : C
 //-----------------------------------------------------------------------------
 void dgChangeZ::DoDataExchange(CDataExchange *pDX) {
 	CAdUiBaseDialog::DoDataExchange(pDX);
-	DDX_Text(pDX, IDC_StartZ, startZ);
-	DDX_Text(pDX, IDC_NextZ, nextZ);
+	double startZMM = startZ * tvsUnits::factor();
+	DDX_Text(pDX, IDC_StartZ, startZMM);
+	if (pDX->m_bSaveAndValidate) startZ = startZMM / tvsUnits::factor();
+	double nextZMM = nextZ * tvsUnits::factor();
+	DDX_Text(pDX, IDC_NextZ, nextZMM);
+	if (pDX->m_bSaveAndValidate) nextZ = nextZMM / tvsUnits::factor();
 	DDX_Text(pDX, IDC_Axis, Axis);
 }
 

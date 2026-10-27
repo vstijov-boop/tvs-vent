@@ -3,12 +3,14 @@ name: Build AutoCAD 2020
 on:
   workflow_dispatch:
   push:
-    branches: [srpski-prevod]
+    branches: [srpski-prevod, unapredjenja-jedinice]
     paths:
       - '.github/workflows/build-autocad-2020.yml'
       - 'TVS_Ventilation_ARX/**'
       - 'TVS_Ventilation_DBX/**'
       - 'GridCtrl_src/**'
+      - 'Installer/TVS_TOOLS/KGTEZ.lsp'
+      - 'Installer/TVS_TOOLS/TVS_TOOLS.cuix'
       - '*2020*'
 
 permissions:
@@ -109,6 +111,7 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item "$output/*.arx", "$output/*.dbx" dist
           Copy-Item Installer/TVS_VENT/TVS_VENT.cuix, Installer/TVS_TOOLS/TVS_TOOLS.cuix dist
+          if (Test-Path Installer/TVS_TOOLS/KGTEZ.lsp) { Copy-Item Installer/TVS_TOOLS/KGTEZ.lsp dist }
           "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nRuntime testing in AutoCAD is still required." | Out-File dist/BUILD.txt -Encoding utf8
       - uses: actions/upload-artifact@v4
         if: always()

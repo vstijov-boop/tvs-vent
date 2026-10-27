@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -98,6 +98,10 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+	bool allowDrawingUnitsChange;
+	double unitsFactor;
+	CComboBox drawingUnits;
+	virtual BOOL OnInitDialog();
 
 public:
 	CEdit fSizeA;

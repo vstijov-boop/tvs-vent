@@ -264,14 +264,14 @@ Acad::ErrorStatus TVS_Entity::subMoveGripPointsAt (
 
 double TVS_Entity::get_Speed() {
 
-	if (SizeA == 0) return 0;
+	if (tvsUnits::mm(SizeA, this) == 0) return 0;
 	if (get_ThisRound() == true)
 	{
-		return Flow / (3600 * 3.14*(SizeA / 1000)*(SizeA / 1000) / 4);
+		return Flow / (3600 * 3.14*(tvsUnits::mm(SizeA, this) / 1000)*(tvsUnits::mm(SizeA, this) / 1000) / 4);
 	}
 	else
 	{
-		return Flow / (3600 * (SizeA / 1000)*(SizeB / 1000));
+		return Flow / (3600 * (tvsUnits::mm(SizeA, this) / 1000)*(tvsUnits::mm(SizeB, this) / 1000));
 	}
 }
 

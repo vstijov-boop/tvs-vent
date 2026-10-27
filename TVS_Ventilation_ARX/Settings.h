@@ -75,3 +75,16 @@ public:
 };
 
 
+
+// Geometry defaults follow the active DWG; dialog and COM values remain in mm.
+static double tvsGlobalUnitsFactor = 1.0;
+static void syncTVSGlobalUnits() {
+    const double next = tvsUnits::factor();
+    if (next == tvsGlobalUnitsFactor) return;
+    double* values[] = { &globSizeA, &globSizeB, &ftSizeB, &ftSizeroundA, &ftLengthp,
+        &globalTapRadiusConst, &globalLengthTr, &globalLengthW, &globalElevMid,
+        &globalWipeoutLength };
+    for (size_t i = 0; i < sizeof(values)/sizeof(values[0]); ++i)
+        *values[i] *= tvsGlobalUnitsFactor / next;
+    tvsGlobalUnitsFactor = next;
+}

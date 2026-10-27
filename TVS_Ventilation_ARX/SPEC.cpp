@@ -85,9 +85,9 @@ bool SPEC::add(AcDbEntity * pEnt)
 			if(pPipe = TVS_Pipe::cast(pEnt))
 			{
 
-				SizeA=pPipe->get_SizeA();
-				SizeB=pPipe->get_SizeB();
-				Length=pPipe->get_Length();
+				SizeA=tvsUnits::mm(pPipe->get_SizeA(), pPipe);
+				SizeB=tvsUnits::mm(pPipe->get_SizeB(), pPipe);
+				Length=tvsUnits::mm(pPipe->get_Length(), pPipe);
 				setUnit1(_T("m"));
 				setUnit2(_T("m²"));
 				if (pPipe->DuctType==DuctTypeFlex)
@@ -117,8 +117,8 @@ bool SPEC::add(AcDbEntity * pEnt)
 						setName(_T("Pravougaoni kanal"));
 						if (SizeB>SizeA)
 						{
-							SizeB=pPipe->SizeA;
-							SizeA=pPipe->SizeB;
+							SizeB=tvsUnits::mm(pPipe->SizeA, pPipe);
+							SizeA=tvsUnits::mm(pPipe->SizeB, pPipe);
 						}
 						setLable(max(SizeA,SizeB));
 						appendLable(_T("x"));
@@ -140,8 +140,8 @@ bool SPEC::add(AcDbEntity * pEnt)
 
 				if (pTap->DuctType==DuctTypeFlex)
 				{
-					SizeA=pTap->get_SizeA();
-					SizeB=pTap->get_SizeB();
+					SizeA=tvsUnits::mm(pTap->get_SizeA(), pTap);
+					SizeB=tvsUnits::mm(pTap->get_SizeB(), pTap);
 
 					setUnit1(_T("m"));
 					setUnit2(_T("m²"));
@@ -150,7 +150,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 					setName(_T("Fleksibilni kanal"));
 					setLable(d);
 					appendLable(SizeA);
-					Length=M_PI*pTap->Radius*pTap->Swectangle/2/M_PI/1000;
+					Length=M_PI*tvsUnits::mm(pTap->Radius, pTap)*pTap->Swectangle/2/M_PI/1000;
 					Area=Length*M_PI*SizeA/1000;
 
 					setParam1(Length, TypeDouble1);
@@ -161,8 +161,8 @@ bool SPEC::add(AcDbEntity * pEnt)
 					Swectangle=5*floor((pTap->Swectangle+(2*M_PI/180))/5*180/M_PI);
 
 					
-					SizeA=pTap->get_SizeA();
-					SizeB=pTap->get_SizeB();
+					SizeA=tvsUnits::mm(pTap->get_SizeA(), pTap);
+					SizeB=tvsUnits::mm(pTap->get_SizeB(), pTap);
 
 					setUnit1(_T("kom"));
 					setUnit2(_T("m²"));
@@ -173,7 +173,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 						setName(_T("Okruglo koljeno"));
 						setLable(d);
 						appendLable(SizeA);
-						Area=M_PI*2*SizeA*pTap->Radius/1000000*pTap->Swectangle;
+						Area=M_PI*2*SizeA*tvsUnits::mm(pTap->Radius, pTap)/1000000*pTap->Swectangle;
 						if ((pTap->RadiusTypeRound==TypeRoundTap_TapSection)&&(SizeA<=355))
 						{
 							Area=Area+M_PI*SizeA*2/10000;
@@ -185,12 +185,12 @@ bool SPEC::add(AcDbEntity * pEnt)
 						if (pTap->Form == Form_Direct)
 						{
 					
-							SizeA=pTap->get_SizeA();
-							SizeB=pTap->get_SizeB();
+							SizeA=tvsUnits::mm(pTap->get_SizeA(), pTap);
+							SizeB=tvsUnits::mm(pTap->get_SizeB(), pTap);
 						}else{
 						
-							SizeB=pTap->get_SizeA();
-							SizeA=pTap->get_SizeB();
+							SizeB=tvsUnits::mm(pTap->get_SizeA(), pTap);
+							SizeA=tvsUnits::mm(pTap->get_SizeB(), pTap);
 						}
 						status=TapRect;
 						setName(_T("Pravougaono koljeno"));
@@ -198,10 +198,10 @@ bool SPEC::add(AcDbEntity * pEnt)
 						appendLable(_T("x"));
 						appendLable(SizeB);
 						Area=(pTap->Swectangle)/(2*M_PI) 
-							*(2*(M_PI*(pTap->Radius+pTap->SizeA)*(pTap->Radius+pTap->SizeA)/1000000
-							-M_PI*(pTap->Radius)*(pTap->Radius)/1000000) 
-							+2*M_PI*(pTap->SizeA+pTap->Radius)/1000*pTap->SizeB/1000
-							+2*M_PI*(pTap->Radius)/1000*pTap->SizeB/1000);
+							*(2*(M_PI*(tvsUnits::mm(pTap->Radius, pTap)+tvsUnits::mm(pTap->SizeA, pTap))*(tvsUnits::mm(pTap->Radius, pTap)+tvsUnits::mm(pTap->SizeA, pTap))/1000000
+							-M_PI*(tvsUnits::mm(pTap->Radius, pTap))*(tvsUnits::mm(pTap->Radius, pTap))/1000000)
+							+2*M_PI*(tvsUnits::mm(pTap->SizeA, pTap)+tvsUnits::mm(pTap->Radius, pTap))/1000*tvsUnits::mm(pTap->SizeB, pTap)/1000
+							+2*M_PI*(tvsUnits::mm(pTap->Radius, pTap))/1000*tvsUnits::mm(pTap->SizeB, pTap)/1000);
 					}
 					appendLable(_T("("));
 					appendLable(Swectangle);
@@ -216,11 +216,11 @@ bool SPEC::add(AcDbEntity * pEnt)
 			if(pWye = TVS_WYE::cast(pEnt))
 			{
 				status=Wye;
-				SizeA=pWye->get_SizeApr();
-				SizeB=pWye->get_SizeBpr();
-				SizeA2=pWye->get_SizeAotv();
-				SizeA3=pWye->get_SizeBotv();
-				Swectangle=pWye->LengthPl;
+				SizeA=tvsUnits::mm(pWye->get_SizeApr(), pWye);
+				SizeB=tvsUnits::mm(pWye->get_SizeBpr(), pWye);
+				SizeA2=tvsUnits::mm(pWye->get_SizeAotv(), pWye);
+				SizeA3=tvsUnits::mm(pWye->get_SizeBotv(), pWye);
+				Swectangle=tvsUnits::mm(pWye->LengthPl, pWye);
 				setUnit1(_T("kom"));
 				setUnit2(_T("m²"));
 
@@ -229,7 +229,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 					setName(_T("T-komad"));
 					setLable(d);
 					appendLable(SizeA);
-					Area=(SizeA2+pWye->LengthPl*2)*M_PI*SizeA/1000000;
+					Area=(SizeA2+tvsUnits::mm(pWye->LengthPl, pWye)*2)*M_PI*SizeA/1000000;
 				}
 				else 
 				{ 
@@ -237,14 +237,14 @@ bool SPEC::add(AcDbEntity * pEnt)
 					setLable(SizeA);
 					appendLable(_T("x"));
 					appendLable(SizeB);
-					Area=(SizeA2+pWye->LengthPl*2)*(SizeA+SizeB)/500000; 
+					Area=(SizeA2+tvsUnits::mm(pWye->LengthPl, pWye)*2)*(SizeA+SizeB)/500000;
 				}
 				appendLable(_T("-"));
 				if (SizeA3==0) 
 				{
 					appendLable(d);
 					appendLable(SizeA2);
-					Area=Area+(pWye->LengthPl)*M_PI*SizeA2/1000000-sCircle(SizeA2/1000);
+					Area=Area+(tvsUnits::mm(pWye->LengthPl, pWye))*M_PI*SizeA2/1000000-sCircle(SizeA2/1000);
 				}
 				else 
 				{ 
@@ -252,11 +252,11 @@ bool SPEC::add(AcDbEntity * pEnt)
 					appendLable(SizeA2);
 					appendLable(_T("x"));
 					appendLable(SizeA3);
-					Area=Area+(pWye->LengthPl)*(SizeA2+SizeA3)/500000-SizeA2*SizeA3/1000000; 
+					Area=Area+(tvsUnits::mm(pWye->LengthPl, pWye))*(SizeA2+SizeA3)/500000-SizeA2*SizeA3/1000000;
 				}
 
 				appendLable(_T(" (L="));
-				appendLable(pWye->LengthPl);
+				appendLable(tvsUnits::mm(pWye->LengthPl, pWye));
 				appendLable(_T(" mm)"));
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);
@@ -266,21 +266,21 @@ bool SPEC::add(AcDbEntity * pEnt)
 			if(pTrans = TVS_TRANS::cast(pEnt))
 			{
 				status=Trans;
-				Swectangle=pTrans->LengthTr;
-				SizeA=pTrans->get_SizeAp1();
-				SizeB=pTrans->get_SizeBp1();
-				SizeA2=pTrans->get_SizeAp2();
-				SizeA3=pTrans->get_SizeBp2();
+				Swectangle=tvsUnits::mm(pTrans->LengthTr, pTrans);
+				SizeA=tvsUnits::mm(pTrans->get_SizeAp1(), pTrans);
+				SizeB=tvsUnits::mm(pTrans->get_SizeBp1(), pTrans);
+				SizeA2=tvsUnits::mm(pTrans->get_SizeAp2(), pTrans);
+				SizeA3=tvsUnits::mm(pTrans->get_SizeBp2(), pTrans);
 				if (SizeB==0)
 				{
 					if (SizeA3==0)
 					{
 						if (SizeA<SizeA2)
 						{
-							SizeA=pTrans->get_SizeAp2();
-							SizeB=pTrans->get_SizeBp2();
-							SizeA2=pTrans->get_SizeAp1();
-							SizeA3=pTrans->get_SizeBp1();
+							SizeA=tvsUnits::mm(pTrans->get_SizeAp2(), pTrans);
+							SizeB=tvsUnits::mm(pTrans->get_SizeBp2(), pTrans);
+							SizeA2=tvsUnits::mm(pTrans->get_SizeAp1(), pTrans);
+							SizeA3=tvsUnits::mm(pTrans->get_SizeBp1(), pTrans);
 						}
 					}
 				}
@@ -289,10 +289,10 @@ bool SPEC::add(AcDbEntity * pEnt)
 					if ((SizeA3==0)||(SizeA<SizeA2))
 					{
 
-						SizeA=pTrans->get_SizeAp2();
-						SizeB=pTrans->get_SizeBp2();
-						SizeA2=pTrans->get_SizeAp1();
-						SizeA3=pTrans->get_SizeBp1();
+						SizeA=tvsUnits::mm(pTrans->get_SizeAp2(), pTrans);
+						SizeB=tvsUnits::mm(pTrans->get_SizeBp2(), pTrans);
+						SizeA2=tvsUnits::mm(pTrans->get_SizeAp1(), pTrans);
+						SizeA3=tvsUnits::mm(pTrans->get_SizeBp1(), pTrans);
 					}
 
 				}
@@ -332,10 +332,10 @@ bool SPEC::add(AcDbEntity * pEnt)
 					radp2=(SizeA2+SizeA3)/(M_PI);
 
 				}
-				double dobr=sqrt(pow(radp1-radp2,2)+pow(pTrans->LengthTr,2));
+				double dobr=sqrt(pow(radp1-radp2,2)+pow(tvsUnits::mm(pTrans->LengthTr, pTrans),2));
 				Area=M_PI*(radp1+radp2)*dobr/1000000;
 				appendLable(_T(" (L="));
-				appendLable(pTrans->LengthTr);
+				appendLable(tvsUnits::mm(pTrans->LengthTr, pTrans));
 				appendLable(_T(" mm)"));
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);

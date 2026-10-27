@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -61,6 +61,7 @@
 #include "TVS_Connector.h"
 #include <iostream>
 #include "commonDef.h"
+#include "DrawingUnits.h"
 
 #include <algorithm>
 using namespace std;

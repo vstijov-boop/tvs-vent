@@ -49,21 +49,21 @@ TVS_WYE::~TVS_WYE () {
 void TVS_WYE::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 {
 
-	if (SizeBpr==0)
+	if (tvsUnits::mm(SizeBpr, this)==0)
 	{
-		sizeStr.Format(L"%%%%c%g", SizeApr);
+		sizeStr.Format(L"%%%%c%g", tvsUnits::mm(SizeApr, this));
 
 	}else{
-		sizeStr.Format(L"%gx%g", SizeApr,SizeBpr);
+		sizeStr.Format(L"%gx%g", tvsUnits::mm(SizeApr, this),tvsUnits::mm(SizeBpr, this));
 	}
 	CString strSize2;
-	if (SizeBotv==0)
+	if (tvsUnits::mm(SizeBotv, this)==0)
 	{
-		strSize2.Format(L"-%%%%c%g", SizeAotv);
+		strSize2.Format(L"-%%%%c%g", tvsUnits::mm(SizeAotv, this));
 		sizeStr += strSize2;
 
 	}else{
-		strSize2.Format(L"-%gx%g", SizeAotv,SizeBotv);
+		strSize2.Format(L"-%gx%g", tvsUnits::mm(SizeAotv, this),tvsUnits::mm(SizeBotv, this));
 		sizeStr += strSize2;
 	}
 }

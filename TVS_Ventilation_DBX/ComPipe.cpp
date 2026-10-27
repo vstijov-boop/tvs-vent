@@ -256,6 +256,7 @@ STDMETHODIMP CComPipe::get_Dpr(double *pVal)
 	size = pSq->SizeA;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -270,6 +271,8 @@ STDMETHODIMP CComPipe::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeA(newVal);
 	Fire_Notification(DISPID_A);
@@ -287,6 +290,7 @@ STDMETHODIMP CComPipe::get_SizeB(double *pVal)
 	size = pSq->SizeB;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -299,6 +303,8 @@ STDMETHODIMP CComPipe::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 	if (newVal==0)pSq->put_ThisRound(true);
 	else pSq->put_ThisRound(false);
 
@@ -320,12 +326,12 @@ STDMETHODIMP CComPipe::get_Speed(double *pVal)
 	{
 		if (pSq->get_ThisRound()==true)
 		{
-			speed=pflow/(3600*3.14*(pSq->SizeA/1000)*(pSq->SizeA/1000)/4);
+			speed=pflow/(3600*3.14*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)/4);
 
 		}
 		else
 		{
-			speed=pflow/(3600*(pSq->SizeA/1000)*(pSq->SizeB/1000));
+			speed=pflow/(3600*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000));
 		}
 	}
 	else speed=0;
@@ -352,12 +358,12 @@ STDMETHODIMP CComPipe::put_Speed(double newVal)
 
 	if ((pSq->get_ThisRound())==true)
 	{
-		pflow=speed*(3600*3.14*((pSq->SizeA)/1000)*((pSq->SizeA)/1000)/4);
+		pflow=speed*(3600*3.14*((tvsUnits::mm(pSq->SizeA, pSq.operator->()))/1000)*((tvsUnits::mm(pSq->SizeA, pSq.operator->()))/1000)/4);
 
 	}
 	else
 	{
-		pflow=speed*(3600*(pSq->SizeA/1000)*(pSq->SizeB/1000));
+		pflow=speed*(3600*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000));
 
 	}
 
@@ -416,11 +422,12 @@ STDMETHODIMP CComPipe::get_Length(double  *pVal)
 
 
 
-	*pVal=pSq->Length ;
+	*pVal=pSq->FirstPoint.distanceTo(pSq->LastPoint);
 
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -433,6 +440,8 @@ STDMETHODIMP CComPipe::put_Length(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 
@@ -540,15 +549,15 @@ STDMETHODIMP CComPipe::get_Parami(double *pVal)
 
 	if (pSq->ThisRound==true)
 	{
-		S=pSq->SizeA*pSq->SizeA*M_PI/4/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeA, pSq.operator->())*M_PI/4/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=pSq->SizeA/1000;
+		dekv=tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000;
 	} 
 	else
 	{
-		S=pSq->SizeA*pSq->SizeB/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=2*pSq->SizeA*pSq->SizeB/(pSq->SizeA+pSq->SizeB)/1000;
+		dekv=2*tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/(tvsUnits::mm(pSq->SizeA, pSq.operator->())+tvsUnits::mm(pSq->SizeB, pSq.operator->()))/1000;
 	}
 	v=L/S;
 	Pd=1.2*v*v/2;
@@ -589,22 +598,22 @@ STDMETHODIMP CComPipe::get_ParamdP(double  *pVal)
 
 	if (pSq->ThisRound==true)
 	{
-		S=pSq->SizeA*pSq->SizeA*M_PI/4/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeA, pSq.operator->())*M_PI/4/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=pSq->SizeA/1000;
+		dekv=tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000;
 	} 
 	else
 	{
-		S=pSq->SizeA*pSq->SizeB/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=2*pSq->SizeA*pSq->SizeB/(pSq->SizeA+pSq->SizeB)/1000;
+		dekv=2*tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/(tvsUnits::mm(pSq->SizeA, pSq.operator->())+tvsUnits::mm(pSq->SizeB, pSq.operator->()))/1000;
 	}
 	v=L/S;
 	Pd=1.2*v*v/2;
 	Re=v*dekv/0.000014;
 	Lambda=0.11*pow((0.1/dekv/1000+68/Re),0.25);
 	i=Pd*Lambda/dekv;
-	*pVal=i*pSq->Length/1000;
+	*pVal=i*tvsUnits::mm(pSq->Length, pSq.operator->())/1000;
 	return S_OK;
 }
 
@@ -719,6 +728,7 @@ STDMETHODIMP CComPipe::get_Elev(double  *pVal)
 	*pVal=pSq->Elev;
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -731,6 +741,8 @@ STDMETHODIMP CComPipe::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);
@@ -757,6 +769,7 @@ STDMETHODIMP CComPipe::get_ElevUp(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -769,6 +782,8 @@ STDMETHODIMP CComPipe::put_ElevUp(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_ElevUp(newVal);
@@ -795,6 +810,7 @@ STDMETHODIMP CComPipe::get_ElevDown(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -807,6 +823,8 @@ STDMETHODIMP CComPipe::put_ElevDown(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_ElevDown(newVal);
