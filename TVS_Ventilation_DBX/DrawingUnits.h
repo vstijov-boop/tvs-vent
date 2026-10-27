@@ -21,7 +21,7 @@ inline double factor(AcDbDatabase* db = NULL) {
     AcDbXrecord* record = NULL;
     if (acdbOpenObject(record, id, AcDb::kForRead) != Acad::eOk) return 1.0;
     resbuf* data = NULL;
-    es = record->rbChain(data);
+    es = record->rbChain(&data);
     record->close();
     double result = 1.0;
     if (es == Acad::eOk) {
