@@ -2779,6 +2779,7 @@ double func::getElev(double &Elev,
 
 TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 {
+	syncTVSGlobalUnits();
 
 
 

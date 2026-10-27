@@ -906,7 +906,7 @@ void TVS_Pipe::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 
 void TVS_Pipe::getCount(double &count)
 {
-	count = tvsUnits::metres(FirstPoint.distanceTo(LastPoint), this);
+	count = tvsUnits::metres(get_Length(), this);
 }
 
 void TVS_Pipe::getCountUnit(CString &unit)
@@ -1199,7 +1199,7 @@ Acad::ErrorStatus TVS_Pipe::subExplode(AcDbVoidPtrArray & entitySet) const
 double TVS_Pipe::get_Length(void) const
 {
 	assertReadEnabled () ;
-	return (FirstPoint.distanceTo(LastPoint)) ;
+	return (FirstPoint.distanceTo(AcGePoint3d(LastPoint.x, LastPoint.y, FirstPoint.z))) ;
 }
 
 AcGePoint3d TVS_Pipe::get_Lastpoint(void) const

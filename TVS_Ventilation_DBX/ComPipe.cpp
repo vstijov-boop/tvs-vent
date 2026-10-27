@@ -422,7 +422,7 @@ STDMETHODIMP CComPipe::get_Length(double  *pVal)
 
 
 
-	*pVal=pSq->FirstPoint.distanceTo(pSq->LastPoint);
+	*pVal=pSq->get_Length();
 
 
 
