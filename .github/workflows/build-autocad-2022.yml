@@ -32,8 +32,13 @@ jobs:
           Invoke-WebRequest -Uri 'https://download.autodesk.com/esd/objectarx/2022/objectarx_for_autocad_2022_win_64bit_dlm.sfx.exe' -OutFile $sdkArchive
           Get-FileHash $sdkArchive -Algorithm SHA256 | Format-List | Out-File build-logs/sdk-sha256.txt
           $extractDir = Join-Path $env:RUNNER_TEMP 'objectarx-extracted'
-          & 'C:\Program Files\7-Zip\7z.exe' x $sdkArchive "-o$extractDir" -y | Tee-Object build-logs/sdk-extraction.txt
-          if ($LASTEXITCODE -ne 0) { throw 'SDK archive extraction failed.' }
+          $signature = Get-AuthenticodeSignature $sdkArchive
+          $signature | Format-List Status, StatusMessage, SignerCertificate | Out-File build-logs/sdk-signature.txt
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Autodesk') { throw 'SDK installer does not have a valid Autodesk signature.' }
+          $extractProcess = Start-Process -FilePath $sdkArchive -ArgumentList @('-suppresslaunch', '-d', "`"$extractDir`"") -PassThru
+          if (!$extractProcess.WaitForExit(180000)) { $extractProcess.Kill(); throw 'SDK self-extraction timed out.' }
+          "SDK extractor exit code: $($extractProcess.ExitCode)" | Out-File build-logs/sdk-extraction.txt
+          if ($extractProcess.ExitCode -ne 0) { throw 'SDK self-extraction failed.' }
           $props = @(Get-ChildItem $extractDir -Recurse -Filter arx.props)
           if ($props.Count -ne 1) {
             Get-ChildItem $extractDir -Recurse | Select-Object FullName | Out-File build-logs/sdk-files.txt
