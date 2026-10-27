@@ -2,6 +2,15 @@
 
 Datum: 26.10.2026. Grana: `srpski-prevod`. Osnova: `master` na `5aa1ac5`.
 
+## Potvrđena online izgradnja — 27.10.2026.
+
+GitHub Actions je uspješno kompajlirao ARX i DBX za AutoCAD 2022 x64:
+0 grešaka i 2 upozorenja o nedostajućim Autodesk debug simbolima (`rxapi.pdb`).
+Run: https://github.com/vstijov-boop/tvs-vent/actions/runs/40512583361
+Izvorni commit: `628efbdd712e85fd65bd16ce6d4ccf05e6a70f09`.
+Preuzimanje i detalji nalaze se u `BUILD_ONLINE.md`.
+Vizuelna i funkcionalna provjera u AutoCAD-u i Excelu i dalje predstoje.
+
 ## Završeno u izvoru
 
 - Prevedena 154 pojavljivanja tekstova u osam definicija dijaloga.
@@ -78,7 +87,7 @@ i postojeći EXE instalateri nijesu mijenjani.
 
 Za ovaj dio prevoda nije potrebna C++ izgradnja. Potrebno je učitati prevedene
 CUIX fajlove u AutoCAD-u i vizuelno provjeriti hintove i ribbon. Prevod dijaloga
-i Properties palete i dalje zahtijeva novu ARX/DBX izgradnju. Detalji i rječnik:
+i Properties palete uključen je u novu online ARX/DBX izgradnju. Detalji i rječnik:
 `PREVOD_TOOLBAROVA.md`.
 
 ## Dodatno: specifikacije u AutoCAD-u i Excelu
@@ -109,8 +118,8 @@ Dodatno je kompajliran test koji poredi stvarni stari fabrički šablon iz Git-a
 s novim šablonom u izvoru. Statički je potvrđeno da proračuni u `SPEC.cpp`,
 kontroler XData i nazivi/tagovi atributa nijesu promijenjeni.
 
-Ovo ne potvrđuje cijelu Windows/ObjectARX izgradnju ni Excel COM izvoz.
-Preostalo: kompajlirati ARX/DBX i provjeriti oba izlaza na istom skupu
+Windows/ObjectARX izgradnja sada je prošla preko GitHub Actions.
+Preostalo je provjeriti AutoCAD i Excel COM izvoz na istom skupu
 objekata. Postojeće nacrtane tabele i ranije izvezeni Excel fajlovi se ne
 mijenjaju; potrebno ih je ponovo generisati. Vidi `PREVOD_SPECIFIKACIJA.md`.
 
@@ -144,7 +153,7 @@ Ovo su statičke provjere, ne potvrda kompajliranja ili rada dodatka.
 
 ## Preostalo prije upotrebe
 
-- [ ] Kompajliranje u Windows-u uz odgovarajući Visual Studio/MFC i ObjectARX SDK.
+- [x] Kompajliranje za AutoCAD 2022 x64 na GitHub Windows runneru uz v142/MFC i ObjectARX SDK.
 - [ ] Potvrda da Windows Resource Compiler ispravno obrađuje UTF-8 resurs.
 - [ ] Otvaranje sedam aktivnih dijaloga i provjera svih stanja i opcija.
 - [ ] Provjera Properties palete, opisa svojstava i uređivanja vrijednosti.
@@ -158,7 +167,8 @@ Ovo su statičke provjere, ne potvrda kompajliranja ili rada dodatka.
 
 Prvi praktični test pripremiti za korisnikovu ciljnu verziju AutoCAD-a
 (2017 ili 2022). U ovom Linux okruženju nema Windows/ObjectARX alata ni
-AutoCAD-a; ARX/DBX i instalacioni EXE fajlovi nijesu napravljeni niti mijenjani.
+AutoCAD-a. Novi ARX/DBX fajlovi napravljeni su na GitHub Windows runneru;
+instalacioni EXE fajlovi nijesu mijenjani.
 
 ## Rječnik tekstova resursa
 

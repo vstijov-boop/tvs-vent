@@ -40,5 +40,21 @@ učitavanje dodataka, dijaloge, Properties paletu, toolbarove i specifikacije.
   MSBuild je prijavio nedostajuće MFC biblioteke za v142 (MSB8041).
 - Dodata je instalacija odgovarajućih v142 MFC i ATL komponenti na runneru.
 
+## Prva uspješna izgradnja — 27.10.2026.
+
+- Run: https://github.com/vstijov-boop/tvs-vent/actions/runs/40512583361
+- Izvorni commit: `628efbdd712e85fd65bd16ce6d4ccf05e6a70f09`.
+- Rezultat: **Build succeeded, 0 grešaka, 2 upozorenja**.
+- Upozorenja su LNK4099 za nedostajući Autodesk `rxapi.pdb` (debug simboli).
+- Napravljeni su `TVSTVS_Ventilation_ARX.arx` i `TVSTVS_Ventilation_DBX.dbx`.
+- Paket: https://github.com/vstijov-boop/tvs-vent/actions/runs/40512583361/artifacts/12737743525
+- ZIP SHA256: `ec2222554e35a8eb7b25ea13c76c2dc851836618c32a29f22bb4896b733b5a53`.
+
+Paket sadrži oba nova dodatka, dva prevedena CUIX menija i BUILD.txt.
+Namijenjen je **AutoCAD-u 2022, 64-bit**, uz postojeću instalaciju TVS-a.
+Nije instalacioni EXE. Provjera u AutoCAD-u i Excelu još nije obavljena.
+Ovaj pokušaj nije mijenjao obradu MLeader parametra `[P]`; njegovo povezivanje
+s jediničnim padom pritiska u Pa/m ostaje zasebna ispravka.
+
 Aktuelan rezultat uvijek provjeriti na GitHub Actions stranici. Stari
 instalacioni EXE fajlovi u `Installer` nijesu dokaz nove izgradnje.
