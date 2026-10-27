@@ -11,6 +11,12 @@ Izvorni commit: `628efbdd712e85fd65bd16ce6d4ccf05e6a70f09`.
 Preuzimanje i detalji nalaze se u `BUILD_ONLINE.md`.
 Vizuelna i funkcionalna provjera u AutoCAD-u i Excelu i dalje predstoje.
 
+Potvrđena je i zasebna izgradnja za **AutoCAD 2020 x64**, sa SDK-om 2020 i
+alatnim skupom v141: 0 grešaka, 2 upozorenja LNK4099. Paket i uputstvo za
+zamjenu: `BUILD_AUTOCAD_2020.md`. Dva poziva za boju pozadine zamijenjena su
+kompatibilnim RGB pozivima; uspješno je ponovljena i izgradnja za 2022.
+Praktična provjera obje verzije u AutoCAD-u ostaje preostali korak.
+
 ## Završeno u izvoru
 
 - Prevedena 154 pojavljivanja tekstova u osam definicija dijaloga.

@@ -58,3 +58,9 @@ s jediničnim padom pritiska u Pa/m ostaje zasebna ispravka.
 
 Aktuelan rezultat uvijek provjeriti na GitHub Actions stranici. Stari
 instalacioni EXE fajlovi u `Installer` nijesu dokaz nove izgradnje.
+
+## Dodatna verzija: AutoCAD 2020 x64
+
+Zaseban workflow i uspješna izgradnja za 2020 opisani su u
+`BUILD_AUTOCAD_2020.md`, zajedno sa linkom za ZIP i tačnim putanjama za zamjenu.
+Verzije 2020 i 2022 imaju različite ARX/DBX fajlove.
