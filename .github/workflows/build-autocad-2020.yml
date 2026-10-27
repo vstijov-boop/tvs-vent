@@ -1,0 +1,120 @@
+name: Build AutoCAD 2020
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [srpski-prevod]
+    paths:
+      - '.github/workflows/build-autocad-2020.yml'
+      - 'TVS_Ventilation_ARX/**'
+      - 'TVS_Ventilation_DBX/**'
+      - 'GridCtrl_src/**'
+      - '*2020*'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 35
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install VS 2017 v141 build tools with MFC and ATL
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build-logs | Out-Null
+          $vsPath = Join-Path $env:RUNNER_TEMP 'vs2017-buildtools'
+          $installer = Join-Path $env:RUNNER_TEMP 'vs2017-buildtools.exe'
+          Invoke-WebRequest 'https://aka.ms/vs/15/release/vs_buildtools.exe' -OutFile $installer
+          $signature = Get-AuthenticodeSignature $installer
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Microsoft') { throw 'Build Tools installer does not have a valid Microsoft signature.' }
+          $installArgs = @('--quiet', '--wait', '--norestart', '--nocache', '--installPath', "`"$vsPath`"", '--add', 'Microsoft.VisualStudio.Workload.VCTools', '--add', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '--add', 'Microsoft.VisualStudio.Component.VC.ATLMFC')
+          $installProcess = Start-Process $installer -ArgumentList $installArgs -PassThru
+          if (!$installProcess.WaitForExit(900000)) { $installProcess.Kill(); throw 'VS 2017 installation timed out.' }
+          "Installer exit code: $($installProcess.ExitCode)" | Out-File build-logs/v141-installation.txt
+          if ($installProcess.ExitCode -notin @(0, 3010)) {
+            Get-ChildItem $env:TEMP -Filter 'dd_*' -File | Copy-Item -Destination build-logs -ErrorAction SilentlyContinue
+            throw 'Unable to install v141 build tools and MFC/ATL.'
+          }
+          $msbuildPath = Join-Path $vsPath 'MSBuild/15.0/Bin/MSBuild.exe'
+          if (!(Test-Path $msbuildPath)) { throw 'VS 2017 MSBuild was not installed.' }
+          "TVS_MSBUILD=$msbuildPath" >> $env:GITHUB_ENV
+          "TVS_VS2017=$vsPath" >> $env:GITHUB_ENV
+      - name: Download and extract ObjectARX SDK 2020
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build-logs | Out-Null
+          $sdkArchive = Join-Path $env:RUNNER_TEMP 'objectarx2020.sfx.exe'
+          Invoke-WebRequest -Uri 'https://download.autodesk.com/esd/objectarx/2020/objectarx_for_autocad_2020_win_64_bit.sfx.exe' -OutFile $sdkArchive
+          Get-FileHash $sdkArchive -Algorithm SHA256 | Format-List | Out-File build-logs/sdk-sha256.txt
+          $extractDir = Join-Path $env:RUNNER_TEMP 'objectarx-extracted'
+          $signature = Get-AuthenticodeSignature $sdkArchive
+          $signature | Format-List Status, StatusMessage, SignerCertificate | Out-File build-logs/sdk-signature.txt
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Autodesk') { throw 'SDK installer does not have a valid Autodesk signature.' }
+          $extractProcess = Start-Process -FilePath $sdkArchive -ArgumentList @('-suppresslaunch', '-d', "`"$extractDir`"") -PassThru
+          if (!$extractProcess.WaitForExit(180000)) { $extractProcess.Kill(); throw 'SDK self-extraction timed out.' }
+          "SDK extractor exit code: $($extractProcess.ExitCode)" | Out-File build-logs/sdk-extraction.txt
+          if ($extractProcess.ExitCode -ne 0) { throw 'SDK self-extraction failed.' }
+          $props = @(Get-ChildItem $extractDir -Recurse -Filter arx.props)
+          if ($props.Count -ne 1) {
+            Get-ChildItem $extractDir -Recurse | Select-Object FullName | Out-File build-logs/sdk-files.txt
+            throw 'Expected exactly one SDK inc/arx.props. Inspect SDK extraction log.'
+          }
+          $sdkRoot = $props[0].Directory.Parent.FullName
+          New-Item -ItemType Directory -Force ThirdParty | Out-Null
+          Copy-Item $sdkRoot ThirdParty/ObjectARX2020 -Recurse
+          Get-ChildItem ThirdParty/ObjectARX2020 -Recurse -Filter '*.tlb' | Select-Object FullName | Out-File build-logs/sdk-type-libraries.txt
+      - name: Prepare existing projects for the SDK on this runner
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdkRoot = (Resolve-Path ThirdParty/ObjectARX2020).Path
+          $typeLibs = @(Get-ChildItem $sdkRoot -Recurse -Filter axdb23enu.tlb)
+          if ($typeLibs.Count -lt 1) { throw 'axdb23enu.tlb missing from SDK; see sdk-type-libraries.txt.' }
+          $typeLibDir = $typeLibs[0].DirectoryName
+          # The checked-in IDLs still refer to AutoCAD 2015. Adapt only this build workspace.
+          foreach ($folder in @('TVS_Ventilation_ARX', 'TVS_Ventilation_DBX')) {
+            $idl = Join-Path $folder "$folder.idl"
+            $source = [IO.File]::ReadAllText((Resolve-Path $idl))
+            [IO.File]::WriteAllText((Resolve-Path $idl), $source.Replace('axdb20enu.tlb', 'axdb23enu.tlb'), [Text.UTF8Encoding]::new($true))
+          }
+          $env:LIB = "$typeLibDir;$env:LIB"
+          "LIB=$env:LIB" >> $env:GITHUB_ENV
+          # Add SDK include directories to MIDL's search path in both property sheets.
+          foreach ($folder in @('TVS_Ventilation_ARX', 'TVS_Ventilation_DBX')) {
+            $file = Join-Path $folder 'Autodesk.arx-2020.props'
+            $source = [IO.File]::ReadAllText((Resolve-Path $file))
+            $source = $source.Replace('<AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>', '<AdditionalIncludeDirectories>$(ArxSdkIncs);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>')
+            [IO.File]::WriteAllText((Resolve-Path $file), $source, [Text.UTF8Encoding]::new($true))
+          }
+          Get-ChildItem (Join-Path $env:TVS_VS2017 'VC/Tools/MSVC') | Select-Object Name | Out-File build-logs/msvc-versions.txt
+      - name: Build Release x64
+        run: |
+          & $env:TVS_MSBUILD 'TVS_Ventilation 2020.sln' /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.17763.0 /bl:build-logs/build.binlog /fl '/flp:logfile=build-logs/build.log;verbosity=normal'
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE. See build.log." }
+      - name: Package new binaries and translated menus
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = 'x64/Release/2020'
+          foreach ($file in @('TVSTVS_Ventilation_ARX.arx', 'TVSTVS_Ventilation_DBX.dbx')) {
+            if (!(Test-Path (Join-Path $output $file))) { throw "Missing newly built output: $file" }
+          }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "$output/*.arx", "$output/*.dbx" dist
+          Copy-Item Installer/TVS_VENT/TVS_VENT.cuix, Installer/TVS_TOOLS/TVS_TOOLS.cuix dist
+          "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nRuntime testing in AutoCAD is still required." | Out-File dist/BUILD.txt -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: autocad-2020-build-logs
+          path: build-logs/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: tvs-vent-srpski-autocad-2020-x64
+          path: dist/
+          if-no-files-found: error
