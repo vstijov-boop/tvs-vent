@@ -252,9 +252,9 @@ bool func::correctpipes(AcGePoint3d &A,
 	AcGePoint3d pB1, pB2;
 	double plength1, plength2, negatvel;
 	double flanez = 0;
-	if ((pThisRound == true) && (pSizeA < 630))
+	if ((pThisRound == true) && (pSizeA * tvsUnits::factor() < 630))
 	{
-		flanez = 45;
+		flanez = 45 / tvsUnits::factor();
 	}
 	plength1 = length2p(A, B);
 	plength2 = length2p(B, C);
@@ -329,17 +329,17 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	const ACHAR*t5)
 {
 	AcGePoint3d pos1, pos2, pos3, pos4, pos5;
-	pos1 = AcGePoint3d(cent.x + 300, cent.y + 50, cent.z);
-	pos2 = AcGePoint3d(cent.x + 300 + 5500, cent.y + 50, cent.z);
-	pos3 = AcGePoint3d(cent.x + 300 + 6400, cent.y + 50, cent.z);
-	pos4 = AcGePoint3d(cent.x + 300 + 7500, cent.y + 50, cent.z);
-	pos5 = AcGePoint3d(cent.x + 300 + 8400, cent.y + 50, cent.z);
+	pos1 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos2 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (5500.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos3 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (6400.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos4 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (7500.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos5 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (8400.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
 
 	AcDbDatabase *db = acdbHostApplicationServices()->workingDatabase();
 
 	AcDbObjectId tId = db->textstyle();
 	///
-	AcDbText *text1 = new AcDbText(pos1, t1, tId, 250, 0);
+	AcDbText *text1 = new AcDbText(pos1, t1, tId, (250.0 / tvsUnits::factor()), 0);
 
 	AcDbBlockTable *pBlockTable;
 	acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -357,7 +357,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	if ((wcscmp(t2, _T("")) != 0))
 	{
 
-		AcDbText *text2 = new AcDbText(pos2, t2, tId, 250, 0);
+		AcDbText *text2 = new AcDbText(pos2, t2, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -376,7 +376,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	//
 	if ((wcscmp(t3, _T("")) != 0))
 	{
-		AcDbText *text3 = new AcDbText(pos3, t3, tId, 250, 0);
+		AcDbText *text3 = new AcDbText(pos3, t3, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -396,7 +396,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	//
 	if ((wcscmp(t4, _T("")) != 0))
 	{
-		AcDbText *text4 = new AcDbText(pos4, t4, tId, 250, 0);
+		AcDbText *text4 = new AcDbText(pos4, t4, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -414,7 +414,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 
 	if ((wcscmp(t5, _T("")) != 0))
 	{
-		AcDbText *text5 = new AcDbText(pos5, t5, tId, 250, 0);
+		AcDbText *text5 = new AcDbText(pos5, t5, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -430,7 +430,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 		text5->close();
 	}
 	//
-	return (AcGePoint3d(cent.x, cent.y - 800, cent.z));
+	return (AcGePoint3d(cent.x, cent.y - (800.0 / tvsUnits::factor()), cent.z));
 
 }
 

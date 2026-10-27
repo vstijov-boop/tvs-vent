@@ -408,7 +408,7 @@ public:
 		AcGeLine3d line1 = AcGeLine3d(p1, p2);
 		AcGeLine3d  line2 = AcGeLine3d(p3, p4);
 		AcGeTol dop;
-		dop.setEqualPoint(0.01);
+		dop.setEqualPoint(0.01 / tvsUnits::factor());
 		int LineStatus = TVSisIntersection;
 		int SizeStatus;
 		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
@@ -566,7 +566,7 @@ public:
 		AcGeLine3d line1 = AcGeLine3d(p1, p2);
 		AcGeLine3d  line2 = AcGeLine3d(p3, p4);
 		AcGeTol dop;
-		dop.setEqualPoint(0.01);
+		dop.setEqualPoint(0.01 / tvsUnits::factor());
 		int LineStatus = TVSisIntersection;
 		int SizeStatus;
 		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
@@ -2412,7 +2412,7 @@ public:
 		ads_real sa, sb;
 		AcDbObjectId id = AcDbObjectId::kNull;
 		ads_name eName;
-		double pSizeA = 250, pSizeB = 0, X1, X2, Y1, Y2, pSwectangle, radius = 150, tapradius;
+		double pSizeA = 250, pSizeB = 0, X1, X2, Y1, Y2, pSwectangle, radius = 150 / tvsUnits::factor(), tapradius;
 		AcGePoint3d A1, A2, A3, pCenterpoint, lastpipi;
 		AcGeVector3d pnormvect, pstartvect;
 		bool pThisRound = false;
@@ -2452,7 +2452,7 @@ public:
 			A3 = asPnt3d(pt2);
 			if (pThisRound == true)
 			{
-				if (pSizeA < 355)
+				if (pSizeA * tvsUnits::factor() < 355)
 				{
 					tapradius = pSizeA + pSizeA / 2;
 					radius = pSizeA;
@@ -2688,39 +2688,39 @@ public:
 					{
 						if (Pipi->ThisRound == true)
 						{
-							if (Pipi->SizeA > Pipi->SizeB)
+							if (tvsUnits::mm(Pipi->SizeA, Pipi) > tvsUnits::mm(Pipi->SizeB, Pipi))
 							{
-								sA = Pipi->SizeA;
-								sB = Pipi->SizeB;
+								sA = tvsUnits::mm(Pipi->SizeA, Pipi);
+								sB = tvsUnits::mm(Pipi->SizeB, Pipi);
 							}
 							else
 							{
-								sA = Pipi->SizeB;
-								sB = Pipi->SizeA;
+								sA = tvsUnits::mm(Pipi->SizeB, Pipi);
+								sB = tvsUnits::mm(Pipi->SizeA, Pipi);
 							}
 							spc.add(sA,
 								sB,
 								true,
-								Pipi->Length);
+								tvsUnits::mm(Pipi->Length, Pipi));
 							VRnd.append(spc);
 						}
 						else
 						{
-							if (Pipi->SizeA > Pipi->SizeB)
+							if (tvsUnits::mm(Pipi->SizeA, Pipi) > tvsUnits::mm(Pipi->SizeB, Pipi))
 							{
-								sA = Pipi->SizeA;
-								sB = Pipi->SizeB;
+								sA = tvsUnits::mm(Pipi->SizeA, Pipi);
+								sB = tvsUnits::mm(Pipi->SizeB, Pipi);
 							}
 							else
 							{
-								sA = Pipi->SizeB;
-								sB = Pipi->SizeA;
+								sA = tvsUnits::mm(Pipi->SizeB, Pipi);
+								sB = tvsUnits::mm(Pipi->SizeA, Pipi);
 							}
 
 							spc.add(sA,
 								sB,
 								false,
-								Pipi->Length);
+								tvsUnits::mm(Pipi->Length, Pipi));
 							VRct.append(spc);
 						}
 
@@ -2736,8 +2736,8 @@ public:
 						{
 
 
-							sA = Tapie->SizeA;
-							sB = Tapie->SizeB;
+							sA = tvsUnits::mm(Tapie->SizeA, Tapie);
+							sB = tvsUnits::mm(Tapie->SizeB, Tapie);
 							sWa = 5 * floor((Tapie->Swectangle + (2 * M_PI / 180)) / 5 * 180 / M_PI);
 							//consoleprint(sWa,_T("\nSWA:"));
 							//consoleprint(Tapie->Swectangle,_T("\nTapie->Swectangle:"));
@@ -2750,20 +2750,20 @@ public:
 							if (Tapie->Swectangle > (M_PI / 4 + 0.01))
 
 
-								spc.Length2 = M_PI*(length2p(Tapie->pMass[0], Tapie->pMass[1]) * 2 + length2p(Tapie->pMass[5], Tapie->pMass[6]))*Tapie->SizeA / 1000000;
+								spc.Length2 = M_PI*(tvsUnits::mm(length2p(Tapie->pMass[0], Tapie->pMass[1]), Tapie) * 2 + tvsUnits::mm(length2p(Tapie->pMass[5], Tapie->pMass[6]), Tapie))*tvsUnits::mm(Tapie->SizeA, Tapie) / 1000000;
 
 
 							else
 
-								spc.Length2 = M_PI*(length2p(Tapie->pMass45[0], Tapie->pMass45[1]) + length2p(Tapie->pMass45[3], Tapie->pMass45[4]))*Tapie->SizeA / 1000000;
+								spc.Length2 = M_PI*(tvsUnits::mm(length2p(Tapie->pMass45[0], Tapie->pMass45[1]), Tapie) + tvsUnits::mm(length2p(Tapie->pMass45[3], Tapie->pMass45[4]), Tapie))*tvsUnits::mm(Tapie->SizeA, Tapie) / 1000000;
 
 							TRnd.append(spc);
 						}
 						else
 						{
 
-							sA = Tapie->SizeA;
-							sB = Tapie->SizeB;
+							sA = tvsUnits::mm(Tapie->SizeA, Tapie);
+							sB = tvsUnits::mm(Tapie->SizeB, Tapie);
 
 							sWa = 5 * floor(((Tapie->Swectangle) + (2 * M_PI / 180)) / 5 * 180 / M_PI);
 							//consoleprint(sWa,_T("\nSWA:"));
@@ -2777,16 +2777,16 @@ public:
 								sWa);
 
 							spc.Length2 = (Tapie->Swectangle) / (2 * M_PI)
-								*(2 * (M_PI*(Tapie->Radius + Tapie->SizeA)*(Tapie->Radius + Tapie->SizeA) / 1000000
-									- M_PI*(Tapie->Radius)*(Tapie->Radius) / 1000000)
-									+ 2 * M_PI*(Tapie->SizeA + Tapie->Radius) / 1000 * Tapie->SizeB / 1000
-									+ 2 * M_PI*(Tapie->Radius) / 1000 * Tapie->SizeB / 1000);
+								*(2 * (M_PI*(tvsUnits::mm(Tapie->Radius, Tapie) + tvsUnits::mm(Tapie->SizeA, Tapie))*(tvsUnits::mm(Tapie->Radius, Tapie) + tvsUnits::mm(Tapie->SizeA, Tapie)) / 1000000
+									- M_PI*(tvsUnits::mm(Tapie->Radius, Tapie))*(tvsUnits::mm(Tapie->Radius, Tapie)) / 1000000)
+									+ 2 * M_PI*(tvsUnits::mm(Tapie->SizeA, Tapie) + tvsUnits::mm(Tapie->Radius, Tapie)) / 1000 * tvsUnits::mm(Tapie->SizeB, Tapie) / 1000
+									+ 2 * M_PI*(tvsUnits::mm(Tapie->Radius, Tapie)) / 1000 * tvsUnits::mm(Tapie->SizeB, Tapie) / 1000);
 							//  							consoleprint(spc.Length2,_T("\nspc.Length2"));
 							//  							consoleprint((Tapie->Swectangle)/(2*M_PI),_T("\n(Tapie->Swectangle)/(2*M_PI)"));
-							//  							consoleprint(M_PI*(Tapie->Radius+Tapie->SizeA)*(Tapie->Radius+Tapie->SizeA)/4000000,_T("\nM_PI*(Tapie->Radius+Tapie->SizeA)*(Tapie->Radius+Tapie->SizeA)/4000000 "));
-							//  							consoleprint(M_PI*(Tapie->Radius)*(Tapie->Radius)/4000000 ,_T("\nM_PI*(Tapie->Radius)*(Tapie->Radius)/4000000 "));
-							//  							consoleprint(M_PI*(Tapie->SizeA+Tapie->Radius)/1000*Tapie->SizeB/1000,_T("\nM_PI*(Tapie->SizeA+Tapie->Radius)/1000*Tapie->SizeB/1000 "));
-							//  							consoleprint(M_PI*(Tapie->Radius)/1000*Tapie->SizeB/1000,_T("\nM_PI*(Tapie->Radius)/1000*Tapie->SizeB/1000 "));
+							//  							consoleprint(M_PI*(tvsUnits::mm(Tapie->Radius, Tapie)+tvsUnits::mm(Tapie->SizeA, Tapie))*(tvsUnits::mm(Tapie->Radius, Tapie)+tvsUnits::mm(Tapie->SizeA, Tapie))/4000000,_T("\nM_PI*(tvsUnits::mm(Tapie->Radius, Tapie)+tvsUnits::mm(Tapie->SizeA, Tapie))*(tvsUnits::mm(Tapie->Radius, Tapie)+tvsUnits::mm(Tapie->SizeA, Tapie))/4000000 "));
+							//  							consoleprint(M_PI*(tvsUnits::mm(Tapie->Radius, Tapie))*(tvsUnits::mm(Tapie->Radius, Tapie))/4000000 ,_T("\nM_PI*(tvsUnits::mm(Tapie->Radius, Tapie))*(tvsUnits::mm(Tapie->Radius, Tapie))/4000000 "));
+							//  							consoleprint(M_PI*(tvsUnits::mm(Tapie->SizeA, Tapie)+tvsUnits::mm(Tapie->Radius, Tapie))/1000*tvsUnits::mm(Tapie->SizeB, Tapie)/1000,_T("\nM_PI*(tvsUnits::mm(Tapie->SizeA, Tapie)+tvsUnits::mm(Tapie->Radius, Tapie))/1000*tvsUnits::mm(Tapie->SizeB, Tapie)/1000 "));
+							//  							consoleprint(M_PI*(tvsUnits::mm(Tapie->Radius, Tapie))/1000*tvsUnits::mm(Tapie->SizeB, Tapie)/1000,_T("\nM_PI*(tvsUnits::mm(Tapie->Radius, Tapie))/1000*tvsUnits::mm(Tapie->SizeB, Tapie)/1000 "));
 							// 
 
 							TRct.append(spc);
@@ -2797,10 +2797,10 @@ public:
 					if ((Wyeie = TVS_WYE::cast(pEnt)) != NULL)
 					{
 
-						sA = Wyeie->SizeApr;
-						sB = Wyeie->SizeBpr;
-						sA2 = Wyeie->SizeAotv;
-						sB2 = Wyeie->SizeBotv;
+						sA = tvsUnits::mm(Wyeie->SizeApr, Wyeie);
+						sB = tvsUnits::mm(Wyeie->SizeBpr, Wyeie);
+						sA2 = tvsUnits::mm(Wyeie->SizeAotv, Wyeie);
+						sB2 = tvsUnits::mm(Wyeie->SizeBotv, Wyeie);
 
 
 						if ((Wyeie->ThisRoundpr == true) && (Wyeie->ThisRoundotv == true))
@@ -2810,7 +2810,7 @@ public:
 								sB,
 								false,
 								1,
-								Wyeie->LengthPl,
+								tvsUnits::mm(Wyeie->LengthPl, Wyeie),
 								sA2,
 								sB2);
 							if (sA >= sA2)
@@ -2820,8 +2820,8 @@ public:
 							}
 							else
 								drad = sA / 2;
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*M_PI*sA / 1000000 ///цилиндр прохода
-								+ (Wyeie->LengthPl + drad)*M_PI*sA2 / 1000000;  ///цилиндр отвода
+							spc.Length2 = (sA2 + tvsUnits::mm(Wyeie->LengthPl, Wyeie) * 2)*M_PI*sA / 1000000 ///цилиндр прохода
+								+ (tvsUnits::mm(Wyeie->LengthPl, Wyeie) + drad)*M_PI*sA2 / 1000000;  ///цилиндр отвода
 							WPRndORnd.append(spc);
 						}
 
@@ -2832,7 +2832,7 @@ public:
 								sB,
 								false,
 								1,
-								Wyeie->LengthPl,
+								tvsUnits::mm(Wyeie->LengthPl, Wyeie),
 								sA2,
 								sB2);
 
@@ -2844,8 +2844,8 @@ public:
 							else
 								drad = sA / 2;
 
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*M_PI*sA / 1000000 ///цилиндр прохода
-								+ (Wyeie->LengthPl + drad)*(sB2 + sA2) / 500000;   ///призма отвода
+							spc.Length2 = (sA2 + tvsUnits::mm(Wyeie->LengthPl, Wyeie) * 2)*M_PI*sA / 1000000 ///цилиндр прохода
+								+ (tvsUnits::mm(Wyeie->LengthPl, Wyeie) + drad)*(sB2 + sA2) / 500000;   ///призма отвода
 							WPRndORct.append(spc);
 						}
 
@@ -2856,12 +2856,12 @@ public:
 								sB,
 								false,
 								1,
-								Wyeie->LengthPl,
+								tvsUnits::mm(Wyeie->LengthPl, Wyeie),
 								sA2,
 								sB2);
 
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*(sB + sA) / 500000 ///призма прохода
-								+ (Wyeie->LengthPl)*(sB2 + sA2) / 500000;   ///призма отвода
+							spc.Length2 = (sA2 + tvsUnits::mm(Wyeie->LengthPl, Wyeie) * 2)*(sB + sA) / 500000 ///призма прохода
+								+ (tvsUnits::mm(Wyeie->LengthPl, Wyeie))*(sB2 + sA2) / 500000;   ///призма отвода
 							WPRctORct.append(spc);
 						}
 
@@ -2872,12 +2872,12 @@ public:
 								sB,
 								false,
 								1,
-								Wyeie->LengthPl,
+								tvsUnits::mm(Wyeie->LengthPl, Wyeie),
 								sA2,
 								sB2);
 
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*(sB + sA) / 500000 ///призма прохода
-								+ (Wyeie->LengthPl)*M_PI*sA2 / 1000000;  ///цилиндр отвода
+							spc.Length2 = (sA2 + tvsUnits::mm(Wyeie->LengthPl, Wyeie) * 2)*(sB + sA) / 500000 ///призма прохода
+								+ (tvsUnits::mm(Wyeie->LengthPl, Wyeie))*M_PI*sA2 / 1000000;  ///цилиндр отвода
 							WPRctORnd.append(spc);
 						}
 
@@ -2888,40 +2888,40 @@ public:
 					if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 					{
 
-						sA = Transie->SizeAp1;
-						sB = Transie->SizeBp1;
-						sA2 = Transie->SizeAp2;
-						sB2 = Transie->SizeBp2;
+						sA = tvsUnits::mm(Transie->SizeAp1, Transie);
+						sB = tvsUnits::mm(Transie->SizeBp1, Transie);
+						sA2 = tvsUnits::mm(Transie->SizeAp2, Transie);
+						sB2 = tvsUnits::mm(Transie->SizeBp2, Transie);
 
 						//круглый круглый
 						if ((Transie->ThisRoundp1 == true) && (Transie->ThisRoundp2 == true))
 						{
 
-							if (Transie->SizeAp1 > Transie->SizeAp2)
+							if (tvsUnits::mm(Transie->SizeAp1, Transie) > tvsUnits::mm(Transie->SizeAp2, Transie))
 							{
-								sA = Transie->SizeAp1;
-								sB = Transie->SizeBp1;
-								sA2 = Transie->SizeAp2;
-								sB2 = Transie->SizeBp2;
+								sA = tvsUnits::mm(Transie->SizeAp1, Transie);
+								sB = tvsUnits::mm(Transie->SizeBp1, Transie);
+								sA2 = tvsUnits::mm(Transie->SizeAp2, Transie);
+								sB2 = tvsUnits::mm(Transie->SizeBp2, Transie);
 							}
 
 							else
 							{
-								sA = Transie->SizeAp2;
-								sB = Transie->SizeBp2;
-								sA2 = Transie->SizeAp1;
-								sB2 = Transie->SizeBp1;
+								sA = tvsUnits::mm(Transie->SizeAp2, Transie);
+								sB = tvsUnits::mm(Transie->SizeBp2, Transie);
+								sA2 = tvsUnits::mm(Transie->SizeAp1, Transie);
+								sB2 = tvsUnits::mm(Transie->SizeBp1, Transie);
 							}
 
 							spc.add(sA,
 								sB,
 								false,
 								1,
-								Transie->LengthTr,
+								tvsUnits::mm(Transie->LengthTr, Transie),
 								sA2,
 								sB2);
 
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (sA / 2 - sA2 / 2)*(sA / 2 - sA2 / 2)) / 1000;
+							drad = sqrt(tvsUnits::mm(Transie->LengthTr, Transie)*tvsUnits::mm(Transie->LengthTr, Transie) + (sA / 2 - sA2 / 2)*(sA / 2 - sA2 / 2)) / 1000;
 							spc.Length2 = drad*M_PI*(sA / 2 + sA2 / 2) / 1000;
 							TRndRnd.append(spc);
 						}
@@ -2932,31 +2932,31 @@ public:
 						if ((Transie->ThisRoundp1 == true) && (Transie->ThisRoundp2 == false))
 						{
 
-							if (Transie->SizeAp2 > Transie->SizeBp2)
+							if (tvsUnits::mm(Transie->SizeAp2, Transie) > tvsUnits::mm(Transie->SizeBp2, Transie))
 							{
-								sA = Transie->SizeAp1;
-								sB = Transie->SizeBp1;
-								sA2 = Transie->SizeAp2;
-								sB2 = Transie->SizeBp2;
+								sA = tvsUnits::mm(Transie->SizeAp1, Transie);
+								sB = tvsUnits::mm(Transie->SizeBp1, Transie);
+								sA2 = tvsUnits::mm(Transie->SizeAp2, Transie);
+								sB2 = tvsUnits::mm(Transie->SizeBp2, Transie);
 							}
 
 							else
 							{
-								sA = Transie->SizeAp1;
-								sB = Transie->SizeBp1;
-								sA2 = Transie->SizeBp2;
-								sB2 = Transie->SizeAp2;
+								sA = tvsUnits::mm(Transie->SizeAp1, Transie);
+								sB = tvsUnits::mm(Transie->SizeBp1, Transie);
+								sA2 = tvsUnits::mm(Transie->SizeBp2, Transie);
+								sB2 = tvsUnits::mm(Transie->SizeAp2, Transie);
 							}
 
 							spc.add(sA,
 								sB,
 								false,
 								1,
-								Transie->LengthTr,
+								tvsUnits::mm(Transie->LengthTr, Transie),
 								sA2,
 								sB2);
 							prad = (sA2 + sB2) / M_PI;
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (sA / 2 - prad)*(sA / 2 - prad)) / 1000;
+							drad = sqrt(tvsUnits::mm(Transie->LengthTr, Transie)*tvsUnits::mm(Transie->LengthTr, Transie) + (sA / 2 - prad)*(sA / 2 - prad)) / 1000;
 							spc.Length2 = drad*M_PI*(sA / 2 + prad) / 1000;
 							TRndRct.append(spc);
 						}
@@ -2966,31 +2966,31 @@ public:
 						if ((Transie->ThisRoundp1 == false) && (Transie->ThisRoundp2 == true))
 						{
 
-							if (Transie->SizeAp1 > Transie->SizeBp1)
+							if (tvsUnits::mm(Transie->SizeAp1, Transie) > tvsUnits::mm(Transie->SizeBp1, Transie))
 							{
-								sA = Transie->SizeAp2;
-								sB = Transie->SizeBp2;
-								sA2 = Transie->SizeAp1;
-								sB2 = Transie->SizeBp1;
+								sA = tvsUnits::mm(Transie->SizeAp2, Transie);
+								sB = tvsUnits::mm(Transie->SizeBp2, Transie);
+								sA2 = tvsUnits::mm(Transie->SizeAp1, Transie);
+								sB2 = tvsUnits::mm(Transie->SizeBp1, Transie);
 							}
 
 							else
 							{
-								sA = Transie->SizeAp2;
-								sB = Transie->SizeBp2;
-								sA2 = Transie->SizeBp1;
-								sB2 = Transie->SizeAp1;
+								sA = tvsUnits::mm(Transie->SizeAp2, Transie);
+								sB = tvsUnits::mm(Transie->SizeBp2, Transie);
+								sA2 = tvsUnits::mm(Transie->SizeBp1, Transie);
+								sB2 = tvsUnits::mm(Transie->SizeAp1, Transie);
 							}
 
 							spc.add(sA,
 								sB,
 								false,
 								1,
-								Transie->LengthTr,
+								tvsUnits::mm(Transie->LengthTr, Transie),
 								sA2,
 								sB2);
 							prad = (sA2 + sB2) / M_PI;
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (sA / 2 - prad)*(sA / 2 - prad)) / 1000;
+							drad = sqrt(tvsUnits::mm(Transie->LengthTr, Transie)*tvsUnits::mm(Transie->LengthTr, Transie) + (sA / 2 - prad)*(sA / 2 - prad)) / 1000;
 							spc.Length2 = drad*M_PI*(sA / 2 + prad) / 1000;
 							TRndRct.append(spc);
 						}
@@ -2999,61 +2999,61 @@ public:
 						if ((Transie->ThisRoundp1 == false) && (Transie->ThisRoundp2 == false))
 						{
 
-							if (Transie->SizeAp1 > Transie->SizeBp1)
+							if (tvsUnits::mm(Transie->SizeAp1, Transie) > tvsUnits::mm(Transie->SizeBp1, Transie))
 							{
 
 
-								if (Transie->SizeAp1 > Transie->SizeAp2)
+								if (tvsUnits::mm(Transie->SizeAp1, Transie) > tvsUnits::mm(Transie->SizeAp2, Transie))
 								{
 
-									sA = Transie->SizeAp1;
-									sB = Transie->SizeBp1;
-									sA2 = Transie->SizeAp2;
-									sB2 = Transie->SizeBp2;
+									sA = tvsUnits::mm(Transie->SizeAp1, Transie);
+									sB = tvsUnits::mm(Transie->SizeBp1, Transie);
+									sA2 = tvsUnits::mm(Transie->SizeAp2, Transie);
+									sB2 = tvsUnits::mm(Transie->SizeBp2, Transie);
 								}
 								else
 								{
-									if (Transie->SizeAp2 > Transie->SizeBp2)
+									if (tvsUnits::mm(Transie->SizeAp2, Transie) > tvsUnits::mm(Transie->SizeBp2, Transie))
 									{
-										sA = Transie->SizeAp2;
-										sB = Transie->SizeBp2;
-										sA2 = Transie->SizeAp1;
-										sB2 = Transie->SizeBp1;
+										sA = tvsUnits::mm(Transie->SizeAp2, Transie);
+										sB = tvsUnits::mm(Transie->SizeBp2, Transie);
+										sA2 = tvsUnits::mm(Transie->SizeAp1, Transie);
+										sB2 = tvsUnits::mm(Transie->SizeBp1, Transie);
 									}
 									else
 									{
-										sA = Transie->SizeBp2;
-										sB = Transie->SizeAp2;
-										sA2 = Transie->SizeBp1;
-										sB2 = Transie->SizeAp1;
+										sA = tvsUnits::mm(Transie->SizeBp2, Transie);
+										sB = tvsUnits::mm(Transie->SizeAp2, Transie);
+										sA2 = tvsUnits::mm(Transie->SizeBp1, Transie);
+										sB2 = tvsUnits::mm(Transie->SizeAp1, Transie);
 									}
 								}
 							}
 
 							else
 							{
-								if (Transie->SizeBp1 > Transie->SizeBp2)
+								if (tvsUnits::mm(Transie->SizeBp1, Transie) > tvsUnits::mm(Transie->SizeBp2, Transie))
 								{
-									sA = Transie->SizeBp1;
-									sB = Transie->SizeAp1;
-									sA2 = Transie->SizeBp2;
-									sB2 = Transie->SizeAp2;
+									sA = tvsUnits::mm(Transie->SizeBp1, Transie);
+									sB = tvsUnits::mm(Transie->SizeAp1, Transie);
+									sA2 = tvsUnits::mm(Transie->SizeBp2, Transie);
+									sB2 = tvsUnits::mm(Transie->SizeAp2, Transie);
 								}
 								else
 								{
-									if (Transie->SizeBp2 > Transie->SizeAp2)
+									if (tvsUnits::mm(Transie->SizeBp2, Transie) > tvsUnits::mm(Transie->SizeAp2, Transie))
 									{
-										sA = Transie->SizeBp2;
-										sB = Transie->SizeAp2;
-										sA2 = Transie->SizeBp1;
-										sB2 = Transie->SizeAp1;
+										sA = tvsUnits::mm(Transie->SizeBp2, Transie);
+										sB = tvsUnits::mm(Transie->SizeAp2, Transie);
+										sA2 = tvsUnits::mm(Transie->SizeBp1, Transie);
+										sB2 = tvsUnits::mm(Transie->SizeAp1, Transie);
 									}
 									else
 									{
-										sA = Transie->SizeAp2;
-										sB = Transie->SizeBp2;
-										sA2 = Transie->SizeAp1;
-										sB2 = Transie->SizeBp1;
+										sA = tvsUnits::mm(Transie->SizeAp2, Transie);
+										sB = tvsUnits::mm(Transie->SizeBp2, Transie);
+										sA2 = tvsUnits::mm(Transie->SizeAp1, Transie);
+										sB2 = tvsUnits::mm(Transie->SizeBp1, Transie);
 									}
 								}
 
@@ -3066,12 +3066,12 @@ public:
 								sB,
 								false,
 								1,
-								Transie->LengthTr,
+								tvsUnits::mm(Transie->LengthTr, Transie),
 								sA2,
 								sB2);
 							prad = (sA2 + sB2) / M_PI;
 							prad2 = (sA + sB) / M_PI;
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (prad2 - prad)*(prad2 - prad)) / 1000;
+							drad = sqrt(tvsUnits::mm(Transie->LengthTr, Transie)*tvsUnits::mm(Transie->LengthTr, Transie) + (prad2 - prad)*(prad2 - prad)) / 1000;
 							spc.Length2 = drad*M_PI*(prad2 + prad) / 1000;
 							TRctRct.append(spc);
 						}

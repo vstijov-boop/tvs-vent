@@ -1,5 +1,6 @@
 #include "stdafx.h"
 #include "graphicHelper.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
 
 void graphicHelper::drawText(AcGePoint3d cent, const ACHAR * pAchar)
 {
@@ -7,7 +8,7 @@ void graphicHelper::drawText(AcGePoint3d cent, const ACHAR * pAchar)
 
 	AcDbObjectId tId = db->textstyle();
 	///
-	AcDbText *text1 = new AcDbText(cent, pAchar, tId, 250, 0);
+	AcDbText *text1 = new AcDbText(cent, pAchar, tId, 250 / tvsUnits::factor(), 0);
 
 	AcDbBlockTable *pBlockTable;
 	acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,

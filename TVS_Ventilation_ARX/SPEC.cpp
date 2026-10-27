@@ -787,12 +787,15 @@ void SPEClist::print()
 
 void SPEClist::printSPDSForm(AcGePoint3d &cent)
 {
-	//int columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
-	int columnswidth[10]={0, 2000,15000,21000,24500,29000,31000,33000,35500,39500};
-	int columndistanse[6]={2000,15000,29000,31000,33000,35500};
-	int rowhight=800;
-	int otstupX=100;
-	int otstupY=150;
+	//double columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
+	double columnswidth[10]={0, 2000,15000,21000,24500,29000,31000,33000,35500,39500};
+	double columndistanse[6]={2000,15000,29000,31000,33000,35500};
+	const double units = tvsUnits::factor();
+	for (double& c : columnswidth) c /= units;
+	for (double& c : columndistanse) c /= units;
+	double rowhight=800 / units;
+	double otstupX=100 / units;
+	double otstupY=150 / units;
 	int length = specList.logicalLength();
 	AcGePoint3d curcnt, pos1, pos2, pos3,pos4,pos5,pos6,pos7;
 	curcnt=cent;
@@ -859,12 +862,12 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 
 	///print table
 
-	double TableLenght=39500;
-	double Hight=length*800;
+	double TableLenght=39500 / units;
+	double Hight=length*rowhight;
 	//vertical Lines
 
 	AcGePoint3d start,end;
-	for each (int c in columnswidth)
+	for each (double c in columnswidth)
 	{
 		start=AcGePoint3d(cent.x+c,cent.y+rowhight,cent.z);
 		end=AcGePoint3d(cent.x+c,cent.y-rowhight*(length+1),cent.z);
@@ -889,7 +892,7 @@ void SPEClist::printText( AcGePoint3d cent, const ACHAR * pAchar )
 
 	AcDbObjectId tId=db->textstyle();
 	///
-	AcDbText *text1 = new AcDbText (cent, pAchar,tId,250,0 );
+	AcDbText *text1 = new AcDbText (cent, pAchar,tId,250 / tvsUnits::factor(),0 );
 
 	AcDbBlockTable *pBlockTable;
 	acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -1041,12 +1044,15 @@ int SpecWithAttrlist::checkCharRelevations(ACHAR * param1, ACHAR * param2)
 void SpecWithAttrlist::printSPDSForm(AcGePoint3d &cent)
 {
 
-	//int columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
-	int columnswidth[10]={0, 2000,15000,21000,24500,29000,31000,33000,35500,39500};
-	int columndistanse[9]={0,2000,15000,21000,24500,29000,31000,33000,35500};
-	int rowhight=800;
-	int otstupX=100;
-	int otstupY=150;
+	//double columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
+	double columnswidth[10]={0, 2000,15000,21000,24500,29000,31000,33000,35500,39500};
+	double columndistanse[9]={0,2000,15000,21000,24500,29000,31000,33000,35500};
+	const double units = tvsUnits::factor();
+	for (double& c : columnswidth) c /= units;
+	for (double& c : columndistanse) c /= units;
+	double rowhight=800 / units;
+	double otstupX=100 / units;
+	double otstupY=150 / units;
 	int length = specList.logicalLength();
 	AcGePoint3d curcnt, pos1, pos2, pos3,pos4,pos5,pos6,pos7,pos8,pos9;
 	curcnt=cent;
@@ -1129,12 +1135,12 @@ void SpecWithAttrlist::printSPDSForm(AcGePoint3d &cent)
 
 	///print table
 
-	double TableLenght=39500;
-	double Hight=length*800;
+	double TableLenght=39500 / units;
+	double Hight=length*rowhight;
 	//vertical Lines
 
 	AcGePoint3d start,end;
-	for each (int c in columnswidth)
+	for each (double c in columnswidth)
 	{
 		start=AcGePoint3d(cent.x+c,cent.y+rowhight,cent.z);
 		end=AcGePoint3d(cent.x+c,cent.y-rowhight*(length+1),cent.z);

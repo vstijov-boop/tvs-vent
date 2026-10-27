@@ -5,11 +5,12 @@
 #include "MSExcel.h"	
 #include "dgSpecProperty.h"
 #include "SpecificationText.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
 TVSSpecTable::TVSSpecTable() :
 	rowsPerList(21),
-	titleHeight(3200),
-	rowHeight(800),
-	textHeight(250),
+	titleHeight(3200 / tvsUnits::factor()),
+	rowHeight(800 / tvsUnits::factor()),
+	textHeight(250 / tvsUnits::factor()),
 	paginating(false)
 {
 }
@@ -56,7 +57,7 @@ bool TVSSpecTable::loadColumnsFromSettings()
 		{
 			TVSSpecTableColumn col;
 			col.name = rowStringVector[0].Trim(L"\n\r\t ;");
-			col.width = _tstof(rowStringVector[1].Trim(L"\n\r\t ;"));
+			col.width = _tstof(rowStringVector[1].Trim(L"\n\r\t ;")) / tvsUnits::factor();
 			col.value = rowStringVector[2].Trim(L"\n\r\t ;");
 			columns.push_back(col);
 		}
@@ -123,8 +124,8 @@ bool TVSSpecTable::toSimpleTable(const AcGePoint3d &startPoint)
 	//draw text;
 	int colIdx = 0;
 	int rowIdx = 0;
-	int otstupX = 100;
-	int otstupY = 150;
+	double otstupX = 100 / tvsUnits::factor();
+	double otstupY = 150 / tvsUnits::factor();
 	double curY = startPoint.y - titleHeight + otstupY;
 	double curX = startPoint.x + otstupX;
 	//draw title;
