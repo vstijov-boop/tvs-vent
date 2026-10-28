@@ -69,7 +69,10 @@ ploče i unutrašnji/spoljašnji pojas), pragovi debljina, dužine, uglovi, okru
 presjeci, pretvaranje mm/cm/m i sabiranje masa.
 `tests/test_sheet_metal_kgtez.py`: kompajlira C++98 obračun i poredi 56 primjera
 sa izvršavanjem stvarnih numeričkih funkcija iz KGTEZ.lsp kroz testni interpreter.
-CAD/COM prikaz i proizvodna tačnost aproksimacija time nijesu simulirani.
+`tests/test_sheet_metal_adapter.py` kompajlira stvarni DBX adapter sa malim
+zamjenama za CAD tipove: provjerava polja, jedinice mm/cm/m, ravan savijanja,
+okrugle/mješovite presjeke, najveću dimenziju ogranka i isključivanje fleksibilnih
+kanala. CAD/COM prikaz i proizvodna tačnost aproksimacija time nijesu simulirani.
 
 Poslije uspješnog Windows build-a zamijeniti ARX i DBX zajedno, uz zatvoren
 AutoCAD i prethodni backup. Koristiti paket koji odgovara verziji AutoCAD-a.
