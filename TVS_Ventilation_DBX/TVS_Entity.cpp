@@ -35,7 +35,7 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
 {
     assertReadEnabled();
     areaM2 = thicknessMm = massKg = 0.0;
-    if (DuctType == DuctTypeFlex) return false;
+    if ((TVS_Pipe::cast(this) || TVS_TAP::cast(this)) && DuctType == DuctTypeFlex) return false;
     const double f = tvsUnits::factor(this);
     double largest = 0.0;
     if (const TVS_Pipe *p = TVS_Pipe::cast(this)) {

@@ -45,6 +45,7 @@ bool TVSSpecTable::setRowSettings(const CString &rowSettings)
 
 bool TVSSpecTable::loadColumnsFromSettings()
 {
+    columns.clear();
 	CString tvsTablePropertyString;
 	if (!getRowSettings(tvsTablePropertyString)) return false;
 
