@@ -1,5 +1,8 @@
 # Masa lima kanala i fitinga
 
+Najnoviji paketi i naknadna ispravka Properties prikaza, zbir mase izbora i
+razmjera tabela opisani su u [TABELE_I_PROPERTIES.md](TABELE_I_PROPERTIES.md).
+
 Grana: `unapredjenja-masa`, nastala iz provjerene grane `unapredjenja-jedinice`.
 
 ## Obračun

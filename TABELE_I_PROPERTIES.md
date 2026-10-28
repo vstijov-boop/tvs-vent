@@ -103,3 +103,18 @@ Provjeriti u AutoCAD-u:
 6. Upravljač svojstava i CAD/Excel specifikacije treba da zadrže isti obračun mase.
 
 Kompilacija i numerički testovi ne zamjenjuju ovu provjeru rada OPM-a u AutoCAD-u.
+
+## Provjereni paketi — 28.10.2026.
+
+Kod: `f26498b4a66b1d5f2292dc26751dbeb24f78782a`.
+Obje Windows Release x64 kompilacije prošle su sa 0 grešaka i po 2 LNK4099
+upozorenja o nedostajućim SDK PDB simbolima. ZIP CRC, PE x64 i odgovarajući
+acdb23/acdb24 DLL importi su provjereni, kao i novi KGTEZ naspram izvornog fajla.
+U binarnim fajlovima potvrđeni su novi zapis razmjere, zbirno svojstvo mase i
+izvoz revizije geometrije. Oba CUIX fajla jednaka su postojećim.
+Numerički testovi prolaze; ručna AutoCAD/Properties provjera ostaje otvorena.
+
+- [AutoCAD 2020](https://github.com/vstijov-boop/tvs-vent/actions/runs/40780544460/artifacts/12856018377)
+  SHA256 `7347575e3894f369613e93a1b70a746ce406b00b71d24b028fe00bda2d77300c`
+- [AutoCAD 2022](https://github.com/vstijov-boop/tvs-vent/actions/runs/40780544374/artifacts/12857437068)
+  SHA256 `e8a617c9d5d7c0743c519500b3ff40df0e690a98d7b3cc1c2a7c5dba9fc193a0`
