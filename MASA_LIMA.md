@@ -92,3 +92,16 @@ Ručna provjera u AutoCAD-u (mm, cm i m):
    upravljač svojstvima; sačuvati/ponovo otvoriti DWG.
 7. Provjeriti pragove 500/1000/1500 mm, račvu sa većim ogrankom, okrugli i
    mješoviti prelaz, fleksibilni kanal i blok sa ručno upisanom masom.
+
+## Završni Windows paketi — 28.10.2026.
+
+Kod binarnih paketa: `f7653a90b195869509f2b7c8ec6dddc9cb232b1a`.
+Obje Release x64 kompilacije: 0 grešaka; 2 upozorenja o nedostajućim PDB
+simbolima u SDK biblioteci. ZIP CRC i PE x64 provjereni; 2020 koristi acdb23.dll,
+a 2022 acdb24.dll. U DBX-u su provjereni izvoz obračuna i COM nazivi novih polja.
+Stvarni prikaz i interakciju u AutoCAD-u još treba potvrditi na korisnikovom računaru.
+
+- [AutoCAD 2020 paket](https://github.com/vstijov-boop/tvs-vent/actions/runs/40774075581/artifacts/12852774377)
+  SHA256: `8f5ed65e619f6c9d790c6c4d3e3598a45ea6c16170c248486f7879b1e34bdab8`
+- [AutoCAD 2022 paket](https://github.com/vstijov-boop/tvs-vent/actions/runs/40774075732/artifacts/12854786258)
+  SHA256: `3fb96bbf4c9d0e0b5a130095b6ff58da758dc8c111c77f308aeaeb46d9950671`
