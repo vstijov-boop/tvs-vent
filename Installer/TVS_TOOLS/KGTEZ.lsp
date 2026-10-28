@@ -16,7 +16,7 @@
 (setq *tvs-wye-k* 1.0)       ; koristi se samo u modu "dpr"
 (setq *tvs-wye-hole* T)      ; T = oduzmi otvor odvojka (Dotv x Hotv) od glavnog dijela T-komada (kao TVS)
 (setq *tvs-elbow-geom* T)    ; T = radijus koljena se cita iz geometrije (kopija + explode + brisanje)
-(setq *tvs-margin-mult* 100.0) ; horizontalna margina spojenih celija (REZERVA, UKUPNO SA REZERVOM) = HorzCellMargin x ovo
+(setq *tvs-summary-margin* 0.5) ; margina zbirnih celija kao dio visine slova
 (setq *tvs-debug* nil)        ; T = ispisuje Ri, Ro, Rc i povrsinu za svako koljeno
 (setq *tvs-deb-fix* 2.0)     ; debljina (mm) kad je u dijalogu ukljucena opcija "debljina 2 mm"
 
@@ -234,7 +234,7 @@
                 (* tW (+ 1.0 (/ *tvs-rez* 100.0)))))))
 
 ;; ---- TABELA U AUTOCAD-U ---------------------------------------------
-(defun tvs-table (mat pt th title / doc sp nr nc tbl r c w rr lbl)
+(defun tvs-table (mat pt th title / doc sp nr nc tbl r c w rr lbl x rowv v)
   (setq doc (vla-get-ActiveDocument (vlax-get-acad-object))
         sp  (if (= (vla-get-ActiveSpace doc) 1)
               (vla-get-ModelSpace doc)
@@ -243,11 +243,10 @@
         nc  8
         tbl (vla-AddTable sp (vlax-3d-point pt) nr nc (* 2.0 th) (* 8.0 th)))
   (vl-catch-all-apply 'vla-SetTextHeight (list tbl 7 th))
-  (setq w (list 5 18 24 8 6 10 11 10))
-  (setq c 0)
-  (foreach x w
-    (vl-catch-all-apply 'vla-SetColumnWidth (list tbl c (* x th)))
-    (setq c (1+ c)))
+  ;; Stil tabele moze imati margine i minimalne redove u drugim jedinicama.
+  ;; Prvo smanji slova i margine, a konacne dimenzije postavi nakon sadrzaja.
+  (vla-put-HorzCellMargin tbl (* 0.2 th))
+  (vla-put-VertCellMargin tbl (* 0.15 th))
   (vla-SetText tbl 0 0 title)
   (setq r 1)
   (foreach rowv mat
@@ -264,9 +263,20 @@
     (vla-SetText tbl rr 0 lbl)
     (vl-catch-all-apply 'vla-MergeCells (list tbl rr rr 0 6))
     (vl-catch-all-apply 'vla-SetCellAlignment (list tbl rr 0 6))
-    ;; horizontalna margina celije (lijevo+desno = 2+8) = HorzCellMargin * *tvs-margin-mult*
+    ;; Lijeva i desna margina zbirnih celija prate visinu slova.
     (vl-catch-all-apply 'vla-SetMargin
-      (list tbl rr 0 10 (* *tvs-margin-mult* (vla-get-HorzCellMargin tbl)))))
+      (list tbl rr 0 10 (* *tvs-summary-margin* th))))
+  ;; AddTable moze povecati pocetne dimenzije zbog naslijedjenog stila.
+  ;; Ponovo ih postavi tek kada su slova, margine i spajanja podeseni.
+  (setq w (list 5 18 24 8 6 10 11 10)
+        c 0)
+  (foreach x w
+    (vla-SetColumnWidth tbl c (* x th))
+    (setq c (1+ c)))
+  (setq r 0)
+  (repeat nr
+    (vla-SetRowHeight tbl r (* 2.0 th))
+    (setq r (1+ r)))
   tbl)
 
 ;; ---- IZVOZ: EXCEL ---------------------------------------------------
