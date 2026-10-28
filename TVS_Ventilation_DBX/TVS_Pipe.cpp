@@ -189,7 +189,7 @@ Acad::ErrorStatus TVS_Pipe::dwgInFields (AcDbDwgFiler *pFiler) {
 
 //- SubXXX() methods (self notification)
 Acad::ErrorStatus TVS_Pipe::subOpen (AcDb::OpenMode mode) {
-	return (AcDbCurve::subOpen (mode)) ;
+	return (TVS_Entity::subOpen (mode)) ;
 }
 
 Acad::ErrorStatus TVS_Pipe::subErase (Adesk::Boolean erasing) {
@@ -197,11 +197,11 @@ Acad::ErrorStatus TVS_Pipe::subErase (Adesk::Boolean erasing) {
 }
 
 Acad::ErrorStatus TVS_Pipe::subCancel () {
-	return (AcDbCurve::subCancel ()) ;
+	return (TVS_Entity::subCancel ()) ;
 }
 
 Acad::ErrorStatus TVS_Pipe::subClose () {
-	return (AcDbCurve::subClose ()) ;
+	return (TVS_Entity::subClose ()) ;
 }
 
 //- Persistent reactor callbacks

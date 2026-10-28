@@ -142,6 +142,7 @@ public:
 	virtual Acad::ErrorStatus subMoveGripPointsAt(const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset, const int bitflags);
 
 	// Derived on demand; does not change DWG storage or the virtual table.
+	static unsigned long sheetMetalRevision();
 	bool getSheetMetal(double &areaM2, double &thicknessMm, double &massKg) const;
 	virtual double get_Speed();
 	//----- AcDbCurve protocols

@@ -5,12 +5,13 @@
 #include "MSExcel.h"	
 #include "dgSpecProperty.h"
 #include "SpecificationText.h"
+#include "TablePresentation.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 TVSSpecTable::TVSSpecTable() :
 	rowsPerList(21),
-	titleHeight(3200 / tvsUnits::factor()),
-	rowHeight(800 / tvsUnits::factor()),
-	textHeight(250 / tvsUnits::factor()),
+	titleHeight(3200 * tvsTable::current().templateFactor()),
+	rowHeight(800 * tvsTable::current().templateFactor()),
+	textHeight(tvsTable::current().textHeight()),
 	paginating(false)
 {
 }
@@ -58,7 +59,7 @@ bool TVSSpecTable::loadColumnsFromSettings()
 		{
 			TVSSpecTableColumn col;
 			col.name = rowStringVector[0].Trim(L"\n\r\t ;");
-			col.width = _tstof(rowStringVector[1].Trim(L"\n\r\t ;")) / tvsUnits::factor();
+			col.width = _tstof(rowStringVector[1].Trim(L"\n\r\t ;")) * tvsTable::current().templateFactor();
 			col.value = rowStringVector[2].Trim(L"\n\r\t ;");
 			columns.push_back(col);
 		}
@@ -70,7 +71,7 @@ bool TVSSpecTable::loadColumnsFromSettings()
     if (!hasTotalMass) {
         TVSSpecTableColumn column;
         column.name = L"Masa, kg";
-        column.width = 2500 / tvsUnits::factor();
+        column.width = 2500 * tvsTable::current().templateFactor();
         column.value = L"[UkupnaMasa]";
         columns.push_back(column);
     }
@@ -136,13 +137,13 @@ bool TVSSpecTable::toSimpleTable(const AcGePoint3d &startPoint)
 	//draw text;
 	int colIdx = 0;
 	int rowIdx = 0;
-	double otstupX = 100 / tvsUnits::factor();
-	double otstupY = 150 / tvsUnits::factor();
+	double otstupX = 100 * tvsTable::current().templateFactor();
+	double otstupY = 150 * tvsTable::current().templateFactor();
 	double curY = startPoint.y - titleHeight + otstupY;
 	double curX = startPoint.x + otstupX;
 	//draw title;
 	for (int i = 0; i < columns.size(); i++) {
-		graphicHelper::drawText(AcGePoint3d(curX, curY, startPoint.z), columns[i].name);
+		graphicHelper::drawText(AcGePoint3d(curX, curY, startPoint.z), columns[i].name, textHeight);
 		curX += columns[i].width;
 	}
 
@@ -151,7 +152,7 @@ bool TVSSpecTable::toSimpleTable(const AcGePoint3d &startPoint)
 		curX = startPoint.x + otstupX;
 		curY -= rowHeight;
 		for (auto &column : row) {
-			graphicHelper::drawText(AcGePoint3d(curX, curY, startPoint.z), column);
+			graphicHelper::drawText(AcGePoint3d(curX, curY, startPoint.z), column, textHeight);
 			curX += columns[colIdx].width;
 			colIdx++;
 		}

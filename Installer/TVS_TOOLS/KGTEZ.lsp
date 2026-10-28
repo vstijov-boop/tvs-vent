@@ -22,7 +22,7 @@
 
 ;; vrijednosti dijaloga (pamte se do kraja sesije, osim sistema)
 (setq *tvs-rez*  20.0)       ; rezerva na tezinu u %
-(setq *tvs-th*   150.0)      ; visina slova tabele u jedinicama crteza
+(setq *tvs-th*   2.5)        ; visina slova na papiru u mm
 (setq *tvs-deb2* nil)        ; T = svi elementi debljine *tvs-deb-fix*
 (setq *tvs-sys*  "")         ; naziv sistema (opcionalno)
 (setq *tvs-tab*  T)          ; T = napravi tabelu u AutoCAD-u
@@ -40,11 +40,45 @@
 ;; TVS COM dimensions (Dpr, SizeB, Length...) remain physical millimetres.
 ;; Only radii read from exploded drawing geometry require conversion here.
 (setq *tvs-mm-per-unit* 1.0)
-(setq *tvs-height-unit-factor* 1.0)
 (defun tvs-drawing-unit-factor ( / data value)
   (setq data (dictsearch (namedobjdict) "TVS_DRAWING_UNITS")
         value (cdr (assoc 40 data)))
   (if (member value '(1.0 10.0 1000.0)) value 1.0))
+
+;; Zajednicka razmjera sa TVS tabelama. Paper space koristi mm papira.
+(defun tvs-table-scale-record ()
+  (if (= (getvar "CVPORT") 1) "TVS_TABLE_SCALE_PAPER" "TVS_TABLE_SCALE_MODEL"))
+(defun tvs-table-scale-default ( / data value)
+  (setq data (dictsearch (namedobjdict) (tvs-table-scale-record))
+        value (cdr (assoc 40 data)))
+  (if (and (numberp value) (> value 0.0)) value
+    (if (= (getvar "CVPORT") 1) 1.0 50.0)))
+(defun tvs-save-table-scale (scale / key data ent ed)
+  (setq key (tvs-table-scale-record)
+        data (dictsearch (namedobjdict) key))
+  (if data
+    (progn
+      (setq ent (cdr (assoc -1 data)) ed (entget ent))
+      (entmod (if (assoc 40 ed) (subst (cons 40 scale) (assoc 40 ed) ed)
+                (append ed (list (cons 40 scale))))))
+    (progn
+      (setq ent (entmakex (list '(0 . "XRECORD") '(100 . "AcDbXrecord")
+                                '(280 . 1) (cons 40 scale))))
+      (if ent (dictadd (namedobjdict) key ent)))))
+(defun tvs-table-text-height (paper-height scale mm-per-unit)
+  (/ (* paper-height scale) mm-per-unit))
+(defun tvs-prompt-table-height ( / previous scale units height)
+  (setq previous (tvs-table-scale-default))
+  (initget 6)
+  (setq scale (getreal (strcat "\nRazmjera tabele 1:<" (rtos previous 2 2)
+                              "> (50 za 1:50, 1 za 1:1): ")))
+  (if (null scale) (setq scale previous))
+  (setq units (if (= (getvar "CVPORT") 1) 1.0 *tvs-mm-per-unit*)
+        height (tvs-table-text-height *tvs-th* scale units))
+  (tvs-save-table-scale scale)
+  (princ (strcat "\nVisina teksta: " (rtos *tvs-th* 2 2) " mm na papiru; "
+                 (rtos height 2 5) " jedinica crteza."))
+  height)
 
 ;; ---- POMOCNE --------------------------------------------------------
 (defun tvs-fmt (x)
@@ -82,7 +116,7 @@
                "  label = \"KGTEZ - Specifikacija lima\";"
                "  : edit_box { key = \"sys\"; label = \"Sistem (opcionalno):\"; edit_width = 26; }"
                "  : edit_box { key = \"rez\"; label = \"Rezerva na tezinu [%]:\"; edit_width = 8; }"
-               "  : edit_box { key = \"th\";  label = \"Visina slova (jedinice crteza):\"; edit_width = 8; }"
+               "  : edit_box { key = \"th\";  label = \"Visina slova na papiru (mm):\"; edit_width = 8; }"
                "  : toggle   { key = \"deb2\"; label = \"Svi kanali i fitinzi debljine 2 mm\"; }"
                "  : boxed_column { label = \"Izlaz\";"
                "    : toggle { key = \"tab\"; label = \"Tabela u AutoCAD-u\"; }"
@@ -236,7 +270,7 @@
 ;; ---- TABELA U AUTOCAD-U ---------------------------------------------
 (defun tvs-table (mat pt th title / doc sp nr nc tbl r c w rr lbl x rowv v)
   (setq doc (vla-get-ActiveDocument (vlax-get-acad-object))
-        sp  (if (= (vla-get-ActiveSpace doc) 1)
+        sp  (if (> (getvar "CVPORT") 1)
               (vla-get-ModelSpace doc)
               (vla-get-PaperSpace doc))
         nr  (+ 1 (length mat))        ; naslov + zaglavlje + redovi + ukupno
@@ -328,10 +362,8 @@
     nil))
 
 ;; ---- KOMANDA --------------------------------------------------------
-(defun c:KGTEZ ( / ss i obj on r nn nskip mat mat2 tot pt ch fn title)
-  (setq *tvs-mm-per-unit* (tvs-drawing-unit-factor)
-        *tvs-th* (* *tvs-th* (/ *tvs-height-unit-factor* *tvs-mm-per-unit*))
-        *tvs-height-unit-factor* *tvs-mm-per-unit*)
+(defun c:KGTEZ ( / ss i obj on r nn nskip mat mat2 tot pt ch fn title table-height)
+  (setq *tvs-mm-per-unit* (tvs-drawing-unit-factor))
   (princ (strcat "\nKGTEZ: jedinice crteza = "
                  (cond ((= *tvs-mm-per-unit* 10.0) "cm")
                        ((= *tvs-mm-per-unit* 1000.0) "m")
@@ -378,8 +410,10 @@
                            "  |  preskoceno TVS (okrugli/nepodrzani): " (itoa nskip)))
             ;; tabela u crtezu
             (if *tvs-tab*
-              (if (setq pt (getpoint "\nTacka umetanja tabele: "))
-                (tvs-table mat pt *tvs-th* title)))
+              (progn
+                (setq table-height (tvs-prompt-table-height))
+                (if (setq pt (getpoint "\nTacka umetanja tabele: "))
+                  (tvs-table mat pt table-height title))))
             ;; izvoz u Excel (ako Excel nije dostupan, nudi CSV)
             (if *tvs-xls*
               (if (tvs-excel mat2)

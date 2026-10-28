@@ -2,20 +2,20 @@
 #include "graphicHelper.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 
-void graphicHelper::drawText(AcGePoint3d cent, const ACHAR * pAchar)
+void graphicHelper::drawText(AcGePoint3d cent, const ACHAR * pAchar, double height)
 {
 	AcDbDatabase *db = acdbHostApplicationServices()->workingDatabase();
 
 	AcDbObjectId tId = db->textstyle();
 	///
-	AcDbText *text1 = new AcDbText(cent, pAchar, tId, 250 / tvsUnits::factor(), 0);
+	AcDbText *text1 = new AcDbText(cent, pAchar, tId, height, 0);
 
 	AcDbBlockTable *pBlockTable;
 	acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
 		AcDb::kForRead);
 
 	AcDbBlockTableRecord *pBlockTableRecord;
-	pBlockTable->getAt(ACDB_MODEL_SPACE, pBlockTableRecord, AcDb::kForWrite);
+	acdbOpenObject(pBlockTableRecord, db->currentSpaceId(), AcDb::kForWrite);
 	pBlockTable->close();
 
 	AcDbObjectId retId = AcDbObjectId::kNull;
@@ -38,7 +38,7 @@ void graphicHelper::drawLine(AcGePoint3d start, AcGePoint3d end)
 		AcDb::kForRead);
 
 	AcDbBlockTableRecord *pBlockTableRecord;
-	pBlockTable->getAt(ACDB_MODEL_SPACE, pBlockTableRecord, AcDb::kForWrite);
+	acdbOpenObject(pBlockTableRecord, db->currentSpaceId(), AcDb::kForWrite);
 	pBlockTable->close();
 	pEnt->setLineWeight(AcDb::kLnWt015);
 	AcDbObjectId retId = AcDbObjectId::kNull;

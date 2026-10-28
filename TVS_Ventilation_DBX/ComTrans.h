@@ -102,6 +102,7 @@ public:
 	STDMETHOD(AddToDb)(AcDbObjectId &objId, AcDbObjectId ownerId =AcDbObjectId::kNull, TCHAR *keyName =NULL);
 
 	//IOPMPropertyExtension
+	STDMETHOD(ShowProperty)(DISPID dispId, BOOL *show);
 	BEGIN_OPMPROP_MAP()
 
 		OPMPROP_ENTRY(0, DISPID_A, PROPCAT_Data, \

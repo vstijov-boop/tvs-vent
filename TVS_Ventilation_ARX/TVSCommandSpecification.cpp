@@ -2,6 +2,7 @@
 #include "TVSCommandSpecification.h"
 #include "TVSPropertySpec.h"
 #include "TVSSpecTable.h"
+#include "TablePresentation.h"
 TVSCommandSpecification::TVSCommandSpecification()
 {
 }
@@ -20,10 +21,12 @@ void TVSCommandSpecification::execute(void)
 	acedSSLength(sset, &len);
 	if (len == 0)
 	{
+		acedSSFree(sset);
 		return;
 	}
 	
 	ads_point pt1;
+	if (!tvsTable::prompt()) { acedSSFree(sset); return; }
 	TVSSpecTable table;
 	int status = 0;
 
@@ -33,6 +36,7 @@ void TVSCommandSpecification::execute(void)
 		switch (status)
 		{
 		case RTCAN:
+			acedSSFree(sset);
 			return;
 			break;
 		case RTKWORD:
@@ -43,6 +47,7 @@ void TVSCommandSpecification::execute(void)
 
 	TVSPropertySpec spec;
 	spec.processSetOfObjects(sset);
+	acedSSFree(sset);
 	spec.sort();
 	
 	table.loadColumnsFromSettings();

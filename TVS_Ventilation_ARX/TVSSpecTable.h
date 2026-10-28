@@ -22,7 +22,7 @@ Naziv kolone; Širina; [Oznaka svojstva]\r\n\
 Primjer: Tip i dimenzije; 6000; [Тип]-[Размер]\r\n\
 Tačka-zarez (;) razdvaja naziv, širinu i sadržaj.\r\n\
 Naziv kolone - tekst u zaglavlju tabele.\r\n\
-Širina - širina kolone u jedinicama AutoCAD-a.\r\n\
+Širina - širina šablona (250 = visina teksta), skalira se pri umetanju.\r\n\
 Sadržaj - tekst i jedna ili više oznaka svojstava.\r\n\
 Oznake u uglastim zagradama ostaju na ruskom:\r\n\
 [Позиция] - Pozicija; [Имя] - Naziv\r\n\

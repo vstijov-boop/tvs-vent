@@ -53,6 +53,7 @@
 #include "TVSCommandAddProperties.h"
 #include "TVSCommandExcelSpecification.h"
 #include "TVSCommandSpecification.h"
+#include "TablePresentation.h"
 //-----------------------------------------------------------------------------
 #define szRDS _RXST("TVS")
 #define dCONTINUE 0
@@ -97,6 +98,7 @@ public:
 	}
 
 	virtual AcRx::AppRetCode On_kUnloadAppMsg(void *pkt) {
+        PropertyAdmin::uninitialize();
 		// TODO: Add your code here
 
 		// You *must* call On_kUnloadAppMsg here
@@ -115,6 +117,7 @@ public:
 		MleaderController mctrl;
 		mctrl.registerApp();
 		TVSController::get()->tvsPropertyController.registerApp();
+        PropertyAdmin::initialize();
 
 		return (retCode);
 	}
@@ -3245,15 +3248,16 @@ public:
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
+		if (!tvsTable::prompt()) { acedSSFree(sset); return; }
 		ads_point pt1;
 		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
-		if (acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM)
-			return;
+		if (acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM) { acedSSFree(sset); return; }
 		pb = asPnt3d(pt1);
 
 		SPEClist speclist, speclistflex;
 		SpecWithAttrlist specatrlist;
 		fillspecification(sset, speclist, speclistflex, specatrlist, L"%%d", L"%%c");
+		acedSSFree(sset);
 		if (speclist.specList.physicalLength() != 0)
 		{
 			//speclist.print();

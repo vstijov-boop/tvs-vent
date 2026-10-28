@@ -694,3 +694,15 @@ STDMETHODIMP CComTrans::get_SheetMass(VARIANT *pVal)
     if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
     return sheetValue(pSq.operator->(), 2, pVal);
 }
+
+STDMETHODIMP CComTrans::ShowProperty(DISPID dispId, BOOL *show)
+{
+    if (!show) return E_POINTER;
+    if (dispId >= DISPID_SheetArea && dispId <= DISPID_SheetMass) {
+        // Automation keeps the original VARIANT accessors. OPM gets the typed
+        // dynamic properties registered by the ARX, without duplicate rows.
+        *show=FALSE;
+        return S_OK;
+    }
+    return IOPMPropertyExtensionImpl<CComTrans>::ShowProperty(dispId,show);
+}

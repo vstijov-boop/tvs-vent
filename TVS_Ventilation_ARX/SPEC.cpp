@@ -1,6 +1,7 @@
 ﻿
 #include "StdAfx.h"
 #include "SPEC.h"
+#include "TablePresentation.h"
 #include "../TVS_Ventilation_DBX/SheetMetal.h"
 
 #include <cmath>
@@ -800,7 +801,7 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 	//double columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
 	double columnswidth[11]={0, 2000,15000,21000,24500,29000,31000,33000,35500,37500,41500};
 	double columndistanse[7]={2000,15000,29000,31000,33000,35500,37500};
-	const double units = tvsUnits::factor();
+	const double units = 1.0 / tvsTable::current().templateFactor();
 	for (double& c : columnswidth) c /= units;
 	for (double& c : columndistanse) c /= units;
 	double rowhight=800 / units;
@@ -912,14 +913,14 @@ void SPEClist::printText( AcGePoint3d cent, const ACHAR * pAchar )
 
 	AcDbObjectId tId=db->textstyle();
 	///
-	AcDbText *text1 = new AcDbText (cent, pAchar,tId,250 / tvsUnits::factor(),0 );
+	AcDbText *text1 = new AcDbText (cent, pAchar,tId,tvsTable::current().textHeight(),0 );
 
 	AcDbBlockTable *pBlockTable;
 	acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
 		AcDb::kForRead);
 
 	AcDbBlockTableRecord *pBlockTableRecord;
-	pBlockTable->getAt(ACDB_MODEL_SPACE, pBlockTableRecord,AcDb::kForWrite);
+	acdbOpenObject(pBlockTableRecord, db->currentSpaceId(),AcDb::kForWrite);
 	pBlockTable->close();
 
 	AcDbObjectId retId = AcDbObjectId::kNull;
@@ -943,7 +944,7 @@ void SPEClist::printLine( AcGePoint3d start, AcGePoint3d end )
 		AcDb::kForRead);
 
 	AcDbBlockTableRecord *pBlockTableRecord;
-	pBlockTable->getAt(ACDB_MODEL_SPACE, pBlockTableRecord,AcDb::kForWrite);
+	acdbOpenObject(pBlockTableRecord, db->currentSpaceId(),AcDb::kForWrite);
 	pBlockTable->close();
 	pEnt->setLineWeight(AcDb::kLnWt015);
 	AcDbObjectId retId = AcDbObjectId::kNull;
@@ -1076,7 +1077,7 @@ void SpecWithAttrlist::printSPDSForm(AcGePoint3d &cent)
 	//double columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
 	double columnswidth[10]={0, 2000,15000,21000,24500,29000,31000,33000,35500,39500};
 	double columndistanse[9]={0,2000,15000,21000,24500,29000,31000,33000,35500};
-	const double units = tvsUnits::factor();
+	const double units = 1.0 / tvsTable::current().templateFactor();
 	for (double& c : columnswidth) c /= units;
 	for (double& c : columndistanse) c /= units;
 	double rowhight=800 / units;

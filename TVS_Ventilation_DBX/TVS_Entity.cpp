@@ -31,6 +31,11 @@
 #include "TVS_WYE.h"
 #include "SheetMetal.h"
 
+// Invalidate the selection total when native geometry is opened/closed for write.
+// This is process-local bookkeeping, not stored object state.
+static unsigned long s_sheetMetalRevision = 1;
+unsigned long TVS_Entity::sheetMetalRevision() { return s_sheetMetalRevision; }
+
 bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &massKg) const
 {
     assertReadEnabled();
@@ -123,6 +128,7 @@ Acad::ErrorStatus TVS_Entity::dwgOutFields (AcDbDwgFiler *pFiler) const {
 }
 
 Acad::ErrorStatus TVS_Entity::dwgInFields (AcDbDwgFiler *pFiler) {
+    ++s_sheetMetalRevision;
 	assertWriteEnabled () ;
 	//----- Read parent class information first.
 	Acad::ErrorStatus es =AcDbCurve::dwgInFields (pFiler) ;
@@ -146,16 +152,20 @@ Acad::ErrorStatus TVS_Entity::dwgInFields (AcDbDwgFiler *pFiler) {
 
 //- SubXXX() methods (self notification)
 Acad::ErrorStatus TVS_Entity::subOpen (AcDb::OpenMode mode) {
-	return (AcDbCurve::subOpen (mode)) ;
+    const Acad::ErrorStatus status = AcDbCurve::subOpen(mode);
+    if (status == Acad::eOk && mode == AcDb::kForWrite) ++s_sheetMetalRevision;
+    return status;
 }
 
 
 
 Acad::ErrorStatus TVS_Entity::subCancel () {
+    ++s_sheetMetalRevision;
 	return (AcDbCurve::subCancel ()) ;
 }
 
 Acad::ErrorStatus TVS_Entity::subClose () {
+    if (isWriteEnabled()) ++s_sheetMetalRevision;
 	return (AcDbCurve::subClose ()) ;
 }
 
