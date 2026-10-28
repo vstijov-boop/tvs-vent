@@ -63,3 +63,11 @@ Obje završne kompilacije imaju 0 grešaka i po 2 LNK4099 upozorenja o nedostaju
 Sve navedene lokalne računske i regresione provjere prolaze. Završni pregled zadržao je postojeći obračun dužine u ravni crteža (XY), uz računanje iz tekućih krajnjih tačaka bez zavisnosti od prethodnog iscrtavanja. Provjera rada u AutoCAD-u, čuvanja DWG-a i svih interaktivnih komandi ostaje korisniku prema gornjem postupku.
 
 Prvi neuspješni pokušaj `f5fc3bf` koristio je pogrešan oblik argumenta za ObjectARX rbChain; ispravljeno je prosljeđivanje adrese pokazivača u `ecdce9a`. Istorijski neuspješni CI pokušaji nisu promijenili korisnikovu instalaciju. Stabilna grana prevoda i master nisu mijenjani tokom ovog unapređenja.
+
+## Popravka koljena u metrima (28.10.2026.)
+
+Prijavljen je problem pri skretanju tokom crtanja i pri spajanju dva kanala. Oba puta pozivaju isti proračun smjera. Stari GiveStartvectorAndAngle konstruisao je paralelne segmente uz fiksni odmak od 10 jedinica i tražio njihov presjek. Na trasama dužine nekoliko metara u m crtežu odmak je bio 10 m; presjek nije postojao na segmentima i vektori smjera mogli su ostati bez ispravnih vrijednosti.
+
+Novi ElbowDirection.h računa ugao i smjer luka iz normalizovanih vektora dolaznog i odlaznog kanala, bez pomoćnog odmaka. Obje putanje crtanja koriste isti ispravljeni postupak. Nulti segmenti, prav nastavak i povratak istom osom odbijaju se bez formiranja neispravnog koljena; spajanje se provjerava prije promjene krajnjih tačaka kanala.
+
+Regresioni test tests/test_elbow_direction.cpp obuhvata 120 kombinacija jedinica mm/cm/m, rotacije trase, lijevog/desnog skretanja i uglova 15–165 stepeni. Provjerava i rekonstruisane tangentne tačke luka prema istoj geometrijskoj formuli koju koristi TVS, uz četiri degenerisana slučaja. U AutoCAD-u treba ponoviti TVS_PIPE skretanje i TVS_CONNECTT na istim 3 m i 2 m trasama u sve tri jedinice.

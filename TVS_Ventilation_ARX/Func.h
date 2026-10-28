@@ -175,7 +175,7 @@ namespace func {
 	void getint(CString &svar, int dvar);
 	void PostToModelSpace(AcDbEntity *pEnt);
 	void SetGlobalProperty(TVS_Entity *pEnt);
-	void GiveStartvectorAndAngle(AcGePoint3d &n1, AcGePoint3d &n2, AcGePoint3d &n3, double &pAngle, AcGeVector3d &pStartvector);
+	bool GiveStartvectorAndAngle(AcGePoint3d &n1, AcGePoint3d &n2, AcGePoint3d &n3, double &pAngle, AcGeVector3d &pStartvector);
 	int TVSClassCheck(AcDbEntity* pEnt);
 	int whyIsGrose(TVS_Entity* pEnt1, TVS_Entity* pEnt2);
 

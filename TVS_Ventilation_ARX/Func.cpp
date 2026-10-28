@@ -1,6 +1,7 @@
 ﻿#pragma once;
 #include "StdAfx.h"
 #include "Func.h"
+#include "ElbowDirection.h"
 
 
 
@@ -2793,7 +2794,7 @@ TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 	bool pThisRound = globRound;
 
 	pMidPoint = t2;
-	GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect);
+	if (!GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect)) return NULL;
 	pStartVect.normalize();
 	pNormVect = AcGeVector3d(0, 0, 1);
 	TVS_TAP* pEnt = TVS_TAP::add_new(pSizeA, pSizeB, pRadius, pNormVect, pStartVect, pMidPoint, pSwectangle, false, pThisRound);
@@ -2824,75 +2825,15 @@ TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 
 
 
-void func::GiveStartvectorAndAngle(AcGePoint3d &n1,
-	AcGePoint3d &n2,
-	AcGePoint3d &n3,
-	double &pAngle,
-	AcGeVector3d &pStartvector)
+bool func::GiveStartvectorAndAngle(AcGePoint3d &n1,
+    AcGePoint3d &n2, AcGePoint3d &n3,
+    double &pAngle, AcGeVector3d &pStartvector)
 {
-
-
-	AcGePoint3d R1, R2, R3, R4,
-		B1, B2, B3, B4,
-		S1, S2, F1, F2, midp,
-		Norm1, Norm2;
-	double pRadius = 10;
-
-	AcGeVector3d finishvector;
-	fourpoints(n1, n2, R1, R2, B2, B1, pRadius);
-	fourpoints(n2, n3, R3, R4, B4, B3, pRadius);
-
-	if (intersection(R1, R2, R3, R4, midp) == true)
-	{
-		//acutPrintf(_T("\n1"));
-		S1 = R2; F1 = B2;
-		S2 = R3; F2 = B3;
-	}
-
-	if (intersection(B1, B2, B3, B4, midp) == true)
-	{
-		//acutPrintf(_T("\n4"));
-		S1 = B2; F1 = R2;
-		S2 = B3; F2 = R3;
-	}
-
-
-	Norm1 = AcGePoint3d(F1.x - S1.x,
-		F1.y - S1.y,
-		0);
-	Norm2 = AcGePoint3d(F2.x - S2.x,
-		F2.y - S2.y,
-		0);
-	//consoleprint(Norm1,_T("\nПервая точка"));
-	//consoleprint(Norm2,_T("\nВторая точка"));
-	pStartvector = AcGeVector3d(Norm1.x, Norm1.y, 0);
-	finishvector = AcGeVector3d(Norm2.x, Norm2.y, 0);
-
-	pAngle = angle(Norm1, Norm2);
-
-	//consoleprint(pAngle,_T("\nУгол"));
-	Givestartvector(pStartvector, finishvector, pAngle);
-	//pStartvector.normalize();
-	midp = n2;
-	//consoleprint(pAngle,_T("\nУгол"));
-
-
-
-
-
-
-
-	// 	AcGeVector3d pfinishvector;
-	// 	pfinishvector=AcGeVector3d(n3.x-n2.x,n3.y-n2.y,n3.z-n2.z);
-	// 	pStartvector=AcGeVector3d(n2.x-n1.x,n2.y-n1.y,n2.z-n1.z);
-	// 	midp=n2;
-	// 	
-	// 	pfinishvector.normalize();
-	// 	pStartvector.normalize();
-	// 	pAngle=pStartvector.angleTo(pfinishvector);
-
-
-
+    double x = 0.0, y = 0.0;
+    if (!tvsGeometry::elbowDirection(n1.x, n1.y, n2.x, n2.y,
+                                    n3.x, n3.y, pAngle, x, y)) return false;
+    pStartvector = AcGeVector3d(x, y, 0.0);
+    return true;
 }
 
 

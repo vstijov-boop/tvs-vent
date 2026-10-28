@@ -449,6 +449,13 @@ public:
 				if (midp.distanceTo(p3) >= midp.distanceTo(p4)) point2 = p3;
 				else point2 = p4;
 			}//end findpoint2
+			// Validate before changing either duct: zero-length or collinear legs cannot form an elbow.
+            double elbowAngle = 0.0;
+            AcGeVector3d elbowStart;
+            if (!GiveStartvectorAndAngle(point1, midp, point2, elbowAngle, elbowStart)) {
+                acutPrintf(L"\nNije moguće napraviti koljeno: provjerite smjerove i krajnje tačke kanala.");
+                return false;
+            }
 			///Tap with point1 midp point2;
 
 			AcDbEntity * pEnt;
@@ -476,6 +483,7 @@ public:
 			}
 #pragma endregion
 			TVS_TAP* pTap = drawTapDirect(point1, midp, point2);
+			if (!pTap) return false;
 			SetGlobalProperty(pTap);
 			SetPropertyLikePipe(pPipe1, pTap);
 
@@ -1104,7 +1112,7 @@ public:
 		bool pThisRound = globRound;
 
 		pMidPoint = t2;
-		GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect);
+		if (!GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect)) return NULL;
 		pStartVect.normalize();
 		pNormVect = AcGeVector3d(0, 0, 1);
 		TVS_TAP* pEnt = TVS_TAP::add_new(pSizeA, pSizeB, pRadius, pNormVect, pStartVect, pMidPoint, pSwectangle, false, pThisRound);
@@ -1162,6 +1170,7 @@ public:
 		vect22 = AcGeVector3d(-A3.x + A2.x,
 			-A3.y + A2.y,
 			-A3.z + A2.z);
+		if (vect1.length() == 0.0 || vect2.length() == 0.0) return;
 		vect1.normalize();
 		vect2.normalize();
 		vect22.normalize();
@@ -1171,6 +1180,7 @@ public:
 
 
 			pTap = drawTapDirect(A1, A2, A3);
+			if (!pTap) return;
 			SetGlobalProperty(pTap);
 			double delta = length2p(pTap->MA, pTap->MiddlePoint);
 			AcGePoint3d A2a = shortlength(A1, A2, delta);
