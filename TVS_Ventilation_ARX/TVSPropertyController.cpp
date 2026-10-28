@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "TVSPropertyController.h"
+#include "../TVS_Ventilation_DBX/SheetMetal.h"
+#include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 
 
 TVSPropertyController::TVSPropertyController()
@@ -172,6 +174,8 @@ bool TVSPropertyController::getProperty(const AcDbObjectId &objectId, TVSPropert
 			if ((ent = TVS_Entity::cast(pObj)) != NULL) {
 				{
 					tvsProperty.isTvsEnt = true;
+                    tvsProperty.hasSheetMetal = ent->getSheetMetal(tvsProperty.sheetArea,
+                        tvsProperty.sheetThickness, tvsProperty.totalMass);
 				}
 			}
 		}
@@ -359,13 +363,37 @@ bool TVSPropertyController::getCount(const AcDbObjectId &objectId, double &val)
 
 bool TVSPropertyController::setMass(const AcDbObjectId &objectId, const double &val)
 {
-	return setSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
+    // Native sheet mass is derived; preserve manual masses of other objects.
+    {
+        AcDbObjectPointer<TVS_Entity> ent(objectId, AcDb::kForRead);
+        double area, thickness, mass;
+        if (ent.openStatus() == Acad::eOk && ent->getSheetMetal(area,thickness,mass)) return false;
+    }
+    return setSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
 }
 
 bool TVSPropertyController::getMass(const AcDbObjectId &objectId, double &val)
 {
-	return getSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
-
+    {
+        AcDbObjectPointer<TVS_Entity> ent(objectId, AcDb::kForRead);
+        double area, thickness, mass;
+        if (ent.openStatus() == Acad::eOk && ent->getSheetMetal(area,thickness,mass)) {
+            // Standard specification columns contain mass per unit of quantity.
+            double quantity;
+            ent->getCount(quantity);
+            if (quantity > 0.0) val = mass / quantity;
+            else if (TVS_Pipe::cast(ent.operator->())) {
+                const TVS_Pipe *pipe = TVS_Pipe::cast(ent.operator->());
+                const double f = tvsUnits::factor(pipe);
+                const double a = pipe->SizeA*f, b = pipe->ThisRound ? 0.0 : pipe->SizeB*f;
+                val = tvsSheetMetal::mass(tvsSheetMetal::perimeter(a,b)/1000.0,thickness);
+            }
+            else val = mass;
+            return true;
+        }
+    }
+    val = 0.0;
+    return getSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
 }
 
 bool TVSPropertyController::setNote(const AcDbObjectId &objectId, const CString &val)

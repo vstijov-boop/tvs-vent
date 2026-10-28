@@ -71,7 +71,7 @@ void dgTVSPropertyManager::OnShowWindow(BOOL bShow, UINT nStatus)
 	mGrid.SetFixedColumnCount(1);
 	mGrid.SetFixedRowCount(1);
 	mGrid.SetRowCount(rowsc + 1);
-	mGrid.SetColumnCount(12);
+	mGrid.SetColumnCount(13);
 	mGrid.SetColumnWidth(0, wide / 2);
 	mGrid.SetColumnWidth(1, wide);
 	mGrid.SetColumnWidth(2, wide * 6);
@@ -84,6 +84,7 @@ void dgTVSPropertyManager::OnShowWindow(BOOL bShow, UINT nStatus)
 	mGrid.SetColumnWidth(9, wide);
 	mGrid.SetColumnWidth(10, wide * 2);
 	mGrid.SetColumnWidth(11, wide * 2);
+	mGrid.SetColumnWidth(12, wide * 2);
 
 	mGrid.SetItemText(0, 0, _T("Br."));
 	mGrid.SetItemText(0, 1, _T("Poz."));
@@ -94,9 +95,10 @@ void dgTVSPropertyManager::OnShowWindow(BOOL bShow, UINT nStatus)
 	mGrid.SetItemText(0, 6, _T("Proizvođač"));
 	mGrid.SetItemText(0, 7, _T("Jed. mj."));
 	mGrid.SetItemText(0, 8, _T("Kol."));
-	mGrid.SetItemText(0, 9, _T("Masa"));
+	mGrid.SetItemText(0, 9, _T("kg/jed."));
 	mGrid.SetItemText(0, 10, _T("Napomena"));
 	mGrid.SetItemText(0, 11, _T("Izabrano"));
+	mGrid.SetItemText(0, 12, _T("Masa, kg"));
 
 	int i = 1;
 	for (auto &row : propertySpec.rows)
@@ -116,6 +118,11 @@ void dgTVSPropertyManager::OnShowWindow(BOOL bShow, UINT nStatus)
 		mGrid.SetItemText(i, 9, getString(row.tvsPropery.mass));
 		mGrid.SetItemText(i, 10, row.tvsPropery.note);
 		mGrid.SetItemText(i, 11, getString(row.objectIds.size()));
+        mGrid.SetItemText(i, 12, getString(row.tvsPropery.hasSheetMetal
+            ? row.tvsPropery.totalMass : row.tvsPropery.mass*row.tvsPropery.count));
+        mGrid.SetItemState(i, 12, mGrid.GetItemState(i, 12) | GVIS_READONLY);
+        if (row.tvsPropery.hasSheetMetal)
+            mGrid.SetItemState(i, 9, mGrid.GetItemState(i, 9) | GVIS_READONLY);
 		i++;
 	}
 }

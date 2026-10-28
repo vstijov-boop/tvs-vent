@@ -625,3 +625,27 @@ STDMETHODIMP CComWye::put_Elev(double  newVal)
 // 
 // 	return S_OK;
 // }
+
+STDMETHODIMP CComWye::get_SheetArea(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 0, pVal);
+}
+
+STDMETHODIMP CComWye::get_SheetThickness(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 1, pVal);
+}
+
+STDMETHODIMP CComWye::get_SheetMass(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 2, pVal);
+}

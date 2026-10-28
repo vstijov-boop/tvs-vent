@@ -55,6 +55,9 @@ double Length;
 double Length2;
 double Swectangle;
 double Area;
+double sheetMass;
+double sheetThickness;
+double sheetUnitMass;
 void add(double pSizeA,
 double pSizeB,
 bool pThisRect,

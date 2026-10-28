@@ -133,6 +133,12 @@ public:
 		OPMPROP_ENTRY(0, DISPID_Tag2, PROPCAT_Data, \
 		0, 0, 0, _T(""), 0, 1, IID_NULL, IID_NULL, "")
 
+		OPMPROP_ENTRY(0, DISPID_SheetArea, PROPCAT_Data, \
+		0, 0, 0, _T(""), 0, 0, IID_NULL, IID_NULL, "")
+		OPMPROP_ENTRY(0, DISPID_SheetThickness, PROPCAT_Data, \
+		0, 0, 0, _T(""), 0, 0, IID_NULL, IID_NULL, "")
+		OPMPROP_ENTRY(0, DISPID_SheetMass, PROPCAT_Data, \
+		0, 0, 0, _T(""), 0, 0, IID_NULL, IID_NULL, "")
 	END_OPMPROP_MAP()
 
 	STDMETHOD(GetCategoryName)(THIS_
@@ -154,6 +160,9 @@ public:
 public:
 	//IComPipe
 	
+	STDMETHOD(get_SheetArea)(VARIANT *pVal);
+	STDMETHOD(get_SheetThickness)(VARIANT *pVal);
+	STDMETHOD(get_SheetMass)(VARIANT *pVal);
 	STDMETHOD(get_Dpr)(/*[out, retval]*/ double  *pVal);
 	STDMETHOD(put_Dpr)(/*[in]*/ double newVal);
 	STDMETHOD(get_SizeB)(/*[out, retval]*/ double  *pVal);

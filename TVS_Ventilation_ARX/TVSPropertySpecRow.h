@@ -167,7 +167,7 @@ public:
 	}
 
 	void setAndRecalculateMass(const double &newVal) {
-		if (tvsPropery.mass != newVal)
+		if (!tvsPropery.hasSheetMetal && tvsPropery.mass != newVal)
 		{
 			acutPrintf(L"change");
 			tvsPropery.mass = newVal;

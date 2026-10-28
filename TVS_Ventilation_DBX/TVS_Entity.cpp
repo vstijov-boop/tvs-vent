@@ -25,6 +25,63 @@
 
 #include "StdAfx.h"
 #include "TVS_Entity.h"
+#include "TVS_Pipe.h"
+#include "TVS_TAP.h"
+#include "TVS_TRANS.h"
+#include "TVS_WYE.h"
+#include "SheetMetal.h"
+
+bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &massKg) const
+{
+    assertReadEnabled();
+    areaM2 = thicknessMm = massKg = 0.0;
+    if (DuctType == DuctTypeFlex) return false;
+    const double f = tvsUnits::factor(this);
+    double largest = 0.0;
+    if (const TVS_Pipe *p = TVS_Pipe::cast(this)) {
+        const double a = p->SizeA*f, b = p->ThisRound ? 0.0 : p->SizeB*f;
+        const double length = p->get_Length()*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::nonnegative(length)) return false;
+        largest = tvsSheetMetal::larger(a,b);
+        areaM2 = tvsSheetMetal::pipeArea(a,b,length);
+    }
+    else if (const TVS_TAP *p = TVS_TAP::cast(this)) {
+        // SizeA is the width in the bend plane, also for up/down elbows.
+        const double a = p->SizeA*f, b = p->ThisRound ? 0.0 : p->SizeB*f;
+        const double radius = p->Radius*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::nonnegative(radius)
+            || !tvsSheetMetal::nonnegative(std::fabs(p->Swectangle))) return false;
+        largest = tvsSheetMetal::larger(a,b);
+        areaM2 = tvsSheetMetal::elbowArea(a,b,radius,p->Swectangle);
+    }
+    else if (const TVS_TRANS *p = TVS_TRANS::cast(this)) {
+        const double a = p->SizeAp1*f, b = p->ThisRoundp1 ? 0.0 : p->SizeBp1*f;
+        const double a2 = p->SizeAp2*f, b2 = p->ThisRoundp2 ? 0.0 : p->SizeBp2*f;
+        const double length = p->LengthTr*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::section(a2,b2)
+            || !tvsSheetMetal::nonnegative(length)) return false;
+        largest = tvsSheetMetal::larger(tvsSheetMetal::larger(a,b),tvsSheetMetal::larger(a2,b2));
+        areaM2 = tvsSheetMetal::transitionArea(a,b,a2,b2,length);
+    }
+    else if (const TVS_WYE *p = TVS_WYE::cast(this)) {
+        const double a = p->SizeApr*f, b = p->ThisRoundpr ? 0.0 : p->SizeBpr*f;
+        const double a2 = p->SizeAotv*f, b2 = p->ThisRoundotv ? 0.0 : p->SizeBotv*f;
+        const double length = p->LengthPl*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::section(a2,b2)
+            || !tvsSheetMetal::nonnegative(length)) return false;
+        largest = tvsSheetMetal::larger(tvsSheetMetal::larger(a,b),tvsSheetMetal::larger(a2,b2));
+        areaM2 = tvsSheetMetal::wyeArea(a,b,a2,b2,length);
+    }
+    else return false;
+    thicknessMm = tvsSheetMetal::thickness(largest);
+    massKg = tvsSheetMetal::mass(areaM2,thicknessMm);
+    if (!tvsSheetMetal::nonnegative(areaM2) || !tvsSheetMetal::nonnegative(massKg)) {
+        areaM2 = thicknessMm = massKg = 0.0;
+        return false;
+    }
+    return thicknessMm > 0.0;
+}
+
 
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_Entity::kCurrentVersionNumber =TVS_Version ;

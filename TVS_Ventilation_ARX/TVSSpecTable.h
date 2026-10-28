@@ -29,7 +29,11 @@ Oznake u uglastim zagradama ostaju na ruskom:\r\n\
 [Тип] - Tip; [Размер] - Dimenzije\r\n\
 [Артикул] - Šifra; [Производитель] - Proizvođač\r\n\
 [Ед.Изм] - Jedinica mjere; [Количество] - Količina\r\n\
-[Масса] - Masa; [Примечание] - Napomena\
+[Масса] - Masa po jedinici količine (kg/m ili kg/kom)\r\n\
+[UkupnaMasa] - Ukupna masa reda, kg\r\n\
+[Povrsina] - Površina lima reda, m²\r\n\
+[Debljina] - Debljina lima, mm\r\n\
+[Примечание] - Napomena\
 "
 
 

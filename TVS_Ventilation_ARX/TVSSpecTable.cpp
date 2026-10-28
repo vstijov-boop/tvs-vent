@@ -62,6 +62,17 @@ bool TVSSpecTable::loadColumnsFromSettings()
 			columns.push_back(col);
 		}
 	}
+    // Always include total mass, including drawings with an older saved template.
+    bool hasTotalMass = false;
+    for (const auto &column : columns)
+        if (column.value.Find(L"[UkupnaMasa]") >= 0) hasTotalMass = true;
+    if (!hasTotalMass) {
+        TVSSpecTableColumn column;
+        column.name = L"Masa, kg";
+        column.width = 2500 / tvsUnits::factor();
+        column.value = L"[UkupnaMasa]";
+        columns.push_back(column);
+    }
 	return true;
 }
 
@@ -211,6 +222,15 @@ bool TVSSpecTable::getRowData(const TVSPropertySpecRow &row, const TVSSpecTableC
 	data.Replace(CTVSProperty_count_val, temp);
 	temp.Format(L"%g", row.tvsPropery.mass);
 	data.Replace(CTVSProperty_mass_val, temp);
+    temp.Format(L"%.3f", row.tvsPropery.hasSheetMetal ? row.tvsPropery.totalMass
+        : row.tvsPropery.mass * row.tvsPropery.count);
+    data.Replace(L"[UkupnaMasa]", temp);
+    temp = L"";
+    if (row.tvsPropery.hasSheetMetal) temp.Format(L"%.3f", row.tvsPropery.sheetArea);
+    data.Replace(L"[Povrsina]", temp);
+    temp = L"";
+    if (row.tvsPropery.hasSheetMetal) temp.Format(L"%.1f", row.tvsPropery.sheetThickness);
+    data.Replace(L"[Debljina]", temp);
 	data.Replace(CTVSProperty_note_val, row.tvsPropery.note);
 	data.Trim(L"\n\r\t ;-");
 	return true;

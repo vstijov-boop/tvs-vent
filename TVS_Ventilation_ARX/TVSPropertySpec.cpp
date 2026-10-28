@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "TVSPropertySpec.h"
 #include "TVSController.h"
+#include <cmath>
 
 TVSPropertySpec::TVSPropertySpec()
 {
@@ -54,11 +55,16 @@ void TVSPropertySpec::addRow(const TVSProperty &props, const AcDbObjectId &objId
 			row.tvsPropery.article == props.article &&
 			row.tvsPropery.manufacturer == props.manufacturer &&
 			row.tvsPropery.units == props.units &&
-			row.tvsPropery.mass == props.mass &&
+			row.tvsPropery.hasSheetMetal == props.hasSheetMetal &&
+            row.tvsPropery.sheetThickness == props.sheetThickness &&
+            // Avoid splitting equal ducts due to length-dependent floating point rounding.
+            fabs(row.tvsPropery.mass - props.mass) <= 1e-9 * (1.0 + fabs(props.mass)) &&
 			row.tvsPropery.note == props.note
 			)
 		{
 			row.tvsPropery.count += props.count;
+            row.tvsPropery.sheetArea += props.sheetArea;
+            row.tvsPropery.totalMass += props.totalMass;
 			row.objectIds.push_back(objId);
 			return;
 		}

@@ -97,6 +97,10 @@ library TVSTVS_Ventilation_DBXLib
 		//[propput, id(16), helpstring("Oznaka 2")] HRESULT Tag2 ([in] BSTR newVal);
 		//[propget, id(1), helpstring("property StartPoint"),helpcontext(IDH_STARTPOINT)] HRESULT StartPoint([out, retval] VARIANT *pVal);
 		//[propput, id(1), helpstring("property StartPoint"),helpcontext(IDH_STARTPOINT)] HRESULT StartPoint([in] VARIANT newVal);
+		[propget, id(90), helpstring("Površina lima elementa, m²")] HRESULT SheetArea([out, retval] VARIANT *pVal);
+		[propget, id(91), helpstring("Debljina lima prema KGTEZ, mm")] HRESULT SheetThickness([out, retval] VARIANT *pVal);
+		[propget, id(92), helpstring("Masa lima elementa bez rezerve, kg")] HRESULT SheetMass([out, retval] VARIANT *pVal);
+
 	};
 	//- Library section of interface IComPipe
 	[
@@ -141,6 +145,10 @@ library TVSTVS_Ventilation_DBXLib
 		[propput, id(9), helpstring("Kota ose")] HRESULT Elev([in] double newVal);
 		[propget, id(10), helpstring("Oblik koljena")] HRESULT Form([out, retval] int *pVal);
 		[propput, id(10), helpstring("Oblik koljena")] HRESULT Form([in] int  newVal);
+
+		[propget, id(90), helpstring("Površina lima elementa, m²")] HRESULT SheetArea([out, retval] VARIANT *pVal);
+		[propget, id(91), helpstring("Debljina lima prema KGTEZ, mm")] HRESULT SheetThickness([out, retval] VARIANT *pVal);
+		[propget, id(92), helpstring("Masa lima elementa bez rezerve, kg")] HRESULT SheetMass([out, retval] VARIANT *pVal);
 
 	};
 	//- Library section of interface ICom_TAP
@@ -193,6 +201,10 @@ library TVSTVS_Ventilation_DBXLib
 // 		[propput, id(11), helpstring("Oznaka 1")] HRESULT Tag1([in] BSTR newVal);
 // 		[propget, id(12), helpstring("Oznaka 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
 // 		[propput, id(12), helpstring("Oznaka 2")] HRESULT Tag2 ([in] BSTR newVal);
+		[propget, id(90), helpstring("Površina lima elementa, m²")] HRESULT SheetArea([out, retval] VARIANT *pVal);
+		[propget, id(91), helpstring("Debljina lima prema KGTEZ, mm")] HRESULT SheetThickness([out, retval] VARIANT *pVal);
+		[propget, id(92), helpstring("Masa lima elementa bez rezerve, kg")] HRESULT SheetMass([out, retval] VARIANT *pVal);
+
 	};
 	//- Library section of interface IComTrans
 	[
@@ -241,6 +253,10 @@ library TVSTVS_Ventilation_DBXLib
 // 		[propput, id(10), helpstring("Oznaka 1")] HRESULT Tag1([in] BSTR newVal);
 // 		[propget, id(11), helpstring("Oznaka 2")] HRESULT Tag2([out, retval]  BSTR *pVal);
 // 		[propput, id(11), helpstring("Oznaka 2")] HRESULT Tag2([in] BSTR newVal);
+		[propget, id(90), helpstring("Površina lima elementa, m²")] HRESULT SheetArea([out, retval] VARIANT *pVal);
+		[propget, id(91), helpstring("Debljina lima prema KGTEZ, mm")] HRESULT SheetThickness([out, retval] VARIANT *pVal);
+		[propget, id(92), helpstring("Masa lima elementa bez rezerve, kg")] HRESULT SheetMass([out, retval] VARIANT *pVal);
+
 	};
 	//- Library section of interface IComWye
 	[

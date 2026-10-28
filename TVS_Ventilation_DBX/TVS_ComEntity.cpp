@@ -5,6 +5,12 @@ bool CTVS_ComEntity::tryToSetCommonDisplayName(const DISPID &dispId, BSTR *propN
 {
 	switch (dispId) 
 	{ 
+    case DISPID_SheetArea:
+        *propName = ::SysAllocString(L"Površina lima, m²"); return true;
+    case DISPID_SheetThickness:
+        *propName = ::SysAllocString(L"Debljina lima, mm"); return true;
+    case DISPID_SheetMass:
+        *propName = ::SysAllocString(L"Masa elementa, kg"); return true;
 		// стандартное 
 	case (0x516): 
 		*propName  = ::SysAllocString(_T("Boja"));
@@ -52,3 +58,14 @@ bool CTVS_ComEntity::tryToSetCommonDisplayName(const DISPID &dispId, BSTR *propN
 
 
 
+
+HRESULT CTVS_ComEntity::sheetValue(const TVS_Entity *entity, int property, VARIANT *value)
+{
+    if (!value) return E_POINTER;
+    ::VariantInit(value);
+    double area, thickness, mass;
+    if (!entity->getSheetMetal(area,thickness,mass)) return S_OK;
+    V_VT(value) = VT_R8;
+    V_R8(value) = property == 0 ? area : property == 1 ? thickness : mass;
+    return S_OK;
+}

@@ -3,7 +3,7 @@ name: Build AutoCAD 2020
 on:
   workflow_dispatch:
   push:
-    branches: [srpski-prevod, unapredjenja-jedinice]
+    branches: [srpski-prevod, unapredjenja-jedinice, unapredjenja-masa]
     paths:
       - '.github/workflows/build-autocad-2020.yml'
       - 'TVS_Ventilation_ARX/**'

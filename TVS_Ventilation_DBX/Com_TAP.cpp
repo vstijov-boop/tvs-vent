@@ -589,3 +589,27 @@ STDMETHODIMP CCom_TAP::put_Form(int  newVal)
 	Fire_Notification(DISPID_Form);
 	return S_OK;
 }
+
+STDMETHODIMP CCom_TAP::get_SheetArea(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 0, pVal);
+}
+
+STDMETHODIMP CCom_TAP::get_SheetThickness(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 1, pVal);
+}
+
+STDMETHODIMP CCom_TAP::get_SheetMass(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 2, pVal);
+}

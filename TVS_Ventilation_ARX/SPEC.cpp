@@ -1,6 +1,7 @@
 ﻿
 #include "StdAfx.h"
 #include "SPEC.h"
+#include "../TVS_Ventilation_DBX/SheetMetal.h"
 
 #include <cmath>
 #include<iostream>
@@ -34,7 +35,7 @@ void SPEC::setAcharType(int val)
 	}
 }
 
-SPEC::SPEC(void)
+SPEC::SPEC(void) : sheetMass(0.0), sheetThickness(0.0), sheetUnitMass(0.0)
 {
 	wcscpy_s(d,_T("%%c"));
 	wcscpy_s(grad,_T("%%d"));
@@ -72,6 +73,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 	Swectangle=0;
 	Length=0;
 	Area=0;
+	sheetMass = sheetThickness = sheetUnitMass = 0.0;
 
 
 
@@ -197,11 +199,8 @@ bool SPEC::add(AcDbEntity * pEnt)
 						setLable(SizeA);
 						appendLable(_T("x"));
 						appendLable(SizeB);
-						Area=(pTap->Swectangle)/(2*M_PI) 
-							*(2*(M_PI*(tvsUnits::mm(pTap->Radius, pTap)+tvsUnits::mm(pTap->SizeA, pTap))*(tvsUnits::mm(pTap->Radius, pTap)+tvsUnits::mm(pTap->SizeA, pTap))/1000000
-							-M_PI*(tvsUnits::mm(pTap->Radius, pTap))*(tvsUnits::mm(pTap->Radius, pTap))/1000000)
-							+2*M_PI*(tvsUnits::mm(pTap->SizeA, pTap)+tvsUnits::mm(pTap->Radius, pTap))/1000*tvsUnits::mm(pTap->SizeB, pTap)/1000
-							+2*M_PI*(tvsUnits::mm(pTap->Radius, pTap))/1000*tvsUnits::mm(pTap->SizeB, pTap)/1000);
+                        Area=tvsSheetMetal::elbowArea(tvsUnits::mm(pTap->SizeA,pTap),
+                            tvsUnits::mm(pTap->SizeB,pTap),tvsUnits::mm(pTap->Radius,pTap),pTap->Swectangle);
 					}
 					appendLable(_T("("));
 					appendLable(Swectangle);
@@ -341,6 +340,10 @@ bool SPEC::add(AcDbEntity * pEnt)
 				setParam2(Area, TypeDouble2);
 			}
 #pragma endregion
+            if (Ent->getSheetMetal(Area,sheetThickness,sheetMass)) {
+                setParam2(Area,TypeDouble2);
+                sheetUnitMass = param1 > 0.0 ? sheetMass / param1 : 0.0;
+            }
 			//if (status!=None) printResult();
 
 
@@ -684,6 +687,7 @@ void SPEC:: add(double pSizeA,
 	SizeA3=pSizeA3;
 	Swectangle=pSwectangle;
 	Area=0;
+	sheetMass = sheetThickness = sheetUnitMass = 0.0;
 
 }
 
@@ -718,6 +722,7 @@ void SPEClist::append(SPEC line)
 		{
 			specList[i].param1=specList[i].param1+line.param1;
 			specList[i].param2=specList[i].param2+line.param2;
+            specList[i].sheetMass += line.sheetMass;
 			specList[i].entityList.append(line.sEnt);
 			return;
 		}
@@ -768,6 +773,11 @@ int SPEClist::checkRelevations(SPEC param1, SPEC param2)
 	}
 
 
+    if (param1.sheetThickness < param2.sheetThickness) return Less;
+    if (param1.sheetThickness > param2.sheetThickness) return Larger;
+    const double massTolerance = 1e-9 * (1.0 + fabs(param2.sheetUnitMass));
+    if (param1.sheetUnitMass < param2.sheetUnitMass - massTolerance) return Less;
+    if (param1.sheetUnitMass > param2.sheetUnitMass + massTolerance) return Larger;
 	return Equal;
 
 }
@@ -788,8 +798,8 @@ void SPEClist::print()
 void SPEClist::printSPDSForm(AcGePoint3d &cent)
 {
 	//double columnswidth[9]={2000,13000,6000,3500,4500,2000,2000,2500,4000};
-	double columnswidth[10]={0, 2000,15000,21000,24500,29000,31000,33000,35500,39500};
-	double columndistanse[6]={2000,15000,29000,31000,33000,35500};
+	double columnswidth[11]={0, 2000,15000,21000,24500,29000,31000,33000,35500,37500,41500};
+	double columndistanse[7]={2000,15000,29000,31000,33000,35500,37500};
 	const double units = tvsUnits::factor();
 	for (double& c : columnswidth) c /= units;
 	for (double& c : columndistanse) c /= units;
@@ -814,7 +824,9 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 	printText(pos3,_T("Jed. mjere"));
 	printText(pos4,_T("Količina"));
 	printText(pos5,_T("Jed. mjere 2"));
-	printText(pos6,_T("Količina"));
+	printText(pos6,_T("Površina, m²"));
+    pos7=AcGePoint3d(curcnt.x+columndistanse[6]+otstupX,curcnt.y+otstupY,curcnt.z);
+    printText(pos7,_T("Masa, kg"));
 	curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 
 	//print all table text
@@ -833,17 +845,23 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 		printText(pos4,specList[i].param1char);
 		printText(pos5,specList[i].unit2);
 		printText(pos6,specList[i].param2char);
+        pos7=AcGePoint3d(curcnt.x+columndistanse[6]+otstupX,curcnt.y+otstupY,curcnt.z);
+        if (specList[i].sheetThickness > 0.0) {
+            ACHAR massText[64]; acdbRToS(specList[i].sheetMass,2,3,massText);
+            printText(pos7,massText);
+        }
 		curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 	}
 
 	/// total
-	double summlenght=0, summArea=0;
+	double summlenght=0, summArea=0, totalMass=0;
 	ACHAR  sA[512];
 
 	for (int i =0; i<length;i++)
 	{
 		//summlenght+=specList[i].param1;
 		summArea+=specList[i].param2;
+        totalMass+=specList[i].sheetMass;
 	}
 	acdbRToS(summArea,2,2,sA);
 	//pos1=AcGePoint3d(curcnt.x+columndistanse[0]+otstupX,curcnt.y+otstupY,curcnt.z);
@@ -858,11 +876,13 @@ void SPEClist::printSPDSForm(AcGePoint3d &cent)
 	//printText(pos4,_T("Količina"));
 	//printText(pos5,_T("Jed. mjere 2"));
 	printText(pos6,sA);
+    pos7=AcGePoint3d(curcnt.x+columndistanse[6]+otstupX,curcnt.y+otstupY,curcnt.z);
+    ACHAR massText[64]; acdbRToS(totalMass,2,3,massText); printText(pos7,massText);
 	curcnt=AcGePoint3d(curcnt.x,curcnt.y-rowhight,curcnt.z);
 
 	///print table
 
-	double TableLenght=39500 / units;
+	double TableLenght=41500 / units;
 	double Hight=length*rowhight;
 	//vertical Lines
 
@@ -950,6 +970,7 @@ bool SPEClist::printToExel(CMSExcel* m_msExcel,long &idx)
 	ACHAR*col7={L"G"};
 	ACHAR*col8={L"H"};
 	ACHAR*col9={L"I"};
+    ACHAR*col10={L"J"};
 
 	//m_msExcel->SetExcelCellFormat(L"A1:i20000",L"Text");
 
@@ -960,7 +981,8 @@ bool SPEClist::printToExel(CMSExcel* m_msExcel,long &idx)
 	m_msExcel->printExelText(col6,idx,_T("Jed. mjere"));
 	m_msExcel->printExelText(col7,idx,_T("Količina"));
 	m_msExcel->printExelText(col8,idx,_T("Jed. mjere 2"));
-	m_msExcel->printExelText(col9,idx,_T("Količina"));
+	m_msExcel->printExelText(col9,idx,_T("Površina, m²"));
+    m_msExcel->printExelText(col10,idx,_T("Masa, kg"));
 
 
  acedSetStatusBarProgressMeter(_T("Izvoz podataka u Excel"),0,length);
@@ -978,6 +1000,10 @@ bool SPEClist::printToExel(CMSExcel* m_msExcel,long &idx)
 		m_msExcel->printExelText(col7,idx,specList[i].param1char);
 		m_msExcel->printExelText(col8,idx,specList[i].unit2);
 		m_msExcel->printExelText(col9,idx,specList[i].param2char);
+        if (specList[i].sheetThickness > 0.0) {
+            ACHAR massText[64]; acdbRToS(specList[i].sheetMass,2,3,massText);
+            m_msExcel->printExelText(col10,idx,massText);
+        }
 
 
 
@@ -986,18 +1012,21 @@ bool SPEClist::printToExel(CMSExcel* m_msExcel,long &idx)
 		acedRestoreStatusBar();
 
 	/// total
-	double summlenght=0, summArea=0;
+	double summlenght=0, summArea=0, totalMass=0;
 	ACHAR  sA[512];
 
 	for (int i =0; i<length;i++)
 	{
 		//summlenght+=specList[i].param1;
 		summArea+=specList[i].param2;
+        totalMass+=specList[i].sheetMass;
 	}
 	acdbRToS(summArea,2,2,sA);
 
 	m_msExcel->printExelText(col8,idx,_T("Ukupno:"));
 	m_msExcel->printExelText(col9,idx,sA);
+    ACHAR massText[64]; acdbRToS(totalMass,2,3,massText);
+    m_msExcel->printExelText(col10,idx,massText);
 
 	idx++;
 

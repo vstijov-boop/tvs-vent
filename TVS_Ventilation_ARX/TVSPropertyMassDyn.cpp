@@ -30,7 +30,7 @@ STDMETHODIMP CTVSPropertyMassDyn::GetDisplayName(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(L"Masa");
+	*pBstrName = ::SysAllocString(L"Masa/jed., kg");
 
 	return (S_OK);
 }
@@ -42,6 +42,14 @@ STDMETHODIMP CTVSPropertyMassDyn::IsPropertyEnabled(IUnknown *pUnk, BOOL *pbEnab
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
 	*pbEnabled = checkEnabled(pUnk);
+    CComQIPtr<IAcadBaseObject> object(pUnk);
+    AcDbObjectId id;
+    if (object && SUCCEEDED(object->GetObjectId(&id))) {
+        AcDbObjectPointer<TVS_Entity> entity(id, AcDb::kForRead);
+        double area, thickness, mass;
+        if (entity.openStatus() == Acad::eOk && entity->getSheetMetal(area,thickness,mass))
+            *pbEnabled = FALSE;
+    }
 
 	return (S_OK);
 }

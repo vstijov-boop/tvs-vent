@@ -197,6 +197,14 @@ bool MleaderController::GetEntityStringPropertyByName(const AcDbObjectId  &objId
 		pEnt->getSizeString(stringText);
 		return true;
 	}
+    else if (stringTemplate == L"M" || stringTemplate == L"A" || stringTemplate == L"T") {
+        double area, thickness, mass;
+        if (!pEnt->getSheetMetal(area,thickness,mass)) return false;
+        if (stringTemplate == L"M") stringText.Format(L"%.3f", mass);
+        else if (stringTemplate == L"A") stringText.Format(L"%.3f", area);
+        else stringText.Format(L"%.1f", thickness);
+        return true;
+    }
 	else if (stringTemplate == L"P") {
 		//pEnt->getSizeString(stringText);
 		return true;

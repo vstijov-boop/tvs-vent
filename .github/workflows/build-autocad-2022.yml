@@ -3,7 +3,7 @@ name: Build AutoCAD 2022
 on:
   workflow_dispatch:
   push:
-    branches: [srpski-prevod, unapredjenja-jedinice]
+    branches: [srpski-prevod, unapredjenja-jedinice, unapredjenja-masa]
     paths:
       - '.github/workflows/build-autocad-2022.yml'
       - 'TVS_Ventilation_ARX/**'

@@ -11,6 +11,9 @@ public:
 [L] - Protok, m³/h\r\n\
 [V] - Brzina, m/s\r\n\
 [D] - Dimenzije, mm\r\n\
+[M] - Masa elementa, kg\r\n\
+[A] - Površina lima, m²\r\n\
+[T] - Debljina lima, mm\r\n\
 [P] - Pad pritiska, Pa\r\n\
 [BN] - Naziv bloka\r\n\
 [N] - Naziv sloja\r\n\
