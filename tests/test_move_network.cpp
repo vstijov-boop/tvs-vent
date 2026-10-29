@@ -1,4 +1,4 @@
-// Prepared for the next user-approved compilation; intentionally not run while builds are held.
+// SDK-independent regression tests for connected fitting movement.
 #include <cassert>
 #include <cmath>
 #define near
@@ -44,6 +44,20 @@ int main(){
         assert(tvsMoveGeometry::pointsNear(out.ports[9][1],n[9].ports[1],1e-7/f));
         assert(std::fabs((out.ports[9][1]-out.ports[9][0]).length()-500/f)<1e-7/f);
         assert(!plan(n,0,turn(Point(0,900),a,f,true),1/f,.1/f,out));assert(out.error==TooShort);
+    }
+    // Round and mixed-section transitions use each port's own shape/diameter.
+    {
+        std::vector<Body> mixed=fixture();
+        for(size_t i=0;i<mixed.size();++i)for(size_t j=0;j<mixed[i].sections.size();++j){
+            mixed[i].sections[j].round=true;mixed[i].sections[j].b=0;
+        }
+        Result checked;assert(plan(mixed,0,Point(0,-300),1,.1,checked));
+        assert(std::fabs((checked.ports[9][1]-checked.ports[9][0]).length()-1100)<1e-8);
+        mixed[5].sections[1].round=false;mixed[5].sections[1].b=400;
+        for(size_t i=6;i<=8;++i)for(size_t j=0;j<mixed[i].sections.size();++j){
+            mixed[i].sections[j].round=false;mixed[i].sections[j].b=400;
+        }
+        assert(plan(mixed,0,Point(0,300),1,.1,checked));
     }
     Result out;std::vector<Body> n=fixture();
     n[9].sections[0].a=300;assert(!plan(n,0,Point(0,300),1,.1,out));assert(out.error==SectionMismatch);

@@ -1,8 +1,8 @@
 # TVS_MOVE — varijanta sa račvama i prelazima
 
-29.10.2026: pripremljen izvorni kod, **bez kompilacije**, po važećoj instrukciji
-korisnika. Ova varijanta i novi izbor `<Izabrana>` još nisu u preuzetim ARX paketima.
-Ne pokretati kompilaciju do novog odobrenja. Commit mora sadržati `[skip ci]`.
+29.10.2026: korisnik je odobrio kompilaciju i build. Prošli su svi pripremljeni
+testovi (devet Python testova i osam C++ programa). Praktična provjera proširene
+mreže i Enter-default ponašanja u AutoCAD-u još predstoji.
 
 ## Kako je predviđeno da radi
 
@@ -55,12 +55,37 @@ jedan UNDO za cijelu promjenu; radni UNDO/REDO tek treba provjeriti.
 ## Provjera koja još predstoji
 
 Pripremljen `tests/test_move_network.cpp` koristi stvarni matematički header.
-Nije kompajliran niti izvršen zbog zabrane kompilacije. Ima mrežu sa T-račvom,
+Kompajliran je uz C++98 i stroga upozorenja i uspješno izvršen. Ima mrežu sa T-račvom,
 prelazom, različitim presjecima i tri dionice koje mijenjaju dužinu; obuhvata
 mm/cm/m, rotacije, skraćivanje preko kraja, duple kontakte, neusaglašene presjeke,
 netangentne ose, 3D, bočni priključak, novi kontakt i granicu 256 elemenata.
 
-Po odobrenju: izvršiti sve testove, kompajlirati 2020/2022 i provjeriti stvarne
+Poslije kompilacije 2020/2022 u AutoCAD-u provjeriti stvarne
 pravougaone/okrugle mreže, asimetrične prelaze, grane, ponovljena pomjeranja,
 sačuvan/ponovo otvoren DWG, UCS, mase, oznake, zaključane slojeve i UNDO/REDO.
 Ovaj izvorni kod još ne predstavlja potvrđenu radnu verziju.
+
+## Provjereni paketi
+
+Izvor: `5677500d2ebeaaabf2dc621359fb0d07f9a5eb29`.
+Novi `test_move_reference_input.py` kompajlira stvarni unos reference sa simuliranim
+AutoCAD API-jem: Enter, Izabrana, Druga, Osa, prekid prije tačke i prekid unosa tačke.
+Prošireni C++ test uključuje okrugle mreže i prelaz okruglo/pravougaono, kao i
+suprotan smjer pomjeranja. Svi testovi prolaze.
+
+- [AutoCAD 2020 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40869321805/artifacts/12895261724)
+  SHA256 `62e4a1f4f34c4ce7c0ddcccdd6edb0147a1925708f227b2e5e7ea04b0d5f9618`.
+  0 grešaka, 2 uobičajena LNK4099 upozorenja za razvojni rxapi.pdb.
+  ZIP CRC, x64 PE/acdb23.dll, BUILD commit, novi prompt i proširenje mreže u ARX-u,
+  najnoviji CUIX sa ikonom i nepromijenjeni KGTEZ potvrđeni.
+
+Instalacija: zatvoriti AutoCAD, sačuvati prethodni ARX/DBX par i CUIX, zamijeniti
+oba binarna fajla odgovarajućom verzijom i TVS_TOOLS.cuix novim iz paketa ako
+ikona još nije instalirana. KGTEZ i TVS_VENT.cuix ostaju nepromijenjeni.
+Praktično ponašanje nove mrežne varijante u AutoCAD-u još treba potvrditi.
+
+- [AutoCAD 2022 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40869321602/artifacts/12895282695)
+  SHA256 `d31bf315b433149e0977d38bb8cd13161806abe6f409a19d5030ee476e9693c9`.
+  0 grešaka, 2 uobičajena LNK4099 upozorenja za razvojni rxapi.pdb.
+  ZIP CRC, x64 PE/acdb24.dll, BUILD commit, novi prompt i proširenje mreže u ARX-u,
+  najnoviji CUIX sa ikonom i nepromijenjeni KGTEZ potvrđeni.

@@ -149,3 +149,10 @@ Dugme i instalacija opisani su u `DUGME_TVS_MOVE.md`, a prošireni proračun i n
 ograničenja u `TVS_MOVE_MREZA.md`. Novi izvorni kod automatski bira prethodni
 jednostavni slučaj ili novi proračun mreže. Pripremljen je test mreže, ali nije
 kompajliran niti izvršen. Posljednja zabrana kompilacije i dalje važi.
+
+## Kompilacija mrežne varijante odobrena
+
+Korisnik je 29.10.2026. odobrio kompilaciju i build; prethodna zabrana je završena.
+Devet Python testova i osam C++ programa prolaze, uključujući Enter-default,
+račvu, prelaz i mješovite presjeke. Paketi i važeći status su u `TVS_MOVE_MREZA.md`.
+Radnu provjeru proširene mreže u AutoCAD-u još treba izvršiti.

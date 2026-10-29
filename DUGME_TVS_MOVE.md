@@ -18,8 +18,7 @@ Ako je ikona keširana, pri zatvorenom AutoCAD-u preimenovati TVS_TOOLS.mnr u
 TVS_TOOLS.mnr.old. Po potrebi ponovo učitati grupu kroz CUILOAD.
 
 Dugme već radi sa prethodno instaliranim TVS_MOVE ARX-om; ne dodaje nove mogućnosti
-u staru binarnu verziju. Novi Enter-default i varijanta mreže čekaju kompilaciju
-po odobrenju korisnika. CUIX sam po sebi ne zahtijeva kompilaciju.
+u staru binarnu verziju. Korisnik je odobrio kompilaciju koja uključuje novi Enter-default i varijantu mreže. CUIX sam po sebi ne zahtijeva kompilaciju.
 
 Provjereni su ZIP CRC, svi XML dijelovi, jedinstvena nova referenca u svakom UI
 mjestu i očuvanje svih prethodnih makroa, referenci i bitmapa, uključujući KGTEZ.
