@@ -76,7 +76,7 @@ ponovljena pomjeranja, SAVE/ponovno otvaranje, UCS World/rotiran/pomjeren, mm/cm
 masu i oznake, UNDO/REDO, Esc, zaključane slojeve/oznake, duple kontakte, prekratke
 dionice, račve/prelaze i XREF. Testirati i stare crteže bez sačuvanih konektora.
 
-## Kompilacija i paketi
+## Paketi prve verzije — korisnik potvrdio rad
 
 Izvor paketa: `79981e451275ec418632767d137fe5dc90e6fe5c`.
 Prvi Windows pokušaj otkrio je sukob naziva `near` sa Windows makroom. Funkcija
@@ -110,3 +110,22 @@ Novi test obuhvata 144 kombinacije: obje ivice, tri reference, oba redosljeda
 krajeva, četiri rotacije i mm/cm/m. Provjerava poznatu konačnu osu kada se na
 zadatu tačku dovede ivica, umjesto samo poređenja sa kopijom istog algoritma.
 Praktično provjeriti obje ivice i opcije I/D/O, OSNAP na susjedni kanal i UNDO.
+
+## Paketi dorade sa izborom ivice
+
+Izvor: `75f4cc2ddaf636706bafba161e9202d635dc48f1`. Osam Python testova i prošireni
+C++ test geometrije prolaze. Korisnik je potvrdio prethodnu verziju sa osom;
+novi izbor ivice tek treba potvrditi u AutoCAD-u.
+
+- [AutoCAD 2020 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40862249796/artifacts/12891728822)
+  SHA256 `bfcabf6232ed5c019c6447ea0a84726a456b14d5d27e0ee39d18fa5966f140fe`.
+  Uspješno, 0 grešaka, 2 uobičajena LNK4099 upozorenja. ZIP CRC, x64 PE,
+  acdb23.dll, BUILD commit i novi prompt sa opcijama ivica provjereni.
+
+KGTEZ i oba CUIX fajla ostaju nepromijenjeni. Za instalaciju zatvoriti AutoCAD,
+sačuvati prethodni ARX/DBX par i zamijeniti oba fajla iz odgovarajućeg paketa.
+
+- [AutoCAD 2022 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40862249787/artifacts/12892491545)
+  SHA256 `f560650278c0bb0a8037bd6c79ca21a202ebfbeb2fbb8ebd32c1db8eaf79d1e2`.
+  Uspješno, 0 grešaka, 2 uobičajena LNK4099 upozorenja. ZIP CRC, x64 PE,
+  acdb24.dll, BUILD commit i novi prompt sa opcijama ivica provjereni.
