@@ -45,3 +45,19 @@ U AutoCAD-u 2020 i 2022 provjeriti:
 
 Zatvoriti AutoCAD prije zamjene binarnih fajlova. Sačuvati prethodni ARX/DBX par
 i koristiti isključivo paket za odgovarajuću verziju AutoCAD-a.
+
+## Provjereni paketi
+
+Izvor: `3f12fb7baea219750517665abae9bcef2749a68d`.
+Obje Windows kompilacije uspješne: 0 grešaka, 2 uobičajena LNK4099 upozorenja
+za nedostajući razvojni `rxapi.pdb`. ZIP CRC i x64 PE/AutoCAD zavisnosti provjereni.
+Šest C++ test programa i svih sedam Python testova prolaze.
+Radna provjera u AutoCAD-u još nije izvršena.
+
+- [AutoCAD 2020 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40842023986/artifacts/12882948086)
+  SHA256 `ec20da6dbfd0262c1a7258a67bfd058ecbf93abbccf6fd9989240b36c040c876`
+- [AutoCAD 2022 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40842024103/artifacts/12884015679)
+  SHA256 `0e31ff38d447d132400ea5fa65b1c499b49b838911c223e47ce10ef42377cd7f`
+
+Zamijeniti ARX i DBX zajedno u direktorijumu odgovarajuće verzije.
+KGTEZ.lsp i oba CUIX fajla nisu mijenjani ovom ispravkom.
