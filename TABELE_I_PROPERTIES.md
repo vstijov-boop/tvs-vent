@@ -118,3 +118,11 @@ Numerički testovi prolaze; ručna AutoCAD/Properties provjera ostaje otvorena.
   SHA256 `7347575e3894f369613e93a1b70a746ce406b00b71d24b028fe00bda2d77300c`
 - [AutoCAD 2022](https://github.com/vstijov-boop/tvs-vent/actions/runs/40780544374/artifacts/12857437068)
   SHA256 `e8a617c9d5d7c0743c519500b3ff40df0e690a98d7b3cc1c2a7c5dba9fc193a0`
+
+## Korisnička potvrda — 29.10.2026.
+
+Korisnik je potvrdio da na AutoCAD-u 2022 rade razmjera tabela, prikaz mase u
+Properties i zbir mase izbora. Time je ručna provjera tog paketa za 2022
+potvrđena; AutoCAD 2020 još čeka korisničku probu. Naknadna ispravka [P] i dvije
+decimale za [P]/[V] obrađeni su u MLEADER_PAD_PRITISKA.md i traže novu provjeru
+oznaka.
