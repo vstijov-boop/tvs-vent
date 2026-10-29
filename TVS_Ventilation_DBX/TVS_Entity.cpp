@@ -51,9 +51,11 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
         areaM2 = tvsSheetMetal::pipeArea(a,b,length);
     }
     else if (const TVS_TAP *p = TVS_TAP::cast(this)) {
-        // SizeA is the width in the bend plane, also for up/down elbows.
-        const double a = p->SizeA*f, b = p->ThisRound ? 0.0 : p->SizeB*f;
-        const double radius = p->Radius*f;
+        // Stored A/B remain plan width/height. Vertical elbows bend through height B.
+        const bool vertical = !p->ThisRound && (p->get_Form() == Form_Up || p->get_Form() == Form_Down);
+        const double a = (vertical ? p->SizeB : p->SizeA)*f;
+        const double b = p->ThisRound ? 0.0 : (vertical ? p->SizeA : p->SizeB)*f;
+        const double radius = p->get_radius()*f;
         if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::nonnegative(radius)
             || !tvsSheetMetal::nonnegative(std::fabs(p->Swectangle))) return false;
         largest = tvsSheetMetal::larger(a,b);

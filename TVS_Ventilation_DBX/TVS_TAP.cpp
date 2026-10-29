@@ -2901,65 +2901,23 @@ Acad::ErrorStatus TVS_TAP::put_Radius(double newVal)
 
 double TVS_TAP::get_radius(void) const
 {
-	assertReadEnabled();
-	return (Radius);
+    assertReadEnabled();
+    if (DuctType == DuctTypeFlex) return SizeA*RadiusVariableParameter;
+    const bool vertical = !ThisRound && (Form == Form_Up || Form == Form_Down);
+    const double bendSide = vertical ? SizeB : SizeA;
+    const int mode = static_cast<int>(ThisRound ? RadiusTypeRound : RadiusTypeRect);
+    if (mode == (ThisRound ? RadiusTypeRound_RadiusConstant : RadiusTypeRect_RadiusConstant))
+        return RadiusConst;
+    if (mode == (ThisRound ? RadiusTypeRound_RadiusVariable : RadiusTypeRect_RadiusVariable))
+        return bendSide*RadiusVariableParameter;
+    if (mode == (ThisRound ? RadiusTypeRound_RadiusSpecific : RadiusTypeRect_RadiusSpecific))
+        return tvsUnits::mm(bendSide,this) < 355.0 ? bendSide : bendSide/2.0;
+    return Radius;
 }
 
 void TVS_TAP::setRadius()
 {
-	if (DuctType == DuctTypeFlex)
-	{
-		Radius = SizeA*RadiusVariableParameter;
-		return;
-	}
-	if (ThisRound == true)
-	{
-		switch ((int)RadiusTypeRound)
-		{
-		case RadiusTypeRound_RadiusConstant:
-			Radius = RadiusConst;
-			return;
-		case RadiusTypeRound_RadiusSpecific:
-			if (tvsUnits::mm(SizeA, this) < 355)
-			{
-				Radius = SizeA;
-			}
-			else Radius = SizeA / 2;
-			return;
-		case RadiusTypeRound_RadiusVariable:
-			Radius = SizeA*RadiusVariableParameter;
-			return;
-
-		default:
-			return;
-		}
-	}
-	else
-	{
-		switch ((int)RadiusTypeRect)
-		{
-		case RadiusTypeRect_RadiusConstant:
-			Radius = RadiusConst;
-			return;
-		case RadiusTypeRect_RadiusSpecific:
-			if (tvsUnits::mm(SizeA, this) < 355)
-			{
-				Radius = SizeA;
-			}
-			else Radius = SizeA / 2;
-			return;
-		case RadiusTypeRect_RadiusVariable:
-			Radius = SizeA*RadiusVariableParameter;
-			return;
-
-		default:
-			return;
-		}
-	}
-
-
-
-
+    Radius = get_radius();
 }
 
 int TVS_TAP::get_Form(void) const
@@ -2971,6 +2929,7 @@ Acad::ErrorStatus TVS_TAP::put_Form(int newVal)
 {
 	assertWriteEnabled();
 	Form = newVal;
+    setRadius();
 	return (Acad::eOk);
 }
 

@@ -200,8 +200,8 @@ bool SPEC::add(AcDbEntity * pEnt)
 						setLable(SizeA);
 						appendLable(_T("x"));
 						appendLable(SizeB);
-                        Area=tvsSheetMetal::elbowArea(tvsUnits::mm(pTap->SizeA,pTap),
-                            tvsUnits::mm(pTap->SizeB,pTap),tvsUnits::mm(pTap->Radius,pTap),pTap->Swectangle);
+                        Area=tvsSheetMetal::elbowArea(SizeA,SizeB,
+                            tvsUnits::mm(pTap->get_radius(),pTap),pTap->Swectangle);
 					}
 					appendLable(_T("("));
 					appendLable(Swectangle);

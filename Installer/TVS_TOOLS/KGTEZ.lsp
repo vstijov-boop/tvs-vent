@@ -166,7 +166,7 @@
     (list (apply 'min rs) (apply 'max rs))
     nil))
 
-(defun tvs-info (obj on / a b a2 b2 rc lm len ang rg ar)
+(defun tvs-info (obj on / a b a2 b2 rc lm len ang rg ar bend vertical native)
   (setq a (vlax-get-property obj 'Dpr)
         b (vlax-get-property obj 'SizeB))
   (cond
@@ -181,12 +181,24 @@
            (/ len 1000.0)))
     ;; koljeno: obim * radijus ose * ugao
     ((= on "TVS_TAP")
-     (setq ang (vlax-get-property obj 'Angle)
-           rg  (if *tvs-elbow-geom* (tvs-elbow-rg obj) nil)   ; (Ri Ro) iz geometrije koljena
+     (setq vertical nil)
+     (if (vlax-property-available-p obj 'Form)
+       (setq vertical (member (vlax-get-property obj 'Form) '(2 3))))
+     (setq bend (if vertical b a)
+           ang (vlax-get-property obj 'Angle)
+           rg  (if vertical nil (if *tvs-elbow-geom* (tvs-elbow-rg obj) nil))   ; (Ri Ro) iz geometrije koljena
            rc  (cond (rg (/ (+ (car rg) (cadr rg)) 2.0))      ; radijus ose iz crteza
-                     ((= *tvs-rmode* "os") (* *tvs-rk* a))
-                     (T (+ (* *tvs-rk* a) (/ a 2.0))))
+                     ((= *tvs-rmode* "os") (* *tvs-rk* bend))
+                     (T (+ (* *tvs-rk* bend) (/ bend 2.0))))
            ar  (/ (* 2.0 (+ a b) rc (* ang (/ pi 180.0))) 1.0e6))
+     ;; Up/down drawing is a projection, not a developed arc. Prefer native sheet area.
+     (if vertical
+       (if (vlax-property-available-p obj 'SheetArea)
+         (progn
+           (setq native (vlax-get-property obj 'SheetArea))
+           (if (= (type native) 'VARIANT) (setq native (vlax-variant-value native)))
+           (if (numberp native)
+             (if (> native 0.0) (setq ar native))))))
      (if *tvs-debug*
        (princ (strcat "\n[koljeno " (tvs-fmt a) "x" (tvs-fmt b) " ugao " (rtos ang 2 2)
                       (if rg (strcat "  Ri=" (rtos (car rg) 2 1) "  Ro=" (rtos (cadr rg) 2 1))

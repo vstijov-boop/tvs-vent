@@ -57,6 +57,10 @@ class Harness:
             'rtos':lambda v,mode,prec:f'{v:.{prec}f}',
             'member':lambda v,a:v in a,
             'vlax-get-property':lambda o,p:o[str(p)],
+            'vlax-property-available-p':lambda o,p:str(p) in o,
+            'numberp':lambda x:isinstance(x,(int,float)), '>':lambda a,b:a>b,
+            'type':lambda x:'variant' if isinstance(x,dict) else 'real' if isinstance(x,float) else 'int' if isinstance(x,int) else 'str' if isinstance(x,str) else 'nil',
+            'vlax-variant-value':lambda x:x['variant'],
             'namedobjdict':lambda:None,
             'dictsearch':lambda *a:self.record,
         })
@@ -82,6 +86,10 @@ class Harness:
                 target[k]=value
             return value
         if op=='if':return self.eval(x[2],e) if self.eval(x[1],e) else self.eval(x[3],e) if len(x)>3 else None
+        if op=='progn':
+            result=None
+            for body in x[1:]:result=self.eval(body,e)
+            return result
         if op=='cond':
             for case in x[1:]:
                 if self.eval(case[0],e):

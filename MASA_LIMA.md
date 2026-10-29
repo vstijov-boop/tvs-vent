@@ -108,3 +108,10 @@ Stvarni prikaz i interakciju u AutoCAD-u još treba potvrditi na korisnikovom ra
   SHA256: `8f5ed65e619f6c9d790c6c4d3e3598a45ea6c16170c248486f7879b1e34bdab8`
 - [AutoCAD 2022 paket](https://github.com/vstijov-boop/tvs-vent/actions/runs/40774075732/artifacts/12854786258)
   SHA256: `3fb96bbf4c9d0e0b5a130095b6ff58da758dc8c111c77f308aeaeb46d9950671`
+
+
+## Ispravka vertikalnih koljena 29.10.2026.
+
+Sačuvani A/B predstavljaju širinu/visinu, a za Gore/Nadolje dimenzija u ravni
+savijanja je B. Ispravljeni su Ri, srednji radijus i native/KGTEZ obračun.
+Detalji, testovi i uticaj na postojeće spojeve: `RADIJUS_KOLJENA_GORE_DOLJE.md`.
