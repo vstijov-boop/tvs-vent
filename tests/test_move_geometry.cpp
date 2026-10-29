@@ -23,6 +23,24 @@ int main(){
   assert(plan(reversed,ra,rf,rotate(Point(700,1000),angle,scale),rotate(Point(700,1400),angle,scale),1/scale,.1/scale,p));
   close(p.selected[0],rotate(Point(2000,1400),angle,scale),tol);
  }
+ // Picking either physical edge aligns that edge, not the axis, to the target.
+ for(int u=0;u<3;++u)for(int r=0;r<4;++r)for(int side=-1;side<=1;side+=2)
+ for(int mode=0;mode<3;++mode)for(int reversed=0;reversed<2;++reversed){
+  double scale=scales[u],angle=angles[r],width=250;
+  Point ends[2]={rotate(Point(0,1000),angle,scale),rotate(Point(2000,1000),angle,scale)};
+  Point cursor=rotate(Point(600,1000+side*(width/2+30)),angle,scale),anchor;
+  Point refEnds[2]={ends[reversed],ends[1-reversed]};
+  Reference reference=static_cast<Reference>(mode);
+  assert(referencePoint(refEnds,cursor,width/scale,reference,anchor));
+  double edge=mode==Axis?0:side*(mode==OtherEdge?-1:1)*width/2;
+  close(anchor,rotate(Point(600,1000+edge),angle,scale),1e-7/scale);
+  Point attached[2]={rotate(Point(-300,700),angle,scale),rotate(Point(2300,700),angle,scale)};
+  Point fixed[2]={rotate(Point(-300,0),angle,scale),rotate(Point(2300,0),angle,scale)};
+  Plan result;
+  assert(plan(ends,attached,fixed,anchor,rotate(Point(600,1400),angle,scale),1/scale,.1/scale,result));
+  close(result.selected[0],rotate(Point(0,1400-edge),angle,scale),1e-7/scale);
+  close(result.selected[1],rotate(Point(2000,1400-edge),angle,scale),1e-7/scale);
+ }
  // Opposite neighbors: one extends, the other shortens by the same amount.
  {
   Point ends[2]={Point(0,0),Point(2000,0)},attached[2]={Point(-300,-300),Point(2300,300)};

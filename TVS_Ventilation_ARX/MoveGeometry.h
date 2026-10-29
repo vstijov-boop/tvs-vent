@@ -21,6 +21,26 @@ inline bool onSegment(const Point& p,const Point& a,const Point& b,double tol){
     double t=(p-a).dot(v)/l;if(t<0)t=0;if(t>1)t=1;
     return pointsNear(p,a+v*t,tol);
 }
+enum Reference { PickedEdge, OtherEdge, Axis };
+// The first click selects the nearer physical edge. Modes remain relative to that click,
+// independent of the pipe's stored endpoint order or the active UCS orientation.
+inline bool referencePoint(const Point ends[2],const Point& cursor,double width,
+                           Reference mode,Point& anchor){
+    if(!valid(ends[0])||!valid(ends[1])||!valid(cursor)||!finite(width)||width<=0)return false;
+    Point axis=ends[1]-ends[0],direction;
+    if(!unit(axis,direction)||std::fabs(direction.z)>1e-8)return false;
+    Point normal(-direction.y,direction.x,0);
+    double fraction=(cursor-ends[0]).dot(axis)/axis.dot(axis);
+    if(fraction<0)fraction=0;
+    if(fraction>1)fraction=1;
+    anchor=ends[0]+axis*fraction;
+    if(mode!=Axis){
+        double side=(cursor-anchor).dot(normal)>=0?1.0:-1.0;
+        if(mode==OtherEdge)side=-side;
+        anchor=anchor+normal*(side*width/2);
+    }
+    return valid(anchor);
+}
 // Reconstruct smooth elbow axis ports from stored tangent intersection, not display caches.
 inline bool elbowPorts(const Point& middle,const Point& start,double sweep,double axisRadius,Point ports[2]){
     Point u;if(!valid(middle)||!unit(Point(start.x,start.y,0),u)||!finite(sweep)

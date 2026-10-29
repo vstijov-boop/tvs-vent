@@ -201,16 +201,30 @@ inline void execute(){
         acutPrintf(L"\nTVS_MOVE: zatvorene petlje nisu podržane u ovom koraku.");return;}
     const int pipes[3]={center,neighbors[0].node,neighbors[1].node};
     if(sideBranches(nodes,pipes,tol)){acutPrintf(L"\nTVS_MOVE: postoji bočni priključak; ovaj korak podržava samo niz od pet elemenata.");return;}
-    // Entity selection returns a cursor point, not necessarily a point on the axis.
-    Point axis=main.ports[1]-main.ports[0],cursor(picked[0],picked[1],picked[2]);
-    double fraction=(cursor-main.ports[0]).dot(axis)/axis.dot(axis);
-    if(fraction<0)fraction=0;if(fraction>1)fraction=1;
-    Point origin=main.ports[0]+axis*fraction;
-    ads_point base={origin.x,origin.y,origin.z},destination;
-    acedInitGet(RSG_NONULL, NULL);
-    if(tvsCoordinates::getPoint(base,L"\nZadajte novu bočnu poziciju dionice: ",destination)!=RTNORM)return;
-    Point ends[2]={main.ports[0],main.ports[1]};tvsMoveGeometry::Plan plan;
-    if(!tvsMoveGeometry::plan(ends,attached,fixed,point(asPnt3d(base)),point(asPnt3d(destination)),minimum,tol,plan)){
+    Point ends[2]={main.ports[0],main.ports[1]},cursor(picked[0],picked[1],picked[2]);
+    tvsMoveGeometry::Reference reference=tvsMoveGeometry::PickedEdge;
+    Point origin;ads_point destination;
+    acutPrintf(L"\nTVS_MOVE: referenca je ivica bliža prvom kliku. Opcije I=Izabrana, D=Druga, O=Osa.");
+    for(;;){
+        if(!tvsMoveGeometry::referencePoint(ends,cursor,main.a,reference,origin)){
+            acutPrintf(L"\nTVS_MOVE: nije moguće odrediti ivicu kanala.");return;}
+        ads_point base={origin.x,origin.y,origin.z};
+        acedInitGet(RSG_NONULL,L"Izabrana Druga Osa");
+        const ACHAR* prompt=reference==tvsMoveGeometry::Axis
+            ?L"\nNova pozicija ose ili [Izabrana/Druga/Osa]: "
+            :reference==tvsMoveGeometry::OtherEdge
+                ?L"\nNova pozicija druge ivice ili [Izabrana/Druga/Osa]: "
+                :L"\nNova pozicija izabrane ivice ili [Izabrana/Druga/Osa]: ";
+        int status=tvsCoordinates::getPoint(base,prompt,destination);
+        if(status==RTNORM)break;
+        if(status!=RTKWORD)return;
+        ACHAR keyword[128];if(acedGetInput(keyword)!=RTNORM)return;
+        if(_wcsicmp(keyword,L"Izabrana")==0||_wcsicmp(keyword,L"I")==0)reference=tvsMoveGeometry::PickedEdge;
+        else if(_wcsicmp(keyword,L"Druga")==0||_wcsicmp(keyword,L"D")==0)reference=tvsMoveGeometry::OtherEdge;
+        else if(_wcsicmp(keyword,L"Osa")==0||_wcsicmp(keyword,L"O")==0)reference=tvsMoveGeometry::Axis;
+    }
+    tvsMoveGeometry::Plan plan;
+    if(!tvsMoveGeometry::plan(ends,attached,fixed,origin,Point(destination[0],destination[1],destination[2]),minimum,tol,plan)){
         acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja ili bi nastala prekratka/obrnuta dionica ili nepodržana 3D geometrija.");return;}
     // Prevent an unconnected external port at the new moving joints or pipe interior.
     for(size_t i=0;i<nodes.size();++i){bool own=false;for(int k=0;k<5;++k)if(static_cast<int>(i)==indexes[k])own=true;

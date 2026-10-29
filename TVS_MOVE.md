@@ -1,15 +1,21 @@
 # TVS_MOVE — prvi korak povezanog pomjeranja
 
-Status 29.10.2026: korisnik je odobrio kompilaciju. Matematički i topološki
-testovi prolaze. Radni test u AutoCAD-u još nije izvršen. Novi paketi uključuju
+Status 29.10.2026: korisnik je potvrdio da prva verzija TVS_MOVE dobro radi.
+Dodata je dorada za izbor ivice; njena radna provjera u AutoCAD-u još predstoji.
+Matematički i topološki testovi prolaze. Novi paketi uključuju
 i početne radijuse 0,5; prethodni UCS paketi ih nemaju.
 
 ## Upotreba i ponašanje
 
 1. `TVS_MOVE` — izabrati krutu pravu TVS dionicu između dva koljena u osnovi.
-2. Zadati tačku nove bočne pozicije ose; uzdužna i vertikalna komponenta unosa
-   se ne koriste. Bazna tačka je projekcija klika na osu izabranog kanala.
-3. Oba koljena klize duž osa susjednih kanala, njihovi udaljeni krajevi ostaju
+   Kliknuti blizu ivice koja treba da dođe na novu poziciju.
+2. Zadati novu poziciju te ivice. Podrazumijevana referenca je bliža fizička
+   ivica prvom kliku (pola širine od ose). Uzdužna i vertikalna komponenta unosa
+   se ne koriste. Gumena linija polazi od izabrane ivice.
+3. Opcije pri zadavanju tačke: `Izabrana` (`I`) vraća ivicu bližu prvom kliku,
+   `Druga` (`D`) bira suprotnu ivicu, `Osa` (`O`) vraća prvobitno pomjeranje ose.
+   Promjena reference ne mijenja geometriju dok se ne zada konačna tačka.
+4. Oba koljena klize duž osa susjednih kanala, njihovi udaljeni krajevi ostaju
    fiksni. Presjeci, radijusi i uglovi koljena ostaju isti.
 
 Za dva koljena od 90° izabrani kanal zadržava dužinu. Za kosa koljena njegovi
@@ -93,3 +99,14 @@ UNDO/REDO i ažuriranje vezanih oznaka, još ostaje da se izvrši.
   SHA256 `14b6ab7ae3084431be15feef4142b1d10b33a8d500c52261a3412b55a4a45a61`.
   ZIP CRC, PE x64, zavisnost acdb24.dll, BUILD commit i nova komanda/prompt u ARX-u
   provjereni. KGTEZ i CUIX fajlovi odgovaraju nepromijenjenim izvorima.
+
+## Dorada: pomjeranje prema ivici
+
+`referencePoint` iz prvog klika i širine kanala određuje fizičku ivicu. Isti
+proračun se koristi za pravougaoni kanal (širina A) i okrugli kanal (prečnik).
+Izbor ivice je nezavisan od redosljeda krajeva kanala i aktivnog UCS-a.
+
+Novi test obuhvata 144 kombinacije: obje ivice, tri reference, oba redosljeda
+krajeva, četiri rotacije i mm/cm/m. Provjerava poznatu konačnu osu kada se na
+zadatu tačku dovede ivica, umjesto samo poređenja sa kopijom istog algoritma.
+Praktično provjeriti obje ivice i opcije I/D/O, OSNAP na susjedni kanal i UNDO.
