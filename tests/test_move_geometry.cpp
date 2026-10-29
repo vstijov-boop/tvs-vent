@@ -23,6 +23,20 @@ int main(){
   assert(plan(reversed,ra,rf,rotate(Point(700,1000),angle,scale),rotate(Point(700,1400),angle,scale),1/scale,.1/scale,p));
   close(p.selected[0],rotate(Point(2000,1400),angle,scale),tol);
  }
+ // Opposite neighbors: one extends, the other shortens by the same amount.
+ {
+  Point ends[2]={Point(0,0),Point(2000,0)},attached[2]={Point(-300,-300),Point(2300,300)};
+  Point fixed[2]={Point(-300,-1300),Point(2300,1300)};Plan z;
+  assert(plan(ends,attached,fixed,Point(500,0),Point(500,400),1,.1,z));
+  assert(std::fabs((z.attached[0]-fixed[0]).length()-1400)<1e-8);
+  assert(std::fabs((z.attached[1]-fixed[1]).length()-600)<1e-8);
+  assert(!plan(ends,attached,fixed,Point(500,0),Point(500,1000),1,.1,z));
+  assert(!plan(ends,attached,fixed,Point(500,0),Point(500,1),1,0,z));
+  assert(plan(ends,attached,fixed,Point(500,0),Point(500,400),1,.1,z));
+  Plan back;assert(plan(z.selected,z.attached,fixed,Point(500,400),Point(500,0),1,.1,back));
+  close(back.selected[0],ends[0],1e-8);close(back.selected[1],ends[1],1e-8);
+  close(back.attached[0],attached[0],1e-8);close(back.attached[1],attached[1],1e-8);
+ }
  // Oblique neighbors translate by different vectors while the selected axis stays parallel.
  Point selected[2]={Point(0,0),Point(2000,0)},attached[2]={Point(-200,-200),Point(2200,-200)},fixed[2]={Point(-1000,-1000),Point(3000,-1000)};
  Plan p;assert(plan(selected,attached,fixed,Point(0,0),Point(800,100),1,.1,p));

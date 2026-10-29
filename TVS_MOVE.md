@@ -69,3 +69,27 @@ pravougaoni i okrugli niz sa 90° i 45° koljenima, obje orijentacije elemenata,
 ponovljena pomjeranja, SAVE/ponovno otvaranje, UCS World/rotiran/pomjeren, mm/cm/m,
 masu i oznake, UNDO/REDO, Esc, zaključane slojeve/oznake, duple kontakte, prekratke
 dionice, račve/prelaze i XREF. Testirati i stare crteže bez sačuvanih konektora.
+
+## Kompilacija i paketi
+
+Izvor paketa: `79981e451275ec418632767d137fe5dc90e6fe5c`.
+Prvi Windows pokušaj otkrio je sukob naziva `near` sa Windows makroom. Funkcija
+je preimenovana u `pointsNear`, a C++ test sada definiše isti makro prije headera
+kako bi provjerio da se sukob ne ponovi.
+
+- [AutoCAD 2020 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40850661942/artifacts/12886893011)
+  — uspješno, 0 grešaka, 2 uobičajena LNK4099 upozorenja za razvojni rxapi.pdb.
+  SHA256 `e98671107b8a7f5780a3ae5f5714097c7d0757fbf3df7ff1c33213ec98c49ebf`.
+  ZIP CRC, PE x64, zavisnost acdb23.dll, BUILD commit i nova komanda/prompt u ARX-u
+  provjereni. KGTEZ i CUIX fajlovi odgovaraju nepromijenjenim izvorima.
+
+Poslije zatvaranja AutoCAD-a sačuvati prethodni ARX/DBX par i zamijeniti oba fajla
+iz paketa odgovarajuće verzije. KGTEZ i CUIX nisu mijenjani ovom doradom.
+Kompilacija i testovi ne potvrđuju rad u AutoCAD-u; praktična provjera, naročito
+UNDO/REDO i ažuriranje vezanih oznaka, još ostaje da se izvrši.
+
+- [AutoCAD 2022 x64](https://github.com/vstijov-boop/tvs-vent/actions/runs/40850662131/artifacts/12887440826)
+  — uspješno, 0 grešaka, 2 uobičajena LNK4099 upozorenja za razvojni rxapi.pdb.
+  SHA256 `14b6ab7ae3084431be15feef4142b1d10b33a8d500c52261a3412b55a4a45a61`.
+  ZIP CRC, PE x64, zavisnost acdb24.dll, BUILD commit i nova komanda/prompt u ARX-u
+  provjereni. KGTEZ i CUIX fajlovi odgovaraju nepromijenjenim izvorima.
