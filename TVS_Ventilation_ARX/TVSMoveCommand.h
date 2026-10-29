@@ -80,7 +80,7 @@ inline bool uniqueContact(const std::vector<Node>& nodes,int owner,int port,doub
     int count=0;
     for(size_t i=0;i<nodes.size();++i)if(static_cast<int>(i)!=owner)
         for(size_t j=0;j<nodes[i].ports.size();++j)
-            if(tvsMoveGeometry::near(nodes[owner].ports[port],nodes[i].ports[j],tol)){
+            if(tvsMoveGeometry::pointsNear(nodes[owner].ports[port],nodes[i].ports[j],tol)){
                 ++count;found.node=static_cast<int>(i);found.port=static_cast<int>(j);
             }
     return count==1;
@@ -127,7 +127,7 @@ inline bool sideBranches(const std::vector<Node>& nodes,const int pipes[3],doubl
         for(size_t i=0;i<nodes.size();++i)if(static_cast<int>(i)!=pipes[k])
             for(size_t j=0;j<nodes[i].ports.size();++j){const Point& q=nodes[i].ports[j];
                 if(tvsMoveGeometry::onSegment(q,p.ports[0],p.ports[1],tol)
-                    && !tvsMoveGeometry::near(q,p.ports[0],tol)&&!tvsMoveGeometry::near(q,p.ports[1],tol))return true;
+                    && !tvsMoveGeometry::pointsNear(q,p.ports[0],tol)&&!tvsMoveGeometry::pointsNear(q,p.ports[1],tol))return true;
             }
     }return false;
 }
@@ -217,8 +217,8 @@ inline void execute(){
         if(own)continue;
         for(size_t j=0;j<nodes[i].ports.size();++j){const Point& q=nodes[i].ports[j];
             bool conflict=tvsMoveGeometry::onSegment(q,plan.selected[0],plan.selected[1],tol);
-            for(int k=0;k<2;++k)conflict=conflict||tvsMoveGeometry::near(q,plan.attached[k],tol)
-                ||(tvsMoveGeometry::onSegment(q,fixed[k],plan.attached[k],tol)&&!tvsMoveGeometry::near(q,fixed[k],tol));
+            for(int k=0;k<2;++k)conflict=conflict||tvsMoveGeometry::pointsNear(q,plan.attached[k],tol)
+                ||(tvsMoveGeometry::onSegment(q,fixed[k],plan.attached[k],tol)&&!tvsMoveGeometry::pointsNear(q,fixed[k],tol));
             if(conflict){acutPrintf(L"\nTVS_MOVE: nova pozicija dodiruje drugi priključak; pomjeranje je odbijeno.");return;}
         }
     }
@@ -229,8 +229,8 @@ inline void execute(){
         const Node& a=nodes[i];const Node& b=current[i];
         bool same=a.id==b.id&&a.kind==b.kind&&a.ports.size()==b.ports.size()
             &&a.a==b.a&&a.b==b.b&&a.round==b.round&&a.elevation==b.elevation
-            &&tvsMoveGeometry::near(a.middle,b.middle,1e-10/factor);
-        for(size_t j=0;same&&j<a.ports.size();++j)same=tvsMoveGeometry::near(a.ports[j],b.ports[j],1e-10/factor);
+            &&tvsMoveGeometry::pointsNear(a.middle,b.middle,1e-10/factor);
+        for(size_t j=0;same&&j<a.ports.size();++j)same=tvsMoveGeometry::pointsNear(a.ports[j],b.ports[j],1e-10/factor);
         if(!same){acutPrintf(L"\nTVS_MOVE: geometrija se promijenila tokom unosa. Pokrenite komandu ponovo.");return;}
     }
     labels=currentLabels;

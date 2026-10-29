@@ -1,9 +1,8 @@
 # TVS_MOVE — prvi korak povezanog pomjeranja
 
-Status 29.10.2026: izvorni kod pripremljen, **bez kompilacije i bez radnog testa
-u AutoCAD-u**, prema izričitom zahtjevu korisnika. Ne pokretati build dok korisnik
-ne potvrdi. Commit mora imati `[skip ci]` da ne aktivira postojeće push workflowe.
-Prethodni ZIP paketi još nemaju ovu komandu niti nove početne radijuse 0,5.
+Status 29.10.2026: korisnik je odobrio kompilaciju. Matematički i topološki
+testovi prolaze. Radni test u AutoCAD-u još nije izvršen. Novi paketi uključuju
+i početne radijuse 0,5; prethodni UCS paketi ih nemaju.
 
 ## Upotreba i ponašanje
 
@@ -55,12 +54,17 @@ cijelu komandu; to obavezno provjeriti u stvarnom AutoCAD-u, zajedno sa REDO.
 
 ## Provjere prije sljedeće distribucije
 
-Pripremljen je `tests/test_move_geometry.cpp` za stvarni matematički header.
-Nije kompajliran niti izvršen dok traje zabrana kompilacije. Pokriva mm/cm/m,
+`tests/test_move_geometry.cpp` kompajlira stvarni matematički header i prolazi.
+Pokriva mm/cm/m,
 rotacije i pomjerene koordinate, obrnuti redosljed krajeva, prava i kosa koljena,
 skraćivanje preko kraja, obrtanje centralnog kanala, 3D unos i nevažeće vrijednosti.
 
-Poslije odobrenja: kompajlirati test i Windows pakete za 2020/2022, pa provjeriti
+`tests/test_move_topology.py` kompajlira stvarne funkcije za prepoznavanje
+kontakata, presjeka i bočnih priključaka. Provjerava duple kontakte, toleranciju
+u fizičkim jedinicama, elevaciju i razliku presjeka. Prolazi svih osam Python
+testova i sedam samostalnih C++ test-programa.
+
+U AutoCAD-u 2020/2022 još provjeriti
 pravougaoni i okrugli niz sa 90° i 45° koljenima, obje orijentacije elemenata,
 ponovljena pomjeranja, SAVE/ponovno otvaranje, UCS World/rotiran/pomjeren, mm/cm/m,
 masu i oznake, UNDO/REDO, Esc, zaključane slojeve/oznake, duple kontakte, prekratke

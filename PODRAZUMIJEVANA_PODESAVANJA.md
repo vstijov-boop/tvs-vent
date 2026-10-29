@@ -10,6 +10,7 @@ Početne vrijednosti su u `TVS_Ventilation_ARX/Settings.h`. Koeficijent je zajed
 za pravougaona i okrugla koljena. Fiksnih 150 mm se pretvara u jedinice crteža kao
 ranije, a koeficijent 0,5 ostaje bezdimenzioni. Postojeći fitinzi se ne mijenjaju.
 
-Izmjena je sačuvana bez kompilacije na zahtjev korisnika. Sačekati naredne izmjene
-prije sljedeće kompilacije. Prethodno preuzeti UCS paketi još nemaju ove nove
-početne vrijednosti. Commit koristi `[skip ci]` da ne pokrene automatske buildove.
+Izmjena je prvobitno sačuvana bez kompilacije (`[skip ci]`), prema zahtjevu
+korisnika. Korisnik je zatim 29.10.2026. odobrio kompilaciju zajedno sa prvom
+verzijom TVS_MOVE. Nove početne vrijednosti ulaze u te pakete. Prethodno preuzeti
+UCS paketi ih nemaju.

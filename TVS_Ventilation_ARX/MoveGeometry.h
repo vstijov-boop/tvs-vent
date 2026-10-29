@@ -15,11 +15,11 @@ struct Point {
 inline bool finite(double a){return a>=-DBL_MAX && a<=DBL_MAX;}
 inline bool valid(const Point& p){return finite(p.x)&&finite(p.y)&&finite(p.z);}
 inline bool unit(const Point& p,Point& out){double l=p.length();if(!finite(l)||l<=0)return false;out=p*(1/l);return valid(out);}
-inline bool near(const Point& a,const Point& b,double tol){return (a-b).length()<=tol;}
+inline bool pointsNear(const Point& a,const Point& b,double tol){return (a-b).length()<=tol;}
 inline bool onSegment(const Point& p,const Point& a,const Point& b,double tol){
-    Point v=b-a;double l=v.dot(v);if(l<=0)return near(p,a,tol);
+    Point v=b-a;double l=v.dot(v);if(l<=0)return pointsNear(p,a,tol);
     double t=(p-a).dot(v)/l;if(t<0)t=0;if(t>1)t=1;
-    return near(p,a+v*t,tol);
+    return pointsNear(p,a+v*t,tol);
 }
 // Reconstruct smooth elbow axis ports from stored tangent intersection, not display caches.
 inline bool elbowPorts(const Point& middle,const Point& start,double sweep,double axisRadius,Point ports[2]){

@@ -1,11 +1,12 @@
 // Prepared for the next approved build. Do not compile while builds are on hold.
 #include <cassert>
 #include <cmath>
+#define near
 #include "../TVS_Ventilation_ARX/MoveGeometry.h"
 using namespace tvsMoveGeometry;
 static const double pi=3.14159265358979323846;
 static Point rotate(const Point& p,double a,double scale){return Point((p.x*std::cos(a)-p.y*std::sin(a)+10000)/scale,(p.x*std::sin(a)+p.y*std::cos(a)-5000)/scale,p.z/scale);}
-static void close(const Point& a,const Point& b,double tol){assert(near(a,b,tol));}
+static void close(const Point& a,const Point& b,double tol){assert(pointsNear(a,b,tol));}
 int main(){
  const double scales[]={1,10,1000},angles[]={0,pi/6,pi/2,-pi/4};
  for(int u=0;u<3;++u)for(int r=0;r<4;++r){
