@@ -3,6 +3,7 @@
 #include "TVSPropertySpec.h"
 #include "TVSSpecTable.h"
 #include "TablePresentation.h"
+#include "CoordinateInput.h"
 TVSCommandSpecification::TVSCommandSpecification()
 {
 }
@@ -32,7 +33,7 @@ void TVSCommandSpecification::execute(void)
 
 	while (status != RTNORM) {
 		acedInitGet(RSG_NONULL, _T("Podešavanja P"));
-		status = acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije ili [Podešavanja]: "), pt1);
+		status = tvsCoordinates::getPoint(NULL, _T("\nZadajte tačku umetanja specifikacije ili [Podešavanja]: "), pt1);
 		switch (status)
 		{
 		case RTCAN:

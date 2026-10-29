@@ -26,6 +26,7 @@
 #include "StdAfx.h"
 #include "resource.h"
 #include "Func.h"
+#include "CoordinateInput.h"
 #include "tdbl.h"
 
 #include "dgPipeSize.h"
@@ -1261,7 +1262,7 @@ public:
 		{
 			while (lt == false)
 			{
-				stat = acedEntSel(_T("\nIzaberite kanal:"), vozd, pt1);
+				stat = tvsCoordinates::selectEntity(_T("\nIzaberite kanal:"), vozd, pt1);
 
 				switch (stat)
 				{
@@ -1572,7 +1573,7 @@ public:
 		{
 			Astat2 = true;
 			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
-			Astat = acedGetPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
+			Astat = tvsCoordinates::getPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1610,7 +1611,7 @@ public:
 		{
 			Astat2 = true;
 			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
-			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1684,7 +1685,7 @@ public:
 
 
 			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
-			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1776,7 +1777,7 @@ public:
 		{
 			Astat2 = true;
 			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
-			Astat = acedGetPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
+			Astat = tvsCoordinates::getPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1805,7 +1806,7 @@ public:
 		{
 			Astat2 = true;
 			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
-			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1863,7 +1864,7 @@ public:
 
 
 			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
-			Astat = acedGetPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1964,9 +1965,9 @@ public:
 		bool pThis1D = false;
 		TVS_TRANS transie;
 
-		if (acedGetPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
+		if (tvsCoordinates::getPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
 			return;
-		if (acedGetPoint(pt1, _T("Set the second point:\n"), pt2) != RTNORM)
+		if (tvsCoordinates::getPoint(pt1, _T("Set the second point:\n"), pt2) != RTNORM)
 			return;
 		pFirstPoint = asPnt3d(pt1);
 		pLastPoint = asPnt3d(pt2);
@@ -2012,7 +2013,7 @@ public:
 		bool pThisRoundotv = true;
 		bool pThis1D = false;
 
-		if (acedGetPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
+		if (tvsCoordinates::getPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
 			return;
 		if (acedGetReal(_T("\nUnesite širinu glavnog kanala: "), &aSizeApr) != RTNORM)
 			return;
@@ -2092,7 +2093,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2129,7 +2130,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id, vozd2) == eOk)
@@ -2198,7 +2199,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2235,7 +2236,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id, vozd2) == eOk)
@@ -2304,7 +2305,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2342,7 +2343,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id2, vozd2) == eOk)
@@ -2443,10 +2444,10 @@ public:
 
 
 
-		if (acedGetPoint(NULL, _T("\nZadajte prvu tačku: "), pt1) != RTNORM)
+		if (tvsCoordinates::getPoint(NULL, _T("\nZadajte prvu tačku: "), pt1) != RTNORM)
 			return;
 		A1 = asPnt3d(pt1);
-		if (acedGetPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
+		if (tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
 			return;
 		A2 = asPnt3d(pt2);
 		pipi = pipie.add_new(A1, A2, pSizeA, pSizeB, false, pThisRound);
@@ -2460,7 +2461,7 @@ public:
 		///////////
 		for (; ;)
 		{
-			if (acedGetPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
+			if (tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
 				return;
 			A3 = asPnt3d(pt2);
 			if (pThisRound == true)
@@ -2678,7 +2679,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nIzaberite kanal:"), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite kanal:"), vozd1, pt1) == RTCAN)
 				return;
 
 			pCut = asPnt3d(pt1);
@@ -3002,7 +3003,7 @@ public:
 		while (status == false)
 		{
 
-			Astat = acedEntSel(_T("\nIzaberite liniju: "), ent, pt1);
+			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite liniju: "), ent, pt1);
 			if (Astat == true)
 			{
 
@@ -3251,7 +3252,7 @@ public:
 		if (!tvsTable::prompt()) { acedSSFree(sset); return; }
 		ads_point pt1;
 		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
-		if (acedGetPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM) { acedSSFree(sset); return; }
+		if (tvsCoordinates::getPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM) { acedSSFree(sset); return; }
 		pb = asPnt3d(pt1);
 
 		SPEClist speclist, speclistflex;
@@ -3605,7 +3606,7 @@ public:
 		Astat2 = false;
 		while (Astat2 == false)
 		{
-			Astat = acedEntSel(_T("\nIzaberite blok za dodavanje atributa: "), ent, pt1);
+			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite blok za dodavanje atributa: "), ent, pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -3793,7 +3794,7 @@ public:
 		isOk = false;
 		while (isOk == false)
 		{
-			acadStatus = acedEntSel(_T("\nIzaberite poliliniju za crtanje podnog grijanja: "), ent, pt1);
+			acadStatus = tvsCoordinates::selectEntity(_T("\nIzaberite poliliniju za crtanje podnog grijanja: "), ent, pt1);
 			switch (acadStatus)
 			{
 			case RTCAN:
@@ -3844,7 +3845,7 @@ public:
 	// 		isOk=false;
 	// 		while (isOk==false)
 	// 		{
-	// 			acadStatus=acedGetPoint(pt1,_T("\nУкажите точку:"),pt1);
+	// 			acadStatus=tvsCoordinates::getPoint(pt1,_T("\nУкажите точку:"),pt1);
 	// 			switch (acadStatus)
 	// 			{
 	// 			case RTCAN:

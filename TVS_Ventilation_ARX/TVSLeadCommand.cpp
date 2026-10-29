@@ -3,6 +3,7 @@
 #include "SPEC.h"
 #include <dbmleader.h>
 #include "Func.h"
+#include "CoordinateInput.h"
 #include "dgMLeadProperty.h"
 #include "MleaderController.h"
 #include "TVSController.h"
@@ -125,7 +126,7 @@ void TVSCommandLead::execute(void)
 		{
 			Astat2 = true;
 			acedInitGet(RSG_NONULL, _T("Podešavanja P"));
-			Astat = acedEntSel(_T("\nIzaberite blok ili kanal ili [Podešavanja]: "), vozd1, pt1);
+			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite blok ili kanal ili [Podešavanja]: "), vozd1, pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -225,7 +226,7 @@ void TVSCommandLead::execute(void)
 	pt1[0] = pCut.x;
 	pt1[1] = pCut.y;
 	pt1[2] = pCut.z;
-	if (acedGetPoint(pt1, _T("\nZadajte drugu tačku: "), pt2) == RTCAN)
+	if (tvsCoordinates::getPoint(pt1, _T("\nZadajte drugu tačku: "), pt2) == RTCAN)
 		return;
 	createMLeader(resultMessage, pCut, asPnt3d(pt2), id);
 	return;
