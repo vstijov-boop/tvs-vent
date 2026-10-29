@@ -27,6 +27,7 @@
 #include "resource.h"
 #include "Func.h"
 #include "CoordinateInput.h"
+#include "TVSMoveCommand.h"
 #include "tdbl.h"
 
 #include "dgPipeSize.h"
@@ -1758,6 +1759,14 @@ public:
 		}
 
 	}
+    // Connected editing is modal so one command owns the complete undo operation.
+    static void Ventilation_ARXTVS_MOVE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsMove::execute();
+    }
+
 	// ----- Ventilation_ARX.TVS_PIPE command
 	static void Ventilation_ARXTVS_PIPE(void)
 	{
@@ -3916,6 +3925,8 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddProp
 
 
 
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MOVE, TVS_MOVE, ACRX_CMD_MODAL, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_TRANSPARENT, NULL)
