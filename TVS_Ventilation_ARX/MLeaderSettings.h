@@ -14,7 +14,7 @@ public:
 [M] - Masa elementa, kg\r\n\
 [A] - Površina lima, m²\r\n\
 [T] - Debljina lima, mm\r\n\
-[P] - Pad pritiska, Pa\r\n\
+[P] - Jedinični pad, Pa/m (kanal)\r\n\
 [BN] - Naziv bloka\r\n\
 [N] - Naziv sloja\r\n\
 [Naziv atributa] - Vrijednost\r\n\

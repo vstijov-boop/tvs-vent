@@ -2,6 +2,9 @@
 #include "MleaderController.h"
 #include "MleaderSettings.h"
 #include "TVSPropertyController.h"
+#include "Calculate.h"
+#include "../TVS_Ventilation_DBX/TVS_Pipe.h"
+#include <cfloat>
 
 MleaderController::MleaderController()
 {
@@ -190,7 +193,7 @@ bool MleaderController::GetEntityStringPropertyByName(const AcDbObjectId  &objId
 		return true;
 	}
 	else if (stringTemplate == L"V") {
-		stringText.Format(L"%g",pEnt->get_Speed());
+		stringText.Format(L"%.2f",pEnt->get_Speed());
 		return true;
 	}
 	else if (stringTemplate == L"D") {
@@ -206,8 +209,20 @@ bool MleaderController::GetEntityStringPropertyByName(const AcDbObjectId  &objId
         return true;
     }
 	else if (stringTemplate == L"P") {
-		//pEnt->getSizeString(stringText);
-		return true;
+        // Linear friction loss of a straight duct, Pa/m, not a fitting's local loss.
+        const TVS_Pipe *pipe = TVS_Pipe::cast(pEnt.operator->());
+        if (!pipe) return false;
+        double a = tvsUnits::mm(pipe->get_SizeA(),pipe);
+        const bool round = pipe->get_ThisRound();
+        double b = round ? 0.0 : tvsUnits::mm(pipe->get_SizeB(),pipe);
+        double flow = pipe->get_Flow();
+        if (!(a > 0.0 && a <= DBL_MAX && (round || b > 0.0) && b >= 0.0 && b <= DBL_MAX
+            && flow >= -DBL_MAX && flow <= DBL_MAX)) return false;
+        // The existing calculator normalizes flow by reference; pass copies.
+        const double loss = TVS_Calculate::getI(a,b,flow);
+        if (!(loss >= 0.0 && loss <= DBL_MAX)) return false;
+        stringText.Format(L"%.2f",loss);
+        return true;
 	}
 
 	return false;
