@@ -36,7 +36,8 @@ struct Plan {Point selected[2], attached[2], delta[2];double offset;};
 // For oblique elbows the two translations differ; the selected axis stays parallel.
 inline bool plan(const Point selected[2],const Point attached[2],const Point fixed[2],
                  const Point& base,const Point& target,double minimum,double tol,Plan& result){
-    if(!valid(base)||!valid(target)||!finite(minimum)||minimum<=0)return false;
+    if(!valid(base)||!valid(target)||!valid(selected[0])||!valid(selected[1])
+        ||!finite(minimum)||minimum<=0||!finite(tol)||tol<=0)return false;
     Point direction;if(!unit(selected[1]-selected[0],direction)||std::fabs(direction.z)>1e-8)return false;
     Point normal(-direction.y,direction.x,0);
     result.offset=(target-base).dot(normal);
