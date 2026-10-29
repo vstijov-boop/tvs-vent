@@ -51,3 +51,18 @@ postojeću konstrukciju promjene kote sa dva koljena niti njen tretman ugla 89,4
 Pri instalaciji zamijeniti ARX i DBX zajedno, uz zatvoren AutoCAD, i ažurirati
 KGTEZ.lsp iz istog paketa. Sačuvati prethodne fajlove prije zamjene.
 
+
+## Potvrđeni buildovi
+
+Kod: `4b157b48af8819316ebffa00522af95eabefbb62`, 29.10.2026.
+Oba Windows builda su uspješna: 0 grešaka i 2 postojeća LNK4099 upozorenja
+za SDK rxapi.pdb. Svih 11 lokalnih Python testova prolazi.
+
+- AutoCAD 2020 x64: [paket](https://github.com/vstijov-boop/tvs-vent/actions/runs/40934777858/artifacts/12923394815).
+  SHA256: `a4af059759570dc644517425503ef238bdf8890bce3fb04587ef4502a93eadc5`.
+- AutoCAD 2022 x64: [paket](https://github.com/vstijov-boop/tvs-vent/actions/runs/40934777777/artifacts/12923698573).
+  SHA256: `88b6f6ab38dc39356c56ffe341f176797cd608e7090bbad9350e85c1b65d9e91`.
+
+Provjereni su ZIP CRC, x64 PE format, zavisnosti acdb23/acdb24, BUILD.txt,
+KGTEZ i oba CUIX fajla prema izvoru. Potvrda ponašanja unutar AutoCAD-a još
+je potrebna. CUIX fajlovi se ovom ispravkom nisu mijenjali.
