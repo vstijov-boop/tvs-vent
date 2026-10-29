@@ -35,6 +35,7 @@ inline bool interior(const Point& q,const Point& a,const Point& b,double tol){
     return tvsMoveGeometry::onSegment(q,a,b,tol)
         &&!tvsMoveGeometry::pointsNear(q,a,tol)&&!tvsMoveGeometry::pointsNear(q,b,tol);
 }
+// Coordinates, delta, minimum length and contact tolerance all use WCS drawing units.
 // Plan a bounded translation through a tree of rigid fittings and straight pipes.
 // Pipes parallel to the translation absorb it by changing length; other pipes carry it on.
 inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta,double minimum,double tol,Result& out){
