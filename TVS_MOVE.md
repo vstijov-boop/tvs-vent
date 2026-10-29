@@ -141,3 +141,11 @@ Ova posljednja dorada je sačuvana **bez kompilacije**, na izričit zahtjev kori
 Ne pokretati novu kompilaciju dok je korisnik ne odobri. Prethodni paketi sa
 ivicama rade, ali još nemaju novi prompt sa podrazumijevanom opcijom.
 Commit mora imati `[skip ci]` da spriječi automatski build.
+
+## Sljedeća varijanta i dugme — pripremljeno bez kompilacije
+
+Korisnik je zatražio novu ikonu i nastavak na mreže sa račvama/prelazima.
+Dugme i instalacija opisani su u `DUGME_TVS_MOVE.md`, a prošireni proračun i njegova
+ograničenja u `TVS_MOVE_MREZA.md`. Novi izvorni kod automatski bira prethodni
+jednostavni slučaj ili novi proračun mreže. Pripremljen je test mreže, ali nije
+kompajliran niti izvršen. Posljednja zabrana kompilacije i dalje važi.

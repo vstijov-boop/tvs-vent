@@ -1,6 +1,7 @@
 ﻿#pragma once
 #include "CoordinateInput.h"
 #include "MoveGeometry.h"
+#include "MoveNetworkGeometry.h"
 #include "TVS_Pipe.h"
 #include "TVS_TAP.h"
 #include "TVS_TRANS.h"
@@ -16,8 +17,9 @@ inline Point point(const AcGePoint3d& p){return Point(p.x,p.y,p.z);}
 inline AcGePoint3d acad(const Point& p){return AcGePoint3d(p.x,p.y,p.z);}
 struct Node {
     AcDbObjectId id;
-    int kind; // 1 rigid pipe, 2 supported elbow, 0 unsupported connector owner
-    std::vector<Point> ports;
+    int kind; // 1 pipe, 2 elbow, 3 transition, 4 wye, 0 unsupported
+    std::vector<Point> ports,axes;
+    std::vector<tvsMoveNetwork::Section> sections;
     Point middle;
     double a,b,elevation;
     bool round;
@@ -29,6 +31,7 @@ inline bool describe(AcDbEntity* entity,Node& n){
     if(TVS_Pipe* p=TVS_Pipe::cast(entity)){
         n.a=p->SizeA;n.b=p->SizeB;n.round=p->ThisRound;n.elevation=p->Elev;
         n.ports.push_back(point(p->FirstPoint));n.ports.push_back(point(p->LastPoint));
+        n.axes.push_back(n.ports[1]-n.ports[0]);n.axes.push_back(n.axes[0]);
         if(p->DuctType==DuctTypeStill)n.kind=1;
     }else if(TVS_TAP* p=TVS_TAP::cast(entity)){
         n.a=p->SizeA;n.b=p->SizeB;n.round=p->ThisRound;n.elevation=p->Elev;
@@ -49,11 +52,14 @@ inline bool describe(AcDbEntity* entity,Node& n){
             && tvsMoveGeometry::elbowPorts(n.middle,Point(p->Startvector.x,p->Startvector.y,0),
                 p->Swectangle,radius+p->SizeA/2,ports)){
             n.kind=2;n.ports.push_back(ports[0]);n.ports.push_back(ports[1]);
+            n.axes.push_back(ports[0]-n.middle);n.axes.push_back(ports[1]-n.middle);
         }else{
             // Read-only fallback only blocks ambiguous contacts; never move these fittings.
             n.ports.push_back(point(p->MA));n.ports.push_back(point(p->MC));
         }
     }else if(TVS_TRANS* p=TVS_TRANS::cast(entity)){
+        n.middle=point(p->FirstPoint);n.elevation=p->Elev;
+        n.a=p->SizeAp1;n.b=p->SizeBp1;n.round=p->ThisRoundp1;
         Point last=point(p->FirstPoint)+Point(p->VectTr.x,p->VectTr.y,0),side;
         if(tvsMoveGeometry::unit(Point(p->VectTr.y,-p->VectTr.x,p->VectTr.z),side)){
             double shift=0;
@@ -62,7 +68,15 @@ inline bool describe(AcDbEntity* entity,Node& n){
             last=last+Point(side.x,side.y,0)*shift;
         }
         n.ports.push_back(point(p->FirstPoint));n.ports.push_back(last);
+        n.axes.push_back(Point(p->VectTr.x,p->VectTr.y,p->VectTr.z));n.axes.push_back(n.axes[0]);
+        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp1,p->SizeBp1,p->ThisRoundp1,p->Elev));
+        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp2,p->SizeBp2,p->ThisRoundp2,p->Elev));
+        Point direction;
+        if(std::fabs(p->VectTr.z)<1e-8
+            &&tvsMoveGeometry::unit(n.ports[1]-n.ports[0],direction))n.kind=3;
     }else if(TVS_WYE* p=TVS_WYE::cast(entity)){
+        n.middle=point(p->Basepoint);n.a=p->SizeApr;n.b=p->SizeBpr;
+        n.round=p->ThisRoundpr;n.elevation=p->Elev;
         // Reconstruct the three WYE ports without depending on a previous redraw.
         Point mainAxis,branchAxis;
         if(tvsMoveGeometry::unit(Point(p->Vectpr.x,p->Vectpr.y,0),mainAxis)
@@ -70,9 +84,16 @@ inline bool describe(AcDbEntity* entity,Node& n){
             Point base=point(p->Basepoint);double half=p->LengthPl+p->SizeAotv/2;
             n.ports.push_back(base-mainAxis*half);n.ports.push_back(base+mainAxis*half);
             n.ports.push_back(base+branchAxis*(p->SizeApr/2+p->LengthPl));
-            n.ports.push_back(base); // Block a side takeoff at its actual junction as well.
+            n.axes.push_back(mainAxis);n.axes.push_back(mainAxis);n.axes.push_back(branchAxis);
+            n.sections.push_back(tvsMoveNetwork::Section(p->SizeApr,p->SizeBpr,p->ThisRoundpr,p->Elev));
+            n.sections.push_back(n.sections[0]);
+            n.sections.push_back(tvsMoveNetwork::Section(p->SizeAotv,p->SizeBotv,p->ThisRoundotv,p->Elev));
+            if(std::fabs(p->Vectpr.z)<1e-8&&std::fabs(p->Vectotv.z)<1e-8
+                &&std::fabs(mainAxis.dot(branchAxis))<1e-6)n.kind=4;
         }
     }
+    if(n.sections.empty())for(size_t i=0;i<n.ports.size();++i)
+        n.sections.push_back(tvsMoveNetwork::Section(n.a,n.b,n.round,n.elevation));
     return true;
 }
 struct Contact {int node,port;Contact():node(-1),port(-1){}};
@@ -166,17 +187,163 @@ inline bool updateLabels(Transaction& tx,const AcDbObjectIdArray& labels,const A
         }
     }return true;
 }
+inline bool destinationPoint(const Node& main,const ads_point picked,Point& origin,ads_point destination){
+    Point ends[2]={main.ports[0],main.ports[1]},cursor(picked[0],picked[1],picked[2]);
+    tvsMoveGeometry::Reference reference=tvsMoveGeometry::PickedEdge;
+    ACHAR keyword[132];
+    acedInitGet(0,L"Izabrana Druga Osa");
+    int status=acedGetKword(L"\nReferenca pomjeranja [Izabrana/Druga/Osa] <Izabrana>: ",keyword);
+    if(status!=RTNORM && status!=RTNONE)return false;
+    if(status==RTNORM){
+        if(_wcsicmp(keyword,L"Druga")==0||_wcsicmp(keyword,L"D")==0)reference=tvsMoveGeometry::OtherEdge;
+        else if(_wcsicmp(keyword,L"Osa")==0||_wcsicmp(keyword,L"O")==0)reference=tvsMoveGeometry::Axis;
+    }
+
+    if(!tvsMoveGeometry::referencePoint(ends,cursor,main.a,reference,origin)){
+        acutPrintf(L"\nTVS_MOVE: nije moguće odrediti ivicu kanala.");return false;}
+    ads_point base={origin.x,origin.y,origin.z};
+    const ACHAR* prompt=reference==tvsMoveGeometry::Axis
+        ?L"\nZadajte novu poziciju ose: "
+        :reference==tvsMoveGeometry::OtherEdge
+            ?L"\nZadajte novu poziciju druge ivice: "
+            :L"\nZadajte novu poziciju izabrane ivice: ";
+    acedInitGet(RSG_NONULL,NULL);
+    if(tvsCoordinates::getPoint(base,prompt,destination)!=RTNORM)return false;
+    return true;
+}
+
+inline bool sameSnapshot(const std::vector<Node>& before,const std::vector<Node>& after,double epsilon){
+    if(before.size()!=after.size())return false;
+    for(size_t i=0;i<before.size();++i){const Node& a=before[i];const Node& b=after[i];
+        if(a.id!=b.id||a.kind!=b.kind||a.a!=b.a||a.b!=b.b||a.elevation!=b.elevation||a.round!=b.round
+            ||a.ports.size()!=b.ports.size()||a.axes.size()!=b.axes.size()||a.sections.size()!=b.sections.size()
+            ||!tvsMoveGeometry::pointsNear(a.middle,b.middle,epsilon))return false;
+        for(size_t p=0;p<a.ports.size();++p)if(!tvsMoveGeometry::pointsNear(a.ports[p],b.ports[p],epsilon))return false;
+        for(size_t p=0;p<a.axes.size();++p)if(!tvsMoveGeometry::pointsNear(a.axes[p],b.axes[p],epsilon))return false;
+        for(size_t p=0;p<a.sections.size();++p){
+            const tvsMoveNetwork::Section& x=a.sections[p];const tvsMoveNetwork::Section& y=b.sections[p];
+            if(x.a!=y.a||x.b!=y.b||x.elevation!=y.elevation||x.round!=y.round)return false;
+        }
+    }return true;
+}
+inline bool simpleChain(const std::vector<Node>& nodes,int selected,double tol){
+    Contact elbow[2],neighbor[2];int ids[5]={selected,-1,-1,-1,-1};
+    for(int i=0;i<2;++i){
+        if(!uniqueContact(nodes,selected,i,tol,elbow[i])||nodes[elbow[i].node].kind!=2)return false;
+        if(!uniqueContact(nodes,elbow[i].node,1-elbow[i].port,tol,neighbor[i])||nodes[neighbor[i].node].kind!=1)return false;
+        ids[i+1]=elbow[i].node;ids[i+3]=neighbor[i].node;
+    }
+    for(int i=0;i<5;++i)for(int j=0;j<i;++j)if(ids[i]==ids[j])return false;
+    const int pipes[3]={selected,neighbor[0].node,neighbor[1].node};
+    if(sideBranches(nodes,pipes,tol))return false;
+    for(size_t i=0;i<nodes.size();++i)if(nodes[i].kind==4)
+        for(int p=0;p<3;++p)if(tvsMoveNetwork::interior(nodes[i].middle,nodes[pipes[p]].ports[0],nodes[pipes[p]].ports[1],tol))return false;
+    return true;
+}
+inline const ACHAR* networkError(tvsMoveNetwork::Error e){
+    switch(e){
+    case tvsMoveNetwork::Ambiguous:return L"Priključak ima više mogućih veza.";
+    case tvsMoveNetwork::Unsupported:return L"Veza vodi do nepodržanog elementa ili izabrana dionica ima slobodan kraj.";
+    case tvsMoveNetwork::SectionMismatch:return L"Presjeci ili elevacije na spoju ne odgovaraju.";
+    case tvsMoveNetwork::NotTangent:return L"Ose nisu usklađene na priključku.";
+    case tvsMoveNetwork::NonPlanar:return L"Mreža nije u zajedničkoj ravni osnove.";
+    case tvsMoveNetwork::TooShort:return L"Pomjeranje bi previše skratilo ili obrnulo dionicu.";
+    case tvsMoveNetwork::SideBranch:return L"Postoji priključak usred nepodijeljenog kanala.";
+    case tvsMoveNetwork::NewContact:return L"Nova pozicija dodiruje drugi priključak.";
+    case tvsMoveNetwork::Cycle:return L"Zatvorene petlje nisu obuhvaćene ovom varijantom.";
+    case tvsMoveNetwork::TooMany:return L"Pomjeranje obuhvata više od 256 elemenata.";
+    default:return L"Nije moguće izračunati povezano pomjeranje.";
+    }
+}
+inline bool networkLabels(Transaction& tx,const std::vector<Node>& nodes,const AcDbObjectIdArray& labels,
+                          const tvsMoveNetwork::Result& result,const Point& delta){
+    MleaderController controller;
+    for(int i=0;i<labels.length();++i){
+        AcDbObjectId target;if(!controller.getObjectId(labels[i],target))continue;
+        int index=-1;
+        for(size_t j=0;j<nodes.size();++j)if(nodes[j].id==target&&result.masks[j]){index=static_cast<int>(j);break;}
+        if(index<0)continue;
+        CString format,text;
+        if(!controller.getFormat(labels[i],format)||!controller.getStringMessage(target,format,text))return false;
+        AcDbMLeader* leader=AcDbMLeader::cast(tx.write(labels[i]));if(!leader)return false;
+        AcDbMText* content=leader->mtext();if(!content)return false;
+        content->setContents(text.GetString());Acad::ErrorStatus status=leader->setMText(content);delete content;
+        if(status!=Acad::eOk)return false;
+        AcArray<int> lines;if(leader->getLeaderLineIndexes(lines)!=Acad::eOk)return false;
+        for(int j=0;j<lines.length();++j){
+            AcGePoint3d old;if(leader->getFirstVertex(lines[j],old)!=Acad::eOk)return false;
+            Point updated=point(old)+delta;
+            if(nodes[index].kind==1){
+                Point v=nodes[index].ports[1]-nodes[index].ports[0];
+                double fraction=(point(old)-nodes[index].ports[0]).dot(v)/v.dot(v);
+                if(fraction<0)fraction=0;
+                if(fraction>1)fraction=1;
+                updated=result.ports[index][0]+(result.ports[index][1]-result.ports[index][0])*fraction;
+            }
+            if(leader->setFirstVertex(lines[j],acad(updated))!=Acad::eOk)return false;
+        }
+    }return true;
+}
+inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
+                           int selected,const ads_point picked,double factor,double tol,double minimum){
+    Point origin;ads_point destination;
+    if(!destinationPoint(nodes[selected],picked,origin,destination))return;
+    Point axis;
+    if(!tvsMoveGeometry::unit(nodes[selected].ports[1]-nodes[selected].ports[0],axis))return;
+    Point normal(-axis.y,axis.x,0),target(destination[0],destination[1],destination[2]);
+    Point delta=normal*((target-origin).dot(normal));
+    if(!tvsMoveGeometry::valid(delta)||delta.length()<=tol){acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja.");return;}
+    std::vector<tvsMoveNetwork::Body> bodies;
+    for(size_t i=0;i<nodes.size();++i){
+        tvsMoveNetwork::Body b;b.ports=nodes[i].ports;b.axes=nodes[i].axes;b.sections=nodes[i].sections;
+        b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
+        if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
+        bodies.push_back(b);
+    }
+    tvsMoveNetwork::Result result;
+    if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
+        acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
+    std::vector<Node> current;AcDbObjectIdArray currentLabels;
+    if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
+        acutPrintf(L"\nTVS_MOVE: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
+    Transaction tx;if(!tx.good())return;
+    std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
+    for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
+        entities[i]=tx.write(nodes[i].id);
+        if(!entities[i]){acutPrintf(L"\nTVS_MOVE: povezani element je zaključan ili nedostupan. Izmjena je poništena.");return;}
+    }
+    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
+    int stretched=0;
+    for(size_t i=0;i<nodes.size();++i)if(entities[i]){
+        if(nodes[i].kind==1){
+            TVS_Pipe* pipe=TVS_Pipe::cast(entities[i]);
+            if(!pipe||pipe->put_FirstPoint(acad(result.ports[i][0]))!=Acad::eOk
+                ||pipe->put_Lastpoint(acad(result.ports[i][1]))!=Acad::eOk)return;
+            if(result.masks[i]!=3)++stretched;
+        }else if(entities[i]->transformBy(translation)!=Acad::eOk){
+            acutPrintf(L"\nTVS_MOVE: fiting nije moguće pomjeriti. Izmjena je poništena.");return;}
+        entities[i]->recordGraphicsModified();
+    }
+    if(!networkLabels(tx,nodes,currentLabels,result,delta)){
+        acutPrintf(L"\nTVS_MOVE: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
+    if(!tx.commit())return;
+    acutPrintf(L"\nTVS_MOVE: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",result.changed,stretched,delta.length()*factor);
+}
+
 inline void execute(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
     if(!db)return;
     ads_name name;ads_point picked;
-    if(tvsCoordinates::selectEntity(L"\nIzaberite pravu dionicu između dva koljena: ",name,picked)!=RTNORM)return;
+    if(tvsCoordinates::selectEntity(L"\nIzaberite pravu dionicu (kliknite bliže željenoj ivici): ",name,picked)!=RTNORM)return;
     AcDbObjectId selected;if(acdbGetObjectId(selected,name)!=Acad::eOk)return;
     std::vector<Node> nodes;AcDbObjectIdArray labels;
     if(!snapshot(db,nodes,labels)){acutPrintf(L"\nTVS_MOVE: nije moguće pročitati elemente trenutnog prostora.");return;}
     int center=-1;for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==selected)center=static_cast<int>(i);
     if(center<0||nodes[center].kind!=1){acutPrintf(L"\nTVS_MOVE: izaberite kruti TVS kanal u trenutnom prostoru.");return;}
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
+    if(!simpleChain(nodes,center,tol)){
+        executeNetwork(db,nodes,center,picked,factor,tol,minimum);return;
+    }
     const Node& main=nodes[center];Contact elbows[2],neighbors[2];int neighborPorts[2];
     Point attached[2],fixed[2];
     for(int i=0;i<2;++i){
@@ -201,27 +368,8 @@ inline void execute(){
         acutPrintf(L"\nTVS_MOVE: zatvorene petlje nisu podržane u ovom koraku.");return;}
     const int pipes[3]={center,neighbors[0].node,neighbors[1].node};
     if(sideBranches(nodes,pipes,tol)){acutPrintf(L"\nTVS_MOVE: postoji bočni priključak; ovaj korak podržava samo niz od pet elemenata.");return;}
-    Point ends[2]={main.ports[0],main.ports[1]},cursor(picked[0],picked[1],picked[2]);
-    tvsMoveGeometry::Reference reference=tvsMoveGeometry::PickedEdge;
-    ACHAR keyword[132];
-    acedInitGet(0,L"Izabrana Druga Osa");
-    int status=acedGetKword(L"\nReferenca pomjeranja [Izabrana/Druga/Osa] <Izabrana>: ",keyword);
-    if(status!=RTNORM && status!=RTNONE)return;
-    if(status==RTNORM){
-        if(_wcsicmp(keyword,L"Druga")==0||_wcsicmp(keyword,L"D")==0)reference=tvsMoveGeometry::OtherEdge;
-        else if(_wcsicmp(keyword,L"Osa")==0||_wcsicmp(keyword,L"O")==0)reference=tvsMoveGeometry::Axis;
-    }
-    Point origin;ads_point destination;
-    if(!tvsMoveGeometry::referencePoint(ends,cursor,main.a,reference,origin)){
-        acutPrintf(L"\nTVS_MOVE: nije moguće odrediti ivicu kanala.");return;}
-    ads_point base={origin.x,origin.y,origin.z};
-    const ACHAR* prompt=reference==tvsMoveGeometry::Axis
-        ?L"\nZadajte novu poziciju ose: "
-        :reference==tvsMoveGeometry::OtherEdge
-            ?L"\nZadajte novu poziciju druge ivice: "
-            :L"\nZadajte novu poziciju izabrane ivice: ";
-    acedInitGet(RSG_NONULL,NULL);
-    if(tvsCoordinates::getPoint(base,prompt,destination)!=RTNORM)return;
+    Point ends[2]={main.ports[0],main.ports[1]},origin;ads_point destination;
+    if(!destinationPoint(main,picked,origin,destination))return;
     tvsMoveGeometry::Plan plan;
     if(!tvsMoveGeometry::plan(ends,attached,fixed,origin,Point(destination[0],destination[1],destination[2]),minimum,tol,plan)){
         acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja ili bi nastala prekratka/obrnuta dionica ili nepodržana 3D geometrija.");return;}
@@ -238,14 +386,8 @@ inline void execute(){
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||current.size()!=nodes.size()){
         acutPrintf(L"\nTVS_MOVE: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
-    for(size_t i=0;i<nodes.size();++i){
-        const Node& a=nodes[i];const Node& b=current[i];
-        bool same=a.id==b.id&&a.kind==b.kind&&a.ports.size()==b.ports.size()
-            &&a.a==b.a&&a.b==b.b&&a.round==b.round&&a.elevation==b.elevation
-            &&tvsMoveGeometry::pointsNear(a.middle,b.middle,1e-10/factor);
-        for(size_t j=0;same&&j<a.ports.size();++j)same=tvsMoveGeometry::pointsNear(a.ports[j],b.ports[j],1e-10/factor);
-        if(!same){acutPrintf(L"\nTVS_MOVE: geometrija se promijenila tokom unosa. Pokrenite komandu ponovo.");return;}
-    }
+    if(!sameSnapshot(nodes,current,1e-10/factor)){
+        acutPrintf(L"\nTVS_MOVE: geometrija se promijenila tokom unosa. Pokrenite komandu ponovo.");return;}
     labels=currentLabels;
     Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_MOVE: nije moguće započeti izmjenu.");return;}
     AcDbEntity* objects[5];AcDbObjectId ids[5];
