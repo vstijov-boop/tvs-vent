@@ -9,12 +9,11 @@ i početne radijuse 0,5; prethodni UCS paketi ih nemaju.
 
 1. `TVS_MOVE` — izabrati krutu pravu TVS dionicu između dva koljena u osnovi.
    Kliknuti blizu ivice koja treba da dođe na novu poziciju.
-2. Zadati novu poziciju te ivice. Podrazumijevana referenca je bliža fizička
-   ivica prvom kliku (pola širine od ose). Uzdužna i vertikalna komponenta unosa
-   se ne koriste. Gumena linija polazi od izabrane ivice.
-3. Opcije pri zadavanju tačke: `Izabrana` (`I`) vraća ivicu bližu prvom kliku,
-   `Druga` (`D`) bira suprotnu ivicu, `Osa` (`O`) vraća prvobitno pomjeranje ose.
-   Promjena reference ne mijenja geometriju dok se ne zada konačna tačka.
+2. Na upit `Referenca pomjeranja [Izabrana/Druga/Osa] <Izabrana>:` pritisnuti
+   Enter za ivicu bližu prvom kliku, ili zadati `Druga` (`D`) / `Osa` (`O`).
+3. Zadati novu poziciju potvrđene reference. Ivica je pola širine od ose;
+   uzdužna i vertikalna komponenta unosa se ne koriste. Gumena linija polazi
+   od potvrđene ivice ili ose. Izbor reference ne mijenja geometriju prije tačke.
 4. Oba koljena klize duž osa susjednih kanala, njihovi udaljeni krajevi ostaju
    fiksni. Presjeci, radijusi i uglovi koljena ostaju isti.
 
@@ -129,3 +128,16 @@ sačuvati prethodni ARX/DBX par i zamijeniti oba fajla iz odgovarajućeg paketa.
   SHA256 `f560650278c0bb0a8037bd6c79ca21a202ebfbeb2fbb8ebd32c1db8eaf79d1e2`.
   Uspješno, 0 grešaka, 2 uobičajena LNK4099 upozorenja. ZIP CRC, x64 PE,
   acdb24.dll, BUILD commit i novi prompt sa opcijama ivica provjereni.
+
+## Podrazumijevani izbor potvrđen Enterom — čeka kompilaciju
+
+Korisnik je potvrdio da dorada sa ivicama radi. Na njegov zahtjev je zatim
+izbor reference izdvojen prije zadavanja tačke:
+`Referenca pomjeranja [Izabrana/Druga/Osa] <Izabrana>:`.
+Enter prihvata `Izabrana`; zatim se zadaje nova pozicija ivice.
+`Druga`/`D` i `Osa`/`O` biraju drugu ivicu ili osu. Esc prekida bez izmjene.
+
+Ova posljednja dorada je sačuvana **bez kompilacije**, na izričit zahtjev korisnika.
+Ne pokretati novu kompilaciju dok je korisnik ne odobri. Prethodni paketi sa
+ivicama rade, ali još nemaju novi prompt sa podrazumijevanom opcijom.
+Commit mora imati `[skip ci]` da spriječi automatski build.
