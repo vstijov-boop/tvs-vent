@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+﻿// (C) Copyright 2002-2007 by Autodesk, Inc. 
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -24,6 +24,10 @@
 //-----------------------------------------------------------------------------
 
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include <limits>
+#endif
 #include "TVS_Entity.h"
 #include "TVS_Pipe.h"
 #include "TVS_TAP.h"
@@ -40,12 +44,22 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
 {
     assertReadEnabled();
     areaM2 = thicknessMm = massKg = 0.0;
+#ifdef TVS_OFFSET_INTEGRATION
+    const tvsOffsetData::Status integrity=tvsOffsetData::validate(this);
+    if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
+        acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
+#endif
     if ((TVS_Pipe::cast(this) || TVS_TAP::cast(this)) && DuctType == DuctTypeFlex) return false;
     const double f = tvsUnits::factor(this);
     double largest = 0.0;
     if (const TVS_Pipe *p = TVS_Pipe::cast(this)) {
         const double a = p->SizeA*f, b = p->ThisRound ? 0.0 : p->SizeB*f;
+        #ifdef TVS_OFFSET_INTEGRATION
+        double physical=0;if(!p->getPhysicalLength(physical))return false;
+        const double length=physical*f;
+#else
         const double length = p->get_Length()*f;
+#endif
         if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::nonnegative(length)) return false;
         largest = tvsSheetMetal::larger(a,b);
         areaM2 = tvsSheetMetal::pipeArea(a,b,length);
@@ -84,6 +98,11 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
     massKg = tvsSheetMetal::mass(areaM2,thicknessMm);
     if (!tvsSheetMetal::nonnegative(areaM2) || !tvsSheetMetal::nonnegative(massKg)) {
         areaM2 = thicknessMm = massKg = 0.0;
+#ifdef TVS_OFFSET_INTEGRATION
+    const tvsOffsetData::Status integrity=tvsOffsetData::validate(this);
+    if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
+        acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
+#endif
         return false;
     }
     return thicknessMm > 0.0;

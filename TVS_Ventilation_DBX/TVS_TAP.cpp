@@ -23,6 +23,10 @@
 //----- TVS_TAP.cpp : Implementation of TVS_TAP
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include <limits>
+#endif
 #include "TVS_TAP.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------

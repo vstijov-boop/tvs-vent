@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TVSPropertyController.h"
 #include "../TVS_Ventilation_DBX/SheetMetal.h"
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
@@ -187,7 +187,11 @@ bool TVSPropertyController::getProperty(const AcDbObjectId &objectId, TVSPropert
 		getManufaturer(objectId, tvsProperty.manufacturer);
 		getMass(objectId, tvsProperty.mass);
 		getUnits(objectId, tvsProperty.units);
-		getCount(objectId, tvsProperty.count);
+		#ifdef TVS_OFFSET_INTEGRATION
+        if(!getCount(objectId,tvsProperty.count))return false;
+#else
+        getCount(objectId, tvsProperty.count);
+#endif
 		getNote(objectId, tvsProperty.note);
 		return true;
 	}
@@ -354,7 +358,10 @@ bool TVSPropertyController::getCount(const AcDbObjectId &objectId, double &val)
 	TVS_Entity * ent;
 	if ((ent = TVS_Entity::cast(pObj)) != NULL) {
 		ent->getCount(val);
-		return true;
+#ifdef TVS_OFFSET_INTEGRATION
+        if(!(val>=0&&val<=DBL_MAX)){acutPrintf(L"\nTVS OFFSET: nevažeća količina; provjerite podatke sklopa.");return false;}
+#endif
+        return true;
 	}
 	else {
 		return getSubXReal(pObj, CTVSProperty, CTVSProperty_Number_count, val);

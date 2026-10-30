@@ -23,6 +23,10 @@
 //----- ComPipe.cpp : Implementation of CComPipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include <limits>
+#endif
 #include "ComPipe.h"
 
 //----- CComPipe
@@ -422,7 +426,11 @@ STDMETHODIMP CComPipe::get_Length(double  *pVal)
 
 
 
-	*pVal=pSq->get_Length();
+	#ifdef TVS_OFFSET_INTEGRATION
+    if(!pSq->getPhysicalLength(*pVal))return E_FAIL;
+#else
+    *pVal=pSq->get_Length();
+#endif
 
 
 

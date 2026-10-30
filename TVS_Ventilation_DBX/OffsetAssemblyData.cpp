@@ -91,7 +91,7 @@ bool physicalLength(const AcDbObject* o,double projected,double& physical){
     Record r;Status s=read(o,r);physical=projected;if(s==Legacy)return true;
     if(s!=Valid||r.role!=SlopedStraight){acutPrintf(L"\nTVS OFFSET: neispravni podaci fizičke dužine (%s).",statusText(s));return false;}
     // Incomplete membership still permits the standalone member's own valid quantity.
-    Status integrity=validate(o,false);if(integrity!=Valid&&integrity!=Incomplete){acutPrintf(L"\nTVS OFFSET: neispravno članstvo (%s).",statusText(integrity));return false;}
+    Status integrity=validate(o,writeDepth==0&&clones.find(o->objectId())==clones.end());if(integrity!=Valid&&integrity!=Incomplete){acutPrintf(L"\nTVS OFFSET: neispravno članstvo (%s).",statusText(integrity));return false;}
     double h=r.rise/tvsUnits::factor(o);physical=std::sqrt(projected*projected+h*h);return tvsOffset::finite(physical);
 }
 Acad::ErrorStatus remapClones(AcDbIdMapping& map){

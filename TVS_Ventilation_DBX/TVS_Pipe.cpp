@@ -23,6 +23,10 @@
 //----- TVS_Pipe.cpp : Implementation of TVS_Pipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include <limits>
+#endif
 #include "TVS_Pipe.h"
 #include "TVS_Ventilation_DBX_i.h"
 #include<vector>
@@ -906,7 +910,12 @@ void TVS_Pipe::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 
 void TVS_Pipe::getCount(double &count)
 {
-	count = tvsUnits::metres(get_Length(), this);
+	#ifdef TVS_OFFSET_INTEGRATION
+    double physical=0;
+    count=getPhysicalLength(physical)?tvsUnits::metres(physical,this):std::numeric_limits<double>::quiet_NaN();
+#else
+    count = tvsUnits::metres(get_Length(), this);
+#endif
 }
 
 void TVS_Pipe::getCountUnit(CString &unit)
@@ -1196,6 +1205,11 @@ Acad::ErrorStatus TVS_Pipe::subExplode(AcDbVoidPtrArray & entitySet) const
 
 }
 
+#ifdef TVS_OFFSET_INTEGRATION
+bool TVS_Pipe::getPhysicalLength(double& value) const {
+    assertReadEnabled();return tvsOffsetData::physicalLength(this,get_Length(),value);
+}
+#endif
 double TVS_Pipe::get_Length(void) const
 {
 	assertReadEnabled () ;

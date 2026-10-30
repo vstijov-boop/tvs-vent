@@ -1,5 +1,8 @@
 ﻿
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include <limits>
+#endif
 #include "SPEC.h"
 #include "TablePresentation.h"
 #include "../TVS_Ventilation_DBX/SheetMetal.h"
@@ -90,7 +93,13 @@ bool SPEC::add(AcDbEntity * pEnt)
 
 				SizeA=tvsUnits::mm(pPipe->get_SizeA(), pPipe);
 				SizeB=tvsUnits::mm(pPipe->get_SizeB(), pPipe);
-				Length=tvsUnits::mm(pPipe->get_Length(), pPipe);
+				#ifdef TVS_OFFSET_INTEGRATION
+                    double physical=0;
+                    if(!pPipe->getPhysicalLength(physical)){acutPrintf(L"\nTVS OFFSET: specifikacija nije validna — greška fizičke dužine.");physical=std::numeric_limits<double>::quiet_NaN();}
+                    Length=tvsUnits::mm(physical,pPipe);
+#else
+                    Length=tvsUnits::mm(pPipe->get_Length(), pPipe);
+#endif
 				setUnit1(_T("m"));
 				setUnit2(_T("m²"));
 				if (pPipe->DuctType==DuctTypeFlex)

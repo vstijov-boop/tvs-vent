@@ -47,7 +47,11 @@ void TVSCommandSpecification::execute(void)
 	}
 
 	TVSPropertySpec spec;
-	spec.processSetOfObjects(sset);
+	#ifdef TVS_OFFSET_INTEGRATION
+    if(!spec.processSetOfObjects(sset)){acedSSFree(sset);return;}
+#else
+    spec.processSetOfObjects(sset);
+#endif
 	acedSSFree(sset);
 	spec.sort();
 	

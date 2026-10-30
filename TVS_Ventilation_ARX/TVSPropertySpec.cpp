@@ -1,7 +1,8 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TVSPropertySpec.h"
 #include "TVSController.h"
 #include <cmath>
+#include "OffsetSelectionCheck.h"
 
 TVSPropertySpec::TVSPropertySpec()
 {
@@ -14,6 +15,9 @@ TVSPropertySpec::~TVSPropertySpec()
 
 bool TVSPropertySpec::processSetOfObjects(ads_name &sset)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!offsetSelectionValid(sset))return false;
+#endif
 	Adesk::Int32 len;
 	acedSSLength(sset, &len);
 

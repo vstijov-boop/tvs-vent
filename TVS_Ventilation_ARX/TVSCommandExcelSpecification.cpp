@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TVSCommandExcelSpecification.h"
 #include "TVSPropertySpec.h"
 #include "TVSSpecTable.h"
@@ -25,7 +25,11 @@ void TVSCommandExcelSpecification::execute(void)
 	}
 
 	TVSPropertySpec spec;
-	spec.processSetOfObjects(sset);
+	#ifdef TVS_OFFSET_INTEGRATION
+    if(!spec.processSetOfObjects(sset)){acedSSFree(sset);return;}
+#else
+    spec.processSetOfObjects(sset);
+#endif
 	spec.sort();
 	TVSSpecTable table;
 	table.loadColumnsFromSettings();

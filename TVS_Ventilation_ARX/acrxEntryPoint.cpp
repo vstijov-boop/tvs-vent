@@ -59,6 +59,7 @@
 #include "TVSCommandExcelSpecification.h"
 #include "TVSCommandSpecification.h"
 #include "TablePresentation.h"
+#include "OffsetSelectionCheck.h"
 //-----------------------------------------------------------------------------
 #define szRDS _RXST("TVS")
 #define dCONTINUE 0
@@ -3272,6 +3273,9 @@ public:
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
+#ifdef TVS_OFFSET_INTEGRATION
+        if(!offsetSelectionValid(sset)){acedSSFree(sset);return;}
+#endif
 		if (!tvsTable::prompt()) { acedSSFree(sset); return; }
 		ads_point pt1;
 		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
@@ -3311,6 +3315,9 @@ public:
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
+#ifdef TVS_OFFSET_INTEGRATION
+        if(!offsetSelectionValid(sset)){acedSSFree(sset);return;}
+#endif
 
 
 		long idx = 1;
