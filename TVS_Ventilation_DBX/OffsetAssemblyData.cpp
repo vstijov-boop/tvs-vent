@@ -97,9 +97,14 @@ Status validate(const AcDbObject* o,bool geometry){
         for(int k=0;k<j;++k)if(r.members[k]==r.members[j])return Corrupt;}
     AcDbObjectPointer<TVS_TAP> a(r.members[0],AcDb::kForRead),b(r.members[2],AcDb::kForRead);
     AcDbObjectPointer<TVS_Pipe> p(r.members[1],AcDb::kForRead);
-    if(a.openStatus()!=Acad::eOk||b.openStatus()!=Acad::eOk||p.openStatus()!=Acad::eOk)return Incomplete;
+    // Null/erased members were classified above. Other failures (wrong class,
+    // unavailable object) cannot certify a safe standalone quantity.
+    if(a.openStatus()!=Acad::eOk||b.openStatus()!=Acad::eOk||p.openStatus()!=Acad::eOk)return Corrupt;
     const AcDbObject* objects[]={a.object(),p.object(),b.object()};Record members[3];
-    for(int j=0;j<3;++j){Status q=read(objects[j],members[j]);if(q!=Valid)return q;
+    for(int j=0;j<3;++j){Status q=read(objects[j],members[j]);
+        // A missing member record is not a legacy assembly: the selected member
+        // explicitly claims reciprocal membership and that claim is broken.
+        if(q==Legacy)return Corrupt;if(q!=Valid)return q;
         if(members[j].role!=j||members[j].guid!=r.guid)return Corrupt;
         for(int k=0;k<3;++k)if(members[j].members[k]!=r.members[k])return Corrupt;}
     if(!geometry)return Valid;
