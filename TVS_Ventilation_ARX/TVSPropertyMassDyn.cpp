@@ -1,6 +1,9 @@
 ﻿#include "StdAfx.h"
 #include "TVSPropertyMassDyn.h"
 #include "TVSController.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#endif
 
 
 //----- CTVSPropertyMassDyn
@@ -173,6 +176,16 @@ STDMETHODIMP CTVSPropertyMassDyn::GetCategoryName(PROPCAT propcat, LCID lcid, BS
 }
 
 namespace {
+#ifdef TVS_OFFSET_INTEGRATION
+bool invalidOffsetMass(const AcDbObjectId& id){
+    AcDbObjectPointer<AcDbObject> object(id,AcDb::kForRead);
+    if(object.openStatus()!=Acad::eOk)return true;
+    tvsOffsetData::Status status=tvsOffsetData::validate(object.object());
+    if(status==tvsOffsetData::Legacy||status==tvsOffsetData::Valid||status==tvsOffsetData::Incomplete)return false;
+    acutPrintf(L"\nTVS OFFSET: ukupna masa izbora nije dostupna — %s. Ne prikazuje se djelimičan zbir.",tvsOffsetData::statusText(status));
+    return true;
+}
+#endif
 bool massObjectId(IUnknown *object, AcDbObjectId &id)
 {
     CComQIPtr<IAcadBaseObject> entity(object);
@@ -208,6 +221,11 @@ bool CTVSSelectionMassDyn::selectionTotal(IUnknown *context, double &mass)
             if (SUCCEEDED(SafeArrayAccessData(selection.parray,reinterpret_cast<void**>(&objects)))) {
                 inspectorSelection=true;
                 const size_t count=static_cast<size_t>(last-first+1);
+#ifdef TVS_OFFSET_INTEGRATION
+                for(size_t i=0;i<count;++i){AcDbObjectId id;
+                    if(massObjectId(objects[i],id)&&invalidOffsetMass(id)){
+                        SafeArrayUnaccessData(selection.parray);clearSelection();return false;}}
+#endif
                 const unsigned long revision=TVS_Entity::sheetMetalRevision();
                 if (!m_key.matches(objects,count,revision)) {
                     clearSelection();
@@ -245,6 +263,9 @@ bool CTVSSelectionMassDyn::selectionTotal(IUnknown *context, double &mass)
             }
             acedSSFree(set);
             const AcDbObjectId *data=ids.empty() ? NULL : &ids[0];
+#ifdef TVS_OFFSET_INTEGRATION
+            for(size_t i=0;i<ids.size();++i)if(invalidOffsetMass(ids[i])){clearSelection();return false;}
+#endif
             if (!m_editorKey.matches(data,ids.size(),TVS_Entity::sheetMetalRevision())) {
                 m_editorTotal=tvsSelection::Total<AcDbObjectId>();
                 for (size_t i=0;i<ids.size();++i) {

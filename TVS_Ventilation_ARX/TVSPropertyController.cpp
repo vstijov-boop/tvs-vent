@@ -1,5 +1,8 @@
 ﻿#include "stdafx.h"
 #include "TVSPropertyController.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#endif
 #include "../TVS_Ventilation_DBX/SheetMetal.h"
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 
@@ -393,6 +396,15 @@ bool TVSPropertyController::setMass(const AcDbObjectId &objectId, const double &
 
 bool TVSPropertyController::getMass(const AcDbObjectId &objectId, double &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    {
+        AcDbObjectPointer<AcDbObject> object(objectId,AcDb::kForRead);
+        if(object.openStatus()!=Acad::eOk)return false;
+        tvsOffsetData::Status status=tvsOffsetData::validate(object.object());
+        if(status!=tvsOffsetData::Legacy&&status!=tvsOffsetData::Valid&&status!=tvsOffsetData::Incomplete){
+            acutPrintf(L"\nTVS OFFSET: masa nije dostupna — %s.",tvsOffsetData::statusText(status));return false;}
+    }
+#endif
     {
         AcDbObjectPointer<TVS_Entity> ent(objectId, AcDb::kForRead);
         double area, thickness, mass;
