@@ -1332,6 +1332,7 @@ public:
         double elevation=0,angle=0;
         tvsOffsetIntegration::Outcome result=tvsOffsetIntegration::execute(pPipe,elevation,angle);
         if(result==tvsOffsetIntegration::Applied){globalElevMid=elevation;globalElev=elevation;globalAxis=angle;}
+        if(result==tvsOffsetIntegration::Failed)acutPrintf(L"\nTVS OFFSET: operacija nije primijenjena; stanje nastavka trase nije ažurirano.");
         return result;
     }
 #else

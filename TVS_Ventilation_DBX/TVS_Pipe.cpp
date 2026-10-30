@@ -300,7 +300,7 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
     tvsOffsetData::Status offsetStatus=tvsOffsetData::read(this,offset);
     if(offsetStatus!=tvsOffsetData::Legacy){
         if(offsetStatus!=tvsOffsetData::Valid||offset.role!=tvsOffsetData::SlopedStraight){
-            AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);invalid->setColorIndex(1);setMainProperty(invalid);
+            AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);
         }else {
             tvsOffset::WorldPoint corners[2][4];
             if(tvsSlopeProjection::joints(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
@@ -308,9 +308,13 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
                 AcGePoint3d p[2][4];for(int j=0;j<2;++j)for(int k=0;k<4;++k)p[j][k]=AcGePoint3d(corners[j][k].x,corners[j][k].y,corners[j][k].z);
                 const int firstEdge=offset.rise>0?2:0,lastEdge=offset.rise>0?0:2;
                 if(Wipeout){AcDbPolyline* mask=new AcDbPolyline();
-                    AcGePoint3d outline[4]={p[0][firstEdge],p[1][lastEdge],p[1][lastEdge+1],p[0][firstEdge+1]};
-                    for(int j=0;j<4;++j)mask->addVertexAt(j,AcGePoint2d(outline[j].x,outline[j].y));
-                    mask->setClosed(true);mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
+                    // Existing mask helper strokes an open centreline with channel width.
+                    // A closed outline would be stroked twice outside the physical footprint.
+                    mask->addVertexAt(0,AcGePoint2d((p[0][firstEdge].x+p[0][firstEdge+1].x)/2,
+                                                   (p[0][firstEdge].y+p[0][firstEdge+1].y)/2));
+                    mask->addVertexAt(1,AcGePoint2d((p[1][lastEdge].x+p[1][lastEdge+1].x)/2,
+                                                   (p[1][lastEdge].y+p[1][lastEdge+1].y)/2));
+                    mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
                 if(!This1D){
                     setMainProperty(new AcDbLine(p[0][firstEdge],p[1][lastEdge]));
                     setMainProperty(new AcDbLine(p[0][firstEdge+1],p[1][lastEdge+1]));

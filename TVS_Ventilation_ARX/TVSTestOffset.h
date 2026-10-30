@@ -38,7 +38,9 @@ public:
     bool append(AcDbEntity* entity,AcDbObjectId& id){
         if(!space){delete entity;return false;}
         if(space->appendAcDbEntity(id,entity)!=Acad::eOk){delete entity;return false;}
-        manager->addNewlyCreatedDBRObject(entity,true);return true;
+        if(manager->addNewlyCreatedDBRObject(entity,true)!=Acad::eOk){
+            entity->erase();entity->close();return false;}
+        return true;
     }
     bool commit(){if(!active||!space||manager->endTransaction()!=Acad::eOk)return false;active=false;return true;}
 };
