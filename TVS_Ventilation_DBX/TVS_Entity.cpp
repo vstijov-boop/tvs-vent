@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc. 
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -172,6 +172,18 @@ Acad::ErrorStatus TVS_Entity::dwgInFields (AcDbDwgFiler *pFiler) {
 }
 
 //- SubXXX() methods (self notification)
+#ifdef TVS_OFFSET_INTEGRATION
+Acad::ErrorStatus TVS_Entity::subDeepClone(AcDbObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
+    Acad::ErrorStatus result=AcDbCurve::subDeepClone(owner,cloned,mapping,primary);
+    if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
+    return result;
+}
+Acad::ErrorStatus TVS_Entity::subWblockClone(AcRxObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
+    Acad::ErrorStatus result=AcDbCurve::subWblockClone(owner,cloned,mapping,primary);
+    if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
+    return result;
+}
+#endif
 Acad::ErrorStatus TVS_Entity::subOpen (AcDb::OpenMode mode) {
     const Acad::ErrorStatus status = AcDbCurve::subOpen(mode);
     if (status == Acad::eOk && mode == AcDb::kForWrite) ++s_sheetMetalRevision;
@@ -311,6 +323,9 @@ Acad::ErrorStatus TVS_Entity::subGetOsnapPoints (
 Acad::ErrorStatus TVS_Entity::subGetGripPoints (
 	AcGePoint3dArray &gripPoints, AcDbIntArray &osnapModes, AcDbIntArray &geomIds
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled () ;
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new getGripPoints() method below (which is the default implementation)
@@ -319,6 +334,9 @@ Acad::ErrorStatus TVS_Entity::subGetGripPoints (
 }
 
 Acad::ErrorStatus TVS_Entity::subMoveGripPointsAt (const AcDbIntArray &indices, const AcGeVector3d &offset) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new moveGripPointsAt() method below (which is the default implementation)
@@ -330,6 +348,9 @@ Acad::ErrorStatus TVS_Entity::subGetGripPoints (
 	AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize, 
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled () ;
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -342,6 +363,9 @@ Acad::ErrorStatus TVS_Entity::subMoveGripPointsAt (
 	const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset,
 	const int bitflags
 ) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -557,6 +581,9 @@ double TVS_Entity::get_Axis(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Axis(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Axis =newVal ;
 	return (Acad::eOk) ;
@@ -574,6 +601,9 @@ double TVS_Entity::get_SizeA(void) const
 
 Acad::ErrorStatus TVS_Entity::put_SizeA(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	SizeA =newVal ;
 	put_Elevation(Elev);
@@ -587,6 +617,9 @@ double TVS_Entity::get_SizeB(void) const
 
 Acad::ErrorStatus TVS_Entity::put_SizeB(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	SizeB =newVal ;
 	if (newVal==0) ThisRound=true;
@@ -603,6 +636,9 @@ bool TVS_Entity::get_ThisRound(void) const
 
 Acad::ErrorStatus TVS_Entity::put_ThisRound (bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	ThisRound =newVal ;
 	return (Acad::eOk) ;
@@ -615,6 +651,9 @@ bool TVS_Entity::get_This1D(void) const
 
 Acad::ErrorStatus TVS_Entity::put_This1D (bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	This1D =newVal ;
 	return (Acad::eOk) ;
@@ -632,6 +671,9 @@ double TVS_Entity::get_Flow(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Flow(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Flow =newVal ;
 	return (Acad::eOk) ;
@@ -647,6 +689,9 @@ int TVS_Entity::get_Direct(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Direct(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Direct =newVal ;
 	return (Acad::eOk) ;
@@ -660,6 +705,9 @@ double TVS_Entity::get_Elevation(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Elevation(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	if (SizeB==0)
 	{
@@ -683,6 +731,9 @@ bool TVS_Entity::get_Wipeout(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Wipeout(bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Wipeout =newVal ;
 	return (Acad::eOk) ;
@@ -696,6 +747,9 @@ int TVS_Entity::get_Param(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Param(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Param =newVal ;
 	return (Acad::eOk) ;
@@ -790,6 +844,9 @@ bool TVS_Entity::get_Grani(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Grani(bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Grani =newVal ;
 	return (Acad::eOk) ;
@@ -808,6 +865,9 @@ double TVS_Entity::get_ElevUp(void) const
 
 Acad::ErrorStatus TVS_Entity::put_ElevUp(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	if (SizeB==0)
 	{
@@ -833,6 +893,9 @@ double TVS_Entity::get_ElevDown(void) const
 
 Acad::ErrorStatus TVS_Entity::put_ElevDown(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	if (SizeB==0)
 	{
@@ -859,6 +922,9 @@ TCHAR * TVS_Entity::get_Tag1(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Tag1(TCHAR * newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	acutDelString(Tag1);
 	Tag1 = NULL;
@@ -879,6 +945,9 @@ TCHAR * TVS_Entity::get_Tag2(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Tag2(TCHAR * newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	acutDelString(Tag2);
 	Tag2 = NULL;
@@ -920,6 +989,9 @@ int TVS_Entity::get_Form(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Form(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Form=newVal;
 	return Acad::eOk;
@@ -1006,6 +1078,9 @@ double TVS_Entity::get_WipeoutLength(void) const
 
 Acad::ErrorStatus TVS_Entity::put_WipeoutLength(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	WipeoutLength=newVal;
 	return Acad::eOk;

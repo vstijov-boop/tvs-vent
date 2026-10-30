@@ -12,6 +12,9 @@
 #include <dbjig.h>
 #include <acgi.h>
 #include <vector>
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#endif
 
 namespace tvsMove {
 using tvsMoveGeometry::Point;
@@ -127,6 +130,9 @@ inline bool snapshot(AcDbDatabase* db,std::vector<Node>& nodes,AcDbObjectIdArray
     delete it;return ok;
 }
 inline bool editable(AcDbEntity* e){
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(e))return false;
+#endif
     AcDbObjectPointer<AcDbLayerTableRecord> layer(e->layerId(),AcDb::kForRead);
     return layer.openStatus()==Acad::eOk&&!layer->isLocked();
 }

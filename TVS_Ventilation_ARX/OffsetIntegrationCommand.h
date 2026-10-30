@@ -96,6 +96,7 @@ inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acce
     if(!committed)return Failed;
     TVS_Pipe* next=NULL;if(acdbOpenObject(next,output,AcDb::kForRead)!=Acad::eOk){acutPrintf(L"\nTVS OFFSET: upis je završen, ali nastavak trase nije moguće otvoriti.");return Failed;}
     current=next;next->close();acceptedElevation=dg.nextZ;acceptedAngle=dg.Axis;
+    tvsOffsetSession::applied(db,original,output,z0);
     acutPrintf(L"\nTVS OFFSET DEV: P=%.6f, riseStraight=%.6f, Lphysical=%.6f mm. Lmin=%.3f / minimumProjection=%.3f su razvojne postavke.",result.projectedLength,result.axis[2].z-result.axis[1].z,result.straightLength,settings.minimumStraightMm,settings.minimumProjectionMm);
     return Applied;
 }

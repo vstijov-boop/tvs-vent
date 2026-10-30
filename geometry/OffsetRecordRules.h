@@ -14,7 +14,8 @@ inline bool physical(double projection,double rise,double& length){
     double a=projection,b=std::fabs(rise),largest=a>b?a:b;
     if(largest==0){length=0;return true;}
     a/=largest;b/=largest;double value=largest*std::sqrt(a*a+b*b);
-    if(!(value>=0&&value<=DBL_MAX))return false;length=value;return true;
+    if(!(value>=0&&value<=DBL_MAX))return false;
+    length=value;return true;
 }
 }
 #endif

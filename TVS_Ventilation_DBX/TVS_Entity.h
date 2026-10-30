@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc.
+﻿// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -85,6 +85,11 @@ public:
 	//- Dwg Filing protocol
 	virtual Acad::ErrorStatus dwgOutFields(AcDbDwgFiler *pFiler) const;
 	virtual Acad::ErrorStatus dwgInFields(AcDbDwgFiler *pFiler);
+
+#ifdef TVS_OFFSET_INTEGRATION
+    virtual Acad::ErrorStatus subDeepClone(AcDbObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary=true) const;
+    virtual Acad::ErrorStatus subWblockClone(AcRxObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary=true) const;
+#endif
 
 	//- SubXXX() methods (self notification)
 	virtual Acad::ErrorStatus subOpen(AcDb::OpenMode mode);

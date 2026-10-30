@@ -1931,6 +1931,9 @@ Acad::ErrorStatus TVS_TAP::subGetOsnapPoints(
 Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 	AcGePoint3dArray &gripPoints, AcDbIntArray &osnapModes, AcDbIntArray &geomIds
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled();
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new getGripPoints() method below (which is the default implementation)
@@ -1948,6 +1951,9 @@ Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 }
 
 Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(const AcDbIntArray &indices, const AcGeVector3d &offset) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new moveGripPointsAt() method below (which is the default implementation)
 	assertWriteEnabled();
@@ -2001,6 +2007,9 @@ Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 	AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize,
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled();
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -2013,6 +2022,9 @@ Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(
 	const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset,
 	const int bitflags
 ) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled();
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -2299,6 +2311,9 @@ TVS_TAP *TVS_TAP::add_new(double &pSizeA,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS OFFSET: transformacija originalnog člana je zabranjena; COPY pozicioniranje je odvojeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Acad::ErrorStatus retCode = AcDbEntity::subTransformBy(xform);
 	MiddlePoint.transformBy(xform);
@@ -2343,6 +2358,9 @@ double TVS_TAP::get_SizeA(void) const
 
 Acad::ErrorStatus TVS_TAP::put_SizeA(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 
 
@@ -2357,6 +2375,9 @@ double TVS_TAP::get_SizeB(void) const
 
 Acad::ErrorStatus TVS_TAP::put_SizeB(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 
 
@@ -2405,6 +2426,9 @@ double TVS_TAP::get_Swectangle(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Swectangle(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Swectangle = newVal;
 	return (Acad::eOk);
@@ -2417,6 +2441,9 @@ AcGeVector3d TVS_TAP::get_Startvector(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Startvector(AcGeVector3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Startvector = newVal;
 	return (Acad::eOk);
@@ -2430,6 +2457,9 @@ AcGePoint3d TVS_TAP::get_Centerpoint(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Centerpoint(AcGePoint3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	MiddlePoint = newVal;
 	return (Acad::eOk);
@@ -2880,6 +2910,9 @@ int TVS_TAP::get_TypeRoundTap(void) const
 }
 Acad::ErrorStatus TVS_TAP::put_TypeRoundTap(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	TypeRoundTap = newVal;
 	return (Acad::eOk);
@@ -2892,12 +2925,18 @@ int TVS_TAP::get_RadiusTypeRound(void) const
 }
 Acad::ErrorStatus TVS_TAP::put_RadiusTypeRound(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusTypeRound = newVal;
 	return (Acad::eOk);
 }
 Acad::ErrorStatus TVS_TAP::put_Radius(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Radius = newVal;
 	return (Acad::eOk);
@@ -2931,6 +2970,9 @@ int TVS_TAP::get_Form(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Form(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Form = newVal;
     setRadius();
@@ -3017,6 +3059,9 @@ int TVS_TAP::get_RadiusTypeRect(void) const
 
 Acad::ErrorStatus TVS_TAP::put_RadiusTypeRect(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusTypeRect = newVal;
 	return (Acad::eOk);
@@ -3045,6 +3090,9 @@ void TVS_TAP::setFlex(const bool &isFlex)
 
 Acad::ErrorStatus TVS_TAP::put_RadiusVariableParameter(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusVariableParameter = newVal;
 	return (Acad::eOk);
@@ -3058,6 +3106,9 @@ int TVS_TAP::get_RadiusConst(void) const
 
 Acad::ErrorStatus TVS_TAP::put_RadiusConst(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusConst = newVal;
 	return (Acad::eOk);

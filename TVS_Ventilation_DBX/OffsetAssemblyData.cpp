@@ -7,6 +7,7 @@
 #include "dbdict.h"
 #include "dbxrecrd.h"
 #include "dbobjptr.h"
+#include "dbtrans.h"
 #include "../geometry/OffsetAdapter.h"
 #include <set>
 #include <map>
@@ -22,7 +23,8 @@ Status read(const AcDbObject* object,Record& out){
     if(!object)return Corrupt;
     AcDbObjectId dictId=object->extensionDictionary();if(dictId.isNull())return Legacy;
     AcDbObjectPointer<AcDbDictionary> dict(dictId,AcDb::kForRead);if(dict.openStatus()!=Acad::eOk)return Corrupt;
-    AcDbObjectId id;if(dict->getAt(L"TVS_OFFSET_MEMBER",id)!=Acad::eOk)return Legacy;
+    AcDbObjectId id;Acad::ErrorStatus lookup=dict->getAt(L"TVS_OFFSET_MEMBER",id);
+    if(lookup==Acad::eKeyNotFound)return Legacy;if(lookup!=Acad::eOk)return Corrupt;
     AcDbObjectPointer<AcDbXrecord> record(id,AcDb::kForRead);if(record.openStatus()!=Acad::eOk)return Corrupt;
     resbuf* data=NULL;if(record->rbChain(&data)!=Acad::eOk||!data)return Corrupt;
     Record r;resbuf* p=data;bool ok=true;
@@ -47,16 +49,29 @@ Status read(const AcDbObject* object,Record& out){
 Acad::ErrorStatus write(AcDbObject* object,const Record& r){
     if(!object||!object->isWriteEnabled()||r.guid.IsEmpty())return Acad::eInvalidInput;
     Acad::ErrorStatus es=object->createExtensionDictionary();if(es!=Acad::eOk)return es;
-    AcDbObjectPointer<AcDbDictionary> dict(object->extensionDictionary(),AcDb::kForWrite);if(dict.openStatus()!=Acad::eOk)return dict.openStatus();
+    AcDbTransactionManager* manager=object->database()->transactionManager();
+    bool managed=manager&&manager->numActiveTransactions()>0;AcDbObject* raw=NULL;
+    AcDbDictionary* dict=NULL;
+    if(managed){es=manager->getObject(raw,object->extensionDictionary(),AcDb::kForWrite);dict=AcDbDictionary::cast(raw);}
+    else es=acdbOpenObject(dict,object->extensionDictionary(),AcDb::kForWrite);
+    if(es!=Acad::eOk||!dict)return es;
     AcDbObjectId id;AcDbXrecord* record=NULL;
-    if(dict->getAt(L"TVS_OFFSET_MEMBER",id)==Acad::eOk){es=acdbOpenObject(record,id,AcDb::kForWrite);if(es!=Acad::eOk)return es;}
-    else {record=new AcDbXrecord();es=dict->setAt(L"TVS_OFFSET_MEMBER",record,id);if(es!=Acad::eOk){delete record;return es;}}
-    resbuf nodes[7]={};const int types[]={90,1,70,330,330,330,40};
-    for(int j=0;j<7;++j){nodes[j].restype=static_cast<short>(types[j]);nodes[j].rbnext=j<6?&nodes[j+1]:NULL;}
-    nodes[0].resval.rlong=r.version;nodes[1].resval.rstring=const_cast<ACHAR*>(r.guid.GetString());nodes[2].resval.rint=static_cast<short>(r.role);
-    for(int j=0;j<3;++j)if(!r.members[j].isNull())acdbGetAdsName(nodes[j+3].resval.rlname,r.members[j]);
-    nodes[6].resval.rreal=r.rise;record->setXlateReferences(true);es=record->setFromRbChain(nodes[0]);record->close();return es;
+    if(dict->getAt(L"TVS_OFFSET_MEMBER",id)==Acad::eOk){
+        if(managed){raw=NULL;es=manager->getObject(raw,id,AcDb::kForWrite);record=AcDbXrecord::cast(raw);}
+        else es=acdbOpenObject(record,id,AcDb::kForWrite);
+    }else {record=new AcDbXrecord();es=dict->setAt(L"TVS_OFFSET_MEMBER",record,id);
+        if(es!=Acad::eOk){delete record;record=NULL;}
+        else if(managed)es=manager->addNewlyCreatedDBRObject(record,true);}
+    if(es==Acad::eOk&&record){
+        resbuf nodes[7]={};const int types[]={90,1,70,330,330,330,40};
+        for(int j=0;j<7;++j){nodes[j].restype=static_cast<short>(types[j]);nodes[j].rbnext=j<6?&nodes[j+1]:NULL;}
+        nodes[0].resval.rlong=r.version;nodes[1].resval.rstring=const_cast<ACHAR*>(r.guid.GetString());nodes[2].resval.rint=static_cast<short>(r.role);
+        for(int j=0;j<3;++j)if(!r.members[j].isNull())acdbGetAdsName(nodes[j+3].resval.rlname,r.members[j]);
+        nodes[6].resval.rreal=r.rise;record->setXlateReferences(true);es=record->setFromRbChain(nodes[0]);
+    }
+    if(!managed){if(record)record->close();dict->close();}return es;
 }
+
 bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy;}
 bool editable(const AcDbObject* o){return writeDepth>0||!marked(o)||clones.find(o->objectId())!=clones.end();}
 bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
@@ -84,6 +99,17 @@ Status validate(const AcDbObject* o,bool geometry){
         if(members[j].role!=j||members[j].guid!=r.guid)return Corrupt;
         for(int k=0;k<3;++k)if(members[j].members[k]!=r.members[k])return Corrupt;}
     if(!geometry)return Valid;
+    // Detect failed clone finalization / duplicate identities without rewriting DWG.
+    AcDbObjectPointer<AcDbBlockTableRecord> owner(o->ownerId(),AcDb::kForRead);
+    if(owner.openStatus()!=Acad::eOk)return Corrupt;
+    AcDbBlockTableRecordIterator* iterator=NULL;if(owner->newIterator(iterator)!=Acad::eOk)return Corrupt;
+    bool conflict=false;
+    for(;!iterator->done();iterator->step()){
+        AcDbEntity* other=NULL;if(iterator->getEntity(other,AcDb::kForRead)!=Acad::eOk){conflict=true;break;}
+        Record record;Status os=read(other,record);other->close();
+        if(os!=Legacy&&record.guid==r.guid){for(int j=0;j<3;++j)if(record.members[j]!=r.members[j])conflict=true;}
+    }
+    delete iterator;if(conflict)return Corrupt;
     double f=tvsUnits::factor(o);double delta=(b->get_Elevation()-a->get_Elevation())*f;
     if(a->ThisRound||b->ThisRound||p->ThisRound||a->DuctType!=DuctTypeStill||b->DuctType!=DuctTypeStill||p->DuctType!=DuctTypeStill)return GeometryMismatch;
     if(std::fabs(a->SizeA-p->SizeA)*f>.001||std::fabs(a->SizeB-p->SizeB)*f>.001||std::fabs(b->SizeA-p->SizeA)*f>.001||std::fabs(b->SizeB-p->SizeB)*f>.001
@@ -94,6 +120,9 @@ Status validate(const AcDbObject* o,bool geometry){
     tvsOffset::Result result=tvsOffset::solve(in);if(!result.hasGeometry())return GeometryMismatch;
     tvsOffsetAdapter::Placement place(tvsOffset::WorldPoint(a->MiddlePoint.x,a->MiddlePoint.y,a->MiddlePoint.z),heading,f,a->get_Elevation()*f);
     tvsOffsetAdapter::Result d=tvsOffsetAdapter::adapt(in,result,place);if(!d.ready())return GeometryMismatch;
+    for(int j=0;j<2;++j){TVS_TAP* tap=j==0?a.object():b.object();const tvsOffsetAdapter::Elbow& expected=d.elbows[j];
+        if((tap->Startvector-AcGeVector3d(expected.startVector.x,expected.startVector.y,0)).length()>1e-8
+            ||(tap->Normvector-AcGeVector3d(0,0,1)).length()>1e-8)return GeometryMismatch;}
     if(!nearPoint(p->FirstPoint,AcGePoint3d(d.middle.first.x,d.middle.first.y,d.middle.first.z),f)
         ||!nearPoint(p->LastPoint,AcGePoint3d(d.middle.last.x,d.middle.last.y,d.middle.last.z),f)
         ||!nearPoint(b->MiddlePoint,AcGePoint3d(d.elbows[1].middle.x,d.elbows[1].middle.y,d.elbows[1].middle.z),f)

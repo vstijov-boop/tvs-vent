@@ -66,3 +66,27 @@ kanali nisu globalno promijenjeni. Tačnost punog izgleda mora se potvrditi u CA
 
 Čuvati izvještaj sa AutoCAD verzijom, jedinicama, režimom i BUILD commit-om.
 Ograničenja i status izvršenih testova biće navedeni u završnom DEV izvještaju.
+
+## Dijagnostika podataka i razvojnih postavki
+
+- TVS_OFFSET_STATUS: izabrati bilo koji član. INTERNAL je valjanost trojke;
+  NEIGHBORS posebno broji odgovarajuće ulazne/izlazne susjede (0/1/više).
+  Srednji komad prikazuje P, L, količinu, površinu i masu. Nema popravke/upisa.
+- TVS_OFFSET_POLICY: sesijska komandnolinijska podešavanja Lmin>=0 i
+  minimumProjection>0 u mm. Podrazumijevano 100/0.1, bez upisa u DWG ili novog
+  dijaloga. Nulti ravanski segment nije podržan integracijom.
+- TVS_OFFSET_TEST_BAD: samo na NOVOM označenom članu namjerno upisuje verziju 999.
+  Koristiti na kopiji probnog DWG-a; STATUS/COM/tabele moraju prijaviti grešku,
+  pa UNDO vraća prethodne podatke. Nije komanda migracije starih objekata.
+
+COPY cijele trojke treba dati novi GUID i recipročna ID-jeva kopija. Djelimična
+kopija nulira veze ka nekopiranim originalima i daje Incomplete. Nepotpuna kopija
+može imati vlastitu fizičku količinu ako je njen rise validan; ne postaje operativni
+povezani sklop. Originalni članovi su zaštićeni setter/grip/transform putanjama;
+novim kopijama dozvoljena je samo translacija pozicioniranja tokom clone komande.
+SCALE/ROTATE/MIRROR originalnih članova nisu podržani parametarski editor.
+Obični susjedi nisu članovi: njihovo nezavisno pomjeranje može prekinuti vezu sa
+unutrašnje validnim sklopom, što STATUS pokazuje odvojeno.
+
+Ove tvrdnje opisuju implementiranu namjeru/putanje; stvarni COPY/Undo/Redo i
+konture ovog integracionog paketa još zahtijevaju praktičnu AutoCAD provjeru.

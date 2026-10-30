@@ -1,5 +1,6 @@
 #pragma once
 #ifdef TVS_OFFSET_INTEGRATION
+#include "TVS_Entity.h"
 #include "dbmain.h"
 #include "dbidmap.h"
 namespace tvsOffsetData {

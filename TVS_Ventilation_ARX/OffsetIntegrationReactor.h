@@ -11,7 +11,7 @@ public:
         Acad::ErrorStatus es=tvsOffsetData::remapClones(mapping);
         if(es!=Acad::eOk)acutPrintf(L"\nTVS OFFSET: COPY podaci nisu završeni; kopija nije potvrđen operativni sklop (%d).",es);
     }
-    virtual void commandEnded(const ACHAR*){tvsOffsetData::clearClonePermits();}
+    virtual void commandEnded(const ACHAR* command){tvsOffsetData::clearClonePermits();tvsOffsetSession::afterUndoRedo(command);}
     virtual void commandCancelled(const ACHAR*){tvsOffsetData::clearClonePermits();}
     virtual void commandFailed(const ACHAR*){tvsOffsetData::clearClonePermits();}
 };

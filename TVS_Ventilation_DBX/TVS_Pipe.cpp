@@ -25,6 +25,7 @@
 #include "StdAfx.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
+#include "../geometry/SlopeProjection.h"
 #include <limits>
 #endif
 #include "TVS_Pipe.h"
@@ -294,6 +295,35 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
 	if (SizeB==0) ThisRound=true;
 	else ThisRound=false;
 
+#ifdef TVS_OFFSET_INTEGRATION
+    tvsOffsetData::Record offset;
+    tvsOffsetData::Status offsetStatus=tvsOffsetData::read(this,offset);
+    if(offsetStatus!=tvsOffsetData::Legacy){
+        if(offsetStatus!=tvsOffsetData::Valid||offset.role!=tvsOffsetData::SlopedStraight){
+            AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);invalid->setColorIndex(1);setMainProperty(invalid);
+        }else {
+            tvsOffset::WorldPoint corners[2][4];
+            if(tvsSlopeProjection::joints(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
+                tvsOffset::WorldPoint(LastPoint.x,LastPoint.y,LastPoint.z),SizeA,SizeB,offset.rise/tvsUnits::factor(this),corners)){
+                AcGePoint3d p[2][4];for(int j=0;j<2;++j)for(int k=0;k<4;++k)p[j][k]=AcGePoint3d(corners[j][k].x,corners[j][k].y,corners[j][k].z);
+                const int firstEdge=offset.rise>0?2:0,lastEdge=offset.rise>0?0:2;
+                if(Wipeout){AcDbPolyline* mask=new AcDbPolyline();
+                    AcGePoint3d outline[4]={p[0][firstEdge],p[1][lastEdge],p[1][lastEdge+1],p[0][firstEdge+1]};
+                    for(int j=0;j<4;++j)mask->addVertexAt(j,AcGePoint2d(outline[j].x,outline[j].y));
+                    mask->setClosed(true);mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
+                if(!This1D){
+                    setMainProperty(new AcDbLine(p[0][firstEdge],p[1][lastEdge]));
+                    setMainProperty(new AcDbLine(p[0][firstEdge+1],p[1][lastEdge+1]));
+                    for(int j=0;j<2;++j){setMainProperty(new AcDbLine(p[j][2],p[j][3]));setHideProperty(new AcDbLine(p[j][0],p[j][1]));}
+                }
+                setCenterProperty(new AcDbLine(FirstPoint,LastPoint));
+            }
+        }
+        for each(AcDbEntity* entity in ListOfWipeout)mode->geometry().draw(entity);
+        for each(AcDbEntity* entity in ListOfEntity)mode->geometry().draw(entity);
+        return Adesk::kTrue;
+    }
+#endif
 	if (Wipeout==true)
 	{
 
@@ -536,6 +566,9 @@ Acad::ErrorStatus TVS_Pipe::subGetOsnapPoints (
 Acad::ErrorStatus TVS_Pipe::subGetGripPoints (
 	AcGePoint3dArray &gripPoints, AcDbIntArray &osnapModes, AcDbIntArray &geomIds
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled () ;
 
 	gripPoints.append(FirstPoint);
@@ -564,6 +597,9 @@ void TVS_Pipe::SetParamsForDraw( AcDbObjectId pEntId, int pGripNumber )
 }
 
 Acad::ErrorStatus TVS_Pipe::subMoveGripPointsAt (const AcDbIntArray &indices, const AcGeVector3d &offset) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new moveGripPointsAt() method below (which is the default implementation)
@@ -609,6 +645,9 @@ Acad::ErrorStatus TVS_Pipe::subGetGripPoints (
 	AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize, 
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	//assertReadEnabled () ;
 
 	//appDataType::iterator appIter = putAppData();
@@ -687,6 +726,9 @@ Acad::ErrorStatus TVS_Pipe::subMoveGripPointsAt (
 	const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset,
 	const int bitflags
 ) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -885,6 +927,9 @@ AcGePoint3d TVS_Pipe::get_FirstPoint(void) const
 
 Acad::ErrorStatus TVS_Pipe::put_FirstPoint(AcGePoint3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	FirstPoint =newVal ;
 	return (Acad::eOk) ;
@@ -1069,6 +1114,9 @@ TVS_Pipe* TVS_Pipe::add_new(AcGePoint3d &pFirstPoint,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS OFFSET: transformacija originalnog člana je zabranjena; COPY pozicioniranje je odvojeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 
 	FirstPoint.transformBy(xform);
@@ -1090,6 +1138,9 @@ void TVS_Pipe::setDuctType(int pDuctType)
 
 Acad::ErrorStatus TVS_Pipe::put_SizeB(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 
 
@@ -1224,6 +1275,9 @@ AcGePoint3d TVS_Pipe::get_Lastpoint(void) const
 
 Acad::ErrorStatus TVS_Pipe::put_Lastpoint(AcGePoint3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	LastPoint =newVal ;
 	return (Acad::eOk) ;

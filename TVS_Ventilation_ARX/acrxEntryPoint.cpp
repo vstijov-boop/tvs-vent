@@ -35,8 +35,10 @@
 
 #include "dgPipeSize.h"
 #include "dgChangeZ.h"
+#include "OffsetSessionState.h"
 #include "OffsetIntegrationCommand.h"
 #include "OffsetIntegrationReactor.h"
+#include "OffsetIntegrationDiagnostics.h"
 #include "MSExcel.h"	
 #include "HeatFloor.h"
 #include "dgBlockManager.h"
@@ -1788,6 +1790,11 @@ public:
 
 	}
 #ifdef TVS_OFFSET_PROOF
+#ifdef TVS_OFFSET_INTEGRATION
+    static void Ventilation_ARXTVS_OFFSET_STATUS(){tvsOffsetDiagnostics::status();}
+    static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
+    static void Ventilation_ARXTVS_OFFSET_TEST_BAD(){tvsOffsetDiagnostics::corruptTest();}
+#endif
     static void Ventilation_ARXTVS_TEST_OFFSET(){tvsOffsetProof::create();}
     static void Ventilation_ARXTVS_TEST_OFFSET_CHECK(){tvsOffsetProof::check();}
     static void Ventilation_ARXTVS_TEST_OFFSET_FAIL(){tvsOffsetProof::create(true);}
@@ -4023,4 +4030,10 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET, TVS_TEST_OFFSET, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET_CHECK, TVS_TEST_OFFSET_CHECK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET_FAIL, TVS_TEST_OFFSET_FAIL, ACRX_CMD_MODAL, NULL)
+#endif
+
+#ifdef TVS_OFFSET_INTEGRATION
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_STATUS, TVS_OFFSET_STATUS, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_POLICY, TVS_OFFSET_POLICY, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_TEST_BAD, TVS_OFFSET_TEST_BAD, ACRX_CMD_MODAL, NULL)
 #endif

@@ -152,7 +152,7 @@
   <ItemDefinitionGroup Condition="'$(TVSOffsetProof)'=='true'">
     <ClCompile><PreprocessorDefinitions>TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
-  <ItemGroup><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
+  <ItemGroup><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="OffsetIntegrationCommand.h" /><ClInclude Include="OffsetIntegrationReactor.h" /><ClInclude Include="OffsetIntegrationDiagnostics.h" /><ClInclude Include="OffsetSessionState.h" /><ClInclude Include="OffsetSelectionCheck.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
   <ItemDefinitionGroup Condition="'$(TVSOffsetIntegration)'=='true'">
     <ClCompile><PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
