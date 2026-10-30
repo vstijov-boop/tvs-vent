@@ -286,7 +286,7 @@ inline bool networkLabels(Transaction& tx,const std::vector<Node>& nodes,const A
         }
     }return true;
 }
-// Temporary highlighting never writes colours or selection state to the drawing.
+// Shared MOVE/STRETCH feedback: highlighting and preview never write geometry, colours or selection state to DWG.
 class StretchHighlight {
     AcDbObjectIdArray ids;
 public:
