@@ -109,7 +109,11 @@
       <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">acad.lib;accore.lib;acdb23.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(TVSOffsetIntegration)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="OffsetAssemblyData.cpp" />
     <ClCompile Include="acrxEntryPoint.cpp" />
     <ClCompile Include="ComPipe.cpp" />
     <ClCompile Include="ComTrans.cpp" />
@@ -132,6 +136,7 @@
     <ClCompile Include="TVS_WYE.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="OffsetAssemblyData.h" />
     <ClInclude Include="commonDef.h" />
     <ClInclude Include="ComPipe.h" />
     <ClInclude Include="ComTrans.h" />

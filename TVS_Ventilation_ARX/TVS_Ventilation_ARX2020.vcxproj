@@ -153,6 +153,9 @@
     <ClCompile><PreprocessorDefinitions>TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
+  <ItemDefinitionGroup Condition="'$(TVSOffsetIntegration)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\GridCtrl_src\GridCell.cpp" />
     <ClCompile Include="..\GridCtrl_src\GridCellBase.cpp" />
