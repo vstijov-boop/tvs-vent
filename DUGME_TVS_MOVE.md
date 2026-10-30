@@ -1,25 +1,34 @@
-# Dugme TVS_MOVE
+# Dugmad TVS_MOVE i TVS_STRETCH
 
-U TVS_TOOLS.cuix dodato je **Povezano pomjeranje**, sa providnim ikonama 16×16 i
-32×32, u toolbaru **Aksonometrija i crtanje**, meniju **Crtanje** i ribbon panelu
-**Crtanje**. Makro je `^C^C_TVS_MOVE;` i koristi postojeću ARX komandu.
+30.10.2026: obje komande nalaze se u TVS_VENT.cuix: toolbar TVS_VENT,
+meni Crtanje kanala i ribbon panel Crtanje kanala. TVS_MOVE je uklonjen iz
+TVS_TOOLS.cuix, gdje KGTEZ i ostale postojeće komande ostaju.
 
-Motiv: kanal sa dva koljena i plavom dvostranom strelicom za pomjeranje. Ikona
-je generisana ugrađenim image_gen alatom, pa prilagođena standardnim dimenzijama.
-Kopije su u `Installer/TVS_TOOLS/icons/TVS_MOVE_16.png`, `TVS_MOVE_32.png` i
-`TVS_MOVE_128.png`. Izvorni prompt: ortogonalni metalni kanal u obliku obrnutog U,
-plava dvostrana vertikalna strelica, providna pozadina, bez teksta, čitljivo u
-malim dimenzijama. Skripta održavanja: `tools/add_move_cuix.py`.
+- Povezano pomjeranje: ^C^C_TVS_MOVE;
+- Istezanje mreže: ^C^C_TVS_STRETCH;
 
-Zatvoriti AutoCAD, sačuvati postojeći TVS_TOOLS.cuix van ApplicationPlugins i
-zamijeniti fajl na lokaciji:
-`C:/ProgramData/Autodesk/ApplicationPlugins/TVS.bundle/Contents/TVS_TOOLS/Resources/TVS_TOOLS.cuix`.
-Ako je ikona keširana, pri zatvorenom AutoCAD-u preimenovati TVS_TOOLS.mnr u
-TVS_TOOLS.mnr.old. Po potrebi ponovo učitati grupu kroz CUILOAD.
+Ispravan naziv je TVS_STRETCH. Providne PNG ikone 16/32 ugrađene su u CUIX,
+a kopije 16/32/128 su u Installer/TVS_VENT/icons. Skripta za održavanje:
+tools/add_connected_cuix.py; stari add_move_cuix.py poziva novu skriptu.
 
-Dugme već radi sa prethodno instaliranim TVS_MOVE ARX-om; ne dodaje nove mogućnosti
-u staru binarnu verziju. Korisnik je odobrio kompilaciju koja uključuje novi Enter-default i varijantu mreže. CUIX sam po sebi ne zahtijeva kompilaciju.
+Nova ikona je generisana ugrađenim image_gen alatom. Prompt: Use case:
+stylized-concept. Asset: single AutoCAD toolbar raster icon, square, transparent
+background. A thick simple steel-gray rectangular ventilation duct runs
+horizontally from a fixed dark bracket on left to a bright blue movable end on
+right. A bold blue horizontal right-pointing arrow above indicates stretching
+length. Minimal orthographic 3D beveled metal style, strong dark outlines, very
+few details, readable when reduced to 16 and 32 pixels. Centered with narrow
+transparent margin. No letters, numbers, words, watermark or background.
+This is the TVS_STRETCH icon.
 
-Provjereni su ZIP CRC, svi XML dijelovi, jedinstvena nova referenca u svakom UI
-mjestu i očuvanje svih prethodnih makroa, referenci i bitmapa, uključujući KGTEZ.
-Praktično učitavanje u AutoCAD-u tek treba potvrditi.
+Zamijeniti oba CUIX fajla uz zatvoren AutoCAD, nakon čuvanja prethodnih kopija:
+- Contents/TVS_VENT/Resources/TVS_VENT.cuix
+- Contents/TVS_TOOLS/Resources/TVS_TOOLS.cuix
+unutar C:/ProgramData/Autodesk/ApplicationPlugins/TVS.bundle/.
+Ako prikaz ostane stari, pri zatvorenom CAD-u preimenovati odgovarajuće .mnr
+fajlove u .mnr.old i po potrebi učitati grupe kroz CUILOAD.
+
+CUIX ne zahtijeva kompilaciju. TVS_MOVE radi sa postojećim ARX-om; novo dugme
+TVS_STRETCH će raditi tek nakon budućeg builda. Build nije pokrenut.
+Provjereni ZIP/XML, reference i očuvanje ostalih makroa/bitmapa; stvarni izgled
+u AutoCAD-u treba potvrditi.
