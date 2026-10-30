@@ -1,0 +1,113 @@
+name: DEV Offset proof AutoCAD 2022
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [razvoj-offset-arx]
+    paths:
+      - 'TVS_Ventilation_ARX/**'
+      - 'TVS_Ventilation_DBX/**'
+      - 'geometry/**'
+      - '.github/workflows/dev-offset-*.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - uses: microsoft/setup-msbuild@v2
+      - name: Install matching v142 MFC and ATL libraries
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build-logs | Out-Null
+          $vsPath = 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise'
+          $installer = 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\setup.exe'
+          $installArgs = @('modify', '--installPath', "`"$vsPath`"", '--add', 'Microsoft.VisualStudio.Component.VC.14.29.16.11.MFC', '--add', 'Microsoft.VisualStudio.Component.VC.14.29.16.11.ATL', '--quiet', '--norestart', '--nocache')
+          $installProcess = Start-Process $installer -ArgumentList $installArgs -PassThru
+          if (!$installProcess.WaitForExit(600000)) { $installProcess.Kill(); throw 'MFC installation timed out.' }
+          "Installer exit code: $($installProcess.ExitCode)" | Out-File build-logs/mfc-installation.txt
+          if ($installProcess.ExitCode -notin @(0, 3010)) {
+            Get-ChildItem $env:TEMP -Filter 'dd_*' -File | Copy-Item -Destination build-logs -ErrorAction SilentlyContinue
+            throw 'Unable to install the v142 MFC/ATL components.'
+          }
+      - name: Download and extract ObjectARX SDK 2022
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force build-logs | Out-Null
+          $sdkArchive = Join-Path $env:RUNNER_TEMP 'objectarx2022.sfx.exe'
+          Invoke-WebRequest -Uri 'https://download.autodesk.com/esd/objectarx/2022/objectarx_for_autocad_2022_win_64bit_dlm.sfx.exe' -OutFile $sdkArchive
+          Get-FileHash $sdkArchive -Algorithm SHA256 | Format-List | Out-File build-logs/sdk-sha256.txt
+          $extractDir = Join-Path $env:RUNNER_TEMP 'objectarx-extracted'
+          $signature = Get-AuthenticodeSignature $sdkArchive
+          $signature | Format-List Status, StatusMessage, SignerCertificate | Out-File build-logs/sdk-signature.txt
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Subject -notmatch 'Autodesk') { throw 'SDK installer does not have a valid Autodesk signature.' }
+          $extractProcess = Start-Process -FilePath $sdkArchive -ArgumentList @('-suppresslaunch', '-d', "`"$extractDir`"") -PassThru
+          if (!$extractProcess.WaitForExit(180000)) { $extractProcess.Kill(); throw 'SDK self-extraction timed out.' }
+          "SDK extractor exit code: $($extractProcess.ExitCode)" | Out-File build-logs/sdk-extraction.txt
+          if ($extractProcess.ExitCode -ne 0) { throw 'SDK self-extraction failed.' }
+          $props = @(Get-ChildItem $extractDir -Recurse -Filter arx.props)
+          if ($props.Count -ne 1) {
+            Get-ChildItem $extractDir -Recurse | Select-Object FullName | Out-File build-logs/sdk-files.txt
+            throw 'Expected exactly one SDK inc/arx.props. Inspect SDK extraction log.'
+          }
+          $sdkRoot = $props[0].Directory.Parent.FullName
+          New-Item -ItemType Directory -Force ThirdParty | Out-Null
+          Copy-Item $sdkRoot ThirdParty/ObjectARX2022 -Recurse
+          Get-ChildItem ThirdParty/ObjectARX2022 -Recurse -Filter '*.tlb' | Select-Object FullName | Out-File build-logs/sdk-type-libraries.txt
+      - name: Prepare existing projects for the SDK on this runner
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $sdkRoot = (Resolve-Path ThirdParty/ObjectARX2022).Path
+          $typeLibs = @(Get-ChildItem $sdkRoot -Recurse -Filter axdb24enu.tlb)
+          if ($typeLibs.Count -lt 1) { throw 'axdb24enu.tlb missing from SDK; see sdk-type-libraries.txt.' }
+          $typeLibDir = $typeLibs[0].DirectoryName
+          # The checked-in IDLs still refer to AutoCAD 2015. Adapt only this build workspace.
+          foreach ($folder in @('TVS_Ventilation_ARX', 'TVS_Ventilation_DBX')) {
+            $idl = Join-Path $folder "$folder.idl"
+            $source = [IO.File]::ReadAllText((Resolve-Path $idl))
+            [IO.File]::WriteAllText((Resolve-Path $idl), $source.Replace('axdb20enu.tlb', 'axdb24enu.tlb'), [Text.UTF8Encoding]::new($true))
+          }
+          $env:LIB = "$typeLibDir;$env:LIB"
+          "LIB=$env:LIB" >> $env:GITHUB_ENV
+          # Add SDK include directories to MIDL's search path in both property sheets.
+          foreach ($folder in @('TVS_Ventilation_ARX', 'TVS_Ventilation_DBX')) {
+            $file = Join-Path $folder 'Autodesk.arx-2022.props'
+            $source = [IO.File]::ReadAllText((Resolve-Path $file))
+            $source = $source.Replace('<AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>', '<AdditionalIncludeDirectories>$(ArxSdkIncs);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>')
+            [IO.File]::WriteAllText((Resolve-Path $file), $source, [Text.UTF8Encoding]::new($true))
+          }
+          Get-ChildItem 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC' | Select-Object Name | Out-File build-logs/msvc-versions.txt
+      - name: Build Release x64
+        run: |
+          & msbuild 'TVS_Ventilation 2022.sln' /m /t:Build /p:TVSOffsetProof=true /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0 /bl:build-logs/build.binlog /fl '/flp:logfile=build-logs/build.log;verbosity=normal'
+          if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE. See build.log." }
+      - name: Package DEVELOPMENT binaries only
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = 'x64/Release/2022'
+          foreach ($file in @('TVSTVS_Ventilation_ARX.arx', 'TVSTVS_Ventilation_DBX.dbx')) {
+            if (!(Test-Path (Join-Path $output $file))) { throw "Missing newly built output: $file" }
+          }
+          New-Item -ItemType Directory -Force dist-offset-dev | Out-Null
+          Copy-Item "$output/*.arx", "$output/*.dbx" dist-offset-dev
+          Copy-Item development/OFFSET_PROOF_GUIDE.md dist-offset-dev
+          "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2022 x64`nDEVELOPMENT ONLY: TVSOffsetProof=true / TVS_OFFSET_PROOF`nNo AutoCAD runtime tests executed by CI. Not for specification." | Out-File dist-offset-dev/BUILD.txt -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dev-offset-autocad-2022-logs
+          path: build-logs/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: DEV-ONLY-offset-autocad-2022-x64
+          path: dist-offset-dev/
+          if-no-files-found: error

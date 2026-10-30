@@ -149,6 +149,10 @@
       <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)TVS_Ventilation_DBX\$(IntDir)TVSTVS_Ventilation_DBX.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(TVSOffsetProof)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\GridCtrl_src\GridCell.cpp" />
     <ClCompile Include="..\GridCtrl_src\GridCellBase.cpp" />

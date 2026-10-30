@@ -28,6 +28,9 @@
 #include "Func.h"
 #include "CoordinateInput.h"
 #include "TVSMoveCommand.h"
+#ifdef TVS_OFFSET_PROOF
+#include "TVSTestOffset.h"
+#endif
 #include "tdbl.h"
 
 #include "dgPipeSize.h"
@@ -1759,6 +1762,11 @@ public:
 		}
 
 	}
+#ifdef TVS_OFFSET_PROOF
+    static void Ventilation_ARXTVS_TEST_OFFSET(){tvsOffsetProof::create();}
+    static void Ventilation_ARXTVS_TEST_OFFSET_CHECK(){tvsOffsetProof::check();}
+    static void Ventilation_ARXTVS_TEST_OFFSET_FAIL(){tvsOffsetProof::create(true);}
+#endif
     static void Ventilation_ARXTVS_STRETCH(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
@@ -3972,3 +3980,9 @@ ACED_ADSSYMBOL_ENTRY_AUTO(CTVS_Ventilation_ARXApp, MyLispFunction, false)
 
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH, TVS_STRETCH, ACRX_CMD_MODAL, NULL)
+
+#ifdef TVS_OFFSET_PROOF
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET, TVS_TEST_OFFSET, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET_CHECK, TVS_TEST_OFFSET_CHECK, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET_FAIL, TVS_TEST_OFFSET_FAIL, ACRX_CMD_MODAL, NULL)
+#endif
