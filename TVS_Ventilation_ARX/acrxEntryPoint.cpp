@@ -35,6 +35,8 @@
 
 #include "dgPipeSize.h"
 #include "dgChangeZ.h"
+#include "OffsetIntegrationCommand.h"
+#include "OffsetIntegrationReactor.h"
 #include "MSExcel.h"	
 #include "HeatFloor.h"
 #include "dgBlockManager.h"
@@ -98,13 +100,19 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		PropertyAdmin::initialize();
-		// TODO: Add your initialization code here
+#ifdef TVS_OFFSET_INTEGRATION
+        acedEditor->addReactor(&offsetReactor());
+#endif
+        // TODO: Add your initialization code here
 
 		return (retCode);
 	}
 
 	virtual AcRx::AppRetCode On_kUnloadAppMsg(void *pkt) {
         PropertyAdmin::uninitialize();
+#ifdef TVS_OFFSET_INTEGRATION
+        acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
+#endif
 		// TODO: Add your code here
 
 		// You *must* call On_kUnloadAppMsg here
@@ -1317,6 +1325,14 @@ public:
 	}
 
 
+#ifdef TVS_OFFSET_INTEGRATION
+    static tvsOffsetIntegration::Outcome changeZ(TVS_Pipe*& pPipe){
+        double elevation=0,angle=0;
+        tvsOffsetIntegration::Outcome result=tvsOffsetIntegration::execute(pPipe,elevation,angle);
+        if(result==tvsOffsetIntegration::Applied){globalElevMid=elevation;globalAxis=angle;}
+        return result;
+    }
+#else
 	static bool changeZ(TVS_Pipe* &pPipe)
 	{
 		AcDbEntity * pEnt;
@@ -1428,6 +1444,7 @@ public:
 
 		return true;
 	}
+#endif
 	static void addtrans(double &pSizeAp1,
 		double &pSizeBp1,
 		double &pSizeAp2,
@@ -1737,12 +1754,19 @@ public:
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
+#ifdef TVS_OFFSET_INTEGRATION
+                if(changeZ(pipi)==tvsOffsetIntegration::Applied){
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+#else
 				changeZ(pipi);
 				A1 = A2;
 				A2 = pipi->LastPoint;
 				pt1[0] = A2.x;
 				pt1[1] = A2.y;
 				pt1[2] = A2.z;
+#endif
 				acdbRToS(0, 2, 2, resultss);
 			}
 
@@ -1935,12 +1959,19 @@ public:
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
+#ifdef TVS_OFFSET_INTEGRATION
+                if(changeZ(pipi)==tvsOffsetIntegration::Applied){
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+#else
 				changeZ(pipi);
 				A1 = A2;
 				A2 = pipi->LastPoint;
 				pt1[0] = A2.x;
 				pt1[1] = A2.y;
 				pt1[2] = A2.z;
+#endif
 				acdbRToS(0, 2, 2, resultss);
 			}
 

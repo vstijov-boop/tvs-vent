@@ -1,4 +1,4 @@
-name: DEV Offset proof AutoCAD 2020
+name: DEV Offset integration AutoCAD 2020
 
 on:
   workflow_dispatch:
@@ -102,7 +102,7 @@ jobs:
           }
       - name: Build Release x64
         run: |
-          & $env:TVS_MSBUILD 'TVS_Ventilation 2020.sln' /m /t:Build /p:TVSOffsetProof=true /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.17763.0 /bl:build-logs/build.binlog /fl '/flp:logfile=build-logs/build.log;verbosity=normal'
+          & $env:TVS_MSBUILD 'TVS_Ventilation 2020.sln' /m /t:Build /p:TVSOffsetProof=true /p:TVSOffsetIntegration=true /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.17763.0 /bl:build-logs/build.binlog /fl '/flp:logfile=build-logs/build.log;verbosity=normal'
           if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE. See build.log." }
       - name: Package DEVELOPMENT binaries only
         run: |
@@ -113,17 +113,17 @@ jobs:
           }
           New-Item -ItemType Directory -Force dist-offset-dev | Out-Null
           Copy-Item "$output/*.arx", "$output/*.dbx" dist-offset-dev
-          Copy-Item development/OFFSET_PROOF_GUIDE.md dist-offset-dev
-          "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nDEVELOPMENT ONLY: TVSOffsetProof=true / TVS_OFFSET_PROOF`nNo AutoCAD runtime tests executed by CI. Not for specification." | Out-File dist-offset-dev/BUILD.txt -Encoding utf8
+          Copy-Item development/OFFSET_PROOF_GUIDE.md, development/OFFSET_INTEGRATION_GUIDE.md dist-offset-dev
+          "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nDEVELOPMENT ONLY: TVSOffsetProof=true / TVSOffsetIntegration=true / TVS_OFFSET_INTEGRATION`nNo AutoCAD runtime tests executed by CI. Development integration: runtime verification still required." | Out-File dist-offset-dev/BUILD.txt -Encoding utf8
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: dev-offset-autocad-2020-logs
+          name: dev-offset-integration-autocad-2020-logs
           path: build-logs/
           if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: DEV-ONLY-offset-autocad-2020-x64
+          name: DEV-INTEGRATION-offset-autocad-2020-x64
           path: dist-offset-dev/
           if-no-files-found: error

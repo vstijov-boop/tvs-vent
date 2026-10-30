@@ -16,6 +16,7 @@ DLLIMPEXP bool marked(const AcDbObject* object);
 DLLIMPEXP bool editable(const AcDbObject* object);
 DLLIMPEXP void permitClone(const AcDbObjectId& id);
 DLLIMPEXP void clearClonePermits();
+DLLIMPEXP bool allowTransform(const AcDbObject* object,const AcGeMatrix3d& matrix);
 DLLIMPEXP Acad::ErrorStatus remapClones(AcDbIdMapping& map);
 DLLIMPEXP const ACHAR* statusText(Status status);
 // Internal construction scope is process-local, never serialized.
