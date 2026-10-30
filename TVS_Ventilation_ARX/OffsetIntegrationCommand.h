@@ -7,6 +7,7 @@ enum Outcome { Applied,NoChange,Cancelled,Failed };
 // Explicit DEVELOPMENT settings, not standards or approved production minima.
 struct IntegrationPolicy {double minimumStraightMm,minimumProjectionMm;IntegrationPolicy():minimumStraightMm(100),minimumProjectionMm(.1){}};
 inline IntegrationPolicy& integrationPolicy(){static IntegrationPolicy policy;return policy;}
+inline bool& failNext(){static bool value=false;return value;}
 inline void initializePipe(TVS_Pipe* pipe){
     tvsOffsetProof::initialize(pipe);TVS_Connector first,last;
     first.connectionID=NULL;first.cTypeCurrent=conPipeStart;last.connectionID=NULL;last.cTypeCurrent=conPipeEnd;
@@ -55,7 +56,7 @@ inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acce
     tvsOffsetAdapter::Placement placement(tvsOffset::WorldPoint(last.x,last.y,last.z),std::atan2(direction.y,direction.x),f,z0*f);
     tvsOffsetAdapter::Result dto=tvsOffsetAdapter::adapt(input,result,placement);
     if(!dto.ready()){acutPrintf(L"\nTVS OFFSET: rezultat nije moguće pouzdano pozicionirati.");return Failed;}
-    AcDbObjectId output;bool committed=false;
+    AcDbObjectId output;TVS_Pipe* createdExit=NULL;bool committed=false;
     {
         tvsOffsetProof::BuildTransaction tx(db);if(!tx.space)return Failed;
         tvsOffsetData::WriteScope allow;
@@ -83,19 +84,21 @@ inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acce
         exit->FirstPoint=tvsOffsetProof::pt(dto.outgoingFirst);
         AcGeVector3d along(std::cos(placement.heading),std::sin(placement.heading),0);
         exit->LastPoint=exit->FirstPoint+along*(300/f);exit->put_Elevation(dg.nextZ);
-        if(!tx.append(exit,output))return Failed;
+        if(!tx.append(exit,output))return Failed;createdExit=exit;
         CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return Failed;
         AcDbObject* members[3]={taps[0],slope,taps[1]};
         for(int j=0;j<3;++j){tvsOffsetData::Record record;record.guid=guid;record.role=j;
             for(int k=0;k<3;++k)record.members[k]=ids[k];
             record.rise=j==1?result.axis[2].z-result.axis[1].z:0;
             if(tvsOffsetData::write(members[j],record)!=Acad::eOk){acutPrintf(L"\nTVS OFFSET: podaci nisu upisani; cijela operacija se poništava.");return Failed;}}
+        if(failNext()){failNext()=false;acutPrintf(L"\nDEV INJECTED FAILURE after member records: aborting full offset transaction.");return Failed;}
         if(source->put_Lastpoint(tvsOffsetProof::pt(dto.incomingLast))!=Acad::eOk)return Failed;
         source->recordGraphicsModified();committed=tx.commit();
     }
     if(!committed)return Failed;
-    TVS_Pipe* next=NULL;if(acdbOpenObject(next,output,AcDb::kForRead)!=Acad::eOk){acutPrintf(L"\nTVS OFFSET: upis je završen, ali nastavak trase nije moguće otvoriti.");return Failed;}
-    current=next;next->close();acceptedElevation=dg.nextZ;acceptedAngle=dg.Axis;
+    // Same resident closed-object convention as the existing drawing loop/add_new API.
+    // No fallible post-commit lookup may turn a committed operation into Failed.
+    current=createdExit;acceptedElevation=dg.nextZ;acceptedAngle=dg.Axis;
     tvsOffsetSession::applied(db,original,output,z0);
     acutPrintf(L"\nTVS OFFSET DEV: P=%.6f, riseStraight=%.6f, Lphysical=%.6f mm. Lmin=%.3f / minimumProjection=%.3f su razvojne postavke.",result.projectedLength,result.axis[2].z-result.axis[1].z,result.straightLength,settings.minimumStraightMm,settings.minimumProjectionMm);
     return Applied;

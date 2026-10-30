@@ -3075,6 +3075,9 @@ int TVS_TAP::get_RadiusVariableParameter(void) const
 
 void TVS_TAP::setFlex(const bool &isFlex)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	if (isFlex)
 	{
@@ -3132,6 +3135,9 @@ void TVS_TAP::chekMiddlePoint()
 
 void TVS_TAP::setDuctType(int pDuctType)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType = pDuctType;
 }

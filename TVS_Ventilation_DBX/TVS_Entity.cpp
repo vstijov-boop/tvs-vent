@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -38,7 +38,13 @@
 // Invalidate the selection total when native geometry is opened/closed for write.
 // This is process-local bookkeeping, not stored object state.
 static unsigned long s_sheetMetalRevision = 1;
-unsigned long TVS_Entity::sheetMetalRevision() { return s_sheetMetalRevision; }
+unsigned long TVS_Entity::sheetMetalRevision() {
+#ifdef TVS_OFFSET_INTEGRATION
+    return s_sheetMetalRevision+tvsOffsetData::revision();
+#else
+    return s_sheetMetalRevision;
+#endif
+}
 
 bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &massKg) const
 {
@@ -1095,6 +1101,9 @@ void TVS_Entity::setFlex( const bool &isFlex )
 
 void TVS_Entity::setStill()
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled () ;
 	DuctType=DuctTypeStill;
 }
@@ -1107,12 +1116,18 @@ int TVS_Entity::getDuctType()
 
 void TVS_Entity::setDuctType(int pDuctType)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType=pDuctType;
 }
 
 void TVS_Entity::setNewParameters()
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType=DuctTypeStill;
 }

@@ -270,7 +270,11 @@ bool TVSPropertyController::setSize(const AcDbObjectId &objectId, const CString 
 
 bool TVSPropertyController::getSize(const AcDbObjectId &objectId, CString &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForRead);
+#else
 	AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForWrite);
+#endif
 	if (pObj.openStatus() != Acad::eOk) return false;
 	TVS_Entity * ent;
 	if ((ent = TVS_Entity::cast(pObj)) != NULL) {
@@ -319,7 +323,11 @@ bool TVSPropertyController::setUnits(const AcDbObjectId &objectId, const CString
 
 bool TVSPropertyController::getUnits(const AcDbObjectId &objectId, CString &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForRead);
+#else
 	AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForWrite);
+#endif
 	if (pObj.openStatus() != Acad::eOk) return false;
 
 	TVS_Entity * ent;
@@ -352,7 +360,11 @@ bool TVSPropertyController::setCount(const AcDbObjectId &objectId, const double 
 
 bool TVSPropertyController::getCount(const AcDbObjectId &objectId, double &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForRead);
+#else
 	AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForWrite);
+#endif
 	if (pObj.openStatus() != Acad::eOk) return false;
 
 	TVS_Entity * ent;

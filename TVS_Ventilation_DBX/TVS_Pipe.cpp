@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -1125,6 +1125,9 @@ Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 }
 void TVS_Pipe::setLastpoint (AcGePoint3d pLastpoint)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	LastPoint=pLastpoint;
 }
 
@@ -1132,6 +1135,9 @@ void TVS_Pipe::setLastpoint (AcGePoint3d pLastpoint)
 
 void TVS_Pipe::setDuctType(int pDuctType)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType=pDuctType;
 }
@@ -1223,6 +1229,9 @@ AcGePoint3dArray TVS_Pipe::getPointsForSpline( const int &quantity, AcDbSpline *
 
 void TVS_Pipe::setFlex( const bool &isFlex )
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	if (isFlex)
 	{

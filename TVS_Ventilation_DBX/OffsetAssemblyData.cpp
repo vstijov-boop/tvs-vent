@@ -14,9 +14,11 @@
 #include <limits>
 #include "../geometry/OffsetRecordRules.h"
 namespace tvsOffsetData {
+static unsigned long dataRevision=1;
+unsigned long revision(){return dataRevision;}
 static int writeDepth=0;static std::set<AcDbObjectId> clones;
 WriteScope::WriteScope(){++writeDepth;}WriteScope::~WriteScope(){--writeDepth;}
-void permitClone(const AcDbObjectId& id){clones.insert(id);}void clearClonePermits(){clones.clear();}
+void permitClone(const AcDbObjectId& id){clones.insert(id);}void clearClonePermits(){clones.clear();++dataRevision;}
 const ACHAR* statusText(Status s){switch(s){case Legacy:return L"Legacy";case Valid:return L"Valid";case Incomplete:return L"Incomplete";case UnsupportedVersion:return L"UnsupportedVersion";case GeometryMismatch:return L"GeometryMismatch";default:return L"Corrupt";}}
 CString newGuid(){GUID id;OLECHAR value[40]={0};if(FAILED(CoCreateGuid(&id)))return CString();StringFromGUID2(id,value,40);return CString(value);}
 Status read(const AcDbObject* object,Record& out){
@@ -39,7 +41,9 @@ Status read(const AcDbObject* object,Record& out){
     }
     if(p)ok=false;acutRelRb(data);
     if(!ok)return Corrupt;out=r;
-    bool guidShape=r.guid.GetLength()==38&&r.guid[0]==L'{'&&r.guid[37]==L'}';
+    GUID parsedGuid;
+    bool guidShape=r.guid.GetLength()==38&&r.guid[0]==L'{'&&r.guid[37]==L'}'
+        &&SUCCEEDED(CLSIDFromString(const_cast<ACHAR*>(r.guid.GetString()),&parsedGuid));
     tvsOffsetRecordRules::ScalarStatus scalar=tvsOffsetRecordRules::validate(r.version,r.role,guidShape,r.rise);
     if(scalar==tvsOffsetRecordRules::ScalarUnsupported)return UnsupportedVersion;
     if(scalar!=tvsOffsetRecordRules::ScalarValid)return Corrupt;
@@ -67,7 +71,7 @@ Acad::ErrorStatus write(AcDbObject* object,const Record& r){
         for(int j=0;j<7;++j){nodes[j].restype=static_cast<short>(types[j]);nodes[j].rbnext=j<6?&nodes[j+1]:NULL;}
         nodes[0].resval.rlong=r.version;nodes[1].resval.rstring=const_cast<ACHAR*>(r.guid.GetString());nodes[2].resval.rint=static_cast<short>(r.role);
         for(int j=0;j<3;++j)if(!r.members[j].isNull())acdbGetAdsName(nodes[j+3].resval.rlname,r.members[j]);
-        nodes[6].resval.rreal=r.rise;record->setXlateReferences(true);es=record->setFromRbChain(nodes[0]);
+        nodes[6].resval.rreal=r.rise;record->setXlateReferences(true);es=record->setFromRbChain(nodes[0]);if(es==Acad::eOk)++dataRevision;
     }
     if(!managed){if(record)record->close();dict->close();}return es;
 }
@@ -147,6 +151,11 @@ Acad::ErrorStatus remapClones(AcDbIdMapping& map){
         if(status==Legacy)continue;if(status!=Valid)return Acad::eInvalidInput;
         AcDbObjectPointer<AcDbObject> dest(pair.value(),AcDb::kForWrite);if(dest.openStatus()!=Acad::eOk)return dest.openStatus();
         Record copy=original;
+        if(std::fabs(tvsUnits::factor(source.object())-tvsUnits::factor(dest.object()))>1e-10){
+            // Explicitly unsupported import, never silently reuse rise in mismatched units.
+            copy.version=-1;
+            acutPrintf(L"\nTVS OFFSET: COPY između različitih jedinica nije podržan; obračun kopije je blokiran (verzija -1).");
+        }
         if(guids.find(original.guid)==guids.end())guids[original.guid]=newGuid();copy.guid=guids[original.guid];
         for(int j=0;j<3;++j){AcDbIdPair member;member.setKey(original.members[j]);
             copy.members[j]=(map.compute(member)&&member.isCloned())?member.value():AcDbObjectId::kNull;}

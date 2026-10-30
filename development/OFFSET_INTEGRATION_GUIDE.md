@@ -90,3 +90,26 @@ unutrašnje validnim sklopom, što STATUS pokazuje odvojeno.
 
 Ove tvrdnje opisuju implementiranu namjeru/putanje; stvarni COPY/Undo/Redo i
 konture ovog integracionog paketa još zahtijevaju praktičnu AutoCAD provjeru.
+
+## Dodatne granice i proba rollback-a
+
+- TVS_OFFSET_FAIL_NEXT uključuje jednokratni namjerni kvar nakon upisa sva tri
+  zapisa, a prije skraćivanja dolaznog kanala. Sljedeći inače izvodljiv Z mora
+  biti potpuno poništen: bez novih objekata/zapisa, pomjeranja kraja i promjene
+  kote. Nastaviti običnim crtanjem. Ako Z bude otkazan/odbijen ranije, kvar ostaje
+  pripremljen za sljedeći izvodljivi pokušaj.
+- COPY između crteža sa različitim faktorima jedinica nije podržan. Kopija dobija
+  rezervisanu nepodržanu verziju -1 i blokiran obračun; nema tihog skaliranja rise.
+  Za ovaj paket testirati COPY unutar istog DWG-a. WBLOCK/INSERT i vanjski API clone
+  tokovi nisu potvrđeni praktičnim testovima.
+- Prva verzija ne dopušta MOVE/ROTATE/SCALE/MIRROR originalne trojke ni pojedinih
+  članova. COPY pozicioniranje je dozvoljeno samo translacijom novih kopija u
+  njihovom clone komandnom ciklusu. Susjede po potrebi ponovo nacrtati.
+- Zaštite pokrivaju postojeće TVS settere, gripove i transform API; nisu garancija
+  protiv proizvoljnog dodatka koji direktno prepisuje javna C++ polja ili Xrecord.
+  Naknadna validacija odbija geometrijski nesaglasne podatke.
+- Globalna kota nakon Undo/Redo usklađuje se u tekućoj sesiji. Z uvijek ponovo čita
+  stvarni aktivni kanal. Višedokumentni tok, zamjena aktivnog DWG-a i nastavak nakon
+  ponovnog učitavanja dodatka zahtijevaju posebnu praktičnu provjeru.
+- Provjera integriteta pretražuje vlasnički Model prostor radi kolizije GUID-a;
+  performanse velikih mreža još nisu mjerene. Postojeće tabele treba ponovo generisati.

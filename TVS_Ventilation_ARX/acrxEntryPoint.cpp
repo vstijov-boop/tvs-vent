@@ -1331,7 +1331,7 @@ public:
     static tvsOffsetIntegration::Outcome changeZ(TVS_Pipe*& pPipe){
         double elevation=0,angle=0;
         tvsOffsetIntegration::Outcome result=tvsOffsetIntegration::execute(pPipe,elevation,angle);
-        if(result==tvsOffsetIntegration::Applied){globalElevMid=elevation;globalAxis=angle;}
+        if(result==tvsOffsetIntegration::Applied){globalElevMid=elevation;globalElev=elevation;globalAxis=angle;}
         return result;
     }
 #else
@@ -1791,6 +1791,7 @@ public:
 	}
 #ifdef TVS_OFFSET_PROOF
 #ifdef TVS_OFFSET_INTEGRATION
+    static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeći uspješni Z će namjerno prekinuti upis poslije podataka sklopa.");}
     static void Ventilation_ARXTVS_OFFSET_STATUS(){tvsOffsetDiagnostics::status();}
     static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
     static void Ventilation_ARXTVS_OFFSET_TEST_BAD(){tvsOffsetDiagnostics::corruptTest();}
@@ -4036,4 +4037,8 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OF
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_STATUS, TVS_OFFSET_STATUS, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_POLICY, TVS_OFFSET_POLICY, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_TEST_BAD, TVS_OFFSET_TEST_BAD, ACRX_CMD_MODAL, NULL)
+#endif
+
+#ifdef TVS_OFFSET_INTEGRATION
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_FAIL_NEXT, TVS_OFFSET_FAIL_NEXT, ACRX_CMD_MODAL, NULL)
 #endif
