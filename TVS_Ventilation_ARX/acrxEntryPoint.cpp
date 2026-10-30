@@ -1759,6 +1759,12 @@ public:
 		}
 
 	}
+    static void Ventilation_ARXTVS_STRETCH(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsMove::executeStretch();
+    }
     // Connected editing is modal so one command owns the complete undo operation.
     static void Ventilation_ARXTVS_MOVE(void)
     {
@@ -3964,3 +3970,5 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, TVSMyGroup, MyPickFirst, MyP
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, TVSMyGroup, MySessionCmd, MySessionCmdLocal, ACRX_CMD_MODAL | ACRX_CMD_SESSION, NULL)
 ACED_ADSSYMBOL_ENTRY_AUTO(CTVS_Ventilation_ARXApp, MyLispFunction, false)
 
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH, TVS_STRETCH, ACRX_CMD_MODAL, NULL)

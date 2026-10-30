@@ -73,4 +73,5 @@ int main(){
     n.push_back(body(Rigid,Point(-1,0),Point(0,0),1));
     for(int i=1;i<300;++i)n.push_back(body(Rigid,Point(i,0),Point(i+1,0),1));
     assert(!plan(n,0,Point(0,1),.01,.001,out));assert(out.error==TooMany);
+    return 0;
 }

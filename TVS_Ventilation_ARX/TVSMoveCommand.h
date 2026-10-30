@@ -407,4 +407,64 @@ inline void execute(){
     if(!tx.commit()){acutPrintf(L"\nTVS_MOVE: izmjena nije sačuvana.");return;}
     acutPrintf(L"\nTVS_MOVE: pomjerena dionica i dva koljena; susjedne dužine prilagođene. Bočni pomjeraj: %.2f mm.",plan.offset*factor);
 }
+inline void executeStretch(){
+    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
+    const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
+    ads_point corner1,corner2;
+    if(acedGetPoint(NULL,L"\nPrvi ugao crossing okvira (presijecite prave dionice): ",corner1)!=RTNORM)return;
+    if(acedGetCorner(corner1,L"\nSuprotni ugao okvira: ",corner2)!=RTNORM)return;
+    std::vector<Node> nodes;AcDbObjectIdArray labels;
+    if(!snapshot(db,nodes,labels))return;
+    std::vector<tvsMoveNetwork::Body> bodies;std::vector<int> masks;
+    for(size_t i=0;i<nodes.size();++i){
+        tvsMoveNetwork::Body b;b.ports=nodes[i].ports;b.axes=nodes[i].axes;b.sections=nodes[i].sections;
+        b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
+        if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
+        bodies.push_back(b);int mask=0;
+        for(size_t j=0;j<b.ports.size();++j){
+            ads_point w={b.ports[j].x,b.ports[j].y,b.ports[j].z},u;
+            if(tvsCoordinates::transformPoint(w,0,1,u)!=RTNORM)return;
+            if(u[0]>=(corner1[0]<corner2[0]?corner1[0]:corner2[0])-tol&&u[0]<=(corner1[0]>corner2[0]?corner1[0]:corner2[0])+tol
+                &&u[1]>=(corner1[1]<corner2[1]?corner1[1]:corner2[1])-tol&&u[1]<=(corner1[1]>corner2[1]?corner1[1]:corner2[1])+tol)
+                mask|=1<<static_cast<int>(j);
+        }
+        if(mask&&b.kind!=tvsMoveNetwork::Pipe&&mask!=(1<<static_cast<int>(b.ports.size()))-1){
+            acutPrintf(L"\nTVS_STRETCH: okvir presijeca fiting. Obuhvatite sve njegove priključke ili ga izostavite.");return;}
+        masks.push_back(mask);
+    }
+    bool any=false;for(size_t i=0;i<masks.size();++i)if(masks[i])any=true;
+    if(!any){acutPrintf(L"\nTVS_STRETCH: okvir ne obuhvata nijedan TVS priključak.");return;}
+    ads_point base,target;
+    if(tvsCoordinates::getPoint(NULL,L"\nBazna tačka pomjeranja: ",base)!=RTNORM)return;
+    if(tvsCoordinates::getPoint(base,L"\nNova pozicija: ",target)!=RTNORM)return;
+    Point delta(target[0]-base[0],target[1]-base[1],target[2]-base[2]);
+    tvsMoveNetwork::Result result;
+    if(!tvsMoveNetwork::planSelection(bodies,masks,delta,minimum,tol,result)){
+        acutPrintf(L"\nTVS_STRETCH: %s",networkError(result.error));return;}
+    std::vector<Node> current;AcDbObjectIdArray currentLabels;
+    if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
+        acutPrintf(L"\nTVS_STRETCH: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
+    Transaction tx;if(!tx.good())return;
+    std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
+    for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
+        entities[i]=tx.write(nodes[i].id);
+        if(!entities[i]){acutPrintf(L"\nTVS_STRETCH: povezani element je zaključan ili nedostupan. Izmjena je poništena.");return;}
+    }
+    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
+    int stretched=0;
+    for(size_t i=0;i<nodes.size();++i)if(entities[i]){
+        if(nodes[i].kind==1){
+            TVS_Pipe* pipe=TVS_Pipe::cast(entities[i]);
+            if(!pipe||pipe->put_FirstPoint(acad(result.ports[i][0]))!=Acad::eOk
+                ||pipe->put_Lastpoint(acad(result.ports[i][1]))!=Acad::eOk)return;
+            if(result.masks[i]!=3)++stretched;
+        }else if(entities[i]->transformBy(translation)!=Acad::eOk){
+            acutPrintf(L"\nTVS_STRETCH: fiting nije moguće pomjeriti. Izmjena je poništena.");return;}
+        entities[i]->recordGraphicsModified();
+    }
+    if(!networkLabels(tx,nodes,currentLabels,result,delta)){
+        acutPrintf(L"\nTVS_STRETCH: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
+    if(!tx.commit())return;
+    acutPrintf(L"\nTVS_STRETCH: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",result.changed,stretched,delta.length()*factor);
+}
 }

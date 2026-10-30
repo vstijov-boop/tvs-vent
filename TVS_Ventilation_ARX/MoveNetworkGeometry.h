@@ -121,4 +121,92 @@ inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta
     if(edges>=out.changed){out.error=Cycle;return false;}
     out.error=Ok;return true;
 }
+// Explicit endpoint selection: never propagate movement outside the selection.
+inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>& masks,
+                          const Point& delta,double minimum,double tol,Result& out){
+    out=Result();
+    if(masks.size()!=bodies.size()||!tvsMoveGeometry::valid(delta)
+        ||!tvsMoveGeometry::finite(minimum)||minimum<=0
+        ||!tvsMoveGeometry::finite(tol)||tol<=0||delta.length()<=tol)return false;
+    if(std::fabs(delta.z)>tol){out.error=NonPlanar;return false;}
+    out.masks=masks;out.ports.resize(bodies.size());
+    double plane=0;bool havePlane=false;
+    for(size_t i=0;i<bodies.size();++i){
+        const Body& b=bodies[i];out.ports[i]=b.ports;
+        if(!masks[i])continue;
+        if(b.kind==Blocked||b.ports.size()<2||b.ports.size()>3
+            ||b.axes.size()!=b.ports.size()||b.sections.size()!=b.ports.size()){
+            out.error=Unsupported;return false;}
+        int full=(1<<static_cast<int>(b.ports.size()))-1;
+        if((masks[i]&~full)||(b.kind==Rigid&&masks[i]!=full)){
+            out.error=Unsupported;return false;}
+        if(++out.changed>256){out.error=TooMany;return false;}
+        if(!havePlane){plane=b.ports[0].z;havePlane=true;}
+        for(size_t j=0;j<b.ports.size();++j){
+            if(!tvsMoveGeometry::valid(b.ports[j])||std::fabs(b.ports[j].z-plane)>tol){
+                out.error=NonPlanar;return false;}
+            if(masks[i]&(1<<static_cast<int>(j)))out.ports[i][j]=b.ports[j]+delta;
+            if(!tvsMoveGeometry::valid(out.ports[i][j]))return false;
+        }
+        if(b.kind==Pipe){
+            Point oldAxis,newAxis;
+            if(b.ports.size()!=2||!tvsMoveGeometry::unit(b.ports[1]-b.ports[0],oldAxis)
+                ||!tvsMoveGeometry::unit(out.ports[i][1]-out.ports[i][0],newAxis)){
+                out.error=TooShort;return false;}
+            if(oldAxis.dot(newAxis)<1-1e-8){out.error=NotTangent;return false;}
+        }
+    }
+    if(!out.changed)return false;
+    for(size_t i=0;i<bodies.size();++i)if(masks[i])
+        for(size_t j=0;j<bodies[i].ports.size();++j){
+            Contact c=contact(bodies,static_cast<int>(i),static_cast<int>(j),tol);
+            if(c.count>1){out.error=Ambiguous;return false;}
+            if(c.count==1){
+                const Body& b=bodies[c.body];
+                if(b.kind==Blocked||b.sections.size()!=b.ports.size()||b.axes.size()!=b.ports.size()){
+                    out.error=Unsupported;return false;}
+                if(!compatible(bodies[i].sections[j],b.sections[c.port],tol)){
+                    out.error=SectionMismatch;return false;}
+                Point aAxis,bAxis;
+                if(!tvsMoveGeometry::unit(bodies[i].axes[j],aAxis)||!tvsMoveGeometry::unit(b.axes[c.port],bAxis)
+                    ||std::fabs(aAxis.dot(bAxis))<1-1e-6){out.error=NotTangent;return false;}
+                if(bool(masks[i]&(1<<static_cast<int>(j)))!=bool(masks[c.body]&(1<<c.port))){
+                    out.error=Unsupported;return false;}
+            }
+        }
+
+    for(size_t i=0;i<bodies.size();++i)if(out.masks[i]){
+        const Body& body=bodies[i];
+        for(size_t j=0;j<body.ports.size();++j){
+            Contact c=contact(bodies,static_cast<int>(i),static_cast<int>(j),tol);
+            if(c.count>1){out.error=Ambiguous;return false;}
+
+        }
+        if(body.kind==Pipe){
+            Point axis;
+            if(!tvsMoveGeometry::unit(body.ports[1]-body.ports[0],axis)
+                ||(out.ports[i][1]-out.ports[i][0]).dot(axis)<minimum){out.error=TooShort;return false;}
+            // A fitting attached halfway along an unsplit pipe cannot be propagated safely.
+            for(size_t k=0;k<bodies.size();++k)if(k!=i)
+                for(size_t p=0;p<bodies[k].ports.size();++p)
+                    if(interior(bodies[k].ports[p],body.ports[0],body.ports[1],tol)
+                        ||interior(out.ports[k][p],out.ports[i][0],out.ports[i][1],tol)){
+                        out.error=SideBranch;return false;}
+            for(size_t k=0;k<bodies.size();++k)if(k!=i)
+                for(size_t p=0;p<bodies[k].junctions.size();++p){
+                    Point old=bodies[k].junctions[p];Point moved=out.masks[k]?old+delta:old;
+                    if(interior(old,body.ports[0],body.ports[1],tol)
+                        ||interior(moved,out.ports[i][0],out.ports[i][1],tol)){
+                        out.error=SideBranch;return false;}
+                }
+        }
+        for(size_t j=0;j<body.ports.size();++j)if(out.masks[i]&(1<<static_cast<int>(j)))
+            for(size_t k=0;k<bodies.size();++k)if(k!=i)
+                for(size_t p=0;p<bodies[k].ports.size();++p)
+                    if(tvsMoveGeometry::pointsNear(out.ports[i][j],out.ports[k][p],tol)
+                        &&!tvsMoveGeometry::pointsNear(body.ports[j],bodies[k].ports[p],tol)){
+                        out.error=NewContact;return false;}
+    }
+    out.error=Ok;return true;
+}
 }
