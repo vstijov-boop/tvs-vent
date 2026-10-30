@@ -4,7 +4,6 @@
 #endif
 #include "../geometry/OffsetAdapter.h"
 #include <dbents.h>
-#include <dbtext.h>
 #include <actrans.h>
 #include <vector>
 
