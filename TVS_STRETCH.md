@@ -13,7 +13,7 @@ mijenja dužinu, dok drugi ostaje fiksan. Fiting mora imati sve priključke u ok
 ili sve van njega. Djelimično obuhvaćen fiting prekida komandu prije izmjene.
 Potpuno neizabrani elementi ostaju nepromijenjeni. Komanda ne prenosi izbor
 na ostatak mreže. Trenutna verzija ima jedan pravougaoni okvir, bez dodatnog
-biranja/oduzimanja pojedinačnih elemenata i bez živog pregleda pomjeranja.
+biranja/oduzimanja pojedinačnih elemenata sa živim šematskim pregledom pomjeranja.
 
 Granični kanali moraju biti paralelni pomjeranju: promjena pravca/ugla nije
 podržana. Koriste se podržani horizontalni kruti TVS elementi u trenutnom prostoru;
@@ -33,3 +33,22 @@ izbor fitinga, bočni pomjeraj, preokretanje dionice i prazan izbor. Uključuje
 postojeće mrežne regresione testove. Prošlo i 11 Python testova.
 U AutoCAD-u još provjeriti okvir u rotiranom/pomjerenom UCS-u, Esc, zaključane
 slojeve, oznake, UNDO/REDO i sačuvan/ponovo otvoren DWG.
+
+## Vizuelna povratna informacija
+
+Izabrani elementi privremeno se ističu prije unosa bazne tačke. AcEdJig prikazuje
+konture pravih kanala i veze priključaka fitinga tokom pomjeranja miša. Fiting je
+šematski prikaz, ne puni izgled lima/radijusa. Zeleno znači dozvoljen položaj;
+crveni element označava prvu pronađenu geometrijsku prepreku, ostali su žuti dok
+potez nije dozvoljen. Pregled ne upisuje objekte ni boje u DWG.
+
+Ako okvir presiječe fiting ili je potvrđen nedozvoljen geometrijski potez,
+problematični original se privremeno ističe uz opis razloga; Enter/Esc vraća
+u crtež. Isticanje se čisti pri svakom izlasku. Prikaz koristi WCS položaj koji
+vraća acquirePoint; izbor okvira ostaje u aktivnom UCS-u. ORTHO je podržan.
+Nema ponovnog unosa u istoj komandi nakon nedozvoljene potvrde: ispraviti izbor
+ili pomjeraj i pokrenuti ponovo. Greške otvaranja/zaključavanja i oznaka i dalje
+se prijavljuju porukom uz poništavanje transakcije.
+
+Windows kompilacija i praktična provjera prikaza, osnap/ortho, Esc i UNDO/REDO
+još nisu urađene. Build ostaje odložen po zahtjevu korisnika.

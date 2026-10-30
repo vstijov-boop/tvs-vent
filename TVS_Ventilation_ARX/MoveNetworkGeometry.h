@@ -15,7 +15,7 @@ struct Section {
 struct Body {Kind kind;std::vector<Point> ports,axes,junctions;std::vector<Section> sections;Body():kind(Blocked){}};
 struct Contact {int body,port,count;Contact():body(-1),port(-1),count(0){}};
 enum Error { Ok,Invalid,Ambiguous,Unsupported,SectionMismatch,NotTangent,NonPlanar,TooShort,SideBranch,NewContact,Cycle,TooMany };
-struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;Result():changed(0),error(Invalid){}};
+struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;int problem;Result():changed(0),error(Invalid),problem(-1){}};
 inline Contact contact(const std::vector<Body>& bodies,int owner,int port,double tol){
     Contact c;
     for(size_t i=0;i<bodies.size();++i)if(static_cast<int>(i)!=owner)
@@ -134,6 +134,7 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
     for(size_t i=0;i<bodies.size();++i){
         const Body& b=bodies[i];out.ports[i]=b.ports;
         if(!masks[i])continue;
+        out.problem=static_cast<int>(i);
         if(b.kind==Blocked||b.ports.size()<2||b.ports.size()>3
             ||b.axes.size()!=b.ports.size()||b.sections.size()!=b.ports.size()){
             out.error=Unsupported;return false;}
@@ -159,6 +160,7 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
     if(!out.changed)return false;
     for(size_t i=0;i<bodies.size();++i)if(masks[i])
         for(size_t j=0;j<bodies[i].ports.size();++j){
+            out.problem=static_cast<int>(i);
             Contact c=contact(bodies,static_cast<int>(i),static_cast<int>(j),tol);
             if(c.count>1){out.error=Ambiguous;return false;}
             if(c.count==1){
@@ -176,8 +178,10 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
         }
 
     for(size_t i=0;i<bodies.size();++i)if(out.masks[i]){
+        out.problem=static_cast<int>(i);
         const Body& body=bodies[i];
         for(size_t j=0;j<body.ports.size();++j){
+            out.problem=static_cast<int>(i);
             Contact c=contact(bodies,static_cast<int>(i),static_cast<int>(j),tol);
             if(c.count>1){out.error=Ambiguous;return false;}
 
@@ -207,6 +211,6 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
                         &&!tvsMoveGeometry::pointsNear(body.ports[j],bodies[k].ports[p],tol)){
                         out.error=NewContact;return false;}
     }
-    out.error=Ok;return true;
+    out.problem=-1;out.error=Ok;return true;
 }
 }

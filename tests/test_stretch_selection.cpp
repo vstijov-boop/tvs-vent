@@ -13,11 +13,11 @@ int main(){
         int chosen[]={3,3,7,1,3,3,3,3,1,1};
         std::vector<int> masks(chosen,chosen+10);Result out;
         Point delta=turn(Point(0,300),a,f,true);
-        assert(planSelection(n,masks,delta,1/f,.1/f,out));assert(out.changed==10);
+        assert(planSelection(n,masks,delta,1/f,.1/f,out));assert(out.changed==10);assert(out.problem==-1);
         for(size_t i=0;i<n.size();++i)for(size_t p=0;p<n[i].ports.size();++p)
             assert(tvsMoveGeometry::pointsNear(out.ports[i][p],n[i].ports[p]+((masks[i]&(1<<p))?delta:Point()),1e-7/f));
         masks[9]=0;assert(!planSelection(n,masks,delta,1/f,.1/f,out)); // must not pull an unselected branch
-        masks[9]=1;masks[2]=3;assert(!planSelection(n,masks,delta,1/f,.1/f,out)); // partial wye
+        masks[9]=1;masks[2]=3;assert(!planSelection(n,masks,delta,1/f,.1/f,out));assert(out.problem==2); // partial wye
         masks[2]=7;assert(!planSelection(n,masks,turn(Point(10,300),a,f,true),1/f,.1/f,out)); // lateral stretch forbidden
         assert(!planSelection(n,masks,turn(Point(0,1000),a,f,true),1/f,.1/f,out)); // inverted branch
     }
