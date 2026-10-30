@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <limits>
+#include <iomanip>
 using namespace tvsOffset;
 static int checks=0;
 static void require(bool b){++checks;if(!b){std::cerr<<"FAILED check "<<checks<<"\n";std::exit(1);}}
@@ -47,6 +48,38 @@ static void minimumAndRadius(){
     require(solve(Input(200,400,200,100,pi()/3,0),p).status==ProjectionTooSmall);
     std::cout<<"PASS explicit Lmin zero/positive/boundary, negative/zero Ri, projection policy\n";
 }
+static const char* statusName(Status s){return s==Ok?"Ok":s==TooShort?"TooShort":"Unexpected";}
+static void analyticMinimumBoundaries(){
+    // Independent analytic heights for R=200; decimal oracles fixed BEFORE solve.
+    // Lmin=100: H30=450-200sqrt(3), H45=400-150sqrt(2), H60=200+50sqrt(3).
+    // Lmin=0: H30=400-200sqrt(3), H45=400-200sqrt(2), H60=200.
+    const double deg[]={30,45,60};
+    const double h100[]={103.5898384862245412945107316988255266,
+                         187.8679656440357426797466913685452882,
+                         286.6025403784438646763723170752936183};
+    const double h0[]={53.5898384862245412945107316988255266,
+                      117.1572875253809902396622551580603843,200.0};
+    for(int i=0;i<3;++i)for(int zero=0;zero<2;++zero){
+        double h=zero?h0[i]:h100[i],minimum=zero?0:100,angle=deg[i]*pi()/180;
+        Result below=solve(Input(h-.000001,400,200,100,angle,minimum));
+        Result above=solve(Input(h+.000001,400,200,100,angle,minimum));
+        require(below.status==TooShort);require(above.status==Ok);
+        Result boundary=solve(Input(h,400,200,100,angle,minimum));
+        // At the decimal-rounded analytic boundary strict binary comparisons can reject.
+        // Do not mandate a libm-specific rounding direction or relax production policy.
+        require(boundary.status==Ok||boundary.status==TooShort);
+        if(boundary.status==Ok)equal(boundary.straightLength,minimum,1e-10);
+        // Diagnostic only: never used to choose heights or acceptance expectations.
+        Result measured=solve(Input(h,400,200,100,angle,0));
+        std::cout<<std::setprecision(17)<<"BOUNDARY "<<deg[i]<<"deg Lmin="<<minimum
+                 <<" H="<<h<<" below="<<statusName(below.status)
+                 <<" exact-decimal="<<statusName(boundary.status)<<" above="<<statusName(above.status);
+        if(measured.status==Ok)std::cout<<" Lcomputed="<<measured.straightLength;
+        else std::cout<<" remainder-negative-under-strict-policy";
+        std::cout<<"\n";
+    }
+    std::cout<<"PASS independent analytic Lmin boundaries (30/45/60 deg, Lmin=0/100)\n";
+}
 static void invariants(){
     const double degrees[]={15,30,45,60,75};
     for(int a=0;a<5;++a){
@@ -57,14 +90,21 @@ static void invariants(){
         equal(up.axis[2].s-up.axis[1].s,up.projectedLength);
         for(int j=0;j<4;++j){equal(up.axis[j].s,down.axis[j].s);equal(up.axis[j].z,-down.axis[j].z);
             equal(plan(up.axis[j]).u,profile(up.axis[j]).u);
-            for(int k=0;k<4;++k)equal(plan(up.corners[j][k]).u,profile(up.corners[j][k]).u);}
+            for(int k=0;k<4;++k){
+                equal(plan(up.corners[j][k]).u,profile(up.corners[j][k]).u);
+                // z reflection reverses the local vertical sign, preserves transverse side.
+                const Point& mirrored=down.corners[j][k^2];
+                equal(up.corners[j][k].s,mirrored.s);
+                equal(up.corners[j][k].z,-mirrored.z);
+                equal(up.corners[j][k].t,mirrored.t);
+            }}
         for(int arc=0;arc<2;++arc)for(int end=0;end<2;++end)equal(distance(up.centers[arc],up.axis[2*arc+end]),200);
         // Tangency tested as radial dot straight vector = 0 (independent constraint).
         Point v(up.axis[2].s-up.axis[1].s,up.axis[2].z-up.axis[1].z);
         equal(((up.axis[1].s-up.centers[0].s)*v.s+(up.axis[1].z-up.centers[0].z)*v.z)/up.straightLength,0);
         equal(((up.axis[2].s-up.centers[1].s)*v.s+(up.axis[2].z-up.centers[1].z)*v.z)/up.straightLength,0);
     }
-    std::cout<<"PASS rising/falling, shared projections, radii and tangent constraints (15..75 deg)\n";
+    std::cout<<"PASS rising/falling, ALL joint corners mapped k XOR 2, shared projections and tangency (15..75 deg)\n";
 }
 static void placement(){
     Result r=solve(Input(400,400,200,100,pi()/4,0));const double units[]={1,10,1000};
@@ -74,10 +114,17 @@ static void placement(){
         const double xs[]={565.685424949238,0,-565.685424949238,0},ys[]={0,565.685424949238,0,-565.685424949238};
         equal(end.x,origin.x+xs[k]/units[u]);equal(end.y,origin.y+ys[k]/units[u]);equal(end.z,0);
     }
+    // Independent 3-4-5 rotation oracle, arbitrary non-cardinal heading 53.1301 deg.
+    // (s,t)=(120,35) -> (x,y)=(44,117); z=-40, all local components nonzero.
+    for(int u=0;u<3;++u){
+        WorldPoint shifted;
+        require(place(Point(120,-40,35),WorldPoint(1000,-500,120),std::atan2(4.0,3.0),units[u],shifted));
+        equal(shifted.x,1000+44/units[u]);equal(shifted.y,-500+117/units[u]);equal(shifted.z,120-40/units[u]);
+    }
     WorldPoint out(1,2,3);require(!place(r.axis[3],WorldPoint(),0,0,out));equal(out.x,1);
     // Absolute elevation is not input to solve: it affects placement only.
     require(place(r.axis[3],WorldPoint(0,0,1e12),0,1,out));equal(out.z,1e12+400,.001);
-    std::cout<<"PASS placement: mm/cm/m, four headings, absolute elevation separated\n";
+    std::cout<<"PASS placement: mm/cm/m, four headings + nonzero s/t/z arbitrary-heading oracle, absolute elevation separated\n";
 }
 static void validation(){
     require(solve(Input(0,400,200,100,pi()/4,0)).status==NoChange);
@@ -100,4 +147,4 @@ static void validation(){
     Result fail=solve(Input(100,400,200,100,pi()/4,0));require(!fail.hasGeometry());equal(fail.totalRun,0);
     std::cout<<"PASS NoChange, exact 90 rejection, invalid/NaN/infinite/overflow, failure has no geometry\n";
 }
-int main(){golden();minimumAndRadius();invariants();placement();validation();std::cout<<"ALL PASSED: "<<checks<<" checks\n";return 0;}
+int main(){golden();minimumAndRadius();analyticMinimumBoundaries();invariants();placement();validation();std::cout<<"ALL PASSED: "<<checks<<" checks\n";return 0;}
