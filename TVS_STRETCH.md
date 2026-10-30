@@ -52,3 +52,23 @@ se prijavljuju porukom uz poništavanje transakcije.
 
 Windows kompilacija i praktična provjera prikaza, osnap/ortho, Esc i UNDO/REDO
 još nisu urađene. Build ostaje odložen po zahtjevu korisnika.
+
+## Provjereni buildovi 30.10.2026
+
+Kod: `4fe8e17abb59ec8c2c40755bf4da1cda73703be3`.
+Oba builda: 0 grešaka, 3 LNK4099 upozorenja za razvojni SDK rxapi.pdb.
+Prošlo svih 11 Python testova i prošireni C++ test_stretch_selection.
+ZIP CRC, x64/acdb23 odnosno acdb24, izvorni commit, oba CUIX, KGTEZ i
+prisustvo komande TVS_STRETCH u ARX-u provjereni. Praktična AutoCAD potvrda
+prikaza, pomjeranja i UNDO/REDO još je potrebna.
+
+- [AutoCAD 2020](https://github.com/vstijov-boop/tvs-vent/actions/runs/41024339332/artifacts/12962748735)
+  SHA256: `4c25096fc7594225928f41755a56d1f899270cc08710b30ce9009a2ca1e3e66d`.
+- [AutoCAD 2022](https://github.com/vstijov-boop/tvs-vent/actions/runs/41024339331/artifacts/12963291607)
+  SHA256: `dd46d7e77ea848fab32d61487cccec968f31d63da71cab3172a42a8c10dffdb7`.
+
+Zatvoriti AutoCAD, sačuvati prethodne fajlove i zamijeniti odgovarajući ARX/DBX
+par u Contents/TVS_VENT/2020/win64 ili 2022/win64. Zamijeniti i
+Contents/TVS_VENT/Resources/TVS_VENT.cuix i
+Contents/TVS_TOOLS/Resources/TVS_TOOLS.cuix te KGTEZ.lsp u istom Resources.
+Oba dugmeta nalaze se u TVS_VENT. Novi build uključuje i izmjenu Tab redoslijeda.
