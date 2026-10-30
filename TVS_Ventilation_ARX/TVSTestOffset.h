@@ -54,8 +54,13 @@ inline bool marker(BuildTransaction& tx,Session& s,const AcGePoint3d& p,int n,in
     AcDbLine* b=new AcDbLine(p-y,p+y);b->setColorIndex(1);if(!add(tx,b,s))return false;
     CString text;text.Format(L"C%d P%d",n,port);return label(tx,s,p+AcGeVector3d(45/f,80/f,0),text,f);
 }
+inline void initialize(TVS_Entity* e){
+    e->Direct=0;e->Param=0;e->IsPipe=false;e->ShowText=false;e->Axis=0;
+    e->Form=0;e->activeStatus=false;e->Tag1=NULL;e->Tag2=NULL;
+    e->Type1=0;e->Type2=0;e->connectorInteractionStatus=false;e->connectorCounts=0;
+}
 inline bool pipe(BuildTransaction& tx,Session& s,const AcGePoint3d& a,const AcGePoint3d& b,double f,double elevation,bool wipe,bool axis){
-    TVS_Pipe* p=new TVS_Pipe();p->setDatabaseDefaults();p->FirstPoint=a;p->LastPoint=b;
+    TVS_Pipe* p=new TVS_Pipe();initialize(p);p->setDatabaseDefaults();p->FirstPoint=a;p->LastPoint=b;
     p->SizeA=400/f;p->SizeB=200/f;p->ThisRound=false;p->This1D=axis;p->DuctType=DuctTypeStill;
     p->Flow=0;p->Wipeout=wipe;p->Grani=false;p->WipeoutLength=50/f;
     p->put_Elevation(elevation/f);return add(tx,p,s);
@@ -91,16 +96,17 @@ inline void create(bool forceFailure=false){
                 if(!marker(tx,pending,ports[j],number,j,f)){failed=true;break;}}
             if(failed)break;
             for(int j=0;j<2;++j){const tvsOffsetAdapter::Elbow& e=dto.elbows[j];
-                TVS_TAP* tap=new TVS_TAP();tap->setDatabaseDefaults();
+                TVS_TAP* tap=new TVS_TAP();initialize(tap);tap->setDatabaseDefaults();
                 // Existing entity public API; explicit append/transaction enrollment avoids add_new's
                 // internally-posted/closed raw pointer and gives rollback ownership to this test.
                 tap->SizeA=e.sizeA;tap->SizeB=e.sizeB;tap->ThisRound=false;tap->DuctType=DuctTypeStill;
                 tap->This1D=axis;tap->Wipeout=wipe;tap->WipeoutLength=50/f;tap->Grani=false;tap->Flow=0;
+                tap->TypeRoundTap=TypeRoundTap_TapSection;tap->RadiusTypeRound=RadiusTypeRound_RadiusConstant;
                 tap->RadiusTypeRect=RadiusTypeRect_RadiusConstant;tap->RadiusConst=e.innerRadius;
                 tap->RadiusVariableParameter=.5;tap->Swectangle=e.angle;
                 tap->Normvector=AcGeVector3d(e.normal.x,e.normal.y,e.normal.z);
                 tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,e.startVector.z);
-                tap->MiddlePoint=pt(e.middle);tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down);
+                tap->MiddlePoint=pt(e.middle);tap->CenterPoint=tap->MiddlePoint;tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down);
                 tap->put_Elevation(e.elevation);
                 // Deliberately poison diagnostic cache: only actual drawing may refresh MA/MC.
                 tap->MA=AcGePoint3d(-999999,-999999,-999999);tap->MC=tap->MA;
