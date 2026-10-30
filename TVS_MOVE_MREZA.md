@@ -89,3 +89,21 @@ Praktično ponašanje nove mrežne varijante u AutoCAD-u još treba potvrditi.
   0 grešaka, 2 uobičajena LNK4099 upozorenja za razvojni rxapi.pdb.
   ZIP CRC, x64 PE/acdb24.dll, BUILD commit, novi prompt i proširenje mreže u ARX-u,
   najnoviji CUIX sa ikonom i nepromijenjeni KGTEZ potvrđeni.
+
+## Dorada 30.10.2026 — slobodan kraj i pregled
+
+Izabrana prava dionica sada smije imati slobodan kraj (ili oba kraja).
+Slobodan kraj prati dionicu; postojeći spojevi se obrađuju istim pravilima mreže.
+Dodato isticanje izabranog kanala prije izbora reference i obuhvaćene mreže tokom
+pomjeranja. AcEdJig prikazuje konture pravih kanala i šematske veze fitinga.
+Sačuvan je poseban proračun dva koljena, uključujući različite pomjeraje kosih
+spojeva. Pregled je zelen kada proračun prolazi, a geometrijski problem dobija
+crveni prikaz gdje je dio pregleda. Nakon nedozvoljene potvrde originalni
+problematični element se ističe do Enter/Esc. Spoljašnji novi kontakt izdvaja se
+nakon potvrde. Greške koje se otkriju kasnije pri otvaranju objekata/oznaka ostaju
+tekstualne uz poništavanje transakcije.
+
+Ovo je pripremljen izvor, bez nove Windows kompilacije i bez potvrde u AutoCAD-u.
+Test dodaje slobodan prvi kraj, prilagođavanje povezane mreže, nepomjeren udaljeni
+kraj ogranka i identifikaciju problema pri prevelikom pomjeranju. Prethodni paketi
+iznad ne sadrže ovu doradu. Build ostaje odložen.

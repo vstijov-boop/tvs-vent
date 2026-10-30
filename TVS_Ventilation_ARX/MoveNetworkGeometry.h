@@ -50,6 +50,7 @@ inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta
     std::vector<std::pair<int,int> > pending;pending.push_back(std::make_pair(selected,0));
     for(size_t next=0;next<pending.size();++next){
         int index=pending[next].first,port=pending[next].second;
+        out.problem=index;
         const Body& body=bodies[index];
         if(body.kind==Blocked||body.ports.size()<2||body.ports.size()>3||body.sections.size()!=body.ports.size()||body.axes.size()!=body.ports.size()){
             out.error=Unsupported;return false;}
@@ -82,11 +83,12 @@ inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta
                     ||!tvsMoveGeometry::unit(bodies[c.body].axes[c.port],bAxis)
                     ||std::fabs(aAxis.dot(bAxis))<1-1e-6){out.error=NotTangent;return false;}
                 pending.push_back(std::make_pair(c.body,c.port));
-            }else if(index==selected){out.error=Unsupported;return false;}
+            }
         }
     }
     int edges=0;
     for(size_t i=0;i<bodies.size();++i)if(out.masks[i]){
+        out.problem=static_cast<int>(i);
         const Body& body=bodies[i];
         for(size_t j=0;j<body.ports.size();++j){
             Contact c=contact(bodies,static_cast<int>(i),static_cast<int>(j),tol);
@@ -119,7 +121,7 @@ inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta
                         out.error=NewContact;return false;}
     }
     if(edges>=out.changed){out.error=Cycle;return false;}
-    out.error=Ok;return true;
+    out.problem=-1;out.error=Ok;return true;
 }
 // Explicit endpoint selection: never propagate movement outside the selection.
 inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>& masks,

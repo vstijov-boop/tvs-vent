@@ -245,7 +245,7 @@ inline bool simpleChain(const std::vector<Node>& nodes,int selected,double tol){
 inline const ACHAR* networkError(tvsMoveNetwork::Error e){
     switch(e){
     case tvsMoveNetwork::Ambiguous:return L"Priključak ima više mogućih veza.";
-    case tvsMoveNetwork::Unsupported:return L"Veza vodi do nepodržanog elementa ili izabrana dionica ima slobodan kraj.";
+    case tvsMoveNetwork::Unsupported:return L"Veza vodi do nepodržanog elementa ili izbor razdvaja povezane priključke.";
     case tvsMoveNetwork::SectionMismatch:return L"Presjeci ili elevacije na spoju ne odgovaraju.";
     case tvsMoveNetwork::NotTangent:return L"Ose nisu usklađene na priključku.";
     case tvsMoveNetwork::NonPlanar:return L"Mreža nije u zajedničkoj ravni osnove.";
@@ -286,10 +286,178 @@ inline bool networkLabels(Transaction& tx,const std::vector<Node>& nodes,const A
         }
     }return true;
 }
+// Temporary highlighting never writes colours or selection state to the drawing.
+class StretchHighlight {
+    AcDbObjectIdArray ids;
+public:
+    ~StretchHighlight(){clear();}
+    void clear(){
+        for(int i=0;i<ids.length();++i){AcDbEntity* e=NULL;
+            if(acdbOpenObject(e,ids[i],AcDb::kForRead)==Acad::eOk){e->unhighlight();e->close();}}
+        ids.setLogicalLength(0);
+    }
+    void add(const AcDbObjectId& id){AcDbEntity* e=NULL;
+        if(acdbOpenObject(e,id,AcDb::kForRead)==Acad::eOk){e->highlight();e->close();ids.append(id);}}
+private:
+    StretchHighlight(const StretchHighlight&);
+    StretchHighlight& operator=(const StretchHighlight&);
+public:
+    StretchHighlight(){}
+};
+inline void stretchProblem(const std::vector<Node>& nodes,int index,const ACHAR* message,const ACHAR* command=L"TVS_STRETCH"){
+    acutPrintf(L"\n%s: %s",command,message);
+    if(index<0||static_cast<size_t>(index)>=nodes.size())return;
+    StretchHighlight mark;mark.add(nodes[index].id);
+    acutPrintf(L"\nProblematični element je istaknut.");
+    ACHAR answer[133]={0};acedGetString(0,L"\nEnter za povratak u crtež: ",answer);
+}
+// Non-database drawable: preview uses exact connector positions and straight-duct edges.
+// Fittings are shown schematically between their ports, not as fabrication geometry.
+class StretchPreview : public AcDbEntity {
+public:
+    const std::vector<Node>& nodes;const std::vector<int>& masks;
+    Point delta;bool allowed;int problem;
+    std::vector<std::vector<Point> > planned;
+    StretchPreview(const std::vector<Node>& n,const std::vector<int>& m):nodes(n),masks(m),allowed(false),problem(-1){}
+    virtual Adesk::Boolean subWorldDraw(AcGiWorldDraw* draw){
+        for(size_t i=0;i<nodes.size();++i)if(masks[i]){
+            const Node& n=nodes[i];
+            draw->subEntityTraits().setColor(static_cast<Adesk::UInt16>(static_cast<int>(i)==problem?1:allowed?3:2));
+            std::vector<Point> ports=n.ports;
+            for(size_t j=0;j<ports.size();++j)if(masks[i]&(1<<static_cast<int>(j)))ports[j]=ports[j]+delta;
+            if(planned.size()==nodes.size()&&planned[i].size()==ports.size())ports=planned[i];
+            if(n.kind==1&&ports.size()==2){
+                AcGePoint3d line[2]={acad(ports[0]),acad(ports[1])};draw->geometry().polyline(2,line);
+                Point axis;if(tvsMoveGeometry::unit(n.ports[1]-n.ports[0],axis)){
+                    Point side(-axis.y*n.a/2,axis.x*n.a/2,0);
+                    AcGePoint3d outline[5]={acad(ports[0]+side),acad(ports[1]+side),acad(ports[1]-side),acad(ports[0]-side),acad(ports[0]+side)};
+                    draw->geometry().polyline(5,outline);
+                }
+            }else if(!ports.empty()){
+                Point center;
+                for(size_t j=0;j<ports.size();++j)center=center+ports[j];
+                center=center*(1.0/ports.size());
+                for(size_t j=0;j<ports.size();++j){AcGePoint3d line[2]={acad(center),acad(ports[j])};draw->geometry().polyline(2,line);}
+            }
+        }
+        return Adesk::kTrue;
+    }
+};
+class StretchJig : public AcEdJig {
+    StretchPreview preview;
+    const std::vector<tvsMoveNetwork::Body>& bodies;
+    const std::vector<int>& masks;
+    AcGePoint3d base,last;double minimum,tol;bool sampled;
+public:
+    tvsMoveNetwork::Result result;
+    StretchJig(const std::vector<Node>& n,const std::vector<tvsMoveNetwork::Body>& b,
+        const std::vector<int>& m,const AcGePoint3d& origin,double minLength,double tolerance)
+        :preview(n,m),bodies(b),masks(m),base(origin),last(origin),minimum(minLength),tol(tolerance),sampled(false){
+        setDispPrompt(L"\nNova pozicija (zeleno: dozvoljeno, crveno: problem; Esc: odustani): ");
+        setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode|kNullResponseAccepted));
+    }
+    virtual AcDbEntity* entity()const{return const_cast<StretchPreview*>(&preview);}
+    virtual DragStatus sampler(){
+        AcGePoint3d next;DragStatus status=acquirePoint(next,base);
+        if(status!=kNormal)return status;
+        if(sampled&&next.distanceTo(last)<tol*0.01)return kNoChange;
+        sampled=true;last=next;return kNormal;
+    }
+    virtual Adesk::Boolean update(){
+        preview.delta=point(last)-point(base);
+        preview.allowed=tvsMoveNetwork::planSelection(bodies,masks,preview.delta,minimum,tol,result);
+        preview.problem=result.problem;
+        return Adesk::kTrue;
+    }
+    Point displacement()const{return preview.delta;}
+};
+
+class MoveJig : public AcEdJig {
+    const std::vector<Node>& nodes;int selected;
+    std::vector<tvsMoveNetwork::Body> bodies;std::vector<int> masks;
+    StretchPreview preview;StretchHighlight highlighted;
+    Point origin,normal;AcGePoint3d last;double minimum,tol;bool sampled;
+    int ids[5],neighborPorts[2];Point attached[2],fixed[2];bool simple;
+public:
+    tvsMoveNetwork::Result result;
+    MoveJig(const std::vector<Node>& n,int chosen,const Point& base,double minLength,double tolerance)
+        :nodes(n),selected(chosen),masks(n.size(),0),preview(n,masks),origin(base),last(acad(base)),
+        minimum(minLength),tol(tolerance),sampled(false),simple(simpleChain(n,chosen,tolerance)){
+        Point axis;tvsMoveGeometry::unit(n[chosen].ports[1]-n[chosen].ports[0],axis);normal=Point(-axis.y,axis.x,0);
+        ids[0]=selected;
+        for(size_t i=0;i<n.size();++i){tvsMoveNetwork::Body body;
+            body.ports=n[i].ports;body.axes=n[i].axes;body.sections=n[i].sections;
+            body.kind=n[i].kind==1?tvsMoveNetwork::Pipe:n[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
+            if(n[i].kind==4)body.junctions.push_back(n[i].middle);bodies.push_back(body);}
+        if(simple)for(int k=0;k<2;++k){Contact elbow,neighbor;
+            uniqueContact(n,selected,k,tol,elbow);uniqueContact(n,elbow.node,1-elbow.port,tol,neighbor);
+            ids[k+1]=elbow.node;ids[k+3]=neighbor.node;neighborPorts[k]=neighbor.port;
+            attached[k]=n[neighbor.node].ports[neighbor.port];fixed[k]=n[neighbor.node].ports[1-neighbor.port];}
+        masks[selected]=3;highlighted.add(n[selected].id);
+        setDispPrompt(L"\nNova pozicija izabrane reference (pregled; Esc: odustani): ");
+        setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode|kNullResponseAccepted));
+    }
+    virtual AcDbEntity* entity()const{return const_cast<StretchPreview*>(&preview);}
+    virtual DragStatus sampler(){AcGePoint3d next;DragStatus status=acquirePoint(next,acad(origin));
+        if(status!=kNormal)return status;
+        if(sampled&&next.distanceTo(last)<tol*.01)return kNoChange;
+        sampled=true;last=next;return kNormal;}
+    virtual Adesk::Boolean update(){
+        Point delta=normal*((point(last)-origin).dot(normal));bool good=false;
+        if(simple){
+            result=tvsMoveNetwork::Result();result.masks.assign(nodes.size(),0);result.ports.resize(nodes.size());
+            for(size_t i=0;i<nodes.size();++i)result.ports[i]=nodes[i].ports;
+            Point ends[2]={nodes[selected].ports[0],nodes[selected].ports[1]};tvsMoveGeometry::Plan plan;
+            good=tvsMoveGeometry::plan(ends,attached,fixed,origin,point(last),minimum,tol,plan);
+            result.masks[selected]=3;result.problem=good?-1:selected;
+            if(good){
+                result.ports[selected][0]=plan.selected[0];result.ports[selected][1]=plan.selected[1];
+                for(int k=0;k<2;++k){result.masks[ids[k+1]]=3;result.masks[ids[k+3]]=1<<neighborPorts[k];
+                    for(size_t j=0;j<result.ports[ids[k+1]].size();++j)result.ports[ids[k+1]][j]=nodes[ids[k+1]].ports[j]+plan.delta[k];
+                    result.ports[ids[k+3]][neighborPorts[k]]=plan.attached[k];}
+                for(size_t i=0;i<nodes.size();++i)if(!result.masks[i])for(size_t j=0;j<nodes[i].ports.size();++j){
+                    const Point& q=nodes[i].ports[j];bool conflict=tvsMoveGeometry::onSegment(q,plan.selected[0],plan.selected[1],tol);
+                    for(int k=0;k<2;++k)conflict=conflict||tvsMoveGeometry::pointsNear(q,plan.attached[k],tol)
+                        ||(tvsMoveGeometry::onSegment(q,fixed[k],plan.attached[k],tol)&&!tvsMoveGeometry::pointsNear(q,fixed[k],tol));
+                    if(conflict){good=false;result.problem=static_cast<int>(i);result.error=tvsMoveNetwork::NewContact;}}
+                if(good)result.error=tvsMoveNetwork::Ok;
+            }
+        }else good=tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result);
+        if(result.masks.size()==nodes.size()){
+            if(masks!=result.masks){highlighted.clear();masks=result.masks;
+                for(size_t i=0;i<masks.size();++i)if(masks[i])highlighted.add(nodes[i].id);}
+            preview.planned=result.ports;
+        }
+        preview.delta=delta;preview.allowed=good;preview.problem=result.problem;
+        return Adesk::kTrue;
+    }
+    AcGePoint3d target()const{return last;}
+    bool valid()const{return preview.allowed;}
+};
+inline bool moveDestination(const std::vector<Node>& nodes,int selected,const ads_point picked,
+                            Point& origin,ads_point destination,double minimum,double tol){
+    StretchHighlight chosen;chosen.add(nodes[selected].id);
+    Point ends[2]={nodes[selected].ports[0],nodes[selected].ports[1]},cursor(picked[0],picked[1],picked[2]);
+    tvsMoveGeometry::Reference reference=tvsMoveGeometry::PickedEdge;ACHAR keyword[132];
+    acedInitGet(0,L"Izabrana Druga Osa");
+    int status=acedGetKword(L"\nReferenca pomjeranja [Izabrana/Druga/Osa] <Izabrana>: ",keyword);
+    if(status!=RTNORM&&status!=RTNONE)return false;
+    if(status==RTNORM){
+        if(_wcsicmp(keyword,L"Druga")==0||_wcsicmp(keyword,L"D")==0)reference=tvsMoveGeometry::OtherEdge;
+        else if(_wcsicmp(keyword,L"Osa")==0||_wcsicmp(keyword,L"O")==0)reference=tvsMoveGeometry::Axis;}
+    if(!tvsMoveGeometry::referencePoint(ends,cursor,nodes[selected].a,reference,origin))return false;
+    chosen.clear();
+    int problem=-1;tvsMoveNetwork::Error error=tvsMoveNetwork::Invalid;bool valid=false;
+    {MoveJig jig(nodes,selected,origin,minimum,tol);if(jig.drag()!=AcEdJig::kNormal)return false;
+        AcGePoint3d target=jig.target();destination[0]=target.x;destination[1]=target.y;destination[2]=target.z;
+        valid=jig.valid();problem=jig.result.problem;error=jig.result.error;}
+    if(!valid){stretchProblem(nodes,problem,networkError(error),L"TVS_MOVE");return false;}
+    return true;
+}
 inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
                            int selected,const ads_point picked,double factor,double tol,double minimum){
     Point origin;ads_point destination;
-    if(!destinationPoint(nodes[selected],picked,origin,destination))return;
+    if(!moveDestination(nodes,selected,picked,origin,destination,minimum,tol))return;
     Point axis;
     if(!tvsMoveGeometry::unit(nodes[selected].ports[1]-nodes[selected].ports[0],axis))return;
     Point normal(-axis.y,axis.x,0),target(destination[0],destination[1],destination[2]);
@@ -371,7 +539,7 @@ inline void execute(){
     const int pipes[3]={center,neighbors[0].node,neighbors[1].node};
     if(sideBranches(nodes,pipes,tol)){acutPrintf(L"\nTVS_MOVE: postoji bočni priključak; ovaj korak podržava samo niz od pet elemenata.");return;}
     Point ends[2]={main.ports[0],main.ports[1]},origin;ads_point destination;
-    if(!destinationPoint(main,picked,origin,destination))return;
+    if(!moveDestination(nodes,center,picked,origin,destination,minimum,tol))return;
     tvsMoveGeometry::Plan plan;
     if(!tvsMoveGeometry::plan(ends,attached,fixed,origin,Point(destination[0],destination[1],destination[2]),minimum,tol,plan)){
         acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja ili bi nastala prekratka/obrnuta dionica ili nepodržana 3D geometrija.");return;}
@@ -409,89 +577,6 @@ inline void execute(){
     if(!tx.commit()){acutPrintf(L"\nTVS_MOVE: izmjena nije sačuvana.");return;}
     acutPrintf(L"\nTVS_MOVE: pomjerena dionica i dva koljena; susjedne dužine prilagođene. Bočni pomjeraj: %.2f mm.",plan.offset*factor);
 }
-// Temporary highlighting never writes colours or selection state to the drawing.
-class StretchHighlight {
-    AcDbObjectIdArray ids;
-public:
-    ~StretchHighlight(){clear();}
-    void clear(){
-        for(int i=0;i<ids.length();++i){AcDbEntity* e=NULL;
-            if(acdbOpenObject(e,ids[i],AcDb::kForRead)==Acad::eOk){e->unhighlight();e->close();}}
-        ids.setLogicalLength(0);
-    }
-    void add(const AcDbObjectId& id){AcDbEntity* e=NULL;
-        if(acdbOpenObject(e,id,AcDb::kForRead)==Acad::eOk){e->highlight();e->close();ids.append(id);}}
-private:
-    StretchHighlight(const StretchHighlight&);
-    StretchHighlight& operator=(const StretchHighlight&);
-public:
-    StretchHighlight(){}
-};
-inline void stretchProblem(const std::vector<Node>& nodes,int index,const ACHAR* message){
-    acutPrintf(L"\nTVS_STRETCH: %s",message);
-    if(index<0||static_cast<size_t>(index)>=nodes.size())return;
-    StretchHighlight mark;mark.add(nodes[index].id);
-    acutPrintf(L"\nProblematični element je istaknut.");
-    ACHAR answer[133]={0};acedGetString(0,L"\nEnter za povratak u crtež: ",answer);
-}
-// Non-database drawable: preview uses exact connector positions and straight-duct edges.
-// Fittings are shown schematically between their ports, not as fabrication geometry.
-class StretchPreview : public AcDbEntity {
-public:
-    const std::vector<Node>& nodes;const std::vector<int>& masks;
-    Point delta;bool allowed;int problem;
-    StretchPreview(const std::vector<Node>& n,const std::vector<int>& m):nodes(n),masks(m),allowed(false),problem(-1){}
-    virtual Adesk::Boolean subWorldDraw(AcGiWorldDraw* draw){
-        for(size_t i=0;i<nodes.size();++i)if(masks[i]){
-            const Node& n=nodes[i];
-            draw->subEntityTraits().setColor(static_cast<Adesk::UInt16>(static_cast<int>(i)==problem?1:allowed?3:2));
-            std::vector<Point> ports=n.ports;
-            for(size_t j=0;j<ports.size();++j)if(masks[i]&(1<<static_cast<int>(j)))ports[j]=ports[j]+delta;
-            if(n.kind==1&&ports.size()==2){
-                AcGePoint3d line[2]={acad(ports[0]),acad(ports[1])};draw->geometry().polyline(2,line);
-                Point axis;if(tvsMoveGeometry::unit(n.ports[1]-n.ports[0],axis)){
-                    Point side(-axis.y*n.a/2,axis.x*n.a/2,0);
-                    AcGePoint3d outline[5]={acad(ports[0]+side),acad(ports[1]+side),acad(ports[1]-side),acad(ports[0]-side),acad(ports[0]+side)};
-                    draw->geometry().polyline(5,outline);
-                }
-            }else if(!ports.empty()){
-                Point center;
-                for(size_t j=0;j<ports.size();++j)center=center+ports[j];
-                center=center*(1.0/ports.size());
-                for(size_t j=0;j<ports.size();++j){AcGePoint3d line[2]={acad(center),acad(ports[j])};draw->geometry().polyline(2,line);}
-            }
-        }
-        return Adesk::kTrue;
-    }
-};
-class StretchJig : public AcEdJig {
-    StretchPreview preview;
-    const std::vector<tvsMoveNetwork::Body>& bodies;
-    const std::vector<int>& masks;
-    AcGePoint3d base,last;double minimum,tol;bool sampled;
-public:
-    tvsMoveNetwork::Result result;
-    StretchJig(const std::vector<Node>& n,const std::vector<tvsMoveNetwork::Body>& b,
-        const std::vector<int>& m,const AcGePoint3d& origin,double minLength,double tolerance)
-        :preview(n,m),bodies(b),masks(m),base(origin),last(origin),minimum(minLength),tol(tolerance),sampled(false){
-        setDispPrompt(L"\nNova pozicija (zeleno: dozvoljeno, crveno: problem; Esc: odustani): ");
-        setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode|kNullResponseAccepted));
-    }
-    virtual AcDbEntity* entity()const{return const_cast<StretchPreview*>(&preview);}
-    virtual DragStatus sampler(){
-        AcGePoint3d next;DragStatus status=acquirePoint(next,base);
-        if(status!=kNormal)return status;
-        if(sampled&&next.distanceTo(last)<tol*0.01)return kNoChange;
-        sampled=true;last=next;return kNormal;
-    }
-    virtual Adesk::Boolean update(){
-        preview.delta=point(last)-point(base);
-        preview.allowed=tvsMoveNetwork::planSelection(bodies,masks,preview.delta,minimum,tol,result);
-        preview.problem=result.problem;
-        return Adesk::kTrue;
-    }
-    Point displacement()const{return preview.delta;}
-};
 inline void executeStretch(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;

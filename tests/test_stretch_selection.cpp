@@ -29,5 +29,14 @@ int main(){
     assert(tvsMoveGeometry::pointsNear(out.ports[1][0],n[1].ports[0],1e-9));
     assert(tvsMoveGeometry::pointsNear(out.ports[1][1],n[1].ports[1],1e-9));
     masks[0]=0;assert(!planSelection(n,masks,Point(10,0),1,.1,out));
+    // MOVE: the selected duct's first end is free, the other end still drives the network.
+    {
+        std::vector<Body> freeEnd=fixture();freeEnd.erase(freeEnd.begin()+3);freeEnd.erase(freeEnd.begin()+1);
+        assert(plan(freeEnd,0,Point(0,300),1,.1,out));
+        assert(tvsMoveGeometry::pointsNear(out.ports[0][0],Point(0,300),1e-9));
+        assert(tvsMoveGeometry::pointsNear(out.ports.back()[1],freeEnd.back().ports[1],1e-9));
+        assert(out.problem==-1);
+        assert(!plan(freeEnd,0,Point(0,1000),1,.1,out));assert(out.problem>=0);
+    }
     return 0;
 }
