@@ -6,6 +6,7 @@ import random
 import subprocess
 import tempfile
 import unittest
+from bypass_compiler import compile_cpp, executable
 F=fractions.Fraction
 class BypassBounds(unittest.TestCase):
     def test_outward_arithmetic_and_trig(self):
@@ -32,11 +33,11 @@ std::cout<<z.lo<<" "<<z.hi<<"\n";}}
         cases.extend(("sqrt",x,0.) for x in [0.,.1,2.,1e-300,1e-200,1e200])
         cases.extend((op,x,0.) for op in ["sin","cos"] for x in [0.,.1,math.pi/6,math.pi/4,math.pi/3,1.1]+[rng.uniform(0,1.1) for _ in range(15)])
         with tempfile.TemporaryDirectory() as directory:
-            path=pathlib.Path(directory)/"bounds.cpp";exe=pathlib.Path(directory)/"bounds"
+            path=pathlib.Path(directory)/"bounds.cpp";exe=executable(pathlib.Path(directory)/"bounds")
             path.write_text(code)
-            subprocess.run(["g++","-std=c++11","-O2","-fno-fast-math","-ffp-contract=off","-Wall","-Wextra","-Werror","-pedantic",str(path),"-o",str(exe)],check=True)
-            bad=subprocess.run(["g++","-std=c++11","-ffast-math","-fsyntax-only",str(path)],capture_output=True,text=True)
-            self.assertNotEqual(bad.returncode,0);self.assertIn("strict IEEE",bad.stderr)
+            compile_cpp(path,exe)
+            bad=compile_cpp(path,exe,fast=True,syntax_only=True)
+            self.assertNotEqual(bad.returncode,0);self.assertIn("strict IEEE",bad.stdout+bad.stderr)
             data="".join(f"{op} {a:.17g} {b:.17g}\n" for op,a,b in cases)
             output=subprocess.run([str(exe)],input=data,capture_output=True,text=True,check=True).stdout.splitlines()
         self.assertEqual(len(output),len(cases))

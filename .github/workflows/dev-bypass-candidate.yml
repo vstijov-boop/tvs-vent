@@ -4,7 +4,7 @@ on:
     branches: [razvoj-offset-arx]
     paths:
       - 'geometry/bypass/**'
-      - 'tests/test_bypass*'
+      - 'tests/*bypass*'
       - '.github/workflows/dev-bypass-candidate.yml'
   workflow_dispatch:
 permissions:
