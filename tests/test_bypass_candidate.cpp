@@ -20,7 +20,7 @@ int main(){
  expect(bounded::sine(I(0)).point()&&bounded::cosine(I(0)).lo==1,"exact zero trig");
  I ss=bounded::sine(I(tvsOffset::pi()/6)),cc=bounded::cosine(I(tvsOffset::pi()/3));
  contains(ss,.5,"sin30 independent .5");contains(cc,.5,"cos60 independent .5");
- int mode=std::fegetround();std::fesetround(FE_DOWNWARD);expect(!bounded::supported(),"wrong rounding rejected");std::fesetround(mode);
+ int mode=std::fegetround();std::fesetround(FE_DOWNWARD);expect(check(reference()).status==Unsupported,"candidate rejects wrong rounding");expect(!bounded::supported(),"wrong rounding rejected");std::fesetround(mode);
  Input p=reference();p.clearance=49.9;Result r=check(p);report("reference below with explicit .1 margin",r);
  expect(r.geometryReady&&r.members.size()==7&&r.axis.size()==8,"seven shared-result members/eight ports");
  expect(r.status==Feasible,"reference positive margin feasible");expect(!r.minimumConfirmed,"no optimizer claim");
@@ -93,7 +93,7 @@ int main(){
  p=reference();p.D=225;p.C=400;p.s0=-590.685424949238;p.clearance=0;r=check(p);report("candidate zero-gap boundary",r);
  expect(r.obstacle.relation==Touching&&r.status==NumericalBoundary,"c0 touch is distinct; assembly guard stays unresolved");
  p.D=224.5;r=check(p);expect(r.status==Infeasible&&r.obstacle.relation==Overlapping,"candidate c0 actual penetration rejected");
- p=reference();p.clearance=49.9;p.s0+=1000000;p.obstacleS+=1000000;p.z0+=1000000;p.obstacleZ+=1000000;r=check(p);
+ p=reference();p.clearance=49.9;p.s0+=1000000;p.windowLeft+=1000000;p.windowRight+=1000000;p.obstacleS+=1000000;p.z0+=1000000;p.obstacleZ+=1000000;r=check(p);
  expect(r.status==Feasible,"physical translation invariance with bounded rounding");
  p=reference();p.angleDegrees=30;p.D=281.69872981077805;p.C=200;p.s0=-695.0961894323342;p.clearance=49.9;r=check(p);
  report("fixed 30",r);expect(r.status==Feasible,"fixed 30 candidate");contains(r.obstacle.mm,50,"30 independent contact gap");
