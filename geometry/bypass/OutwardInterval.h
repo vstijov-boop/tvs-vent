@@ -59,7 +59,7 @@ inline I hull(I a,I b){return I(std::min(a.lo,b.lo),std::max(a.hi,b.hi));}
 inline I absolute(I a){return a.lo>=0?a:a.hi<=0?-a:I(0,std::max(-a.lo,a.hi));}
 inline I square(I a){
  I p=product(a.lo,a.lo),q=product(a.hi,a.hi);
- return I(a.lo<=0&&a.hi>=0?0:std::min(p.lo,q.lo),std::max(p.hi,q.hi));
+ return I(a.lo<=0&&a.hi>=0?0:std::max(0.0,std::min(p.lo,q.lo)),std::max(p.hi,q.hi));
 }
 inline I root(I a){
  if(a.lo<0)throw std::runtime_error("negative square root");

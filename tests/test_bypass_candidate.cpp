@@ -86,6 +86,19 @@ int main(){
  expect(d.relation==Overlapping,"c0 overlap is not allowed touch");
  expect(pairRelation(big,b[0],policy)==Overlapping,"nonadjacent body overlap proof");
  p=reference();p.clearance=49.9;p.policy.maxCells=1;r=check(p);expect(r.status==NumericalBoundary,"work limit not false infeasible");
+ 
+ Body touchA=straight(V(I(-10),I(0)),V(I(0),I(0)),V(I(0),I(1)),I(1),FirstElbow);
+ Body touchB=straight(V(I(0),I(0)),V(I(10),I(0)),V(I(0),I(1)),I(1),FourthElbow);
+ expect(pairRelation(touchA,touchB,policy)==Touching,"pair boundary touch is not positive distance");
+ p=reference();p.D=225;p.C=400;p.s0=-590.685424949238;p.clearance=0;r=check(p);report("candidate zero-gap boundary",r);
+ expect(r.obstacle.relation==Touching&&r.status==NumericalBoundary,"c0 touch is distinct; assembly guard stays unresolved");
+ p.D=224.5;r=check(p);expect(r.status==Infeasible&&r.obstacle.relation==Overlapping,"candidate c0 actual penetration rejected");
+ p=reference();p.clearance=49.9;p.s0+=1000000;p.obstacleS+=1000000;p.z0+=1000000;p.obstacleZ+=1000000;r=check(p);
+ expect(r.status==Feasible,"physical translation invariance with bounded rounding");
+ p=reference();p.angleDegrees=30;p.D=281.69872981077805;p.C=200;p.s0=-695.0961894323342;p.clearance=49.9;r=check(p);
+ report("fixed 30",r);expect(r.status==Feasible,"fixed 30 candidate");contains(r.obstacle.mm,50,"30 independent contact gap");
+ p=reference();p.angleDegrees=60;p.D=300;p.C=163.39745962155614;p.s0=-485.8439182435161;p.clearance=49.9;r=check(p);
+ report("fixed 60",r);expect(r.status==Feasible,"fixed 60 candidate");contains(r.obstacle.mm,50,"60 independent contact gap");
  p=reference();p.policy.distanceToleranceMm=-1;expect(check(p).status==InvalidInput,"invalid numerical policy");
  std::cout<<"ALL PASSED "<<checks<<" checks. Candidate validation only, no optimizer/CAD."<<std::endl;
 }

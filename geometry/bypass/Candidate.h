@@ -129,9 +129,21 @@ inline bool separated(const Body& a,const Region& b,const Policy& p){
  (void)box;return false;
 }
 inline Relation pairRelation(const Body& a,const Body& b,const Policy& p){
- if(separated(a,b,p))return PositiveDistance;
- for(int u=0;u<3;++u)for(int v=0;v<3;++v)
-  if(b.strictContains(a.at(I(u*.5),I(v*.5)))||a.strictContains(b.at(I(u*.5),I(v*.5))))return Overlapping;
+ std::vector<V> directions=axes(std::max(a.theta,b.theta));
+ bool interiorsSeparate=false;
+ for(size_t j=0;j<directions.size();++j){
+  I x=a.support(directions[j],p.supportSlices),y=b.support(directions[j],p.supportSlices);
+  if(x.hi<y.lo||y.hi<x.lo)return PositiveDistance;
+  interiorsSeparate=interiorsSeparate||x.hi<=y.lo||y.hi<=x.lo;
+ }
+ for(int u=0;u<3;++u)for(int v=0;v<3;++v){
+  V x=a.at(I(u*.5),I(v*.5));
+  if(b.strictContains(x)||a.strictContains(b.at(I(u*.5),I(v*.5))))return Overlapping;
+  if(interiorsSeparate)for(int q=0;q<3;++q)for(int r=0;r<3;++r){
+   V y=b.at(I(q*.5),I(r*.5));
+   if(x.s.point()&&x.z.point()&&y.s.point()&&y.z.point()&&x.s.lo==y.s.lo&&x.z.lo==y.z.lo)return Touching;
+  }
+ }
  return Unresolved;
 }
 struct Distance {
@@ -150,7 +162,7 @@ inline bool containedWitness(const Body& a,const Region& o,V& where){
  V mid=a.at(I(.5),I(.5));if(regionInterior(o,mid)){where=mid;return true;}return false;
 }
 inline Distance measure(const std::vector<Body>& bodies,const Region& o,const Policy& policy){
- Distance out;if(bodies.empty())return out;
+ Distance out;if(!bounded::supported()||bodies.empty())return out;
  std::priority_queue<Patch,std::vector<Patch>,ComparePatch> queue;
  double upper=std::numeric_limits<double>::infinity();bool allSeparated=true;
  for(size_t j=0;j<bodies.size();++j){V w;
