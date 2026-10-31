@@ -1,4 +1,4 @@
-#include "../geometry/bypass/Candidate.h"
+#include "../geometry/bypass/Generator.h"
 #include <iostream>
 #include <iomanip>
 #include <cstdlib>
@@ -35,6 +35,8 @@ int main(){
   State before;Result r=check(p);State after;
   expect(r.status==Feasible,"normal numerical execution");
   expect(before.same(after),"successful check restores all flags and controls");
+  before=State();tvsBypassSearch::Result generated=tvsBypassSearch::generate(p,tvsBypassSearch::Policy(5,10,25));after=State();
+  expect(generated.hasCandidate&&before.same(after),"generator success restores all flags and controls");
   Input invalid=p;invalid.D=-1;before=State();r=check(invalid);after=State();
   expect(r.status==InvalidInput&&before.same(after),"invalid return restores state");
   Input boundary=p;boundary.policy.maxCells=1;before=State();r=check(boundary);after=State();
@@ -49,6 +51,8 @@ int main(){
    before=State();bool ok=bounded::supported();r=check(p);after=State();
    expect(!ok&&r.status==Unsupported,"alternate rounding rejected");
    expect(before.same(after),"rejected rounding not silently normalized");
+   before=State();generated=tvsBypassSearch::generate(p,tvsBypassSearch::Policy(5,10,25));after=State();
+   expect(generated.status==tvsBypassSearch::Unsupported&&before.same(after),"generator rejects rounding with exact state preservation");
   }
   expect(std::fesetround(FE_TONEAREST)==0,"restore nearest");
 #if defined(__SSE2__) || defined(_M_X64)
@@ -58,6 +62,8 @@ int main(){
    std::cout<<"FP unsupported CSR="<<std::hex<<before.csr<<" after="<<after.csr<<std::dec<<" supported="<<ok<<std::endl;
    expect(!ok&&r.status==Unsupported,"FTZ/DAZ individually and together rejected");
    expect(before.same(after),"rejected FTZ/DAZ exact state restored");
+   before=State();generated=tvsBypassSearch::generate(p,tvsBypassSearch::Policy(5,10,25));after=State();
+   expect(generated.status==tvsBypassSearch::Unsupported&&before.same(after),"generator rejects FTZ/DAZ with exact state preservation");
    _mm_setcsr(csr);
   }
 #endif

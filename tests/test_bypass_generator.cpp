@@ -42,7 +42,7 @@ int main(){
  tvsBypass::Input base(100,100,.1);base.windowLeft=-700;base.windowRight=700;
  Policy p(5,10,25);
  Result reference=run("below45",base,p,true);
- // Independently fixed numeric expectations: R=200, D=290, C=360; W=580+400*sqrt(2)+? 
+ // Independently fixed numeric expectations: R=200, D=290, C=360. 
  // W=2*(290+400*(sqrt(2)-1))+360 = 1271.370849898476.
  near(reference.D,290,"known chosen D");near(reference.C,360,"known chosen C");
  near(reference.W.lo,1271.370849898476,"independently specified 45 degree run");
@@ -52,7 +52,8 @@ int main(){
  Result mirror=run("above45",q,p,true);near(mirror.passElevation.lo,-110,"above reference elevation");
  near(mirror.W.lo,reference.W.lo,"mirrored run agrees");
  for(int j=0;j<3;++j){q=base;q.angleDegrees=30+15*j;q.windowLeft=-1100;q.windowRight=1100;
-  run(j==0?"angle30":j==1?"angle45":"angle60",q,p,true);}
+  run(j==0?"angle30":j==1?"angle45":"angle60",q,p,true);
+  q.above=true;run(j==0?"above30":j==1?"above45-wide":"above60",q,p,true);}
  q=base;q.insulation=25;q.obstacleInsulation=25;q.windowLeft=-900;q.windowRight=900;
  run("insulated",q,p,true);
  q=base;q.windowLeft=-600;q.windowRight=600;run("narrow-feasible",q,p,true);
@@ -63,6 +64,8 @@ int main(){
  q=base;q.above=true;q.ceiling.active=true;q.ceiling.mm=100;run("active-ceiling",q,p,true);
  q=base;q.floor.active=true;q.floor.mm=-650; // Required bridge axis <=-675, lower face <=-775: impossible.
  Result blocked=run("floor-proven-impossible",q,p,false);expect(!blocked.hasCandidate,"known impossible floor rejected");
+ q=base;q.above=true;q.ceiling.active=true;q.ceiling.mm=-150;
+ blocked=run("ceiling-proven-impossible",q,p,false);expect(!blocked.hasCandidate,"known impossible ceiling rejected");
  q=base;q.windowLeft=-500;q.windowRight=500;
  // Even allowing C=100, D>=275 gives W >=100+700*sqrt(2)=1089.94949 >1000.
  blocked=run("window-proven-impossible",q,p,false);expect(!blocked.hasCandidate,"known impossible window rejected");

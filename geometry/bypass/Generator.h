@@ -75,11 +75,13 @@ inline bool better(const tvsBypass::Input& in,const tvsBypass::Result& checked,c
  return dw.point()&&dw.lo==0&&(I(in.D)+I(p.improvementDToleranceMm)).hi<best.D;
 }
 inline Result generate(const tvsBypass::Input& problem,const Policy& policy){
- Result out(problem);Clock::time_point start=Clock::now();
+ Result out(problem);
+ // Reject unsupported host controls without floating-point timing arithmetic.
  if(!tvsBypass::bounded::supported()){out.status=Unsupported;
-  return finish(out,start,"unsupported floating-point environment");}
+  out.termination="unsupported floating-point environment";return out;}
  tvsBypass::bounded::Environment environment;
- if(!environment.active){out.status=Unsupported;return finish(out,start,"cannot preserve floating environment");}
+ if(!environment.active){out.status=Unsupported;out.termination="cannot preserve floating environment";return out;}
+ Clock::time_point start=Clock::now();
  if(!valid(problem,policy)){out.status=InvalidInput;return finish(out,start,"invalid input or search policy");}
  if((problem.angleDegrees!=30&&problem.angleDegrees!=45&&problem.angleDegrees!=60)||problem.ri<=problem.insulation){
   out.status=Unsupported;return finish(out,start,"MVP requires 30/45/60 degrees and Ri > insulation");}
