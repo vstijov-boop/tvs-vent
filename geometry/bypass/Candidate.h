@@ -259,13 +259,22 @@ inline Result check(const Input& in){
  tvsOffset::Input first(sign*in.D,in.width,in.height,in.ri,theta,in.minimumSlope);
  tvsOffset::Input second(-sign*in.D,in.width,in.height,in.ri,theta,in.minimumSlope);
  out.offsets[0]=tvsOffset::solve(first,base);out.offsets[1]=tvsOffset::solve(second,base);
+ // Necessary constraint residuals only: do not generate an alternative offset Result.
+ I rt=I(in.ri)+I(in.height)/I(2),angle(theta);
+ I bendRise=I(2)*rt*(I(1)-bounded::cosine(angle));
+ I requiredSlope=bendRise+I(in.minimumSlope)*bounded::sine(angle);
+ I requiredProjection=bendRise+I(in.minimumProjection)*bounded::sine(angle)/bounded::cosine(angle);
+ bool constraintBoundary=in.D<requiredSlope.hi||in.D<requiredProjection.hi;
+ if(in.D<requiredSlope.lo||in.D<requiredProjection.lo){
+  out.status=Infeasible;out.reason="minimum-piece necessary inequality violated";return out;
+ }
  if(!out.offsets[0].hasGeometry()||!out.offsets[1].hasGeometry()){
-  out.status=Infeasible;out.reason="existing solve rejected offset/minimum; strict policy unchanged";return out;}
+  out.status=NumericalBoundary;out.reason="strict existing solve rejected; physical boundary unresolved, no repair";return out;}
  if(out.offsets[0].projectedLength<=0){out.status=Unsupported;out.reason="zero projected slope";return out;}
  I s(in.s0),z(in.z0),h=I(in.height)/I(2)+I(in.insulation),ri=I(in.ri)-I(in.insulation),ro=I(in.ri)+I(in.height)+I(in.insulation);
  I x(out.offsets[0].totalRun),s2=s+x+I(in.C),z2=z+I(sign)*I(in.D);
  I t(theta);V n(-I(sign)*bounded::sine(t),bounded::cosine(t)),n2(I(sign)*bounded::sine(t),bounded::cosine(t));
- out.run=x+I(in.C)+I(out.offsets[1].totalRun);out.passElevation=z2;out.slopeLength=I(out.offsets[0].straightLength);
+ out.run=x+I(in.C)+I(out.offsets[1].totalRun);out.passElevation=z2;out.slopeLength=bounded::distance(translate(out.offsets[0].axis[1],s,z),translate(out.offsets[0].axis[2],s,z));
  out.bridgeLength=I(in.C);out.physicalRise=I(out.offsets[0].axis[2].z)-I(out.offsets[0].axis[1].z);
  out.members.push_back(offsetSector(out.offsets[0],0,s,z,ri,ro,sign,theta,FirstElbow));
  out.members.push_back(straight(translate(out.offsets[0].axis[1],s,z),translate(out.offsets[0].axis[2],s,z),n,h,FirstSlope));
@@ -281,8 +290,13 @@ inline Result check(const Input& in){
  out.jointDeviationUpperMm=agreement(out.members);
  if(out.jointDeviationUpperMm>in.policy.jointToleranceMm){out.status=NumericalBoundary;out.reason="joint agreement not proven within explicit tolerance";return out;}
  if(in.C<in.minimumBridge){out.status=Infeasible;out.reason="minimum horizontal bridge";return out;}
- I end=s+out.run;bool uncertain=s.lo<in.windowLeft||end.hi>in.windowRight;
+ if(out.slopeLength.hi<in.minimumSlope){out.status=Infeasible;out.reason="physical slope minimum";return out;}
+ I end=s+out.run;bool uncertain=constraintBoundary||s.lo<in.windowLeft||end.hi>in.windowRight;
  if(s.hi<in.windowLeft||end.lo>in.windowRight){out.status=Infeasible;out.reason="available window";return out;}
+ if(out.slopeLength.lo<in.minimumSlope)uncertain=true;
+ I actualProjection=bounded::absolute(out.members[1].last.s-out.members[1].first.s);
+ if(actualProjection.hi<in.minimumProjection){out.status=Infeasible;out.reason="projected slope minimum";return out;}
+ if(actualProjection.lo<in.minimumProjection)uncertain=true;
  // Body bounds include the computed seam discrepancy as a conservative assembly guard.
  double guard=out.jointDeviationUpperMm;
  V tangent[]={V(bounded::cosine(t),I(sign)*bounded::sine(t)),V(bounded::cosine(t),I(sign)*bounded::sine(t)),
@@ -296,6 +310,14 @@ inline Result check(const Input& in){
  }
  out.jointDeviationUpperMm=guard;
  for(size_t j=0;j<out.members.size();++j){Box b=out.members[j].enclosure(I(0,1),I(0,1));
+  if((I(b.s.lo)-I(guard)).lo<in.windowLeft||(I(b.s.hi)+I(guard)).hi>in.windowRight){
+   bool outside=false;for(int u=0;u<3;++u)for(int v=0;v<3;++v){
+    V p=out.members[j].at(I(u*.5),I(v*.5));
+    if(p.s.hi<in.windowLeft||p.s.lo>in.windowRight)outside=true;
+   }
+   if(outside){out.status=Infeasible;out.reason="outer body outside availability window";return out;}
+   uncertain=true;
+  }
   if(in.floor.active){I bottom=I(b.z.lo)-I(guard);
    if(bottom.hi<in.floor.mm){ // A lower enclosure alone is not a penetration witness: inspect actual points.
     bool violation=false;for(int u=0;u<3;++u)for(int v=0;v<3;++v)

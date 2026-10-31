@@ -99,6 +99,8 @@ int main(){
  report("fixed 30",r);expect(r.status==Feasible,"fixed 30 candidate");contains(r.obstacle.mm,50,"30 independent contact gap");
  p=reference();p.angleDegrees=60;p.D=300;p.C=163.39745962155614;p.s0=-485.8439182435161;p.clearance=49.9;r=check(p);
  report("fixed 60",r);expect(r.status==Feasible,"fixed 60 candidate");contains(r.obstacle.mm,50,"60 independent contact gap");
+ p=reference();p.D=187.86796564403573;p.C=400;p.s0=-500;
+ r=check(p);expect(r.status==NumericalBoundary,"strict Lmin decimal boundary stays unresolved, not repaired");
  p=reference();p.policy.distanceToleranceMm=-1;expect(check(p).status==InvalidInput,"invalid numerical policy");
  std::cout<<"ALL PASSED "<<checks<<" checks. Candidate validation only, no optimizer/CAD."<<std::endl;
 }
