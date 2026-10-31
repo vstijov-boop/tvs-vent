@@ -5,6 +5,8 @@
 #include <cfenv>
 #include <cfloat>
 #include <limits>
+#include <cstdint>
+#include <cstring>
 #include <stdexcept>
 #if defined(__FAST_MATH__) || FLT_EVAL_METHOD != 0
 #error Bypass bounds require strict IEEE binary64 evaluation without fast-math.
@@ -16,8 +18,19 @@ struct I {
  I(double a,double b):lo(a),hi(b){if(!(a<=b))throw std::runtime_error("invalid interval");}
  bool point()const{return lo==hi;}
 };
-inline bool supported(){return std::numeric_limits<double>::is_iec559 &&
- sizeof(double)==8 && std::fegetround()==FE_TONEAREST;}
+struct Environment {
+ std::fenv_t saved;bool active;
+ Environment():active(std::feholdexcept(&saved)==0){}
+ ~Environment(){if(active)std::fesetenv(&saved);}
+ Environment(const Environment&)=delete;Environment& operator=(const Environment&)=delete;
+};
+inline bool supported(){
+ if(!std::numeric_limits<double>::is_iec559||sizeof(double)!=8||std::fegetround()!=FE_TONEAREST)return false;
+ Environment env;if(!env.active)return false;
+ volatile double a=std::numeric_limits<double>::denorm_min(),b=2;
+ volatile double product=a*b;double value=product;std::uint64_t bits=0;
+ std::memcpy(&bits,&value,sizeof(bits));return bits==2; // Reject FTZ/DAZ without changing host flags.
+}
 inline double down(double x){return std::nextafter(x,-std::numeric_limits<double>::infinity());}
 inline double up(double x){return std::nextafter(x,std::numeric_limits<double>::infinity());}
 inline I rounded(double p,double residual,bool exactSafe=true){

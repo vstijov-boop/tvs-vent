@@ -20,11 +20,11 @@ struct Input {
  double insulation,obstacleInsulation,clearance,D,C,s0,windowLeft,windowRight;
  double obstacleTmin,obstacleTmax,minimumSlope,minimumBridge,minimumProjection;
  bool above;OptionalBound floor,ceiling;Policy policy;
- Input():width(400),height(200),ri(100),angleDegrees(45),z0(-400),obstacleS(0),
+ Input(double minSlope,double minBridge,double minProjection):width(400),height(200),ri(100),angleDegrees(45),z0(-400),obstacleS(0),
  obstacleZ(-400),obstacleWidth(250),obstacleHeight(250),insulation(0),
  obstacleInsulation(0),clearance(50),D(400),C(400),s0(-800),windowLeft(-1200),
- windowRight(1200),obstacleTmin(-1000),obstacleTmax(1000),minimumSlope(100),
- minimumBridge(100),minimumProjection(.1),above(false){}
+ windowRight(1200),obstacleTmin(-1000),obstacleTmax(1000),minimumSlope(minSlope),
+ minimumBridge(minBridge),minimumProjection(minProjection),above(false){}
 };
 struct Region {I left,right,bottom,top;
  Region(I a=I(),I b=I(),I c=I(),I d=I()):left(a),right(b),bottom(c),top(d){}
@@ -163,6 +163,7 @@ inline bool containedWitness(const Body& a,const Region& o,V& where){
 }
 inline Distance measure(const std::vector<Body>& bodies,const Region& o,const Policy& policy){
  Distance out;if(!bounded::supported()||bodies.empty())return out;
+ bounded::Environment environment;if(!environment.active)return out;
  std::priority_queue<Patch,std::vector<Patch>,ComparePatch> queue;
  double upper=std::numeric_limits<double>::infinity();bool allSeparated=true;
  for(size_t j=0;j<bodies.size();++j){V w;
@@ -235,7 +236,8 @@ inline double agreement(const std::vector<Body>& bodies){
 inline bool scalar(double x){return std::isfinite(x)&&std::fabs(x)<=1e9;}
 inline Result check(const Input& in){
  Result out;
- if(!bounded::supported()){out.status=Unsupported;out.reason="IEEE binary64/FE_TONEAREST required";return out;}
+ if(!bounded::supported()){out.status=Unsupported;out.reason="strict IEEE binary64/FE_TONEAREST and gradual underflow required";return out;}
+ bounded::Environment environment;if(!environment.active){out.status=Unsupported;out.reason="cannot preserve floating environment";return out;}
  try{
  const double fields[]={in.width,in.height,in.ri,in.angleDegrees,in.z0,in.obstacleS,in.obstacleZ,
  in.obstacleWidth,in.obstacleHeight,in.insulation,in.obstacleInsulation,in.clearance,in.D,in.C,in.s0,

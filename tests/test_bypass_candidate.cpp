@@ -3,11 +3,14 @@
 #include <iomanip>
 #include <cstdlib>
 #include <limits>
+#if defined(__SSE2__) || defined(_M_X64)
+#include <xmmintrin.h>
+#endif
 using namespace tvsBypass;
 static int checks=0;
 static void expect(bool ok,const char* message){++checks;if(!ok){std::cerr<<"FAIL "<<message<<"\n";std::exit(1);}}
 static void contains(I a,double x,const char* what){expect(a.lo<=x+1e-10&&a.hi>=x-1e-10,what);}
-static Input reference(){Input p;p.D=289.64466094067262;p.C=179.28932188134524;p.s0=-544.9747468305833;return p;}
+static Input reference(){Input p(100,100,.1);p.D=289.64466094067262;p.C=179.28932188134524;p.s0=-544.9747468305833;return p;}
 static void report(const char* label,const Result& r){
  std::cout<<std::setprecision(15)<<label<<" status="<<r.status<<" "<<r.reason
  <<" distance=["<<r.obstacle.mm.lo<<","<<r.obstacle.mm.hi<<"] guard="<<r.jointDeviationUpperMm<<" cells="<<r.obstacle.cells<<std::endl;
@@ -21,7 +24,13 @@ int main(){
  I ss=bounded::sine(I(tvsOffset::pi()/6)),cc=bounded::cosine(I(tvsOffset::pi()/3));
  contains(ss,.5,"sin30 independent .5");contains(cc,.5,"cos60 independent .5");
  int mode=std::fegetround();std::fesetround(FE_DOWNWARD);expect(check(reference()).status==Unsupported,"candidate rejects wrong rounding");expect(!bounded::supported(),"wrong rounding rejected");std::fesetround(mode);
+ #if defined(__SSE2__) || defined(_M_X64)
+ unsigned csr=_mm_getcsr();_mm_setcsr(csr|0x8040);
+ expect(!bounded::supported(),"FTZ/DAZ rejected");_mm_setcsr(csr);
+#endif
  Input p=reference();p.clearance=49.9;Result r=check(p);report("reference below with explicit .1 margin",r);
+ 
+ int flags=std::fetestexcept(FE_ALL_EXCEPT);check(p);expect(std::fetestexcept(FE_ALL_EXCEPT)==flags,"floating flags restored");
  expect(r.geometryReady&&r.members.size()==7&&r.axis.size()==8,"seven shared-result members/eight ports");
  expect(r.status==Feasible,"reference positive margin feasible");expect(!r.minimumConfirmed,"no optimizer claim");
  contains(r.run,1089.9494936611665,"fixed run oracle");
