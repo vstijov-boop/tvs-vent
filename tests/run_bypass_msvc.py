@@ -15,6 +15,8 @@ for line in configured.stdout.splitlines():
     if "=" in line and not line.startswith("="):
         key,value=line.split("=",1);env[key]=value
 env["TVS_BYPASS_CXX"]="msvc"
+# Windows CreateProcess executable lookup also consults the parent PATH.
+os.environ.update(env)
 print("TOOLSET",toolset,"vcvars",batch,args,flush=True)
 for name in ["VCToolsInstallDir","VCToolsVersion","WindowsSDKVersion","WindowsSdkDir"]:
     print(name,env.get(name),flush=True)
