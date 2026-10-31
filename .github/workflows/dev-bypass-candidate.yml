@@ -21,7 +21,7 @@ jobs:
           mkdir -p bypass-test-results
           python3 --version | tee bypass-test-results/environment.txt
           g++ --version | head -n 1 | tee -a bypass-test-results/environment.txt
-          python3 -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee bypass-test-results/tests.txt
+          TVS_BYPASS_REFERENCE_OUT=bypass-test-results/references.json python3 -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee bypass-test-results/tests.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:

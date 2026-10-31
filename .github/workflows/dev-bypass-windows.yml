@@ -61,6 +61,7 @@ jobs:
           }
       - name: Run isolated numerical tests (no ARX or DBX build)
         env:
+          TVS_BYPASS_REFERENCE_OUT: bypass-windows-results/references.json
           TVS_BYPASS_TOOLSET: ${{ matrix.toolset }}
         run: |
           New-Item -ItemType Directory -Force bypass-windows-results | Out-Null
