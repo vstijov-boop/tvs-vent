@@ -66,8 +66,9 @@ int main(){
  Result blocked=run("floor-proven-impossible",q,p,false);expect(!blocked.hasCandidate,"known impossible floor rejected");
  q=base;q.above=true;q.ceiling.active=true;q.ceiling.mm=-150;
  blocked=run("ceiling-proven-impossible",q,p,false);expect(!blocked.hasCandidate,"known impossible ceiling rejected");
- q=base;q.windowLeft=-500;q.windowRight=500;
- // Even allowing C=100, D>=275 gives W >=100+700*sqrt(2)=1089.94949 >1000.
+ q=base;q.windowLeft=-450;q.windowRight=450;
+ // c=50 implies D>=275. At 45 degrees X=D+400*(sqrt(2)-1).
+ // With C>=100: W>=800*sqrt(2)-150=981.370849898476 > the 900 mm window.
  blocked=run("window-proven-impossible",q,p,false);expect(!blocked.hasCandidate,"known impossible window rejected");
  expect(blocked.status==NoCandidateFoundWithinBudget||blocked.status==Unresolved,"search failure not labeled global infeasibility");
  q=base;q.minimumSlope=300;q.minimumBridge=420;q.windowLeft=-1100;q.windowRight=1100;
