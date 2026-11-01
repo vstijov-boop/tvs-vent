@@ -2,6 +2,7 @@
 #include <cassert>
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <memory>
 #include <sstream>
@@ -88,7 +89,7 @@ inline bool reject(const wchar_t*){return false;}
 inline bool checked(Acad::ErrorStatus e){return e==Acad::eOk;}
 inline bool describe(TVS_Entity* e,tvsMove::Node& n){if(!nodes.count(e->id.id))return false;n=nodes[e->id.id];return true;}
 inline void putId(std::wostringstream& s,AcDbObjectId id){s<<id.id;}
-inline bool connections(TVS_Entity* e,std::wostringstream& out){for(const auto& c:e->connectors)out<<c.cTypeCurrent<<c.connectionID.id;return true;}
+inline void putPoint(std::wostringstream& s,const AcGePoint3d& p){s<<p.x<<L','<<p.y<<L','<<p.z<<L';';}
 inline bool capture(AcDbObjectId,tvsOffsetOperation::End,Snapshot& s){s=live;return !badCapture&&!::fixtureSource.locked;}
 inline bool pipeState(TVS_Pipe*,Snapshot& s){s.fingerprint=live.fingerprint;return !::fixtureSource.locked;}
 inline void initialize(TVS_Entity*){}

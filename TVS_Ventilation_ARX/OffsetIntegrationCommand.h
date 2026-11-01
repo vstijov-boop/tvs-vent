@@ -53,7 +53,7 @@ inline Outcome interact(const AcDbObjectId& source,tvsOffsetOperation::End end,d
     tvsOffsetService::Snapshot snapshot;if(!tvsOffsetService::capture(source,end,snapshot))return Failed;
     dgChangeZ dg;dg.startZ=snapshot.physical.elevation;dg.nextZ=dg.startZ;dg.Axis=defaultAngle;
     if(dg.DoModal()!=IDOK)return Cancelled;
-    if(std::fabs(dg.startZ-snapshot.physical.elevation)*snapshot.physical.factor>.001){
+    if(!tvsOffset::finite(dg.startZ)||std::fabs(dg.startZ-snapshot.physical.elevation)*snapshot.physical.factor>.001){
         tvsOffsetService::reject(L"Pocetna apsolutna kota mora odgovarati izabranom kanalu.");return Failed;}
     tvsOffsetOperation::Request request;request.elevation=dg.nextZ;request.angleDegrees=dg.Axis;
     request.minimumStraight=integrationPolicy().minimumStraightMm;request.minimumProjection=integrationPolicy().minimumProjectionMm;

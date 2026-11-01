@@ -22,7 +22,7 @@ class OffsetServiceTests(unittest.TestCase):
     def test_actual_service_guards_topology_and_transaction(self):
         text = (ROOT/'TVS_Ventilation_ARX/OffsetService.h').read_text(encoding='utf-8-sig')
         extracted = '\n'.join(function(text, s) for s in [
-            'inline bool topology(', 'inline bool current(', 'inline Outcome write('])
+            'inline bool connections(', 'inline bool topology(', 'inline bool current(', 'inline Outcome write('])
         # Layout-only formatting for the extracted existing compact C++ statements.
         extracted = extracted.replace(';if(', ';\n    if(')
         main = r'''
@@ -68,8 +68,12 @@ int main(){
   fixtureSource.connectors[e].connectionID=0;
   n->connectors[0].point.x+=1;assert(!topology(live,&fixtureSource,signature));++assertions;
   n->connectors[0].point.x-=1;
+  n->connectors[0].point.x=std::numeric_limits<double>::quiet_NaN();assert(!topology(live,&fixtureSource,signature));++assertions;
+  n->connectors[0].point=n->LastPoint;
   n->connectors.clear();assert(!topology(live,&fixtureSource,signature));++assertions;
   fixtureSource.connectors.clear();assert(topology(live,&fixtureSource,signature));++assertions;
+  const double savedX=nodes[2].ports[1].x;nodes[2].ports[1].x=std::numeric_limits<double>::quiet_NaN();
+  assert(!topology(live,&fixtureSource,signature));++assertions;nodes[2].ports[1].x=savedX;
   nodes[2].sections[1].a=300;assert(!topology(live,&fixtureSource,signature));++assertions;
   nodes[2].sections[1].a=400;
   nodes[2].axes[1]=tvsMoveGeometry::Point(0,1,0);assert(!topology(live,&fixtureSource,signature));++assertions;

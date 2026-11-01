@@ -31,7 +31,10 @@ inline void putString(std::wostringstream& s,const std::wstring& value){s<<value
 inline bool connections(TVS_Entity* entity,std::wostringstream& out){
     out<<entity->connectors.size()<<L';';
     for(const auto& c:entity->connectors){out<<int(c.cTypeCurrent)<<L';';putId(out,c.connectionID);
-        if(!c.connectionID.isNull()){out<<int(c.cTypeAnother)<<L';';putPoint(out,c.point);}}
+        if(!c.connectionID.isNull()){
+            if(!tvsOffsetAdapter::finitePoint(tvsOffset::WorldPoint(c.point.x,c.point.y,c.point.z)))
+                return reject(L"Neispravna tacka povezanog konektora.");
+            out<<int(c.cTypeAnother)<<L';';putPoint(out,c.point);}}
     return true;
 }
 inline bool properties(TVS_Pipe* source,Snapshot& s,std::wostringstream& out){
@@ -91,7 +94,7 @@ inline bool pipeState(TVS_Pipe* p,Snapshot& s){
        <<int(color.red())<<L';'<<int(color.green())<<L';'<<int(color.blue())<<L';'
        <<p->linetypeScale()<<L';'<<int(p->lineWeight())<<L';'<<int(p->visibility())<<L';'
        <<p->transparency().serializeOut()<<L';';
-    connections(p,out);
+    if(!connections(p,out))return false;
     if(!properties(p,s,out))return false;
     s.fingerprint=out.str();return true;
 }
@@ -144,7 +147,8 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature)
         TVS_Entity* e=TVS_Entity::cast(object.object());if(!e||e->objectId()==s.source)continue;
         tvsMove::Node node;if(!describe(e,node)||!node.kind||node.ports.size()!=node.axes.size()
             ||node.ports.size()!=node.sections.size())return reject(L"Nepodrzana TVS geometrija u Model prostoru.");
-        putId(out,e->objectId());connections(e,out);
+        putId(out,e->objectId());
+        if(!connections(e,out))return false;
         for(const auto& c:e->connectors)if(c.connectionID==s.source){
             ++inbound;
             if(ownIndex[opposite]<0)return reject(L"Jednosmjerna ulazna konektorska veza.");
@@ -156,6 +160,8 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature)
         out<<node.kind<<L';';
         for(size_t j=0;j<node.ports.size();++j){
             const auto& p=node.ports[j];const auto& sec=node.sections[j];const auto& axis=node.axes[j];
+            const double values[]={p.x,p.y,p.z,sec.a,sec.b,sec.elevation,axis.x,axis.y,axis.z};
+            for(double value:values)if(!tvsOffset::finite(value))return reject(L"Neispravna geometrija susjeda.");
             out<<p.x<<L';'<<p.y<<L';'<<p.z<<L';'<<sec.a<<L';'<<sec.b<<L';'<<sec.elevation<<L';'
                <<sec.round<<L';'<<axis.x<<L';'<<axis.y<<L';'<<axis.z<<L';';
             if(std::fabs(sec.elevation-source->Elev)>tol)continue;
