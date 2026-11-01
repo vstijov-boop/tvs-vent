@@ -89,7 +89,7 @@ int main(){
   v=engine.calculate(s,unit,false,o,false);expect(v.ready,"detail matrix candidate");
   for(bool detailed:{false,true}){
    SideDetail d=sideDetail(v,o,"OB-01",detailed,3.5,4.);
-   near(d.factor,unit,"DWG factor retained");expect(d.dimensions.size()==(detailed?5u:3u),"native dimension plan count");
+   near(d.factor,unit,"DWG factor retained");near(d.minS,0,"detail bounds start at local zero, not absolute s0");near(d.maxS,v.W,"detail bounds end at W");expect(d.dimensions.size()==(detailed?5u:3u),"native dimension plan count");
    near(std::hypot(d.dimensions[0].a.s-d.dimensions[0].b.s,d.dimensions[0].a.z-d.dimensions[0].b.z)/unit*unit,v.W,"W dimension geometry times DIMLFAC");
    near(std::hypot(d.dimensions[1].a.s-d.dimensions[1].b.s,d.dimensions[1].a.z-d.dimensions[1].b.z)/unit*unit,v.C,"H dimension real geometry");
    near(std::fabs(d.dimensions[2].a.z-d.dimensions[2].b.z),v.D,"D dimension real geometry");
@@ -118,3 +118,4 @@ int main(){
  }
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / presentation / layout / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
+

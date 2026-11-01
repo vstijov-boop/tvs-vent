@@ -35,7 +35,7 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  d.paths.push_back(detailRectangle(-v.frame.obstacleWidth/2,v.frame.obstacleWidth/2,v.frame.obstacleZ-v.frame.obstacleHeight/2,v.frame.obstacleZ+v.frame.obstacleHeight/2,false));
  d.paths.push_back(detailRectangle(-v.frame.obstacleWidth/2-o.obstacleInsulation,v.frame.obstacleWidth/2+o.obstacleInsulation,v.frame.obstacleZ-v.frame.obstacleHeight/2-o.obstacleInsulation,v.frame.obstacleZ+v.frame.obstacleHeight/2+o.obstacleInsulation,true));
  // Translate the absolute physical elevation datum to the local drawing origin. Geometry stays 1:1.
- d.minS=d.maxS=v.axis.front().s;d.minZ=d.maxZ=0;
+ d.minS=d.maxS=0;d.minZ=d.maxZ=0;
  for(auto& p:d.paths)for(auto& x:p.points){x.s-=v.axis.front().s;x.z-=v.frame.z0;
   d.minS=(std::min)(d.minS,x.s);d.maxS=(std::max)(d.maxS,x.s);d.minZ=(std::min)(d.minZ,x.z);d.maxZ=(std::max)(d.maxZ,x.z);}
  auto local=[&](Vertex p){return Vertex(p.s-v.axis.front().s,p.z-v.frame.z0);};
@@ -85,4 +85,5 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
 }
 }
 #endif
+
 
