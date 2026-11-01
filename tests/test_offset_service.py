@@ -133,5 +133,148 @@ int main(){
             compile_cpp(cpp, target)
             subprocess.run([str(executable(target))], check=True)
 
+    def test_both_actual_drawing_callers_preserve_outcomes(self):
+        ui = (ROOT/'TVS_Ventilation_ARX/OffsetIntegrationCommand.h').read_text(encoding='utf-8-sig')
+        entry = (ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+        execute = function(ui, 'inline Outcome execute(')
+        wrapper = function(entry, 'static tvsOffsetIntegration::Outcome changeZ(')
+        needle = 'if(changeZ(pipi)==tvsOffsetIntegration::Applied)'
+        callers = []
+        remaining = entry
+        while needle in remaining:
+            body = function(remaining, needle)
+            callers.append(body)
+            remaining = remaining[remaining.index(needle) + len(body):]
+        self.assertEqual(len(callers), 2, 'Both existing Z call sites must be exercised')
+        prelude = r'''
+#include <cassert>
+#include <iostream>
+#include <stdexcept>
+struct AcGePoint3d {double x,y,z;AcGePoint3d(double a=0,double b=0,double c=0):x(a),y(b),z(c){}};
+struct AcDbObjectId {int id;AcDbObjectId(int n=0):id(n){}};
+struct TVS_Pipe {int id;AcGePoint3d FirstPoint,LastPoint;AcDbObjectId objectId(){return AcDbObjectId(id);}};
+struct AcDbDatabase {};
+struct Host {AcDbDatabase* workingDatabase(){return NULL;}};
+static Host host;
+static Host* acdbHostApplicationServices(){return &host;}
+static double globalAxis=33,globalElevMid=-400,globalElev=-400;
+static void acutPrintf(const wchar_t*,...){}
+namespace tvsOffsetOperation {enum End {First,Last};}
+namespace tvsOffsetService {
+enum Outcome {Applied,NoChange,Cancelled,Failed};
+struct Commit {AcDbObjectId output;TVS_Pipe* residentOutput;double elevation,angle,before;};
+}
+static int events=0;static bool throwHistory=false;
+namespace tvsOffsetSession {inline void applied(AcDbDatabase*,AcDbObjectId a,AcDbObjectId b,double before){
+ assert(a.id==1&&b.id==2&&before==-400);++events;if(throwHistory)throw std::runtime_error("test allocation failure");}}
+namespace tvsOffsetIntegration {
+using namespace tvsOffsetService;
+static Outcome desired=Failed;static Commit fixture;
+inline Outcome interact(AcDbObjectId id,tvsOffsetOperation::End end,double angle,Commit& out){
+ assert(id.id==1&&end==tvsOffsetOperation::Last&&angle==33);out=fixture;return desired;}
+'''
+        source = prelude + execute + '\n}\n' + wrapper + '\n'
+        for index, body in enumerate(callers):
+            source += f'\nstatic void caller{index}(TVS_Pipe*& pipi,AcGePoint3d& A1,AcGePoint3d& A2,double* pt1){{' + body + '}\n'
+        source += r'''
+int main(){
+ TVS_Pipe original;original.id=1;original.FirstPoint=AcGePoint3d(-2000,0,37);original.LastPoint=AcGePoint3d(0,0,37);
+ TVS_Pipe output;output.id=2;output.FirstPoint=AcGePoint3d(500,0,37);output.LastPoint=AcGePoint3d(800,0,37);
+ auto& commit=tvsOffsetIntegration::fixture;commit.output=2;commit.residentOutput=&output;commit.elevation=0;commit.angle=45;commit.before=-400;
+ int cases=0;
+ for(int which=0;which<2;++which)for(int status=0;status<4;++status)for(int fail=0;fail<2;++fail){
+  globalAxis=33;globalElevMid=globalElev=-400;events=0;throwHistory=fail!=0;
+  tvsOffsetIntegration::desired=tvsOffsetService::Outcome(status);
+  TVS_Pipe* current=&original;AcGePoint3d a1(-1,-2,37),a2(0,0,37);double pt[3]={0,0,37};
+  if(which==0)caller0(current,a1,a2,pt);else caller1(current,a1,a2,pt);
+  if(status==tvsOffsetService::Applied){
+   assert(current==&output&&globalElevMid==0&&globalElev==0&&globalAxis==45&&events==1);
+   assert(a1.x==500&&a2.x==800&&pt[0]==800&&pt[1]==0&&pt[2]==37);
+  }else{
+   assert(current==&original&&globalElevMid==-400&&globalElev==-400&&globalAxis==33&&events==0);
+   assert(a1.x==-1&&a1.y==-2&&a2.x==0&&pt[0]==0&&pt[1]==0&&pt[2]==37);
+  }
+  ++cases;
+ }
+ std::cout<<"PASS "<<cases<<" actual TVS_PIPE/drawStep3 Z caller cases: Applied/NoChange/Cancelled/Failed, continuation/globals, post-commit memory failure; no MFC/CAD runtime\n";
+}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            cpp = pathlib.Path(folder)/'drawing.cpp'
+            cpp.write_text(source, encoding='utf-8')
+            target = pathlib.Path(folder)/'drawing'
+            compile_cpp(cpp, target)
+            subprocess.run([str(executable(target))], check=True)
+
+    def test_actual_attribute_policy(self):
+        text = (ROOT/'TVS_Ventilation_ARX/OffsetService.h').read_text(encoding='utf-8-sig')
+        body = function(text, 'inline bool properties(')
+        stub = r'''
+#include <cassert>
+#include <cwchar>
+#include <iostream>
+#include <set>
+#include <sstream>
+#include <string>
+#define CTVSProperty L"TVS_Property"
+namespace Acad {enum ErrorStatus {eOk,eInvalid};}
+namespace AcDb {enum OpenMode {kForRead};}
+struct AcDbObjectId {bool exists;bool isNull()const{return !exists;}};
+struct resbuf {int restype;struct {int rint;double rreal;const wchar_t* rstring;} resval;resbuf* rbnext;
+ resbuf(int type):restype(type),rbnext(NULL){resval.rint=0;resval.rreal=0;resval.rstring=L"";}};
+static int allocated=0,released=0,dictionaryEntries=0;
+static resbuf* node(int type){++allocated;return new resbuf(type);}
+static void acutRelRb(resbuf* p){while(p){resbuf* next=p->rbnext;delete p;++released;p=next;}}
+struct AcDbDictionary {int numEntries(){return dictionaryEntries;}};
+template<class T>struct AcDbObjectPointer {T value;AcDbObjectPointer(AcDbObjectId,AcDb::OpenMode){}
+ Acad::ErrorStatus openStatus(){return Acad::eOk;}T* operator->(){return &value;}};
+struct TVS_Pipe {resbuf* data;bool dictionary;TVS_Pipe():data(NULL),dictionary(false){}
+ AcDbObjectId extensionDictionary(){AcDbObjectId id={dictionary};return id;}resbuf* xData(void*){return data;}};
+namespace tvsOffsetService {
+struct Snapshot {std::wstring manufacturer,note;};
+inline bool reject(const wchar_t*){return false;}
+inline void putString(std::wostringstream& s,const std::wstring& v){s<<v.size()<<L':'<<v;}
+}
+'''
+        main = r'''
+using namespace tvsOffsetService;
+static resbuf* app(const wchar_t* name=L"TVS_Property"){resbuf* n=node(1001);n->resval.rstring=name;return n;}
+static void append(resbuf* head,int tag,const wchar_t* value){
+ while(head->rbnext)head=head->rbnext;
+ head->rbnext=node(1070);head=head->rbnext;head->resval.rint=tag;
+ head->rbnext=node(1000);head->rbnext->resval.rstring=value;
+}
+static void number(resbuf* head,int tag,double value){
+ while(head->rbnext)head=head->rbnext;
+ head->rbnext=node(1070);head=head->rbnext;head->resval.rint=tag;
+ head->rbnext=node(1040);head->rbnext->resval.rreal=value;
+}
+static bool run(resbuf* data,Snapshot& s){TVS_Pipe p;p.data=data;std::wostringstream out;return properties(&p,s,out);}
+int main(){
+ int cases=0;
+ {Snapshot s;assert(run(NULL,s));++cases;}
+ {Snapshot s;resbuf* data=app();append(data,0,L"UNIQUE-01");append(data,5,L"Manufacturer");append(data,9,L"Shared note");
+  append(data,1,L"");number(data,7,0);number(data,8,0);assert(run(data,s));
+  assert(s.manufacturer==L"Manufacturer"&&s.note==L"Shared note");++cases;}
+ {Snapshot s;assert(!run(app(L"UnknownApplication"),s));++cases;}
+ for(int tag=1;tag<=6;++tag)if(tag!=5){Snapshot s;resbuf* data=app();append(data,tag,L"custom override");assert(!run(data,s));++cases;}
+ for(int tag=7;tag<=8;++tag){Snapshot s;resbuf* data=app();number(data,tag,123);assert(!run(data,s));++cases;}
+ {Snapshot s;resbuf* data=app();append(data,10,L"unknown");assert(!run(data,s));++cases;}
+ {Snapshot s;resbuf* data=app();append(data,5,L"A");append(data,5,L"B");assert(!run(data,s));++cases;}
+ {Snapshot s;resbuf* data=app();data->rbnext=node(1070);assert(!run(data,s));++cases;}
+ {Snapshot s;resbuf* data=app();number(data,5,0);assert(!run(data,s));++cases;}
+ {Snapshot s;TVS_Pipe p;p.dictionary=true;dictionaryEntries=1;std::wostringstream out;assert(!properties(&p,s,out));++cases;}
+ assert(allocated==released);
+ std::cout<<"PASS "<<cases<<" actual read-only attribute-policy cases: shared manufacturer/note, unique position retained, ambiguous overrides/unknown apps/duplicates/dictionaries refused, buffers released; SDK substitutes only\n";
+}
+'''
+        source = stub + '\nnamespace tvsOffsetService {\n' + body + '\n}\n' + main
+        with tempfile.TemporaryDirectory() as folder:
+            cpp = pathlib.Path(folder)/'attributes.cpp'
+            cpp.write_text(source, encoding='utf-8')
+            target = pathlib.Path(folder)/'attributes'
+            compile_cpp(cpp, target)
+            subprocess.run([str(executable(target))], check=True)
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

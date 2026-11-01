@@ -85,7 +85,8 @@ inline bool pipeState(TVS_Pipe* p,Snapshot& s){
     out<<p->SizeA<<L';'<<p->SizeB<<L';'<<p->Elev<<L';'<<p->ElevUp<<L';'<<p->ElevDown<<L';'
        <<p->Flow<<L';'<<p->Direct<<L';'<<p->Param<<L';'<<p->Form<<L';'<<p->IsPipe<<L';'
        <<p->Wipeout<<L';'<<p->WipeoutLength<<L';'<<p->This1D<<L';'<<p->Grani<<L';';
-    putId(out,p->layerId());putId(out,p->linetypeId());putId(out,p->material());putId(out,p->plotStyleNameId());
+    putId(out,p->layerId());putId(out,p->linetypeId());putId(out,p->materialId());
+    AcDbObjectId plotStyle;out<<int(p->getPlotStyleNameId(plotStyle))<<L';';putId(out,plotStyle);
     const AcCmColor color=p->color();out<<int(color.colorMethod())<<L';'<<color.colorIndex()<<L';'
        <<int(color.red())<<L';'<<int(color.green())<<L';'<<int(color.blue())<<L';'
        <<p->linetypeScale()<<L';'<<int(p->lineWeight())<<L';'<<int(p->visibility())<<L';'
@@ -252,7 +253,9 @@ inline Outcome write(const Snapshot& s,const tvsOffsetOperation::Request& reques
         tap->Swectangle=e.angle;tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,0);tap->Normvector=AcGeVector3d(0,0,1);
         tap->MiddlePoint=tvsOffsetProof::pt(e.middle);tap->CenterPoint=tap->MiddlePoint;
         if(!checked(tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down))||!checked(tap->put_Elevation(e.elevation)))return Failed;
-        const int role=j==0?0:2;TVS_TAP* raw=tap.release();if(!tx.append(raw,pending.members[role]))return Failed;members[role]=raw;
+        const int role=j==0?0:2;TVS_TAP* raw=tap.release();
+        if(!tx.append(raw,pending.members[role]))return Failed;
+        members[role]=raw;
     }
     std::unique_ptr<TVS_Pipe> slope(new TVS_Pipe());initializePipe(slope.get());slope->setDatabaseDefaults();
     if(!appearance(source,slope.get(),s))return Failed;
@@ -260,14 +263,18 @@ inline Outcome write(const Snapshot& s,const tvsOffsetOperation::Request& reques
     slope->FirstPoint=tvsOffsetProof::pt(d.middle.first);slope->LastPoint=tvsOffsetProof::pt(d.middle.last);
     if(!checked(slope->put_Elevation((d.middle.firstElevationMm+d.middle.lastElevationMm)/2/s.physical.factor)))return Failed;
     slope->connectors[0].point=slope->FirstPoint;slope->connectors[1].point=slope->LastPoint;
-    TVS_Pipe* rawSlope=slope.release();if(!tx.append(rawSlope,pending.members[1]))return Failed;members[1]=rawSlope;
+    TVS_Pipe* rawSlope=slope.release();
+    if(!tx.append(rawSlope,pending.members[1]))return Failed;
+    members[1]=rawSlope;
     std::unique_ptr<TVS_Pipe> exit(new TVS_Pipe());initializePipe(exit.get());exit->setDatabaseDefaults();
     if(!appearance(source,exit.get(),s))return Failed;
     exit->SizeA=s.physical.a;exit->SizeB=s.physical.b;exit->ThisRound=false;exit->DuctType=DuctTypeStill;
     exit->FirstPoint=tvsOffsetProof::pt(verified.exitFirst);exit->LastPoint=tvsOffsetProof::pt(verified.exitLast);
     if(!checked(exit->put_Elevation(verified.acceptedElevation)))return Failed;
     exit->connectors[0].point=exit->FirstPoint;exit->connectors[1].point=exit->LastPoint;
-    TVS_Pipe* rawExit=exit.release();if(!tx.append(rawExit,pending.output))return Failed;pending.residentOutput=rawExit;
+    TVS_Pipe* rawExit=exit.release();
+    if(!tx.append(rawExit,pending.output))return Failed;
+    pending.residentOutput=rawExit;
     const CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return Failed;
     for(int j=0;j<3;++j){tvsOffsetData::Record record;record.guid=guid;record.role=j;
         for(int k=0;k<3;++k)record.members[k]=pending.members[k];

@@ -3,7 +3,7 @@
 #include "OffsetService.h"
 #include "acgiTransient.h"
 #include "dbpl.h"
-#include "dbtext.h"
+#include "dbents.h"
 namespace tvsOffsetIntegration {
 using tvsOffsetService::Outcome;
 using tvsOffsetService::Applied;using tvsOffsetService::NoChange;
