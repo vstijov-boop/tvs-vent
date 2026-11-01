@@ -34,7 +34,8 @@ static Inventory inventory(AcDbDatabase* db){
   for(;!e->done();e->step()){
    AcDbEntity* entity=NULL;require(e->getEntity(entity,AcDb::kForRead));AcDbObjectPointer<AcDbEntity> ent;ent.acquire(entity);
    AcDbBlockReference* ref=AcDbBlockReference::cast(entity);if(!ref)continue;Identity value=identity(ref);if(value.guid.empty())continue;
-   std::string label(value.label.begin(),value.label.end());std::wstring key=widen(labelKey(label));
+   std::string label;for(wchar_t c:value.label){if(c<0||c>127)throw std::runtime_error("Non-ASCII detail identity");label.push_back(static_cast<char>(c));}
+   if(!detailLabelValid(label))throw std::runtime_error("Invalid detail identity label");std::wstring key=widen(labelKey(label));
    if(!guids.insert(value.guid).second||!labels.insert(key).second)out.duplicated=true;
    out.labels.push_back(label);
   }
@@ -177,3 +178,4 @@ static void insert(AcDbDatabase* db,const View& v,const Options& o,const AcDbObj
  }
 }
 }
+
