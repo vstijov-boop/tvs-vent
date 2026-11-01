@@ -1,5 +1,10 @@
 # Plan integracije promjene kote — bez implementacije
 
+Istorijski predlog prve offset integracije. Za stanje na HEAD-u bd01b2e i naredni
+zajednički offset/bypass plan vidjeti [aktuelni plan](../development/INTEGRATION_PLAN.md),
+[stanje koda](../development/CODE_STATE.md) i [backlog](../development/INTEGRATION_BACKLOG.md).
+Tekst ispod nije tvrdnja da integracija danas još nije započeta.
+
 30.10.2026. Osnova: prihvaćeni izolovani modul iz commita 249e212 i naknadna
 dopuna njegovih testova. Ovaj dokument ništa ne povezuje sa aplikacijom.
 XRecord, novi dijalog, promjena entiteta i postojećih DWG crteža nisu uvedeni.

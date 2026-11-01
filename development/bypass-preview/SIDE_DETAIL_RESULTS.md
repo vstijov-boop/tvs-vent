@@ -1,5 +1,14 @@
 # DEV side detail — results, 2026-11-01
 
+Later checkpoint / priority change: controlled AutoCAD 2022 LINE and interactive
+detail Undo/Redo passed with the documented startup exclusions; another startup
+environment reproduced the failure. Cause remains unisolated and no individual
+add-on is blamed. Investigation is deferred to final stabilization, not a blocker
+for integration planning. No new Redo testing is requested now. The original
+report below is historical; later results and incomplete interactive checks are
+recorded in [REDO_INVESTIGATION.md](REDO_INVESTIGATION.md) and the authoritative
+[backlog/checklist](../INTEGRATION_BACKLOG.md). Production is not approved.
+
 Executable source: `ee85e72cce0e805991d172a2c34cdc4306530cb3`. Corrected packages: **r3**. PR #1 remains draft on `razvoj-bypass-candidate`; no production merge. CI checkout `a8c445b693930666021d1accc69a7d3db3ed318f` has the identical executable tree (GitHub compare: zero changed files).
 
 ## Commits and scope
