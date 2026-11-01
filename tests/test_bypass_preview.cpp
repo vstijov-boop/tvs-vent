@@ -88,5 +88,5 @@ int main(){
   }
   expect(sectionLayout(sx,sy,false,expert).labels.empty(),"Kote off has no stale annotation slots");
  }
- std::cout<<"PASS PREVIEW "<<checks<<" adapter / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
+ std::cout<<"PASS PREVIEW "<<checks<<" adapter / presentation / layout / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }

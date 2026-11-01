@@ -157,6 +157,7 @@ struct Dialog {
  }
  void init(HWND h){window=h;loading=true;
   RECT work;SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
+  MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);if(GetMonitorInfoW(MonitorFromWindow(GetParent(h),MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;
   SetWindowPos(h,NULL,work.left+10,work.top+10,(std::min)(1220L,work.right-work.left-20),(std::min)(760L,work.bottom-work.top-20),SWP_NOZORDER);
   RECT client;GetClientRect(h,&client);scaleX=client.right/1204.0;scaleY=client.bottom/720.0;
   if(!font)font=CreateFontW(-(int)(13*(std::min)(scaleX,scaleY)),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI");
