@@ -272,7 +272,7 @@ struct Dialog {
  }
 };
 }
-void tvsBypassDetailTestCommand(){try{tvsSideDetail::nativeFixture();}catch(const std::exception& e){tvsSideDetail::injectedStage=0;acutPrintf(L"\nNATIVE_DETAIL_FIXTURE_FAILED: %hs",e.what());}catch(...){tvsSideDetail::injectedStage=0;acutPrintf(L"\nNATIVE_DETAIL_FIXTURE_FAILED. Disposable test drawing may contain completed fixtures.");}}
+void tvsBypassDetailTestCommand(){try{tvsSideDetail::nativeFixture();}catch(const std::exception& e){tvsSideDetail::injectedStage=0;acutPrintf(L"\nNATIVE_DETAIL_FIXTURE_FAILED: %ls",wide(e.what()).c_str());}catch(...){tvsSideDetail::injectedStage=0;acutPrintf(L"\nNATIVE_DETAIL_FIXTURE_FAILED. Disposable test drawing may contain completed fixtures.");}}
 void tvsBypassDetailCheckCommand(){
  try{auto used=tvsSideDetail::inventory(acdbHostApplicationServices()->workingDatabase());
   acutPrintf(L"\nBocni detalji: %u lokalnih referenci. %ls",static_cast<unsigned>(used.labels.size()),used.duplicated?L"DUPLIKATI: COPY nije nezavisni detalj; uklonite kopije.":L"Oznake/GUID-i bez otkrivenih duplikata. XREF i ponovljene parent instance nisu globalno provjereni.");

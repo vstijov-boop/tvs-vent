@@ -23,7 +23,8 @@ static void verifyNative(AcDbObjectId id,const SideDetail& d,const std::string& 
   AcDbAlignedDimension* dimension=AcDbAlignedDimension::cast(ent.object());if(!dimension)continue;
   assertTest(count<d.dimensions.size());double measured=0;require(dimension->measurement(measured));
   const auto& q=d.dimensions[count];double expected=std::hypot(q.a.s-q.b.s,q.a.z-q.b.z);
-  assertTest(std::fabs(measured*d.factor-expected)<1e-6);assertTest(std::fabs(dimension->dimlfac()-d.factor)<1e-12);assertTest(!dimension->dimBlockId().isNull());++count;
+  // AutoCAD measurement() already includes DIMLFAC; endpoints remain raw DWG units.
+  assertTest(std::fabs(measured-expected)<1e-6);assertTest(std::fabs(dimension->xLine1Point().distanceTo(dimension->xLine2Point())*d.factor-expected)<1e-6);assertTest(std::fabs(dimension->dimlfac()-d.factor)<1e-12);assertTest(!dimension->dimBlockId().isNull());++count;
  }
  assertTest(count==d.dimensions.size());
 }
