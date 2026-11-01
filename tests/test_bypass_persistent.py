@@ -10,12 +10,14 @@ class PersistentBypass(unittest.TestCase):
         offset=(ROOT/'TVS_Ventilation_ARX/OffsetService.h').read_text(encoding='utf-8-sig')
         bypass=(ROOT/'TVS_Ventilation_ARX/BypassService.h').read_text(encoding='utf-8-sig')
         data=(ROOT/'TVS_Ventilation_DBX/BypassAssemblyData.h').read_text(encoding='utf-8-sig')
+        parent=(ROOT/'TVS_Ventilation_DBX/BypassAssemblyData.cpp').read_text(encoding='utf-8-sig')
         stub=(ROOT/'tests/offset_service_stubs.h').read_text().replace('#include "../','#include "'+ROOT.as_posix()+'/')
         code=stub+'\n#define TVS_BYPASS_PREVIEW\n#include "'+(ROOT/'TVS_Ventilation_ARX/BypassNumericBridge.cpp').as_posix()+'"\n'
         code+='\nnamespace tvsOffsetService {\n'
         for name in ['inline bool current(', 'inline std::unique_ptr<TVS_TAP> makeElbow(', 'inline std::unique_ptr<TVS_Pipe> makePipe(']:
             code+=function(offset,name)+'\n'
         code+='}\nnamespace tvsBypassData {\n'+function(data,'struct Record')+';\n'
+        code+=function(parent,'static bool boundaryPinned(')+'\n'
         code+=r'''
 static std::map<int,Record> parents;static bool failParent=false,pinnedFlag=false;
 inline bool pinned(AcDbObjectId,bool){return pinnedFlag;}
@@ -84,6 +86,21 @@ static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvs
  copy(&fixtureSource,model.route);copy(obstacle,model.obstacle);return model;
 }
 int main(){
+ for(bool reverse:{false,true}){
+  tvsBypassData::Record r;r.reverse=reverse;r.inlet=71;r.outlet=72;
+  assert(tvsBypassData::boundaryPinned(r,71,reverse));
+  assert(!tvsBypassData::boundaryPinned(r,71,!reverse));
+  assert(tvsBypassData::boundaryPinned(r,72,!reverse));
+  assert(!tvsBypassData::boundaryPinned(r,72,reverse));
+  r.neighbors[0]=73;r.ports[0]=1;r.neighbors[1]=74;r.ports[1]=2;
+  assert(tvsBypassData::boundaryPinned(r,71,!reverse));
+  assert(tvsBypassData::boundaryPinned(r,72,reverse));
+  assert(tvsBypassData::boundaryPinned(r,73,true));
+  assert(!tvsBypassData::boundaryPinned(r,73,false));
+  assert(tvsBypassData::boundaryPinned(r,74,false));
+  assert(!tvsBypassData::boundaryPinned(r,74,true));
+  assert(!tvsBypassData::boundaryPinned(r,75,false));
+ }
  int cases=0,failures=0;
  for(double factor:{1.,10.,1000.})for(double heading:{0.,.6457718232379019})for(bool reverse:{false,true})
  for(bool above:{false,true})for(int angle:{30,45,60}){

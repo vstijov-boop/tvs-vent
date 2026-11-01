@@ -67,6 +67,14 @@ static Status read(const AcDbObjectId& id,Record& out){
 static AcGePoint3d horizontalPort(TVS_TAP* p){
     return p->MiddlePoint-AcGeVector3d(-p->Startvector.y,p->Startvector.x,0)*((p->get_radius()+p->SizeB/2)*std::sin(p->Swectangle));
 }
+static bool boundaryPinned(const Record& r,const AcDbObjectId& source,bool first){
+    if(r.inlet==source&&(first==r.reverse||!r.neighbors[0].isNull()))return true;
+    if(r.outlet==source&&(first!=r.reverse||!r.neighbors[1].isNull()))return true;
+    for(int k=0;k<2;++k){
+        if(r.neighbors[k]==source&&r.ports[k]==(first?1:2))return true;
+    }
+    return false;
+}
 bool pinned(const AcDbObjectId& source,bool first){
     if(source.isNull()||!source.database())return true;
     AcDbObjectPointer<AcDbDictionary> nod(source.database()->namedObjectsDictionaryId(),AcDb::kForRead);
@@ -76,7 +84,7 @@ bool pinned(const AcDbObjectId& source,bool first){
     for(;!it->done();it->next()){
         if(_wcsnicmp(it->name(),L"TVS_BYPASS_",11))continue;
         Record r;const Status s=read(it->objectId(),r);if(s!=Valid)return true;
-        if((r.inlet==source&&first==r.reverse)||(r.outlet==source&&first!=r.reverse))return true;
+        if(boundaryPinned(r,source,first))return true;
     }
     return false;
 }
