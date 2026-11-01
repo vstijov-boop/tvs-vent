@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cstdlib>
 #include <limits>
+#include <cfenv>
 using namespace tvsBypassPreview;
 static int checks=0;
 static void expect(bool b,const char* m){++checks;if(!b){std::cerr<<"FAIL "<<m<<std::endl;std::exit(1);}}
@@ -37,10 +38,19 @@ int main(){
  View shorter=engine.calculate(s,1,false,o,true);expect(shorter.ready&&shorter.W<=v.W,"improvement retains best");
  o.calls=1;View limited=engine.calculate(s,1,false,o,true);expect(limited.ready,"changed budget is a new request");
  // Same signature, deterministic first proposal is longer than the prior improved result: retain best.
- o.calls=64;View improved=engine.calculate(s,1,false,o,true);View repeated=engine.calculate(s,1,false,o,false);(void)repeated;
+ o.calls=64;View improved=engine.calculate(s,1,false,o,true);View repeated=engine.calculate(s,1,false,o,true);expect(repeated.ready&&repeated.W<=improved.W,"repeated improvement preserves best for unchanged inputs");
  engine.invalidate();expect(!engine.ready(),"explicit UI invalidation clears engine");
  o.useFloor=true;o.floor=-650;v=engine.calculate(s,1,false,o,true);expect(!v.ready&&!engine.ready(),"changed inputs cannot retain old feasible result");
  o.useFloor=false;o.confirmed=false;v=engine.calculate(s,1,false,o,false);expect(!v.ready,"unconfirmed manual inputs rejected");
  o.confirmed=true;s.obstacle.first.y=-50;s.obstacle.last.y=50;v=engine.calculate(s,1,false,o,false);expect(!v.ready,"partial transverse overlap rejected by checker");
+ {
+  std::fenv_t saved;std::fegetenv(&saved);std::feclearexcept(FE_ALL_EXCEPT);std::feraiseexcept(FE_DIVBYZERO|FE_INEXACT);
+  int flags=std::fetestexcept(FE_ALL_EXCEPT);s=example(1,0);o=Options();o.confirmed=true;o.left=-1100;o.right=1100;
+  v=engine.calculate(s,1,false,o,false);expect(v.ready&&std::fetestexcept(FE_ALL_EXCEPT)==flags,"bridge restores host floating flags");
+  Frame f2=engine.frame(s,1,false);expect(f2.valid&&std::fetestexcept(FE_ALL_EXCEPT)==flags,"frame adapter restores flags");
+  std::fesetround(FE_UPWARD);flags=std::fetestexcept(FE_ALL_EXCEPT);v=engine.calculate(s,1,false,o,false);
+  expect(!v.ready&&std::fegetround()==FE_UPWARD&&std::fetestexcept(FE_ALL_EXCEPT)==flags,"bridge rejects without normalizing rounding");
+  std::fesetenv(&saved);
+ }
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }

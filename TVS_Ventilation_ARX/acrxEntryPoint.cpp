@@ -102,6 +102,10 @@ public:
 		delete pdbl;
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
+#ifdef TVS_BYPASS_PREVIEW
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
+#endif
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->addReactor(&offsetReactor());
@@ -112,6 +116,9 @@ public:
 	}
 
 	virtual AcRx::AppRetCode On_kUnloadAppMsg(void *pkt) {
+#ifdef TVS_BYPASS_PREVIEW
+        acedRegCmds->removeGroup(L"TVS_BYPASS_DEV");
+#endif
         PropertyAdmin::uninitialize();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
@@ -1791,9 +1798,6 @@ public:
 		}
 
 	}
-#ifdef TVS_BYPASS_PREVIEW
-    static void Ventilation_ARXTVS_BYPASS_PREVIEW(){tvsBypassPreviewCommand();}
-#endif
 #ifdef TVS_OFFSET_PROOF
 #ifdef TVS_OFFSET_INTEGRATION
     static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeći uspješni Z će namjerno prekinuti upis poslije podataka sklopa.");}
@@ -4048,6 +4052,3 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_FAIL_NEXT, TVS_OFFSET_FAIL_NEXT, ACRX_CMD_MODAL, NULL)
 #endif
 
-#ifdef TVS_BYPASS_PREVIEW
-ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_BYPASS_PREVIEW, TVS_BYPASS_PREVIEW, ACRX_CMD_MODAL, NULL)
-#endif
