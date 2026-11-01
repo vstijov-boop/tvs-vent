@@ -26,6 +26,7 @@
 #include "StdAfx.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
+#include "BypassAssemblyData.h"
 #include <limits>
 #endif
 #include "TVS_Entity.h"
@@ -180,11 +181,13 @@ Acad::ErrorStatus TVS_Entity::dwgInFields (AcDbDwgFiler *pFiler) {
 //- SubXXX() methods (self notification)
 #ifdef TVS_OFFSET_INTEGRATION
 Acad::ErrorStatus TVS_Entity::subDeepClone(AcDbObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
+    if(tvsBypassData::marked(this)){cloned=NULL;acutPrintf(L"\nDEV BYPASS: COPY sklopa nije podrzan; original ostaje nepromijenjen.");return Acad::eNotApplicable;}
     Acad::ErrorStatus result=AcDbCurve::subDeepClone(owner,cloned,mapping,primary);
     if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
     return result;
 }
 Acad::ErrorStatus TVS_Entity::subWblockClone(AcRxObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
+    if(tvsBypassData::marked(this)){cloned=NULL;acutPrintf(L"\nDEV BYPASS: WBLOCK/INSERT kloniranje nije podrzano.");return Acad::eNotApplicable;}
     Acad::ErrorStatus result=AcDbCurve::subWblockClone(owner,cloned,mapping,primary);
     if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
     return result;

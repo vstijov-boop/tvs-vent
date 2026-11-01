@@ -87,6 +87,10 @@ int main(){
   s=example(unit,.6457718232379019);s.route.elevation=s.obstacle.elevation=datum/unit;
   o=Options();o.confirmed=true;o.above=above;o.angle=angle;o.insulation=o.obstacleInsulation=iso;o.left=-1600;o.right=1600;
   v=engine.calculate(s,unit,false,o,false);expect(v.ready,"detail matrix candidate");
+  for(int pair=0;pair<2;++pair){const auto& dto=v.offsets[pair];expect(dto.ready(),"checked native offset DTO exported");
+   const auto p=v.frame.world(v.axis[pair?4:0].s,0);near(dto.incomingLast.x,p.x,"accepted candidate start X");near(dto.incomingLast.y,p.y,"accepted candidate start Y");
+   near(dto.middle.physicalLengthMm,v.slopePhysical[pair],"native physical length equals checked candidate");
+   near(dto.middle.lastElevationMm-dto.middle.firstElevationMm,pair?(above?-1:1)*std::fabs(v.offsets[0].middle.lastElevationMm-v.offsets[0].middle.firstElevationMm):(above?1:-1)*std::fabs(dto.middle.lastElevationMm-dto.middle.firstElevationMm),"independent signed local rise");}
   for(bool detailed:{false,true}){
    SideDetail d=sideDetail(v,o,"OB-01",detailed,3.5,4.);
    near(d.factor,unit,"DWG factor retained");near(d.minS,0,"detail bounds start at local zero, not absolute s0");near(d.maxS,v.W,"detail bounds end at W");expect(d.dimensions.size()==(detailed?5u:3u),"native dimension plan count");

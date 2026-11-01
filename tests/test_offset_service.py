@@ -22,7 +22,7 @@ class OffsetServiceTests(unittest.TestCase):
     def test_actual_service_guards_topology_and_transaction(self):
         text = (ROOT/'TVS_Ventilation_ARX/OffsetService.h').read_text(encoding='utf-8-sig')
         extracted = '\n'.join(function(text, s) for s in [
-            'inline bool connections(', 'inline bool topology(', 'inline bool current(', 'inline Outcome write('])
+            'inline bool connections(', 'inline bool topology(', 'inline bool current(', 'inline std::unique_ptr<TVS_TAP> makeElbow(', 'inline std::unique_ptr<TVS_Pipe> makePipe(', 'inline Outcome write('])
         # Layout-only formatting for the extracted existing compact C++ statements.
         extracted = extracted.replace(';if(', ';\n    if(')
         main = r'''

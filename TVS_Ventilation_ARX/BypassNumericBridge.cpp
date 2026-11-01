@@ -98,6 +98,15 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
  out.witnessBody=Vertex(middle(checked.obstacle.onBody.s),middle(checked.obstacle.onBody.z));
  out.witnessObstacle=Vertex(middle(checked.obstacle.onObstacle.s),middle(checked.obstacle.onObstacle.z));
  for(const auto& a:checked.axis)out.axis.push_back(Vertex(middle(a.s),middle(a.z)));
+ for(int j=0;j<2;++j){
+  const int first=j==0?0:4,mid=first+1;
+  const Point q=f.world(out.axis[mid].s,0);
+  tvsOffset::Input input(out.axis[first+3].z-out.axis[first].z,f.width,f.height,o.ri,
+      o.angle*tvsOffset::pi()/180,o.minSlope);
+  out.offsets[j]=tvsOffsetAdapter::adapt(input,checked.offsets[j],
+      tvsOffsetAdapter::Placement(tvsOffset::WorldPoint(q.x,q.y,q.z),std::atan2(f.uy,f.ux),factor,out.axis[first].z));
+  if(!out.offsets[j].ready()){invalidate();return failed;}
+ }
  for(int j=0;j<2;++j){out.slopePhysical[j]=checked.offsets[j].straightLength;out.slopeProjected[j]=checked.offsets[j].projectedLength;}
  for(const tvsBypass::Body& body:checked.members){
   exactPath(body,true,out.detailPaths);

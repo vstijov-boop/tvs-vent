@@ -15,9 +15,13 @@ struct AcDbDatabase {};
 static AcDbDatabase database;
 namespace Acad {enum ErrorStatus {eOk,eInvalid};}
 namespace AcDb {enum OpenMode {kForRead,kForWrite};}
-struct AcGeVector3d {double x,y,z;AcGeVector3d(double a=0,double b=0,double c=0):x(a),y(b),z(c){}};
+struct AcGeVector3d {double x,y,z;AcGeVector3d(double a=0,double b=0,double c=0):x(a),y(b),z(c){}
+ double length()const{return std::sqrt(x*x+y*y+z*z);}double dotProduct(const AcGeVector3d& b)const{return x*b.x+y*b.y+z*b.z;}
+ AcGeVector3d operator/(double v)const{return AcGeVector3d(x/v,y/v,z/v);}AcGeVector3d operator*(double v)const{return AcGeVector3d(x*v,y*v,z*v);}};
 struct AcGePoint3d {double x,y,z;AcGePoint3d(double a=0,double b=0,double c=0):x(a),y(b),z(c){}
- double distanceTo(const AcGePoint3d& b)const{return std::sqrt((x-b.x)*(x-b.x)+(y-b.y)*(y-b.y)+(z-b.z)*(z-b.z));}};
+ double distanceTo(const AcGePoint3d& b)const{return std::sqrt((x-b.x)*(x-b.x)+(y-b.y)*(y-b.y)+(z-b.z)*(z-b.z));}
+ AcGeVector3d operator-(const AcGePoint3d& b)const{return AcGeVector3d(x-b.x,y-b.y,z-b.z);}
+ AcGePoint3d operator+(const AcGeVector3d& b)const{return AcGePoint3d(x+b.x,y+b.y,z+b.z);}};
 struct AcDbObjectId {int id;AcDbObjectId(int i=0):id(i){}bool isNull()const{return !id;}
  bool operator==(const AcDbObjectId& b)const{return id==b.id;}bool operator!=(const AcDbObjectId& b)const{return id!=b.id;}
  unsigned long asOldId()const{return static_cast<unsigned long>(id);} };
@@ -51,6 +55,7 @@ struct AcDbBlockTableRecord:AcDbObject {Acad::ErrorStatus newIterator(AcDbBlockT
 static AcDbBlockTableRecord block;
 static int failAppend=0,appendCalls=0,failRecord=0,recordCalls=0,commits=0,aborts=0,txStarts=0;
 static bool failCommit=false;
+static void (*rollbackHook)()=NULL;
 struct Manager {Acad::ErrorStatus getObject(AcDbObject*& out,AcDbObjectId id,AcDb::OpenMode){out=objects[id.id];return out?Acad::eOk:Acad::eInvalid;}};
 static Manager manager;
 static Manager* actrTransactionManager=&manager;
@@ -59,7 +64,7 @@ namespace tvsOffsetData {
 struct Record {CString guid;int role;AcDbObjectId members[3];double rise;};
 static std::map<int,Record> records;
 struct WriteScope {WriteScope(){}~WriteScope(){}};
-inline CString newGuid(){CString s;s.text=L"new-guid";return s;}
+inline CString newGuid(){static int n=0;CString s;s.text=L"new-guid-"+std::to_wstring(++n);return s;}
 inline Acad::ErrorStatus write(AcDbObject* o,const Record& r){if(++recordCalls==failRecord)return Acad::eInvalid;records[o->id.id]=r;return Acad::eOk;}
 }
 namespace tvsOffsetProof {
@@ -68,11 +73,12 @@ struct BuildTransaction {
  AcDbBlockTableRecord* space;bool committed;AcGePoint3d beforeFirst,beforeLast;std::vector<int> created;
  BuildTransaction(AcDbDatabase*):space(&block),committed(false),beforeFirst(fixtureSource.FirstPoint),beforeLast(fixtureSource.LastPoint){++txStarts;}
  ~BuildTransaction(){if(!committed){++aborts;fixtureSource.FirstPoint=beforeFirst;fixtureSource.LastPoint=beforeLast;
- for(int id:created){delete objects[id];objects.erase(id);tvsOffsetData::records.erase(id);}}}
+ for(int id:created){delete objects[id];objects.erase(id);tvsOffsetData::records.erase(id);}if(rollbackHook)rollbackHook();}}
  bool append(TVS_Entity* p,AcDbObjectId& id){if(++appendCalls==failAppend){delete p;return false;}id=100+appendCalls;p->id=id;objects[id.id]=p;created.push_back(id.id);return true;}
  bool commit(){if(failCommit)return false;committed=true;++commits;return true;}
 };}
 namespace tvsMove {
+inline bool editable(TVS_Entity* e){TVS_Pipe* p=TVS_Pipe::cast(e);return p&&!p->locked;}
 struct Node {int kind;std::vector<tvsMoveGeometry::Point> ports,axes;std::vector<tvsMoveNetwork::Section> sections;Node():kind(1){}};
 inline tvsMoveGeometry::Point point(const AcGePoint3d& p){return tvsMoveGeometry::Point(p.x,p.y,p.z);}
 }
@@ -90,7 +96,7 @@ inline bool checked(Acad::ErrorStatus e){return e==Acad::eOk;}
 inline bool describe(TVS_Entity* e,tvsMove::Node& n){if(!nodes.count(e->id.id))return false;n=nodes[e->id.id];return true;}
 inline void putId(std::wostringstream& s,AcDbObjectId id){s<<id.id;}
 inline void putPoint(std::wostringstream& s,const AcGePoint3d& p){s<<p.x<<L','<<p.y<<L','<<p.z<<L';';}
-inline bool capture(AcDbObjectId,tvsOffsetOperation::End,Snapshot& s){s=live;return !badCapture&&!::fixtureSource.locked;}
+inline bool capture(AcDbObjectId,tvsOffsetOperation::End,Snapshot& s,bool=false){s=live;return !badCapture&&!::fixtureSource.locked;}
 inline bool pipeState(TVS_Pipe*,Snapshot& s){s.fingerprint=live.fingerprint;return !::fixtureSource.locked;}
 inline void initialize(TVS_Entity*){}
 inline void initializePipe(TVS_Pipe* p){p->connectors.resize(2);p->connectors[0].cTypeCurrent=1;p->connectors[1].cTypeCurrent=2;}

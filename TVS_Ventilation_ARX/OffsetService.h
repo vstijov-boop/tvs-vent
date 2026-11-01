@@ -120,7 +120,7 @@ inline bool describe(TVS_Entity* e,tvsMove::Node& n){
     }
     return true;
 }
-inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature){
+inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature,bool bounded=false){
     const double tol=.001/s.physical.factor;
     const int selected=s.physical.end==tvsOffsetOperation::First?0:1,opposite=1-selected;
     const AcGePoint3d ends[]={source->FirstPoint,source->LastPoint};
@@ -133,9 +133,9 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature)
         ownIndex[port]=static_cast<int>(k);
     }
     if(!source->connectors.empty()&&(ownIndex[0]<0||ownIndex[1]<0))return reject(L"Nepotpun par konektora.");
-    if(ownIndex[selected]>=0&&!source->connectors[ownIndex[selected]].connectionID.isNull())
+    if(!bounded&&ownIndex[selected]>=0&&!source->connectors[ownIndex[selected]].connectionID.isNull())
         return reject(L"Izabrani izlaz ima vezu; mreza se ne pomjera.");
-    AcDbObjectId contactId[2];int contactPort[2]={-1,-1},count[2]={0,0},inbound=0;
+    AcDbObjectId contactId[2];int contactPort[2]={-1,-1},count[2]={0,0},inbound[2]={0,0};
     std::wostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(17);
     AcDbObjectPointer<AcDbBlockTableRecord> space(s.owner,AcDb::kForRead);
     if(space.openStatus()!=Acad::eOk)return false;
@@ -150,11 +150,13 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature)
         putId(out,e->objectId());
         if(!connections(e,out))return false;
         for(const auto& c:e->connectors)if(c.connectionID==s.source){
-            ++inbound;
-            if(ownIndex[opposite]<0)return reject(L"Jednosmjerna ulazna konektorska veza.");
-            const TVS_Connector& own=source->connectors[ownIndex[opposite]];
+            const int port=c.cTypeAnother==conPipeStart?0:c.cTypeAnother==conPipeEnd?1:-1;
+            if(port<0||(!bounded&&port!=opposite))return reject(L"Neispravna ulazna veza.");
+            ++inbound[port];
+            if(ownIndex[port]<0)return reject(L"Jednosmjerna ulazna konektorska veza.");
+            const TVS_Connector& own=source->connectors[ownIndex[port]];
             if(own.connectionID!=e->objectId()||c.cTypeAnother!=own.cTypeCurrent||own.cTypeAnother!=c.cTypeCurrent
-                ||c.point.distanceTo(ends[opposite])>tol||own.point.distanceTo(ends[opposite])>tol)
+                ||c.point.distanceTo(ends[port])>tol||own.point.distanceTo(ends[port])>tol)
                 return reject(L"Pokvarena ili nedvosmislena reciprocna veza nije potvrdjena.");
         }
         out<<node.kind<<L';';
@@ -182,20 +184,21 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature)
                     return reject(L"Kraj dodiruje unutrasnjost drugog kanala.");
         }
     }
-    if(count[selected]!=0||count[opposite]>1||inbound>1)return reject(L"Izlaz nije slobodan ili je suprotni prikljucak dvosmislen.");
-    if(ownIndex[opposite]>=0){const auto& own=source->connectors[ownIndex[opposite]];
+    if((!bounded&&count[selected]!=0)||count[0]>1||count[1]>1||inbound[0]>1||inbound[1]>1)return reject(L"Dvosmisleni spoljasnji prikljucci.");
+    for(int port=0;port<2;++port){
+        if(!bounded&&port==selected)continue;
+        if(ownIndex[port]<0)continue;
+        const auto& own=source->connectors[ownIndex[port]];
         if(!own.connectionID.isNull()){
-            // First version supports explicit reciprocal pipe ports; other stored
-            // fitting port conventions are rejected rather than guessed.
             AcDbObjectPointer<TVS_Pipe> neighbor(own.connectionID,AcDb::kForRead);
-            if(count[opposite]!=1||inbound!=1||contactId[opposite]!=own.connectionID
-                ||neighbor.openStatus()!=Acad::eOk||own.cTypeAnother!=(contactPort[opposite]==0?conPipeStart:conPipeEnd))
-                return reject(L"Suprotna reciprokna pipe veza nije geometrijski potvrdjena.");
-        }else if(inbound)return false;
+            if(count[port]!=1||inbound[port]!=1||contactId[port]!=own.connectionID
+                ||neighbor.openStatus()!=Acad::eOk||own.cTypeAnother!=(contactPort[port]==0?conPipeStart:conPipeEnd))
+                return reject(L"Reciprocna pipe veza nije geometrijski potvrdjena.");
+        }else if(inbound[port])return false;
     }
     signature=out.str();return true;
 }
-inline bool capture(const AcDbObjectId& id,tvsOffsetOperation::End end,Snapshot& s){
+inline bool capture(const AcDbObjectId& id,tvsOffsetOperation::End end,Snapshot& s,bool bounded=false){
     s=Snapshot();s.db=acdbHostApplicationServices()->workingDatabase();s.source=id;s.physical.end=end;
     if(!s.db||id.isNull()||id.database()!=s.db)return false;
     s.physical.factor=tvsUnits::factor(s.db);
@@ -208,10 +211,10 @@ inline bool capture(const AcDbObjectId& id,tvsOffsetOperation::End end,Snapshot&
     tvsOffsetOperation::Request validation;validation.elevation=s.physical.elevation;
     if(tvsOffsetOperation::prepare(s.physical,validation).status!=tvsOffsetOperation::NoChange)
         return reject(L"Neispravan ili nehorizontalan kanal.");
-    return topology(s,p.object(),s.network);
+    return topology(s,p.object(),s.network,bounded);
 }
-inline bool current(const Snapshot& before){
-    Snapshot now;if(!capture(before.source,before.physical.end,now))return false;
+inline bool current(const Snapshot& before,bool bounded=false){
+    Snapshot now;if(!capture(before.source,before.physical.end,now,bounded))return false;
     if(now.db!=before.db||now.owner!=before.owner||now.physical.factor!=before.physical.factor
         ||now.fingerprint!=before.fingerprint||now.network!=before.network)
         return reject(L"Izvor, svojstva, veze ili jedinice su promijenjeni poslije snapshot-a.");
@@ -241,6 +244,26 @@ inline bool appearance(TVS_Pipe* source,TVS_Entity* target,const Snapshot& s){
     }
     return true;
 }
+inline std::unique_ptr<TVS_TAP> makeElbow(TVS_Pipe* source,const Snapshot& s,const tvsOffsetAdapter::Elbow& e){
+    std::unique_ptr<TVS_TAP> tap(new TVS_TAP());initialize(tap.get());tap->setDatabaseDefaults();
+    if(!appearance(source,tap.get(),s))return std::unique_ptr<TVS_TAP>();
+    tap->SizeA=e.sizeA;tap->SizeB=e.sizeB;tap->ThisRound=false;tap->DuctType=DuctTypeStill;
+    tap->TypeRoundTap=TypeRoundTap_TapSection;tap->RadiusTypeRect=RadiusTypeRect_RadiusConstant;
+    tap->RadiusTypeRound=RadiusTypeRound_RadiusConstant;tap->RadiusVariableParameter=.5;tap->RadiusConst=e.innerRadius;
+    tap->Swectangle=e.angle;tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,0);tap->Normvector=AcGeVector3d(0,0,1);
+    tap->MiddlePoint=tvsOffsetProof::pt(e.middle);tap->CenterPoint=tap->MiddlePoint;
+    if(!checked(tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down))||!checked(tap->put_Elevation(e.elevation)))return std::unique_ptr<TVS_TAP>();
+    return tap;
+}
+inline std::unique_ptr<TVS_Pipe> makePipe(TVS_Pipe* source,const Snapshot& s,const tvsOffset::WorldPoint& first,const tvsOffset::WorldPoint& last,double elevation){
+    std::unique_ptr<TVS_Pipe> p(new TVS_Pipe());initializePipe(p.get());p->setDatabaseDefaults();
+    if(!appearance(source,p.get(),s))return std::unique_ptr<TVS_Pipe>();
+    p->SizeA=s.physical.a;p->SizeB=s.physical.b;p->ThisRound=false;p->DuctType=DuctTypeStill;
+    p->FirstPoint=tvsOffsetProof::pt(first);p->LastPoint=tvsOffsetProof::pt(last);
+    if(!checked(p->put_Elevation(elevation)))return std::unique_ptr<TVS_Pipe>();
+    p->connectors[0].point=p->FirstPoint;p->connectors[1].point=p->LastPoint;
+    return p;
+}
 inline Outcome write(const Snapshot& s,const tvsOffsetOperation::Request& request,const tvsOffsetOperation::Plan& plan,Commit& result){
     if(plan.status!=tvsOffsetOperation::Ready||!current(s))return Failed;
     // Recompute only the deterministic plan from the same snapshot/request; reject a
@@ -257,33 +280,18 @@ inline Outcome write(const Snapshot& s,const tvsOffsetOperation::Request& reques
     if(!pipeState(source,inside)||inside.fingerprint!=s.fingerprint)return Failed;
     AcDbObject* members[3]={NULL,NULL,NULL};Commit pending;
     for(int j=0;j<2;++j){
-        const auto& e=d.elbows[j];std::unique_ptr<TVS_TAP> tap(new TVS_TAP());initialize(tap.get());tap->setDatabaseDefaults();
-        if(!appearance(source,tap.get(),s))return Failed;
-        tap->SizeA=e.sizeA;tap->SizeB=e.sizeB;tap->ThisRound=false;tap->DuctType=DuctTypeStill;
-        tap->TypeRoundTap=TypeRoundTap_TapSection;tap->RadiusTypeRect=RadiusTypeRect_RadiusConstant;
-        tap->RadiusTypeRound=RadiusTypeRound_RadiusConstant;tap->RadiusVariableParameter=.5;tap->RadiusConst=e.innerRadius;
-        tap->Swectangle=e.angle;tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,0);tap->Normvector=AcGeVector3d(0,0,1);
-        tap->MiddlePoint=tvsOffsetProof::pt(e.middle);tap->CenterPoint=tap->MiddlePoint;
-        if(!checked(tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down))||!checked(tap->put_Elevation(e.elevation)))return Failed;
+        auto tap=makeElbow(source,s,d.elbows[j]);if(!tap)return Failed;
         const int role=j==0?0:2;TVS_TAP* raw=tap.release();
         if(!tx.append(raw,pending.members[role]))return Failed;
         members[role]=raw;
     }
-    std::unique_ptr<TVS_Pipe> slope(new TVS_Pipe());initializePipe(slope.get());slope->setDatabaseDefaults();
-    if(!appearance(source,slope.get(),s))return Failed;
-    slope->SizeA=s.physical.a;slope->SizeB=s.physical.b;slope->ThisRound=false;slope->DuctType=DuctTypeStill;
-    slope->FirstPoint=tvsOffsetProof::pt(d.middle.first);slope->LastPoint=tvsOffsetProof::pt(d.middle.last);
-    if(!checked(slope->put_Elevation((d.middle.firstElevationMm+d.middle.lastElevationMm)/2/s.physical.factor)))return Failed;
-    slope->connectors[0].point=slope->FirstPoint;slope->connectors[1].point=slope->LastPoint;
+    auto slope=makePipe(source,s,d.middle.first,d.middle.last,(d.middle.firstElevationMm+d.middle.lastElevationMm)/2/s.physical.factor);
+    if(!slope)return Failed;
     TVS_Pipe* rawSlope=slope.release();
     if(!tx.append(rawSlope,pending.members[1]))return Failed;
     members[1]=rawSlope;
-    std::unique_ptr<TVS_Pipe> exit(new TVS_Pipe());initializePipe(exit.get());exit->setDatabaseDefaults();
-    if(!appearance(source,exit.get(),s))return Failed;
-    exit->SizeA=s.physical.a;exit->SizeB=s.physical.b;exit->ThisRound=false;exit->DuctType=DuctTypeStill;
-    exit->FirstPoint=tvsOffsetProof::pt(verified.exitFirst);exit->LastPoint=tvsOffsetProof::pt(verified.exitLast);
-    if(!checked(exit->put_Elevation(verified.acceptedElevation)))return Failed;
-    exit->connectors[0].point=exit->FirstPoint;exit->connectors[1].point=exit->LastPoint;
+    auto exit=makePipe(source,s,verified.exitFirst,verified.exitLast,verified.acceptedElevation);
+    if(!exit)return Failed;
     TVS_Pipe* rawExit=exit.release();
     if(!tx.append(rawExit,pending.output))return Failed;
     pending.residentOutput=rawExit;

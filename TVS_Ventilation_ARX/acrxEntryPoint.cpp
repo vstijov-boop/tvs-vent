@@ -107,6 +107,8 @@ public:
             acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
 #endif
@@ -1721,8 +1723,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
-			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1766,6 +1768,15 @@ public:
 				return false;
 			}
 
+#ifdef TVS_BYPASS_PREVIEW
+            if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
+                TVSBypassOutput result;
+                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                    pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+            }
+#endif
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
@@ -1933,8 +1944,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
-			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1978,6 +1989,15 @@ public:
 				return;
 			}
 
+#ifdef TVS_BYPASS_PREVIEW
+            if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
+                TVSBypassOutput result;
+                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                    pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+            }
+#endif
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;

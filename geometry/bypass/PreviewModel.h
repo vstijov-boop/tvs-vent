@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include "../OffsetAdapter.h"
 namespace tvsBypassPreview {
 struct Point {double x,y,z;Point(double a=0,double b=0,double c=0):x(a),y(b),z(c){}};
 struct Segment {Point first,last;double a,b,elevation;bool rectangular,rigid,ordinary;
@@ -62,6 +63,7 @@ struct Curve {int member;bool insulation;int kind;std::vector<Vertex> points;Cur
 // Exact drawing geometry exported from the checked bodies; bulge belongs to the outgoing edge.
 struct DetailPath {int member;bool insulation,axis,closed;std::vector<Vertex> points;std::vector<double> bulges;};
 struct View {
+ tvsOffsetAdapter::Result offsets[2]; // exported from the SAME checked candidate, no native re-solve
  bool ready;std::string status,details;Frame frame;std::vector<Curve> profile,plan;std::vector<DetailPath> detailPaths;
  double D,C,s0,W,zPass,gapLo,gapHi,elapsedMs;double slopePhysical[2],slopeProjected[2];int criticalRole;std::vector<Vertex> axis;Vertex witnessBody,witnessObstacle;unsigned calls;std::uint64_t cells;
  View():ready(false),D(0),C(0),s0(0),W(0),zPass(0),gapLo(0),gapHi(0),elapsedMs(0),criticalRole(-1),calls(0),cells(0){slopePhysical[0]=slopePhysical[1]=slopeProjected[0]=slopeProjected[1]=0;}

@@ -15,6 +15,7 @@
 #endif
 #include "BypassSideDetail.h"
 #include "BypassSideDetailTest.h"
+#include "BypassService.h"
 namespace {
 using namespace tvsBypassPreview;
 static std::wstring wide(const std::string& s){
@@ -40,6 +41,10 @@ static bool readPipe(const ACHAR* prompt,Segment& out,AcDbObjectId& id){
  out.a=p->SizeA;out.b=p->SizeB;out.elevation=p->get_Elevation();out.rectangular=!p->ThisRound;
  out.rigid=p->DuctType==DuctTypeStill;out.ordinary=!marked;
  return true;
+}
+static bool readPipe(const ACHAR* prompt,Segment& out,AcDbObjectId& id){
+ ads_name name;ads_point pick;if(acedEntSel(prompt,name,pick)!=RTNORM)return false;
+ return acdbGetObjectId(id,name)==Acad::eOk&&readSegment(id,out);
 }
 class Transient {
  AcGiTransientManager* manager;AcDbIntArray viewports;std::vector<AcDbPolyline*> lines;
@@ -84,9 +89,9 @@ static const wchar_t* labels[FieldCount]={L"Unutrašnji radijus koljena Ri (mm)"
  L"Min. dužina kosog komada (mm)",L"Min. dužina srednjeg komada C (mm)",L"Min. projekcija, mm",L"Početak prozora s (mm)",L"Kraj prozora s (mm)",L"Donja granica Z, mm (opciono)",L"Gornja granica Z, mm (opciono)",
  L"Vrijeme, ms (max 10000)",L"Checker pozivi (max 128)",L"Ćelije (max 1000000)",L"Korak D, mm",L"Korak C, mm",L"Max. traženi D, mm",L"Nivoi D (max 128)",L"Prijedlozi C (max 16)",L"Položaji (max 16)",L"Seed solve (max 128)",L"Prijedlozi (max 2048)",L"Inset prozora, mm",L"Prag poboljšanja W, mm",L"Prag poboljšanja D, mm"};
 struct Dialog {
- Snapshot snapshot;bool reverse,loading,unitFromRecord,advanced,showDimensions,showAxes,allEdges;double scaleX,scaleY;Engine engine;View view;Options options;
+ Snapshot snapshot;bool reverse,loading,unitFromRecord,advanced,showDimensions,showAxes,allEdges,canAccept;double scaleX,scaleY;Engine engine;View view;Options options;
  std::wstring values[FieldCount];int units,angle,side;bool confirmed;HWND window;HFONT font;
- Dialog(const Snapshot& s,bool r,double factor,bool known):snapshot(s),reverse(r),loading(true),unitFromRecord(known),advanced(false),showDimensions(true),showAxes(true),allEdges(false),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL){
+ Dialog(const Snapshot& s,bool r,double factor,bool known,bool accept=false):snapshot(s),reverse(r),loading(true),unitFromRecord(known),advanced(false),showDimensions(true),showAxes(true),allEdges(false),canAccept(accept),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL){
   for(int j=0;j<FieldCount;++j)values[j]=number(options.*fields[j]);
   values[1]=values[2]=L"";values[10]=values[11]=L"";
   Frame f=engine.frame(s,factor,r);if(known&&f.valid){values[8]=number(f.left);values[9]=number(f.right);}else values[8]=values[9]=L"";
@@ -107,7 +112,7 @@ struct Dialog {
   }else t<<L"Izaberite jedinice crteža i unesite izolacije. Podaci iz objekata ostaju neizmijenjeni.\r\n"<<wide(f.reason);
   SetDlgItemTextW(window,600,t.str().c_str());
  }
- void invalidate(){engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");InvalidateRect(window,NULL,TRUE);}
+ void invalidate(){engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);EnableWindow(GetDlgItem(window,704),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");InvalidateRect(window,NULL,TRUE);}
  void capture(){for(int j=0;j<FieldCount;++j)values[j]=text(100+j);
   units=(int)SendDlgItemMessage(window,502,CB_GETCURSEL,0,0);angle=(int)SendDlgItemMessage(window,501,CB_GETCURSEL,0,0);side=(int)SendDlgItemMessage(window,500,CB_GETCURSEL,0,0);
   confirmed=IsDlgButtonChecked(window,503)==BST_CHECKED;}
@@ -133,7 +138,7 @@ struct Dialog {
    refreshResult();}
   catch(...){invalidate();SetDlgItemTextW(window,800,L"Greška računanja. Nema DWG izmjena.");}
   EnableWindow(GetDlgItem(window,700),TRUE);EnableWindow(GetDlgItem(window,702),TRUE);
-  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());InvalidateRect(window,NULL,TRUE);
+  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,704),canAccept&&view.ready&&engine.ready());InvalidateRect(window,NULL,TRUE);
  }
  void refreshResult(){
   std::wstring value=advanced?wide(view.status)+L"\r\n"+wide(view.details):wide(summary(view,options));
@@ -154,7 +159,7 @@ struct Dialog {
   auto move=[&](int id,int x,int y,int w,int h){SetWindowPos(GetDlgItem(window,id),NULL,(int)(x*scaleX),(int)(y*scaleY),(int)(w*scaleX),(int)(h*scaleY),SWP_NOZORDER);};
   move(602,left,90,width,20);move(505,left,112,68,22);move(506,left+76,112,68,22);move(507,left+165,110,width-165,100);
   move(800,left,556,width,109);move(603,left,675,width,34);move(601,12,480,left-30,68);move(503,12,576,left-30,25);
-  move(700,12,616,130,30);move(702,156,616,145,30);move(701,315,616,143,30);move(IDCANCEL,315,666,143,30);
+  move(700,12,616,130,30);move(702,156,616,145,30);move(701,315,616,143,30);move(703,12,666,145,30);move(704,165,666,145,30);move(IDCANCEL,318,666,140,30);
   InvalidateRect(window,NULL,TRUE);
  }
  void init(HWND h){window=h;loading=true;
@@ -178,7 +183,8 @@ struct Dialog {
   child(L"BUTTON",L"Pokušaj kraći prolaz",BS_PUSHBUTTON|WS_TABSTOP,702,174,616,170,30);
   child(L"BUTTON",L"Pregled u crtežu",BS_PUSHBUTTON|WS_TABSTOP,701,356,616,165,30);EnableWindow(GetDlgItem(h,701),view.ready&&engine.ready());
   child(L"BUTTON",L"Umetni detalj…",BS_PUSHBUTTON|WS_TABSTOP,703,12,666,180,30);EnableWindow(GetDlgItem(h,703),view.ready&&engine.ready());
-  child(L"BUTTON",L"Otkaži / zatvori",BS_PUSHBUTTON|WS_TABSTOP,IDCANCEL,348,666,173,30);
+  child(L"BUTTON",L"Prihvati obilazak",BS_PUSHBUTTON|WS_TABSTOP,704,165,666,145,30);EnableWindow(GetDlgItem(h,704),canAccept&&view.ready&&engine.ready());
+  child(L"BUTTON",L"Otkaži / zatvori",BS_PUSHBUTTON|WS_TABSTOP,IDCANCEL,318,666,140,30);
   child(L"BUTTON",L"Napredno / dijagnostika",BS_AUTOCHECKBOX|WS_TABSTOP,504,12,112,280,22);CheckDlgButton(h,504,advanced?BST_CHECKED:BST_UNCHECKED);
   child(L"STATIC",L"Uzdužni presjek — fizičke kote, ista razmjera s/z",0,602,590,90,590,20);
   child(L"BUTTON",L"Kote",BS_AUTOCHECKBOX|WS_TABSTOP,505,590,112,68,22);CheckDlgButton(h,505,showDimensions?BST_CHECKED:BST_UNCHECKED);
@@ -187,7 +193,7 @@ struct Dialog {
   SendMessage(c,CB_ADDSTRING,0,(LPARAM)L"Konture (dijagnostika, bez zaklanjanja)");
   SendMessage(c,CB_ADDSTRING,0,(LPARAM)L"Sve ivice — dijagnostika (bez zaklanjanja)");SendMessage(c,CB_SETCURSEL,allEdges?1:0,0);
   child(L"EDIT",view.ready?(wide(view.status)+L"\r\n"+wide(view.details)).c_str():L"Rezultat nije izračunat. Nema trajnog upisa.",ES_MULTILINE|ES_READONLY|WS_VSCROLL,800,590,556,590,109);
-  child(L"STATIC",L"DEV: Umetni detalj upisuje staticki blok. TVS obilazak nije implementiran.\r\nIzabrana originalna trasa ostaje vidljiva ispod transient pregleda.",0,603,590,675,590,34);
+  child(L"STATIC",canAccept?L"DEV: Prihvati upisuje 7 TVS clanova i cuva krajnje prikljucke.\r\nPrikaz ne racuna tacnu vidljivost/zaklanjanje; detalj je odvojen staticki snimak.":L"DEV preview: staticki detalj je dostupan. Za trajni upis koristite TVS_BYPASS.\r\nPrikaz ne racuna tacnu vidljivost/zaklanjanje.",0,603,590,675,590,34);
   fieldLayout();refreshResult();loading=false;
  }
  void paint(){
@@ -260,11 +266,11 @@ struct Dialog {
    if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;InvalidateRect(h,NULL,TRUE);return TRUE;}
    if(id==507&&code==CBN_SELCHANGE){self->allEdges=SendDlgItemMessage(h,507,CB_GETCURSEL,0,0)==1;return TRUE;}
    if(id==700||id==702){self->calculate(id==702);return TRUE;}
-   if((id==701||id==703)&&self->view.ready&&self->engine.ready()){self->capture();EndDialog(h,id);return TRUE;}
+   if((id==701||id==703||(id==704&&self->canAccept))&&self->view.ready&&self->engine.ready()){self->capture();EndDialog(h,id);return TRUE;}
   }return FALSE;
  }
  INT_PTR show(HWND owner){
-  const wchar_t title[]=L"TVS — Obilazak kanala (DEV preview)";
+  const wchar_t title[]=L"TVS — Obilazak kanala (DEV)";
   std::vector<WORD> buffer((sizeof(DLGTEMPLATE)+sizeof(title)+8)/2,0);
   DLGTEMPLATE t={};t.style=WS_POPUP|WS_CAPTION|WS_SYSMENU|DS_MODALFRAME;t.cx=780;t.cy=460;
   memcpy(&buffer[0],&t,sizeof(t));BYTE* p=(BYTE*)&buffer[0]+sizeof(t);p+=4;memcpy(p,title,sizeof(title));
@@ -278,41 +284,55 @@ void tvsBypassDetailCheckCommand(){
   acutPrintf(L"\nBocni detalji: %u lokalnih referenci. %ls",static_cast<unsigned>(used.labels.size()),used.duplicated?L"DUPLIKATI: COPY nije nezavisni detalj; uklonite kopije.":L"Oznake/GUID-i bez otkrivenih duplikata. XREF i ponovljene parent instance nisu globalno provjereni.");
  }catch(...){acutPrintf(L"\nProvjera detalja nije zavrsena; zapis je mozda neispravan ili nedostupan.");}
 }
-void tvsBypassPreviewCommand(){
+static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput* output){
  try{
   AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
-  if(!db||db->tilemode()==false){acutPrintf(L"\nDEV pregled radi samo u Model prostoru.");return;}
-  acutPrintf(L"\nDEV BYPASS: dozvoljen je standardni staticki bocni detalj. Trajni TVS obilazak nije implementiran.");
-  Snapshot s;AcDbObjectId route,obstacle;
-  if(!readPipe(L"\nIzaberite pravi horizontalni TVS kanal kao referencu nove trase: ",s.route,route))return;
-  if(!readPipe(L"\nIzaberite jednu pravougaonu horizontalnu TVS prepreku: ",s.obstacle,obstacle))return;
-  if(route==obstacle){acutPrintf(L"\nTrasa i prepreka moraju biti različiti objekti.");return;}
-  acedInitGet(0,L"Prvi Posljednji");ACHAR answer[80]=L"";
-  int status=acedGetKword(L"\nAktivni kraj / smjer +s [Prvi/Posljednji] <Posljednji>: ",answer);
-  if(status!=RTNORM&&status!=RTNONE)return;
-  bool reverse=_wcsicmp(answer,L"Prvi")==0;
-  bool known=false;AcDbDictionary* dict=NULL;
-  if(db->getNamedObjectsDictionary(dict,AcDb::kForRead)==Acad::eOk){AcDbObjectId id;if(dict->getAt(tvsUnits::recordName(),id)==Acad::eOk){
-    AcDbXrecord* record=NULL;if(acdbOpenObject(record,id,AcDb::kForRead)==Acad::eOk){resbuf* data=NULL;
-     if(record->rbChain(&data)==Acad::eOk){for(resbuf* p=data;p;p=p->rbnext)if(p->restype==40&&tvsUnits::validFactor(p->resval.rreal))known=true;if(data)acutRelRb(data);}record->close();}}
-   dict->close();}
-  Dialog dialog(s,reverse,tvsUnits::factor(db),known);
-  HWND owner=acedGetAcadFrame()->GetSafeHwnd();
-  for(;;){
-   INT_PTR action=dialog.show(owner);
-   if(action==703){
-    try{if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);}
-    catch(...){acutPrintf(L"\nUmetanje detalja nije zavrseno. Transakcija je prekinuta; provjerite poruke i probajte ponovo.");}
-    break; // One insertion per command: a single command Undo boundary.
-   }
-   if(action!=701)break;
-   Transient preview;
-   if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes)){acutPrintf(L"\nTransient pregled nije moguće prikazati. Nema DWG izmjena.");return;}
-   acutPrintf(L"\nPrivremena OSNOVA — DIJAGNOSTIKA, BEZ ZAKLANJANJA. Pune: gabariti; crtice: simbolički spojevi/pomoćne linije; dugo-kratko: ose. Originalna trasa ostaje vidljiva. Nema DWG upisa.");
-   ACHAR buffer[256];int r=acedGetString(0,L"\nPregled: Enter vraća dijalog; Esc završava i uklanja pregled: ",buffer);
-   preview.clear();if(r!=RTNORM&&r!=RTNONE)break;
-  }
- }catch(...){acutPrintf(L"\nGreška razvojnog pregleda. Privremena grafika je uklonjena; nema DWG upisa.");}
-}
+  if(!db||!db->tilemode())return false;
+#ifndef TVS_OFFSET_INTEGRATION
+  if(permanent){acutPrintf(L"\nTrajni bypass zahtijeva upareni DEV DBX/ARX sa integracijom.");return false;}
 #endif
-
+  Snapshot s;AcDbObjectId route=active,obstacle;
+  if(active.isNull()){if(!readPipe(L"\nIzaberite pravi horizontalni TVS kanal: ",s.route,route))return false;}
+  else if(!readSegment(active,s.route))return false;
+  if(!readPipe(L"\nIzaberite pravougaonu horizontalnu TVS prepreku: ",s.obstacle,obstacle)||route==obstacle)return false;
+  bool reverse=false;
+  if(active.isNull()){
+   acedInitGet(0,L"Prvi Posljednji");ACHAR answer[80]=L"";
+   int status=acedGetKword(L"\nSmjer obilaska [Prvi/Posljednji] <Posljednji>: ",answer);
+   if(status!=RTNORM&&status!=RTNONE)return false;reverse=_wcsicmp(answer,L"Prvi")==0;
+  }
+#ifdef TVS_OFFSET_INTEGRATION
+  tvsBypassService::Snapshot native;
+  if(permanent&&(!tvsBypassService::capture(route,obstacle,reverse,native)||!readSegment(route,s.route)||!readSegment(obstacle,s.obstacle)||!tvsBypassService::current(native)))return false;
+#endif
+  bool known=false;AcDbDictionary* dict=NULL;
+  if(db->getNamedObjectsDictionary(dict,AcDb::kForRead)==Acad::eOk){AcDbObjectId id;
+   if(dict->getAt(tvsUnits::recordName(),id)==Acad::eOk){AcDbObjectPointer<AcDbXrecord> record(id,AcDb::kForRead);
+    if(record.openStatus()==Acad::eOk){resbuf* data=NULL;if(record->rbChain(&data)==Acad::eOk){
+     for(resbuf* p=data;p;p=p->rbnext)if(p->restype==40&&tvsUnits::validFactor(p->resval.rreal))known=true;
+     if(data)acutRelRb(data);}}}dict->close();}
+  Dialog dialog(s,reverse,tvsUnits::factor(db),known,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
+  for(;;){INT_PTR action=dialog.show(owner);
+   if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);return false;}
+#ifdef TVS_OFFSET_INTEGRATION
+   if(action==704&&permanent&&dialog.view.ready&&dialog.engine.ready()){
+    tvsBypassService::Commit result;
+    if(!tvsBypassService::write(native,dialog.view,dialog.options,result)){
+     acutPrintf(L"\nBYPASS nije upisan: snapshot/raspoloziva duzina/atributi ili transakcija. Nema djelimicnog upisa.");return false;}
+    if(output){output->pipe=result.resident;output->elevation=result.elevation;output->angle=result.angle;}
+    acutPrintf(L"\nBYPASS upisan: cetiri koljena, dva kosa i H; dvije V1 trojke, jedan roditelj. Pocetna/izlazna kota ista.");
+    return true;
+   }
+#endif
+   if(action!=701)return false;
+   Transient preview;if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes))return false;
+   acutPrintf(L"\nPrivremena osnova BEZ tacne vidljivosti/zaklanjanja. Crtice su simbolika, ne dokaz skrivenih ivica. Original ostaje vidljiv.");
+   ACHAR text[256];int status=acedGetString(0,L"\nEnter vraca dijalog i Prihvati; Esc uklanja pregled: ",text);
+   preview.clear();if(status!=RTNORM&&status!=RTNONE)return false;
+  }
+ }catch(...){acutPrintf(L"\nBYPASS prekinut. Nepotvrdjena transakcija/grafika je uklonjena.");return false;}
+}
+void tvsBypassPreviewCommand(){runBypass(AcDbObjectId::kNull,false,NULL);}
+void tvsBypassCommand(){runBypass(AcDbObjectId::kNull,true,NULL);}
+bool tvsBypassDuringDrawing(const AcDbObjectId& route,TVSBypassOutput& result){return runBypass(route,true,&result);}
+#endif
