@@ -1,5 +1,11 @@
 # Stvarno stanje koda na pregledanom HEAD-u
 
+Istorijski inventar pregledanog HEAD-a bd01b2e, sačuvan bez reinterpretacije.
+U naknadno odobrenom INT-00 uvedena je DEV registracija `TVS_OFFSET` i zajednički
+servis oba Z pozivaoca. Aktuelni ugovor i ograničenja: [INT-00 uputstvo](OFFSET_INT00_GUIDE.md).
+Izvršni HEAD i stvarni build/test rezultati su u [INT-00 izvještaju](OFFSET_INT00_RESULTS.md).
+Tvrdnja ispod da TVS_OFFSET nije registrovan važi za navedeni stari HEAD, ne novu isporuku.
+
 Pregled: 01.11.2026. Tačan HEAD: `bd01b2e208a5ef58e2905ce9854d8a63dac75382`.
 Grana `razvoj-bypass-candidate`, PR #1 draft. Sadržaj izvršnog r3 paketa potiče
 iz `ee85e72cce0e805991d172a2c34cdc4306530cb3`. Ovaj inventar opisuje izvorni kod,

@@ -2,7 +2,10 @@
 
 Datum 01.11.2026; osnova koda `bd01b2e208a5ef58e2905ce9854d8a63dac75382`.
 Aktuelni plan: [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md).
-Stanje koda: [CODE_STATE.md](CODE_STATE.md). Nema nove implementacije u ovoj isporuci.
+Istorijsko stanje koda: [CODE_STATE.md](CODE_STATE.md). Naknadno je odobrena i
+implementirana samo razvojna faza INT-00; ugovor: [OFFSET_INT00_GUIDE.md](OFFSET_INT00_GUIDE.md).
+Rezultati, commit-i i paketi: [OFFSET_INT00_RESULTS.md](OFFSET_INT00_RESULTS.md).
+Praktično prihvatanje nove isporuke je odvojeno od kompilacije i testova sa zamjenama.
 
 ## STAB-01 — otvoreno, odloženo u završnu stabilizaciju
 
@@ -27,9 +30,10 @@ Sačuvani nalaz iz već izvršenih proba:
 - Detalji i putanje dokaza: [sačuvani izvještaj](bypass-preview/REDO_INVESTIGATION.md).
   Nove probe nisu izvršene za potrebe ovog plana.
 
-## Razvojne stavke — predloženo, nije implementirano
+## Razvojne stavke — status
 
-- [ ] INT-00: zajednički snapshot/ugovor upisa i samostalni pravougaoni offset.
+- [x] INT-00 DEV implementacija: zajednički servis/snapshot/writer, očuvana oba Z
+  pozivaoca i registrovan TVS_OFFSET. Nije produkciono niti praktično runtime prihvatanje.
 - [ ] INT-01: trajni pravougaoni bypass, samostalna komanda i spoljni konektori.
 - [ ] INT-02: isti servis kao opcija tokom crtanja.
 - [ ] INT-03: AssemblyId → OB-xx → DetailId, izvor/revizija, ručno osvježavanje.
@@ -39,6 +43,28 @@ Sačuvani nalaz iz već izvršenih proba:
 - [ ] INT-05: završna stabilizacija i zasebno produkciono prihvatanje, uključujući STAB-01.
 
 Zavisnosti, datoteke, potrebni podaci i kriterijumi svake stavke su u planu.
+
+## INT-00 — preostali praktični pregled nove isporuke
+
+Sljedeće nije izvršeno u AutoCAD-u tokom INT-00 i ostaje otvoreno za pregled:
+
+- [ ] AutoCAD 2020 i 2022, odvojeni restartovani DEV procesi i odgovarajući DBX/ARX.
+- [ ] TVS_OFFSET Prvi/Posljednji, obrnut pravac, podizanje/spuštanje, 30/45/60,
+  A!=B, mm/cm/m i stvarno rotiran UCS; vizuelni preview i potvrda.
+- [ ] Povezan izabrani kraj odbijen; suprotni priključak, originalni identitet,
+  MLeader veza, inženjerski/prikazni i podržani korisnički podaci očuvani.
+- [ ] Cancel/NoChange/Failed, premala visina/ulaz, stale snapshot, zaključan sloj,
+  nepodržani atributi i fail-next bez ostataka ili promjene susjeda.
+- [ ] Z kroz TVS_PIPE i TVS_DRAW: iste fizičke mjere i ispravan naredni segment,
+  na starom kraju pri neuspjehu i na novom izlazu poslije uspjeha.
+- [ ] Stvarni fizički potrošači (COM, Properties, TVS/Excel specifikacija, KGTEZ),
+  materijal/prikaz i save/reopen. Legacy neupisivanje konektorskog vektora ostaje
+  ograničenje; INT-00 ne uvodi novu trajnu topološku šemu.
+
+Numerička matrica i testovi stvarnih C++ funkcija sa SDK zamjenama ne označavaju
+ove stavke kao prošle. STAB-01/Redo se sada ne testira. Faze INT-01 i dalje nisu
+odobrene: prije prve bypass šeme slijedi kratko poređenje roditelja nad dvije
+v1 trojke i H naspram posebnog sedmočlanog ugovora.
 
 ## Preostale provjere prethodne isporuke — NISU prošle
 
