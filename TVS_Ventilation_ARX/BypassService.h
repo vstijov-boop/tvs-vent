@@ -36,8 +36,13 @@ public:
     ~ConnectorRollback(){if(!accepted)object->connectors.swap(before);}
     void commit(){accepted=true;}
 };
-inline int connector(TVS_Entity* p,int role){int result=-1;for(size_t j=0;j<p->connectors.size();++j)
-    if(p->connectors[j].cTypeCurrent==role){if(result>=0)return -1;result=static_cast<int>(j);}return result;}
+inline int connector(TVS_Entity* p,int role){
+    int result=-1;
+    for(size_t j=0;j<p->connectors.size();++j){
+        if(p->connectors[j].cTypeCurrent==role){if(result>=0)return -1;result=static_cast<int>(j);}
+    }
+    return result;
+}
 inline bool inject(int stage){wchar_t text[24]={0};GetEnvironmentVariableW(L"TVS_BYPASS_FAIL",text,24);return _wtoi(text)==stage;}
 inline bool write(const Snapshot& s,const View& view,const Options& options,Commit& output){
     if(!view.ready||view.axis.size()!=8||!view.offsets[0].ready()||!view.offsets[1].ready()||!current(s))return false;
@@ -46,8 +51,8 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
         ||view.frame.z0!=base.physical.elevation*f)return tvsOffsetService::reject(L"Jedinice/snapshot kandidata ne odgovaraju bazi.");
     const auto& first=view.offsets[0];const auto& second=view.offsets[1];
     const AcGePoint3d oldFirst=tvsOffsetProof::pt(base.physical.first),oldLast=tvsOffsetProof::pt(base.physical.last);
-    const AcGePoint3d fixed=reverse?oldLast:oldFirst,far=reverse?oldFirst:oldLast;
-    const AcGeVector3d delta=far-fixed;const double available=delta.length();if(!(available>0))return false;
+    const AcGePoint3d fixed=reverse?oldLast:oldFirst,outerPoint=reverse?oldFirst:oldLast;
+    const AcGeVector3d delta=outerPoint-fixed;const double available=delta.length();if(!(available>0))return false;
     const AcGeVector3d u=delta/available;
     const AcGePoint3d cutIn=tvsOffsetProof::pt(first.incomingLast),cutOut=tvsOffsetProof::pt(second.outgoingFirst);
     const double a=(cutIn-fixed).dotProduct(u),b=(cutOut-fixed).dotProduct(u);
@@ -88,7 +93,7 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     if(!tx.append(h,record.members[3]))return false;
     members[3]=h;
     if(inject(1))return false;
-    const tvsOffset::WorldPoint farWorld(far.x,far.y,far.z);
+    const tvsOffset::WorldPoint farWorld(outerPoint.x,outerPoint.y,outerPoint.z);
     auto tail=tvsOffsetService::makePipe(source,base,reverse?farWorld:second.outgoingFirst,reverse?second.outgoingFirst:farWorld,base.physical.elevation);
     if(!tail)return false;
     TVS_Pipe* exit=tail.release();
@@ -97,7 +102,7 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     TVS_Pipe* neighbor=NULL;std::unique_ptr<ConnectorRollback> neighborConnections;
     if(selected>=0){const TVS_Connector old=source->connectors[selected];
         const int exitIndex=connector(exit,selectedRole);if(exitIndex<0)return false;
-        exit->connectors[exitIndex]=old;exit->connectors[exitIndex].point=far;
+        exit->connectors[exitIndex]=old;exit->connectors[exitIndex].point=outerPoint;
         if(!old.connectionID.isNull()){
             raw=NULL;if(actrTransactionManager->getObject(raw,old.connectionID,AcDb::kForWrite)!=Acad::eOk)return false;
             neighbor=TVS_Pipe::cast(raw);if(!neighbor||!tvsMove::editable(neighbor))return false;

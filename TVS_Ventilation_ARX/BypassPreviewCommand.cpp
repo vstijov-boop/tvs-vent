@@ -23,9 +23,7 @@ static std::wstring wide(const std::string& s){
  std::vector<wchar_t> out(n);MultiByteToWideChar(CP_UTF8,0,s.c_str(),-1,&out[0],n);return &out[0];
 }
 static std::wstring number(double x){wchar_t buf[80];swprintf_s(buf,L"%.9g",x);return buf;}
-static bool readPipe(const ACHAR* prompt,Segment& out,AcDbObjectId& id){
- ads_name name;ads_point pick;if(acedEntSel(prompt,name,pick)!=RTNORM)return false;
- if(acdbGetObjectId(id,name)!=Acad::eOk)return false;
+static bool readSegment(const AcDbObjectId& id,Segment& out){
  AcDbObjectPointer<TVS_Pipe> p(id,AcDb::kForRead);
  if(p.openStatus()!=Acad::eOk){acutPrintf(L"\nIzaberite pravi TVS kanal, bez XREF-a/bloka.");return false;}
  AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
