@@ -1,107 +1,111 @@
-﻿#pragma once
+#pragma once
 #ifdef TVS_OFFSET_INTEGRATION
-#include "OffsetAssemblyData.h"
-#include "../geometry/OffsetAdapter.h"
+#include "OffsetService.h"
+#include "acgiTransient.h"
+#include "dbpl.h"
+#include "dbents.h"
 namespace tvsOffsetIntegration {
-enum Outcome { Applied,NoChange,Cancelled,Failed };
-// Explicit DEVELOPMENT settings, not standards or approved production minima.
-struct IntegrationPolicy {double minimumStraightMm,minimumProjectionMm;IntegrationPolicy():minimumStraightMm(100),minimumProjectionMm(.1){}};
-inline IntegrationPolicy& integrationPolicy(){static IntegrationPolicy policy;return policy;}
-inline bool& failNext(){static bool value=false;return value;}
-inline void initializePipe(TVS_Pipe* pipe){
-    tvsOffsetProof::initialize(pipe);TVS_Connector first,last;
-    first.connectionID=NULL;first.cTypeCurrent=conPipeStart;last.connectionID=NULL;last.cTypeCurrent=conPipeEnd;
-    pipe->connectors.resize(2);pipe->connectors[0]=first;pipe->connectors[1]=last;
-}
+using tvsOffsetService::Outcome;
+using tvsOffsetService::Applied;using tvsOffsetService::NoChange;
+using tvsOffsetService::Cancelled;using tvsOffsetService::Failed;
+typedef tvsOffsetService::Policy IntegrationPolicy;
+inline IntegrationPolicy& integrationPolicy(){return tvsOffsetService::policy();}
+inline bool& failNext(){return tvsOffsetService::failNext();}
 inline const ACHAR* errorText(tvsOffset::Status s){switch(s){
-case tvsOffset::Unsupported90:return L"90° nije podržano: vertikalni međukomad ima nultu XY projekciju. Ugao nije zamijenjen.";
-case tvsOffset::TooShort:return L"Premala razlika kota za lukove i Lmin (ili strogo numeričko odbijanje na granici). Završna kota nije promijenjena.";
-case tvsOffset::ProjectionTooSmall:return L"Premala horizontalna projekcija međukomada.";
-default:return L"Nevažeći podaci ili nepodržana geometrija promjene kote.";}}
-inline void appearance(TVS_Pipe* source,TVS_Entity* target){
-    target->setLayer(source->layerId());target->setColor(source->color());target->setLinetype(source->linetypeId());
-    target->setLinetypeScale(source->linetypeScale());target->setLineWeight(source->lineWeight());
-    target->Flow=source->Flow;target->Grani=source->Grani;target->Wipeout=source->Wipeout;target->This1D=source->This1D;
+case tvsOffset::Unsupported90:return L"90 stepeni nije podrzano; ugao nije zamijenjen.";
+case tvsOffset::TooShort:return L"Premala razlika kota za lukove i Lmin (ukljucujuci strogu numericku granicu).";
+case tvsOffset::ProjectionTooSmall:return L"Premala horizontalna projekcija medjukomada.";
+default:return L"Nevazeci podaci ili nepodrzana geometrija promjene kote.";}}
+class Preview {
+    AcGiTransientManager* manager;AcDbIntArray viewports;std::vector<AcDbEntity*> entities;
+    bool add(std::unique_ptr<AcDbEntity> e){
+        if(!manager)return false;
+        entities.push_back(e.get());
+        bool added=false;
+        try {added=manager->addTransient(e.get(),kAcGiDirectShortTerm,130,viewports);}
+        catch(...){entities.pop_back();throw;}
+        if(!added){entities.pop_back();return false;}
+        e.release();return true;
+    }
+public:
+    Preview():manager(acgiGetTransientManager()){}
+    ~Preview(){for(auto e:entities){manager->eraseTransient(e,viewports);delete e;}}
+    bool show(const tvsOffsetService::Snapshot& snapshot,const tvsOffsetOperation::Plan& p){
+        const double f=snapshot.physical.factor;
+        std::unique_ptr<AcDbPolyline> line(new AcDbPolyline());line->setColorIndex(3);
+        const tvsOffset::WorldPoint points[]={p.dto.incomingLast,p.dto.middle.first,p.dto.middle.last,p.exitFirst,p.exitLast};
+        for(int j=0;j<5;++j)if(line->addVertexAt(j,AcGePoint2d(points[j].x,points[j].y))!=Acad::eOk)return false;
+        line->setElevation(points[0].z);
+        if(line->elevation()!=points[0].z||!add(std::unique_ptr<AcDbEntity>(line.release())))return false;
+        const double elevations[]={snapshot.physical.elevation*f,p.dto.middle.firstElevationMm,p.dto.middle.lastElevationMm,p.acceptedElevation*f};
+        for(int j=0;j<4;++j){
+            std::unique_ptr<AcDbText> text(new AcDbText());CString label;label.Format(L"P%d Z=%.3f mm",j,elevations[j]);
+            if(text->setPosition(tvsOffsetProof::pt(points[j])+AcGeVector3d(0,(80+80*(j%2))/f,0))!=Acad::eOk
+                ||text->setHeight(35/f)!=Acad::eOk||text->setTextString(label)!=Acad::eOk)return false;
+            text->setColorIndex(2);if(!add(std::unique_ptr<AcDbEntity>(text.release())))return false;
+        }
+        return true;
+    }
+};
+// Input acquisition is separate from the service. Only the drawing adapter may
+// update the active drawing continuation and its globals, after Applied.
+inline Outcome interact(const AcDbObjectId& source,tvsOffsetOperation::End end,double defaultAngle,tvsOffsetService::Commit& output){
+    tvsOffsetService::Snapshot snapshot;if(!tvsOffsetService::capture(source,end,snapshot))return Failed;
+    dgChangeZ dg;dg.startZ=snapshot.physical.elevation;dg.nextZ=dg.startZ;dg.Axis=defaultAngle;
+    if(dg.DoModal()!=IDOK)return Cancelled;
+    if(!tvsOffset::finite(dg.startZ)||std::fabs(dg.startZ-snapshot.physical.elevation)*snapshot.physical.factor>.001){
+        tvsOffsetService::reject(L"Pocetna apsolutna kota mora odgovarati izabranom kanalu.");return Failed;}
+    tvsOffsetOperation::Request request;request.elevation=dg.nextZ;request.angleDegrees=dg.Axis;
+    request.minimumStraight=integrationPolicy().minimumStraightMm;request.minimumProjection=integrationPolicy().minimumProjectionMm;
+    if(globalRadiusTypeRect==RadiusTypeRect_RadiusConstant)request.ri=globalTapRadiusConst*snapshot.physical.factor;
+    else if(globalRadiusTypeRect==RadiusTypeRect_RadiusVariable)request.ri=globalTapRadiusVariableParameter*snapshot.physical.b*snapshot.physical.factor;
+    else {tvsOffsetService::reject(L"Izaberite konstantni ili k*B radijus pravougaonog koljena.");return Failed;}
+    const auto plan=tvsOffsetOperation::prepare(snapshot.physical,request);
+    if(plan.status==tvsOffsetOperation::NoChange)return NoChange;
+    if(plan.status!=tvsOffsetOperation::Ready){
+        if(plan.status==tvsOffsetOperation::TooShort)tvsOffsetService::reject(L"Ulaz je prekratak za koljeno i ostatak od 1 mm.");
+        else acutPrintf(L"\nTVS OFFSET DEV: Lmin=%.3f, minProjection=%.3f mm. %s",request.minimumStraight,request.minimumProjection,errorText(plan.geometryStatus));
+        return Failed;
+    }
+    acutPrintf(L"\nDEV preview: zelena osa/spojevi u osnovi; zute oznake su apsolutne fizicke kote, nisu WCS Z.");
+    acutPrintf(L"\nDva glatka pravougaona koljena: Ri=%.3f, ugao=%.3f; A x B=%.3f x %.3f mm.",request.ri,request.angleDegrees,snapshot.physical.a*snapshot.physical.factor,snapshot.physical.b*snapshot.physical.factor);
+    acutPrintf(L"\nZ %.3f -> %.3f mm; P=%.6f, rise=%.6f, L=%.6f mm; izlazni nastavak 300 mm.",
+        snapshot.physical.elevation*snapshot.physical.factor,plan.acceptedElevation*snapshot.physical.factor,
+        plan.geometry.projectedLength,plan.geometry.axis[2].z-plan.geometry.axis[1].z,plan.geometry.straightLength);
+    int answer;ACHAR value[32]=L"";
+    {Preview preview;if(!preview.show(snapshot,plan))return Failed;
+        acedInitGet(0,L"Primijeni Otkazi");answer=acedGetKword(L"\nPotvrda offset-a [Primijeni/Otkazi] <Otkazi>: ",value);}
+    if(answer!=RTNORM||_wcsicmp(value,L"Primijeni"))return Cancelled;
+    return tvsOffsetService::write(snapshot,request,plan,output);
 }
 inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acceptedAngle){
-    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db||!current)return Failed;
-    AcDbObjectId original=current->objectId();double a,b,z0,f=tvsUnits::factor(db);AcGePoint3d first,last;
-    {
-        AcDbObjectPointer<TVS_Pipe> source(original,AcDb::kForRead);
-        if(source.openStatus()!=Acad::eOk||!tvsMove::editable(source.object())||tvsOffsetData::marked(source.object())){
-            acutPrintf(L"\nTVS OFFSET: aktivni kanal nije dostupan, zaključan je ili je član sklopa.");return Failed;}
-        if(source->ThisRound||source->SizeA<=0||source->SizeB<=0||source->DuctType!=DuctTypeStill
-            ||std::fabs(source->LastPoint.z-source->FirstPoint.z)*f>.001||db->currentSpaceId()!=tvsOffsetProof::modelId(db)){
-            acutPrintf(L"\nTVS OFFSET: podržan je samo horizontalni pravougaoni kruti kanal u Model prostoru.");return Failed;}
-        a=source->SizeA;b=source->SizeB;z0=source->get_Elevation();first=source->FirstPoint;last=source->LastPoint;
+    if(!current)return Failed;
+    tvsOffsetService::Commit output;Outcome result;
+    const AcDbObjectId original=current->objectId();
+    try {result=interact(original,tvsOffsetOperation::Last,globalAxis,output);}
+    catch(...){acutPrintf(L"\nTVS OFFSET: izuzetak; nepotvrdjena transakcija je ponistena.");return Failed;}
+    if(result==Applied){
+        current=output.residentOutput;acceptedElevation=output.elevation;acceptedAngle=output.angle;
+        try {tvsOffsetSession::applied(acdbHostApplicationServices()->workingDatabase(),original,output.output,output.before);}
+        catch(...){acutPrintf(L"\nDEV: geometrija je upisana; sesijska evidencija nije sacuvana.");}
     }
-    dgChangeZ dg;dg.startZ=z0;dg.nextZ=z0;dg.Axis=globalAxis;
-    if(dg.DoModal()!=IDOK)return Cancelled;
-    if(std::fabs((dg.nextZ-z0)*f)<=.001)return NoChange;
-    double ri=0;
-    if(globalRadiusTypeRect==RadiusTypeRect_RadiusConstant)ri=globalTapRadiusConst*f;
-    else if(globalRadiusTypeRect==RadiusTypeRect_RadiusVariable)ri=globalTapRadiusVariableParameter*b*f;
-    else {acutPrintf(L"\nTVS OFFSET: izaberite konstantni ili promjenljivi radijus pravougaonog koljena.");return Failed;}
-    if(!(ri>0&&ri<=DBL_MAX)){acutPrintf(L"\nTVS OFFSET: potreban je pozitivan unutrašnji radijus.");return Failed;}
-    AcGeVector3d direction=last-first;double available=std::sqrt(direction.x*direction.x+direction.y*direction.y)*f;
-    if(!(available>0&&available<=DBL_MAX))return Failed;
-    IntegrationPolicy settings=integrationPolicy();tvsOffset::Policy policy;policy.minimumProjection=settings.minimumProjectionMm;
-    tvsOffset::Input input((dg.nextZ-z0)*f,a*f,b*f,ri,dg.Axis*tvsOffset::pi()/180,settings.minimumStraightMm);
-    tvsOffset::Result result=tvsOffset::solve(input,policy);
-    if(result.status==tvsOffset::NoChange)return NoChange;
-    if(result.hasGeometry()&&result.projectedLength<=0){acutPrintf(L"\nTVS OFFSET: nulti ravanski međukomad nije podržan u integraciji.");return Failed;}
-    if(!result.hasGeometry()){
-        acutPrintf(L"\nTVS OFFSET DEV: Lmin=%.3f mm, minimumProjection=%.3f mm. %s",settings.minimumStraightMm,settings.minimumProjectionMm,errorText(result.status));return Failed;}
-    if(available-result.axis[1].s<1){acutPrintf(L"\nTVS OFFSET: dolazni kanal je prekratak za koljeno i preostali segment od 1 mm.");return Failed;}
-    tvsOffsetAdapter::Placement placement(tvsOffset::WorldPoint(last.x,last.y,last.z),std::atan2(direction.y,direction.x),f,z0*f);
-    tvsOffsetAdapter::Result dto=tvsOffsetAdapter::adapt(input,result,placement);
-    if(!dto.ready()){acutPrintf(L"\nTVS OFFSET: rezultat nije moguće pouzdano pozicionirati.");return Failed;}
-    AcDbObjectId output;TVS_Pipe* createdExit=NULL;bool committed=false;
-    {
-        tvsOffsetProof::BuildTransaction tx(db);if(!tx.space)return Failed;
-        tvsOffsetData::WriteScope allow;
-        AcDbObject* base=NULL;if(actrTransactionManager->getObject(base,original,AcDb::kForWrite)!=Acad::eOk)return Failed;
-        TVS_Pipe* source=TVS_Pipe::cast(base);if(!source||source->FirstPoint.distanceTo(first)*f>.001||source->LastPoint.distanceTo(last)*f>.001
-            ||source->SizeA!=a||source->SizeB!=b||source->get_Elevation()!=z0)return Failed;
-        TVS_TAP* taps[2]={NULL,NULL};AcDbObjectId ids[3];
-        for(int j=0;j<2;++j){const tvsOffsetAdapter::Elbow& e=dto.elbows[j];
-            TVS_TAP* tap=new TVS_TAP();tvsOffsetProof::initialize(tap);tap->setDatabaseDefaults();appearance(source,tap);
-            tap->SizeA=e.sizeA;tap->SizeB=e.sizeB;tap->ThisRound=false;tap->DuctType=DuctTypeStill;
-            tap->TypeRoundTap=TypeRoundTap_TapSection;tap->RadiusTypeRect=RadiusTypeRect_RadiusConstant;
-            tap->RadiusTypeRound=RadiusTypeRound_RadiusConstant;tap->RadiusVariableParameter=.5;tap->RadiusConst=e.innerRadius;
-            tap->Swectangle=e.angle;tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,0);tap->Normvector=AcGeVector3d(0,0,1);
-            tap->MiddlePoint=tvsOffsetProof::pt(e.middle);tap->CenterPoint=tap->MiddlePoint;tap->WipeoutLength=50/f;
-            tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down);tap->put_Elevation(e.elevation);
-            if(!tx.append(tap,ids[j==0?0:2]))return Failed;taps[j]=tap;
-        }
-        TVS_Pipe* slope=new TVS_Pipe();initializePipe(slope);slope->setDatabaseDefaults();appearance(source,slope);
-        slope->SizeA=a;slope->SizeB=b;slope->ThisRound=false;slope->DuctType=DuctTypeStill;slope->WipeoutLength=50/f;
-        slope->FirstPoint=tvsOffsetProof::pt(dto.middle.first);slope->LastPoint=tvsOffsetProof::pt(dto.middle.last);
-        slope->put_Elevation((dto.middle.firstElevationMm+dto.middle.lastElevationMm)/2/f);
-        if(!tx.append(slope,ids[1]))return Failed;
-        TVS_Pipe* exit=new TVS_Pipe();initializePipe(exit);exit->setDatabaseDefaults();appearance(source,exit);
-        exit->SizeA=a;exit->SizeB=b;exit->ThisRound=false;exit->DuctType=DuctTypeStill;exit->WipeoutLength=50/f;
-        exit->FirstPoint=tvsOffsetProof::pt(dto.outgoingFirst);
-        AcGeVector3d along(std::cos(placement.heading),std::sin(placement.heading),0);
-        exit->LastPoint=exit->FirstPoint+along*(300/f);exit->put_Elevation(dg.nextZ);
-        if(!tx.append(exit,output))return Failed;createdExit=exit;
-        CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return Failed;
-        AcDbObject* members[3]={taps[0],slope,taps[1]};
-        for(int j=0;j<3;++j){tvsOffsetData::Record record;record.guid=guid;record.role=j;
-            for(int k=0;k<3;++k)record.members[k]=ids[k];
-            record.rise=j==1?result.axis[2].z-result.axis[1].z:0;
-            if(tvsOffsetData::write(members[j],record)!=Acad::eOk){acutPrintf(L"\nTVS OFFSET: podaci nisu upisani; cijela operacija se poništava.");return Failed;}}
-        if(failNext()){failNext()=false;acutPrintf(L"\nDEV INJECTED FAILURE after member records: aborting full offset transaction.");return Failed;}
-        if(source->put_Lastpoint(tvsOffsetProof::pt(dto.incomingLast))!=Acad::eOk)return Failed;
-        source->recordGraphicsModified();committed=tx.commit();
-    }
-    if(!committed)return Failed;
-    // Same resident closed-object convention as the existing drawing loop/add_new API.
-    // No fallible post-commit lookup may turn a committed operation into Failed.
-    current=createdExit;acceptedElevation=dg.nextZ;acceptedAngle=dg.Axis;
-    tvsOffsetSession::applied(db,original,output,z0);
-    acutPrintf(L"\nTVS OFFSET DEV: P=%.6f, riseStraight=%.6f, Lphysical=%.6f mm. Lmin=%.3f / minimumProjection=%.3f su razvojne postavke.",result.projectedLength,result.axis[2].z-result.axis[1].z,result.straightLength,settings.minimumStraightMm,settings.minimumProjectionMm);
-    return Applied;
+    return result;
+}
+inline void standalone(){
+    try {
+        ads_name entity;ads_point pick;
+        if(tvsCoordinates::selectEntity(L"\nIzaberite obican horizontalni pravougaoni TVS kanal: ",entity,pick)!=RTNORM)return;
+        AcDbObjectId id;if(acdbGetObjectId(id,entity)!=Acad::eOk)return;
+        ACHAR value[32]=L"";acedInitGet(0,L"Prvi Posljednji");
+        const int status=acedGetKword(L"\nSlobodan kraj [Prvi/Posljednji] <Posljednji>: ",value);
+        if(status!=RTNORM&&status!=RTNONE)return;
+        const auto end=status==RTNORM&&_wcsicmp(value,L"Prvi")==0?tvsOffsetOperation::First:tvsOffsetOperation::Last;
+        tvsOffsetService::Commit output;const Outcome result=interact(id,end,globalAxis,output);
+        if(result==NoChange)acutPrintf(L"\nTVS_OFFSET: NoChange; nema upisa.");
+        else if(result==Cancelled)acutPrintf(L"\nTVS_OFFSET: otkazano; nema upisa.");
+        else if(result==Failed)acutPrintf(L"\nTVS_OFFSET: operacija nije primijenjena.");
+        // Standalone intentionally does not touch current pipe, globals or drawing-session history.
+    }catch(...){acutPrintf(L"\nTVS_OFFSET: izuzetak; nepotvrdjena transakcija je ponistena.");}
 }
 }
 #endif

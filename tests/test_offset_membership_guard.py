@@ -9,9 +9,9 @@ ROOT=pathlib.Path(__file__).resolve().parents[1]
 class OffsetMembershipGuard(unittest.TestCase):
     def test_actual_reciprocal_membership_validation(self):
         code=(ROOT/'TVS_Ventilation_DBX/OffsetAssemblyData.cpp').read_text(encoding='utf-8-sig')
-        start=code.index('Status validate(')
+        start=code.index('Status validateCore(')
         end=code.index('    if(!geometry)return Valid;',start)+len('    if(!geometry)return Valid;')
-        body=code[start:end]+'\n    return Valid;\n}\n'
+        body=code[start:end].replace('Status validateCore(', 'Status validate(')+'\n    return Valid;\n}\n'
         # Whitespace-only formatting of the extracted dense source for GCC -Werror.
         body=body.replace('if(q==Legacy)return Corrupt;if(q!=Valid)return q;',
                           'if(q==Legacy)return Corrupt;\n        if(q!=Valid)return q;')

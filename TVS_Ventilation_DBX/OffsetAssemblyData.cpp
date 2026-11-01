@@ -4,6 +4,7 @@
 #include "TVS_Pipe.h"
 #include "TVS_TAP.h"
 #include "OffsetAssemblyData.h"
+#include "BypassAssemblyData.h"
 #include "dbdict.h"
 #include "dbxrecrd.h"
 #include "dbobjptr.h"
@@ -76,7 +77,7 @@ Acad::ErrorStatus write(AcDbObject* object,const Record& r){
     if(!managed){if(record)record->close();dict->close();}return es;
 }
 
-bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy;}
+bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy||tvsBypassData::marked(o);}
 bool editable(const AcDbObject* o){return writeDepth>0||!marked(o)||clones.find(o->objectId())!=clones.end();}
 bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
     if(!marked(o)||writeDepth>0)return true;
@@ -90,7 +91,7 @@ bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
     return true;
 }
 static bool nearPoint(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
-Status validate(const AcDbObject* o,bool geometry){
+Status validateCore(const AcDbObject* o,bool geometry){
     Record r;Status s=read(o,r);if(s!=Valid)return s;
     for(int j=0;j<3;++j){if(r.members[j].isNull()||r.members[j].isErased())return Incomplete;
         if(r.members[j].database()!=o->database())return Corrupt;
@@ -139,8 +140,16 @@ Status validate(const AcDbObject* o,bool geometry){
         ||a->get_Form()!=(delta>0?Form_Up:Form_Down)||b->get_Form()!=(delta>0?Form_Down:Form_Up))return GeometryMismatch;
     return Valid;
 }
+Status validate(const AcDbObject* o,bool geometry){
+    Status s=validateCore(o,geometry);
+    if(s!=Legacy&&s!=Valid)return s;
+    return tvsBypassData::marked(o)?tvsBypassData::validate(o,geometry):s;
+}
 bool physicalLength(const AcDbObject* o,double projected,double& physical){
-    Record r;Status s=read(o,r);physical=projected;if(s==Legacy)return true;
+    Record r;Status s=read(o,r);physical=projected;if(s==Legacy){
+        if(!tvsBypassData::marked(o))return true;
+        const Status parent=tvsBypassData::validate(o);return parent==Valid||parent==Incomplete;
+    }
     if(s!=Valid||r.role!=SlopedStraight){acutPrintf(L"\nTVS OFFSET: neispravni podaci fizičke dužine (%s).",statusText(s));return false;}
     // Incomplete membership still permits the standalone member's own valid quantity.
     Status integrity=validate(o,writeDepth==0&&clones.find(o->objectId())==clones.end());if(integrity!=Valid&&integrity!=Incomplete){acutPrintf(L"\nTVS OFFSET: neispravno članstvo (%s).",statusText(integrity));return false;}

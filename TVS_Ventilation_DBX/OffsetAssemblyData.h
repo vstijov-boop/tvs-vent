@@ -12,6 +12,7 @@ DLLIMPEXP Status read(const AcDbObject* object,Record& record);
 DLLIMPEXP Acad::ErrorStatus write(AcDbObject* object,const Record& record);
 DLLIMPEXP CString newGuid();
 DLLIMPEXP Status validate(const AcDbObject* object,bool geometry=true);
+DLLIMPEXP Status validateCore(const AcDbObject* object,bool geometry=true);
 DLLIMPEXP bool physicalLength(const AcDbObject* object,double projected,double& physical);
 DLLIMPEXP bool marked(const AcDbObject* object);
 DLLIMPEXP bool editable(const AcDbObject* object);

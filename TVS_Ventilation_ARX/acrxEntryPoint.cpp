@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2002-2012 by Autodesk, Inc. 
+// (C) Copyright 2002-2012 by Autodesk, Inc. 
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -25,6 +25,7 @@
 #pragma once
 #include "StdAfx.h"
 #include "resource.h"
+#include "BypassPreviewCommand.h"
 #include "Func.h"
 #include "CoordinateInput.h"
 #include "TVSMoveCommand.h"
@@ -101,6 +102,16 @@ public:
 		delete pdbl;
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
+#ifdef TVS_BYPASS_PREVIEW
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
+#endif
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->addReactor(&offsetReactor());
@@ -111,6 +122,9 @@ public:
 	}
 
 	virtual AcRx::AppRetCode On_kUnloadAppMsg(void *pkt) {
+#ifdef TVS_BYPASS_PREVIEW
+        acedRegCmds->removeGroup(L"TVS_BYPASS_DEV");
+#endif
         PropertyAdmin::uninitialize();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
@@ -1709,8 +1723,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
-			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1754,6 +1768,15 @@ public:
 				return false;
 			}
 
+#ifdef TVS_BYPASS_PREVIEW
+            if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
+                TVSBypassOutput result;
+                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                    pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+            }
+#endif
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
@@ -1792,7 +1815,8 @@ public:
 	}
 #ifdef TVS_OFFSET_PROOF
 #ifdef TVS_OFFSET_INTEGRATION
-    static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeći uspješni Z će namjerno prekinuti upis poslije podataka sklopa.");}
+    static void Ventilation_ARXTVS_OFFSET(){tvsOffsetIntegration::standalone();}
+    static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeci potvrdeni offset/Z prekida transakciju poslije podataka i kraja izvora.");}
     static void Ventilation_ARXTVS_OFFSET_STATUS(){tvsOffsetDiagnostics::status();}
     static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
     static void Ventilation_ARXTVS_OFFSET_TEST_BAD(){tvsOffsetDiagnostics::corruptTest();}
@@ -1920,8 +1944,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N"));
-			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje]: "), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1965,6 +1989,15 @@ public:
 				return;
 			}
 
+#ifdef TVS_BYPASS_PREVIEW
+            if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
+                TVSBypassOutput result;
+                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                    pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+            }
+#endif
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
@@ -4036,6 +4069,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OF
 
 #ifdef TVS_OFFSET_INTEGRATION
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_STATUS, TVS_OFFSET_STATUS, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET, TVS_OFFSET, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_POLICY, TVS_OFFSET_POLICY, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_TEST_BAD, TVS_OFFSET_TEST_BAD, ACRX_CMD_MODAL, NULL)
 #endif
@@ -4043,3 +4077,4 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_
 #ifdef TVS_OFFSET_INTEGRATION
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_FAIL_NEXT, TVS_OFFSET_FAIL_NEXT, ACRX_CMD_MODAL, NULL)
 #endif
+
