@@ -14,6 +14,7 @@
 #include "OffsetAssemblyData.h"
 #endif
 #include "BypassSideDetail.h"
+#include "BypassSideDetailTest.h"
 namespace {
 using namespace tvsBypassPreview;
 static std::wstring wide(const std::string& s){
@@ -271,6 +272,7 @@ struct Dialog {
  }
 };
 }
+void tvsBypassDetailTestCommand(){try{tvsSideDetail::nativeFixture();}catch(...){tvsSideDetail::injectedStage=0;acutPrintf(L"\nNATIVE_DETAIL_FIXTURE_FAILED. Disposable test drawing may contain completed fixtures.");}}
 void tvsBypassDetailCheckCommand(){
  try{auto used=tvsSideDetail::inventory(acdbHostApplicationServices()->workingDatabase());
   acutPrintf(L"\nBocni detalji: %u lokalnih referenci. %ls",static_cast<unsigned>(used.labels.size()),used.duplicated?L"DUPLIKATI: COPY nije nezavisni detalj; uklonite kopije.":L"Oznake/GUID-i bez otkrivenih duplikata. XREF i ponovljene parent instance nisu globalno provjereni.");
@@ -313,4 +315,3 @@ void tvsBypassPreviewCommand(){
  }catch(...){acutPrintf(L"\nGreška razvojnog pregleda. Privremena grafika je uklonjena; nema DWG upisa.");}
 }
 #endif
-

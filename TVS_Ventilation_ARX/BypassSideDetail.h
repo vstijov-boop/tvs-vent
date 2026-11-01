@@ -94,11 +94,12 @@ static void record(AcDbBlockReference* ref,const std::vector<std::wstring>& stri
 }
 static std::wstring scalar(const wchar_t* key,double value){std::wostringstream out;out.imbue(std::locale::classic());out<<key<<L"="<<std::setprecision(17)<<value;return out.str();}
 // DEV-only fault injection: process environment TVS_SIDE_DETAIL_FAIL=1/2/3/4; clear after tests.
-static void failpoint(int stage){wchar_t value[32]=L"";if(GetEnvironmentVariableW(L"TVS_SIDE_DETAIL_FAIL",value,32)&&_wtoi(value)==stage)throw std::runtime_error("Injected detail write failure");}
-static void write(AcDbDatabase* db,const SideDetail& d,const View& view,const Options& options,const std::string& label,bool detailed,const AcGePoint3d& position,const std::wstring& guid,const std::wstring& routeHandle,const std::wstring& obstacleHandle){
+static int injectedStage=0;
+static void failpoint(int stage){if(injectedStage==stage)throw std::runtime_error("Injected fixture write failure");wchar_t value[32]=L"";if(GetEnvironmentVariableW(L"TVS_SIDE_DETAIL_FAIL",value,32)&&_wtoi(value)==stage)throw std::runtime_error("Injected detail write failure");}
+static AcDbObjectId write(AcDbDatabase* db,const SideDetail& d,const View& view,const Options& options,const std::string& label,bool detailed,const AcGePoint3d& position,const std::wstring& guid,const std::wstring& routeHandle,const std::wstring& obstacleHandle){
  Inventory current=inventory(db);if(current.duplicated)throw std::runtime_error("Duplicate copied detail identity");
  for(const auto& used:current.labels)if(labelKey(used)==labelKey(label))throw std::runtime_error("Duplicate detail label");
- Transaction transaction;
+ AcDbObjectId resultId;Transaction transaction;
  std::wstring token=guid;for(wchar_t& c:token)if(c==L'{'||c==L'}'||c==L'-')c=L'_';
  const std::wstring name=L"TVS_SIDE_"+token;
  AcDbObjectId layerId,textId,styleId,blockId;
@@ -146,10 +147,10 @@ static void write(AcDbDatabase* db,const SideDetail& d,const View& view,const Op
   data.push_back(L"numericOrder=width,height,z0,obsWidth,obsHeight,obsZ,ux,uy,originX,originY,originZ,D,H,W,s0,zPass,gapLo,gapHi,Ri,iso,obsIso,clearance,reserve,angle,above,left,right,floor,ceiling,useFloor,useCeiling");
   for(double value:values)data.push_back(scalar(L"value",value));for(const auto& p:view.axis){data.push_back(scalar(L"axisS",p.s));data.push_back(scalar(L"axisZ",p.z));}
   data.push_back(scalar(L"witnessBodyS",view.witnessBody.s));data.push_back(scalar(L"witnessBodyZ",view.witnessBody.z));data.push_back(scalar(L"witnessObstacleS",view.witnessObstacle.s));data.push_back(scalar(L"witnessObstacleZ",view.witnessObstacle.z));
-  record(inserted.object(),data);
+  record(inserted.object(),data);resultId=id;
  }
  failpoint(4);
- transaction.commit();
+ transaction.commit();return resultId;
 }
 static std::wstring handle(const AcDbObjectId& id){AcDbHandle h=id.handle();wchar_t s[32];h.getIntoAsciiBuffer(s);return s;}
 static void insert(AcDbDatabase* db,const View& v,const Options& o,const AcDbObjectId& route,const AcDbObjectId& obstacle){
@@ -176,4 +177,3 @@ static void insert(AcDbDatabase* db,const View& v,const Options& o,const AcDbObj
  }
 }
 }
-

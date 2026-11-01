@@ -103,6 +103,8 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 #ifdef TVS_BYPASS_PREVIEW
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)

@@ -43,3 +43,10 @@ Prije potvrde koriste se samo transient objekti. Poslije potvrde jedna transakci
 7. DEV injekcija greške tokom upisa dokumentovana u završnom izvještaju; abort ne smije ostaviti ni reference ni definicije ni stilove. Ne proglašavati transakcijsko ponašanje/Undo runtime prolazom na osnovu kompajliranja.
 
 Automatizovane testove, DEV buildove i praktične AutoCAD provjere izvještavati odvojeno. Po isporuci stati radi pregleda. Produkciona grana/bundle se ne mijenjaju.
+
+
+## DEV native fixture
+
+TVS_BYPASS_DETAIL_TEST radi samo u potpuno praznom Model prostoru novog potrosnog crteza. Kreira 72 sinteticka checked slucaja: mm/cm/m, iznad/ispod, 30/45/60, izolacije 0/25 i osnovno/detaljno. Cita stvarne aligned mjere, DIMLFAC, anonimne blokove i XRecord. Provjerava 4 abort tacke i duplu oznaku. Ovo nije test interaktivnog izbora TVS objekata, Cancel/Undo/Save/Reopen ili izgleda. Ocekivano: NATIVE_DETAIL_FIXTURE_PASS. Ne pokretati na projektu.
+
+Rucna injekcija: Windows PROCESS environment TVS_SIDE_DETAIL_FAIL prije pokretanja AutoCAD-a postaviti na 1 (poslije stilova), 2 (poslije definicije bloka), 3 (poslije geometrije/kota), 4 (poslije reference/XRecord-a, prije commita). Poslije testa ukloniti env i restartovati AutoCAD. Ovo nije AutoLISP setenv. Native fixture interno prolazi iste tacke bez promjene process env.
