@@ -25,6 +25,7 @@
 #pragma once
 #include "StdAfx.h"
 #include "resource.h"
+#include "BypassPreviewCommand.h"
 #include "Func.h"
 #include "CoordinateInput.h"
 #include "TVSMoveCommand.h"
@@ -1790,6 +1791,9 @@ public:
 		}
 
 	}
+#ifdef TVS_BYPASS_PREVIEW
+    static void Ventilation_ARXTVS_BYPASS_PREVIEW(){tvsBypassPreviewCommand();}
+#endif
 #ifdef TVS_OFFSET_PROOF
 #ifdef TVS_OFFSET_INTEGRATION
     static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeći uspješni Z će namjerno prekinuti upis poslije podataka sklopa.");}
@@ -4042,4 +4046,8 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_
 
 #ifdef TVS_OFFSET_INTEGRATION
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_FAIL_NEXT, TVS_OFFSET_FAIL_NEXT, ACRX_CMD_MODAL, NULL)
+#endif
+
+#ifdef TVS_BYPASS_PREVIEW
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_BYPASS_PREVIEW, TVS_BYPASS_PREVIEW, ACRX_CMD_MODAL, NULL)
 #endif

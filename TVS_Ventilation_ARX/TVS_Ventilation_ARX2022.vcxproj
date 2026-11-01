@@ -149,6 +149,19 @@
       <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)TVS_Ventilation_DBX\$(IntDir)TVSTVS_Ventilation_DBX.lib;AcPal.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(TVSBypassPreview)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_BYPASS_PREVIEW;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(TVSBypassPreview)'=='true'">
+    <ClCompile Include="BypassPreviewCommand.cpp" />
+    <ClCompile Include="BypassNumericBridge.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+    </ClCompile>
+  </ItemGroup>
   <ItemDefinitionGroup Condition="'$(TVSOffsetProof)'=='true'">
     <ClCompile><PreprocessorDefinitions>TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
