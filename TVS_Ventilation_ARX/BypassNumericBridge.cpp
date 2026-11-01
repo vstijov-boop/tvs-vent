@@ -110,7 +110,7 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
  out.plan.push_back(rectangle(7,true,-f.obstacleWidth/2-o.obstacleInsulation,f.obstacleWidth/2+o.obstacleInsulation,f.tmin,f.tmax));
  // The union footprint has constant width. Individual fitting envelopes are diagnostics.
  double left=out.plan.front().points.front().s,right=left;
- for(const auto& c:out.plan)if(c.member<7)for(const auto& p:c.points){left=std::min(left,p.s);right=std::max(right,p.s);}
+ for(const auto& c:out.plan)if(c.member<7)for(const auto& vertex:c.points){left=std::min(left,vertex.s);right=std::max(right,vertex.s);}
  out.plan.push_back(rectangle(10,true,left,right,-f.width/2-o.insulation,f.width/2+o.insulation));
  out.plan.push_back(rectangle(10,false,out.axis.front().s,out.axis.back().s,-f.width/2,f.width/2));
  Curve planAxis;planAxis.member=8;planAxis.insulation=false;planAxis.kind=AxisLine;
