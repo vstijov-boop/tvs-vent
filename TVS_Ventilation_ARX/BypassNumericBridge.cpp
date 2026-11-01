@@ -85,6 +85,11 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
  text<<"Kriticni clan="<<static_cast<int>(checked.obstacle.witnessMember)<<"; donja ograda clan="<<static_cast<int>(checked.obstacle.lowerMember)<<"\r\n";
  text<<"Tijelo(s,z)=("<<middle(checked.obstacle.onBody.s)<<","<<middle(checked.obstacle.onBody.z)<<")\r\nPrepreka(s,z)=("<<middle(checked.obstacle.onObstacle.s)<<","<<middle(checked.obstacle.onObstacle.z)<<") mm\r\n";
  out.details=text.str();
+ out.criticalRole=static_cast<int>(checked.obstacle.witnessMember);
+ out.witnessBody=Vertex(middle(checked.obstacle.onBody.s),middle(checked.obstacle.onBody.z));
+ out.witnessObstacle=Vertex(middle(checked.obstacle.onObstacle.s),middle(checked.obstacle.onObstacle.z));
+ for(const auto& a:checked.axis)out.axis.push_back(Vertex(middle(a.s),middle(a.z)));
+ for(int j=0;j<2;++j){out.slopePhysical[j]=checked.offsets[j].straightLength;out.slopeProjected[j]=checked.offsets[j].projectedLength;}
  for(const tvsBypass::Body& body:checked.members){
   outline(body,true,out.profile);
   tvsBypass::Body metal=body;
@@ -92,19 +97,27 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
   else metal.half=metal.half-tvsBypass::I(o.insulation);
   outline(metal,false,out.profile);
   tvsBypass::Box box=body.enclosure(tvsBypass::I(0,1),tvsBypass::I(0,1));
-  out.plan.push_back(rectangle(static_cast<int>(body.role),true,box.s.lo,box.s.hi,-f.width/2-o.insulation,f.width/2+o.insulation));
+  out.plan.push_back(rectangle(static_cast<int>(body.role),true,box.s.lo,box.s.hi,-f.width/2-o.insulation,f.width/2+o.insulation));out.plan.back().kind=DiagnosticLine;
   tvsBypass::Box bare=metal.enclosure(tvsBypass::I(0,1),tvsBypass::I(0,1));
-  out.plan.push_back(rectangle(static_cast<int>(body.role),false,bare.s.lo,bare.s.hi,-f.width/2,f.width/2));
+  out.plan.push_back(rectangle(static_cast<int>(body.role),false,bare.s.lo,bare.s.hi,-f.width/2,f.width/2));out.plan.back().kind=DiagnosticLine;
   tvsBypass::V ports[2];for(int end=0;end<2;++end){tvsBypass::port(body,end!=0,ports);
    for(int k=0;k<2;++k){Curve c;c.member=static_cast<int>(body.role);c.insulation=false;
+    c.kind=JointSymbol;
     c.points.push_back(Vertex(middle(ports[k].s),-f.width/2-o.insulation));c.points.push_back(Vertex(middle(ports[k].s),f.width/2+o.insulation));out.plan.push_back(c);}}
  }
  out.profile.push_back(rectangle(7,false,-f.obstacleWidth/2,f.obstacleWidth/2,f.obstacleZ-f.obstacleHeight/2,f.obstacleZ+f.obstacleHeight/2));
  out.profile.push_back(rectangle(7,true,-f.obstacleWidth/2-o.obstacleInsulation,f.obstacleWidth/2+o.obstacleInsulation,f.obstacleZ-f.obstacleHeight/2-o.obstacleInsulation,f.obstacleZ+f.obstacleHeight/2+o.obstacleInsulation));
  out.plan.push_back(rectangle(7,true,-f.obstacleWidth/2-o.obstacleInsulation,f.obstacleWidth/2+o.obstacleInsulation,f.tmin,f.tmax));
+ // The union footprint has constant width. Individual fitting envelopes are diagnostics.
+ double left=out.plan.front().points.front().s,right=left;
+ for(const auto& c:out.plan)if(c.member<7)for(const auto& p:c.points){left=std::min(left,p.s);right=std::max(right,p.s);}
+ out.plan.push_back(rectangle(10,true,left,right,-f.width/2-o.insulation,f.width/2+o.insulation));
+ out.plan.push_back(rectangle(10,false,out.axis.front().s,out.axis.back().s,-f.width/2,f.width/2));
+ Curve planAxis;planAxis.member=8;planAxis.insulation=false;planAxis.kind=AxisLine;
+ planAxis.points.push_back(Vertex(out.axis.front().s,0));planAxis.points.push_back(Vertex(out.axis.back().s,0));out.plan.push_back(planAxis);
  // Reference axes and witness distance, from the same Result.
- Curve axis;axis.member=8;axis.insulation=false;for(const auto& v:checked.axis)axis.points.push_back(Vertex(middle(v.s),middle(v.z)));out.profile.push_back(axis);
- Curve witness;witness.member=9;witness.insulation=false;
+ Curve axis;axis.member=8;axis.insulation=false;axis.kind=AxisLine;for(const auto& v:checked.axis)axis.points.push_back(Vertex(middle(v.s),middle(v.z)));out.profile.push_back(axis);
+ Curve witness;witness.member=9;witness.insulation=false;witness.kind=DiagnosticLine;
  witness.points.push_back(Vertex(middle(checked.obstacle.onBody.s),middle(checked.obstacle.onBody.z)));
  witness.points.push_back(Vertex(middle(checked.obstacle.onObstacle.s),middle(checked.obstacle.onObstacle.z)));out.profile.push_back(witness);
  stateRef.revision.accept();stateRef.view=out;return out;

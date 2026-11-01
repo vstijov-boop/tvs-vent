@@ -57,11 +57,12 @@ struct Options {
  floor(0),ceiling(0),timeMs(5000),calls(64),cells(300000),depthStep(10),bridgeStep(25),maxDepth(100000),depthLevels(8),bridgeLevels(5),positions(5),seedSolves(64),proposals(512),inset(1),wTolerance(.01),dTolerance(.01),angle(45),above(false),useFloor(false),useCeiling(false),confirmed(false){}
 };
 struct Vertex {double s,z;Vertex(double a=0,double b=0):s(a),z(b){}};
-struct Curve {int member;bool insulation;std::vector<Vertex> points;};
+enum CurveKind {PhysicalOutline,JointSymbol,AxisLine,DiagnosticLine};
+struct Curve {int member;bool insulation;int kind;std::vector<Vertex> points;Curve():member(0),insulation(false),kind(PhysicalOutline){} };
 struct View {
  bool ready;std::string status,details;Frame frame;std::vector<Curve> profile,plan;
- double D,C,s0,W,zPass,gapLo,gapHi,elapsedMs;unsigned calls;std::uint64_t cells;
- View():ready(false),D(0),C(0),s0(0),W(0),zPass(0),gapLo(0),gapHi(0),elapsedMs(0),calls(0),cells(0){}
+ double D,C,s0,W,zPass,gapLo,gapHi,elapsedMs;double slopePhysical[2],slopeProjected[2];int criticalRole;std::vector<Vertex> axis;Vertex witnessBody,witnessObstacle;unsigned calls;std::uint64_t cells;
+ View():ready(false),D(0),C(0),s0(0),W(0),zPass(0),gapLo(0),gapHi(0),elapsedMs(0),criticalRole(-1),calls(0),cells(0){slopePhysical[0]=slopePhysical[1]=slopeProjected[0]=slopeProjected[1]=0;}
 };
 // Opaque numeric engine: UI translation units never include interval/checker headers.
 class Engine {

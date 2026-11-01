@@ -1,4 +1,4 @@
-#include "../geometry/bypass/PreviewModel.h"
+#include "../geometry/bypass/PreviewPresentation.h"
 #include <iostream>
 #include <cstdlib>
 #include <limits>
@@ -51,6 +51,33 @@ int main(){
   std::fesetround(FE_UPWARD);flags=std::fetestexcept(FE_ALL_EXCEPT);v=engine.calculate(s,1,false,o,false);
   expect(!v.ready&&std::fegetround()==FE_UPWARD&&std::fetestexcept(FE_ALL_EXCEPT)==flags,"bridge rejects without normalizing rounding");
   std::fesetenv(&saved);
+ }
+ // Independent regression from the user's actual screenshot, not formulas repeated from solve().
+ s=example(1,0);s.route.b=250;s.route.elevation=s.obstacle.elevation=0;o=Options();o.confirmed=true;o.left=-2812.95376;o.right=1987.82064;
+ v=engine.calculate(s,1,false,o,false);expect(v.ready,"screenshot case feasible");
+ near(v.D,315,"screenshot D");near(v.C,360,"screenshot C");near(v.W,1362.792206135785,"screenshot W");near(v.zPass,-315,"screenshot elevation");
+ near(v.slopePhysical[0],259.081169079632,"screenshot physical slope");near(v.slopeProjected[0],183.198051533946,"screenshot projected slope");
+ expect(v.axis.size()==8,"checked section axes available for dimensions");near(v.axis.front().z,0,"initial dimension");near(v.axis.back().z,0,"final dimension");
+ auto notes=captions(v,o);expect(notes.size()==12,"annotation rail has twelve non-overlay cells");
+ expect(notes[3].text.find("125.0 / -125.0")!=std::string::npos,"obstacle top/bottom labels");
+ expect(notes[5].text.find("-190.0 / -440.0")!=std::string::npos,"pass top/bottom labels");
+ expect(summary(v,o).find("315.0")!=std::string::npos,"human summary one decimal");
+ expect(summary(v,o).find("[64.99, 65.01]")!=std::string::npos,"display interval rounded OUTWARD");
+ expect(memberName(3)=="srednji komad","member names not raw codes");
+ auto contours=planLines(v,false,false),all=planLines(v,true,true);expect(all.size()>contours.size(),"separate contour/all-edges modes");
+ for(const auto& l:contours)expect(l.kind==PhysicalOutline,"contours hide symbolic and diagnostic fitting boundaries");
+ View empty;expect(captions(empty,o).empty(),"invalid result has no stale dimensions");
+ View coincident;Curve diagnostic,physical;diagnostic.kind=DiagnosticLine;diagnostic.points={Vertex(0,0),Vertex(10,0)};
+ physical.kind=PhysicalOutline;physical.points={Vertex(10,0),Vertex(0,0)};coincident.plan={diagnostic,physical};
+ auto unique=planLines(coincident,true,true);expect(unique.size()==1&&unique[0].kind==PhysicalOutline,"physical contour precedes coincident diagnostic");
+ // Display-only axes and geometry labels are checked for both sides, headings, angles and insulation.
+ for(bool above:{false,true})for(double heading:{0.,.6457718232379019})for(int angle:{30,45,60})for(double iso:{0.,25.}){
+  s=example(1,heading);o=Options();o.confirmed=true;o.above=above;o.angle=angle;o.insulation=o.obstacleInsulation=iso;o.left=-1600;o.right=1600;
+  v=engine.calculate(s,1,false,o,false);expect(v.ready,"presentation matrix confirmed candidate");
+  near(v.axis.front().z,-400,"initial axis from checked Result");near(v.axis.back().z,-400,"final axis from checked Result");
+  expect((v.zPass>-400)==above,"above/below section orientation");
+  expect(v.witnessBody.s==v.witnessBody.s&&v.witnessObstacle.z==v.witnessObstacle.z,"critical points finite");
+  expect(captions(v,o).size()==12&&!planLines(v,true,true).empty(),"both presentations available");
  }
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
