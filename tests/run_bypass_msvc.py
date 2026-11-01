@@ -1,7 +1,10 @@
 """Configure the existing development toolset in this subprocess, then RUN tests."""
 import os,pathlib,subprocess,sys
 toolset=os.environ["TVS_BYPASS_TOOLSET"]
-if toolset=="v141":
+if toolset=="v143":
+    root=pathlib.Path(r"C:\Program Files\Microsoft Visual Studio\2022\Community")
+    args=""
+elif toolset=="v141":
     root=pathlib.Path(os.environ["TVS_VS2017"])
     args="10.0.17763.0 -vcvars_ver=14.16"
 else:
@@ -22,5 +25,7 @@ for name in ["VCToolsInstallDir","VCToolsVersion","WindowsSDKVersion","WindowsSd
     print(name,env.get(name),flush=True)
 version=subprocess.run(["cl"],env=env,capture_output=True,text=True)
 print(version.stdout+version.stderr,flush=True)
-result=subprocess.run([sys.executable,"-m","unittest","discover","-s","tests","-p","test_bypass*.py","-v"],env=env)
-sys.exit(result.returncode)
+for pattern in (sys.argv[1:] or ["test_bypass*.py", "test_offset_operation.py", "test_offset_service.py"]):
+    result=subprocess.run([sys.executable,"-m","unittest","discover","-s","tests","-p",pattern,"-v"],env=env)
+    if result.returncode:
+        sys.exit(result.returncode)

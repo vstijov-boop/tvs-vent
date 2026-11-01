@@ -4,6 +4,8 @@ on:
     branches: [razvoj-offset-arx]
     paths:
       - 'geometry/bypass/**'
+      - 'geometry/OffsetOperation.h'
+      - 'tests/*offset*'
       - 'tests/*bypass*'
       - '.github/workflows/dev-bypass-windows.yml'
   workflow_dispatch:

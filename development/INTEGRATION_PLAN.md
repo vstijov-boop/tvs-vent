@@ -125,6 +125,11 @@ MLeader veze prema originalu ne prebacivati tiho na proizvoljni novi član.
 
 ## 4. Trajni podaci — koncept za zasebnu implementacionu reviziju
 
+**Naknadna odluka korisnika uz odobrenje samo INT-00:** ranije prihvaćeni smjer je
+roditelj nad dvije v1 trojke i H. Dolje navedeni poseban sedmočlani ugovor nije
+odobrena promjena tog smjera. Prije faze 1 dostaviti kratko poređenje i preporuku;
+sada se ne implementira nijedna bypass šema.
+
 Postojeći `TVS_OFFSET_MEMBER` v1 ostaje nepromijenjen: tri člana, GUID, uloga,
 recipročne reference i rise. Nije sedmočlani bypass ugovor. Ne upisivati dva
 nezavisna offset sklopa i predstavljati ih kao jedan kompletno validiran obilazak.
