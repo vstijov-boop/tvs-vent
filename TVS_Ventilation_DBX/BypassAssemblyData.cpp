@@ -10,6 +10,7 @@
 #include "dbtrans.h"
 #include "../geometry/OffsetGeometry.h"
 #include <set>
+#include <memory>
 namespace tvsBypassData {
 using namespace tvsOffsetData;
 static const wchar_t* memberKey(){return L"TVS_BYPASS_PARENT";}
@@ -66,7 +67,20 @@ static Status read(const AcDbObjectId& id,Record& out){
 static AcGePoint3d horizontalPort(TVS_TAP* p){
     return p->MiddlePoint-AcGeVector3d(-p->Startvector.y,p->Startvector.x,0)*((p->get_radius()+p->SizeB/2)*std::sin(p->Swectangle));
 }
-static bool near(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
+bool pinned(const AcDbObjectId& source,bool first){
+    if(source.isNull()||!source.database())return true;
+    AcDbObjectPointer<AcDbDictionary> nod(source.database()->namedObjectsDictionaryId(),AcDb::kForRead);
+    if(nod.openStatus()!=Acad::eOk)return true;
+    std::unique_ptr<AcDbDictionaryIterator> it(nod->newIterator());
+    if(!it)return true;
+    for(;!it->done();it->next()){
+        if(_wcsnicmp(it->name(),L"TVS_BYPASS_",11))continue;
+        Record r;const Status s=read(it->objectId(),r);if(s!=Valid)return true;
+        if((r.inlet==source&&first==r.reverse)||(r.outlet==source&&first!=r.reverse))return true;
+    }
+    return false;
+}
+static bool nearPoint(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
 Status validate(const AcDbObject* object,bool geometry){
     AcDbObjectId parent;int role=-1;Status s=link(object,parent,role);if(s!=Valid)return s;
     Record r;s=read(parent,r);if(s!=Valid)return s;
@@ -90,9 +104,9 @@ Status validate(const AcDbObject* object,bool geometry){
         ||std::fabs(a->SizeA-c->SizeA)*f>.001||std::fabs(a->SizeB-c->SizeB)*f>.001
         ||std::fabs(h->SizeA-a->SizeA)*f>.001||std::fabs(h->SizeB-a->SizeB)*f>.001
         ||std::fabs(a->get_radius()-c->get_radius())*f>.001||std::fabs(a->Swectangle-c->Swectangle)>1e-8
-        ||!near(h->FirstPoint,horizontalPort(b.object()),f)||!near(h->LastPoint,horizontalPort(c.object()),f)
-        ||!near(r.reverse?in->FirstPoint:in->LastPoint,horizontalPort(a.object()),f)
-        ||!near(r.reverse?out->LastPoint:out->FirstPoint,horizontalPort(d.object()),f)
+        ||!nearPoint(h->FirstPoint,horizontalPort(b.object()),f)||!nearPoint(h->LastPoint,horizontalPort(c.object()),f)
+        ||!nearPoint(r.reverse?in->FirstPoint:in->LastPoint,horizontalPort(a.object()),f)
+        ||!nearPoint(r.reverse?out->LastPoint:out->FirstPoint,horizontalPort(d.object()),f)
         ||std::fabs(in->Elev-a->Elev)*f>.001||std::fabs(out->Elev-a->Elev)*f>.001)return GeometryMismatch;
     AcGeVector3d direction=h->LastPoint-h->FirstPoint;direction.normalize();
     for(int k=0;k<2;++k){AcDbObjectPointer<TVS_Pipe> slope(r.members[k?5:1],AcDb::kForRead);if(slope.openStatus()!=Acad::eOk)return Corrupt;
@@ -102,7 +116,7 @@ Status validate(const AcDbObject* object,bool geometry){
         if(r.ports[k]!=1&&r.ports[k]!=2)return Corrupt;
         AcDbObjectPointer<TVS_Pipe> neighbor(r.neighbors[k],AcDb::kForRead);if(neighbor.openStatus()!=Acad::eOk)return Incomplete;
         const AcGePoint3d expected=k?(r.reverse?out->FirstPoint:out->LastPoint):(r.reverse?in->LastPoint:in->FirstPoint);
-        if(!near(r.ports[k]==1?neighbor->FirstPoint:neighbor->LastPoint,expected,f)||std::fabs(neighbor->Elev-a->Elev)*f>.001
+        if(!nearPoint(r.ports[k]==1?neighbor->FirstPoint:neighbor->LastPoint,expected,f)||std::fabs(neighbor->Elev-a->Elev)*f>.001
             ||std::fabs(neighbor->SizeA-a->SizeA)*f>.001||std::fabs(neighbor->SizeB-a->SizeB)*f>.001)return GeometryMismatch;
     }
     return Valid;

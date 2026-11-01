@@ -18,13 +18,14 @@ inline bool obstacleState(const AcDbObjectId& id,std::wstring& value){
     s<<p->SizeA<<L';'<<p->SizeB<<L';'<<p->Elev;value=s.str();return true;
 }
 inline bool capture(const AcDbObjectId& route,const AcDbObjectId& obstacle,bool reverse,Snapshot& s){
-    if(route==obstacle)return false;
+    if(route==obstacle||tvsBypassData::pinned(route,reverse))return false;
     s.obstacle=obstacle;
     return tvsOffsetService::capture(route,reverse?tvsOffsetOperation::First:tvsOffsetOperation::Last,s.route,true)
         &&obstacle.database()==s.route.db&&obstacleState(obstacle,s.obstacleState);
 }
 inline bool current(const Snapshot& s){std::wstring now;
-    return tvsOffsetService::current(s.route,true)&&obstacleState(s.obstacle,now)&&now==s.obstacleState;
+    return !tvsBypassData::pinned(s.route.source,s.route.physical.end==tvsOffsetOperation::First)
+        &&tvsOffsetService::current(s.route,true)&&obstacleState(s.obstacle,now)&&now==s.obstacleState;
 }
 // Connector vectors are legacy non-filed state. Swap restores them without allocation
 // on any abort, including failure after the neighboring reciprocal link changed.

@@ -79,6 +79,14 @@ int main(){
   nodes[2].axes[1]=tvsMoveGeometry::Point(0,1,0);assert(!topology(live,&fixtureSource,signature));++assertions;
   reset();live.physical.end=tvsOffsetOperation::End(e);neighbor(e);
   assert(!topology(live,&fixtureSource,signature));++assertions;
+  reset();live.physical.end=tvsOffsetOperation::End(e);n=neighbor(1-e);connect(n,1-e);
+  TVS_Pipe* third=new TVS_Pipe();third->id=3;objects[3]=third;
+  const AcGePoint3d far=e==0?fixtureSource.FirstPoint:fixtureSource.LastPoint;
+  third->FirstPoint=far;third->LastPoint=AcGePoint3d(far.x+(e==0?-500:500),far.y,far.z);
+  tvsMove::Node thirdNode=nodes[2];thirdNode.ports[0]=tvsMove::point(third->FirstPoint);thirdNode.ports[1]=tvsMove::point(third->LastPoint);nodes[3]=thirdNode;
+  TVS_Connector back;back.cTypeCurrent=1;back.cTypeAnother=e+1;back.connectionID=1;back.point=far;third->connectors.push_back(back);
+  fixtureSource.connectors[e].connectionID=3;fixtureSource.connectors[e].cTypeAnother=1;fixtureSource.connectors[e].point=far;
+  assert(!topology(live,&fixtureSource,signature));assert(topology(live,&fixtureSource,signature,true));++assertions;
  }
  reset();neighbor(0);TVS_Pipe* duplicate=new TVS_Pipe();duplicate->id=3;objects[3]=duplicate;nodes[3]=nodes[2];
  std::wstring signature;assert(!topology(live,&fixtureSource,signature));++assertions;

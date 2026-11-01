@@ -22,9 +22,10 @@ struct AcGePoint3d {double x,y,z;AcGePoint3d(double a=0,double b=0,double c=0):x
  double distanceTo(const AcGePoint3d& b)const{return std::sqrt((x-b.x)*(x-b.x)+(y-b.y)*(y-b.y)+(z-b.z)*(z-b.z));}
  AcGeVector3d operator-(const AcGePoint3d& b)const{return AcGeVector3d(x-b.x,y-b.y,z-b.z);}
  AcGePoint3d operator+(const AcGeVector3d& b)const{return AcGePoint3d(x+b.x,y+b.y,z+b.z);}};
-struct AcDbObjectId {int id;AcDbObjectId(int i=0):id(i){}bool isNull()const{return !id;}
+struct AcDbObjectId {int id;static const AcDbObjectId kNull;AcDbObjectId(int i=0):id(i){}bool isNull()const{return !id;}
  bool operator==(const AcDbObjectId& b)const{return id==b.id;}bool operator!=(const AcDbObjectId& b)const{return id!=b.id;}
  unsigned long asOldId()const{return static_cast<unsigned long>(id);} };
+const AcDbObjectId AcDbObjectId::kNull;
 static const int conPipeStart=1,conPipeEnd=2,DuctTypeStill=0,TypeRoundTap_TapSection=1;
 static const int RadiusTypeRect_RadiusConstant=1,RadiusTypeRound_RadiusConstant=2,Form_Up=2,Form_Down=3;
 struct TVS_Connector {int cTypeCurrent,cTypeAnother;AcDbObjectId connectionID;AcGePoint3d point;
@@ -83,7 +84,7 @@ struct Node {int kind;std::vector<tvsMoveGeometry::Point> ports,axes;std::vector
 inline tvsMoveGeometry::Point point(const AcGePoint3d& p){return tvsMoveGeometry::Point(p.x,p.y,p.z);}
 }
 static std::map<int,tvsMove::Node> nodes;
-static void acutPrintf(const wchar_t*,...){}
+inline void acutPrintf(const wchar_t*,...){}
 namespace tvsOffsetService {
 enum Outcome {Applied,NoChange,Cancelled,Failed};
 struct Snapshot {AcDbDatabase* db;AcDbObjectId source,owner;tvsOffsetOperation::Snapshot physical;std::wstring fingerprint,network,manufacturer,note;Snapshot():db(&database),source(1),owner(99){}};

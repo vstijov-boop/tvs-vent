@@ -9,6 +9,7 @@ struct Record {
     Record():revision(1),factor(0),reverse(false){ports[0]=ports[1]=0;for(int j=0;j<4;++j)policy[j]=0;for(int j=0;j<8;++j)obstacleSnapshot[j]=0;}
 };
 DLLIMPEXP bool marked(const AcDbObject* object);
+DLLIMPEXP bool pinned(const AcDbObjectId& source,bool first);
 DLLIMPEXP tvsOffsetData::Status validate(const AcDbObject* object,bool geometry=true);
 DLLIMPEXP Acad::ErrorStatus write(AcDbDatabase* db,Record& record,AcDbObject* members[7],AcDbObjectId& parent);
 }
