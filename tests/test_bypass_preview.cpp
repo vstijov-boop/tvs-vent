@@ -1,4 +1,4 @@
-#include "../geometry/bypass/PreviewPresentation.h"
+#include "../geometry/bypass/SideDetail.h"
 #include <iostream>
 #include <cstdlib>
 #include <limits>
@@ -79,6 +79,34 @@ int main(){
   expect(v.witnessBody.s==v.witnessBody.s&&v.witnessObstacle.z==v.witnessObstacle.z,"critical points finite");
   expect(captions(v,o).size()==12&&!planLines(v,true,true).empty(),"both presentations available");
  }
+
+ // Side-detail units and native circular bulges are checked against the checked numerical bodies.
+ expect(nextDetailLabel({"ob-01","OB-03"})=="OB-02","next free case-insensitive label");
+ expect(!detailLabelValid("x y")&&!detailLabelValid("a/b")&&!detailLabelValid(std::string(33,'X')),"unsafe labels rejected");
+ for(double unit:{1.,10.,1000.})for(bool above:{false,true})for(int angle:{30,45,60})for(double iso:{0.,25.})for(double datum:{-400.,12000.}){
+  s=example(unit,.6457718232379019);s.route.elevation=s.obstacle.elevation=datum/unit;
+  o=Options();o.confirmed=true;o.above=above;o.angle=angle;o.insulation=o.obstacleInsulation=iso;o.left=-1600;o.right=1600;
+  v=engine.calculate(s,unit,false,o,false);expect(v.ready,"detail matrix candidate");
+  for(bool detailed:{false,true}){
+   SideDetail d=sideDetail(v,o,"OB-01",detailed,3.5,4.);
+   near(d.factor,unit,"DWG factor retained");expect(d.dimensions.size()==(detailed?5u:3u),"native dimension plan count");
+   near(std::hypot(d.dimensions[0].a.s-d.dimensions[0].b.s,d.dimensions[0].a.z-d.dimensions[0].b.z)/unit*unit,v.W,"W dimension geometry times DIMLFAC");
+   near(std::hypot(d.dimensions[1].a.s-d.dimensions[1].b.s,d.dimensions[1].a.z-d.dimensions[1].b.z)/unit*unit,v.C,"H dimension real geometry");
+   near(std::fabs(d.dimensions[2].a.z-d.dimensions[2].b.z),v.D,"D dimension real geometry");
+   expect(d.notes[3].text.find(displayNumber(datum))!=std::string::npos,"absolute datum in annotation");
+   if(detailed)for(int j=0;j<2;++j){const auto& q=d.dimensions[3+j];near(std::hypot(q.a.s-q.b.s,q.a.z-q.b.z),v.slopePhysical[j],"S dimension physical not projected");}
+   unsigned arcs=0;for(const auto& p:d.paths){expect(p.points.size()==p.bulges.size(),"outgoing bulge topology");
+    for(size_t j=0;j<p.points.size();++j)if(p.bulges[j]!=0){++arcs;double sweep=4*std::atan(p.bulges[j]);near(std::fabs(sweep),angle*3.14159265358979323846/180,"true circular sweep");
+     Vertex a=p.points[j],b=p.points[(j+1)%p.points.size()];double chord=std::hypot(a.s-b.s,a.z-b.z);double radius=chord/(2*std::sin(std::fabs(sweep)/2));
+     double expected=p.axis?o.ri+v.frame.height/2:(j==0?o.ri-(p.insulation?iso:0):o.ri+v.frame.height+(p.insulation?iso:0));
+     near(radius,expected,"circle radius derives from checked body");}
+   }
+   expect(arcs==20,"four elbows: bare and insulation boundaries plus exact axes");
+   for(size_t j=0;j<d.dimensions.size();++j){const auto& q=d.dimensions[j];expect(q.rail.z<d.minZ||q.rail.z>d.maxZ||q.rail.s<d.minS||q.rail.s>d.maxS,"dimension text external to geometry");}
+  }
+ }
+ bool invalid=false;try{sideDetail(View(),Options(),"OB-01",false,3.5,3.5);}catch(const std::runtime_error&){invalid=true;}expect(invalid,"stale result has no insert model");
+ invalid=false;try{sideDetail(v,o,"OB-01",false,0,3.5);}catch(const std::runtime_error&){invalid=true;}expect(invalid,"invalid annotation height rejected");
  for(bool expert:{false,true})for(double sx:{.65,.8,1.,1.25,1.5,2.})for(double sy:{.65,.8,1.,1.25,1.5,2.}){
   auto layout=sectionLayout(sx,sy,true,expert);expect(layout.labels.size()==16,"dimension rails have fixed non-overlap slots");
   for(size_t a=0;a<layout.labels.size();++a){auto r=layout.labels[a];

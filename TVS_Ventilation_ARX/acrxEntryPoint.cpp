@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2002-2012 by Autodesk, Inc. 
+// (C) Copyright 2002-2012 by Autodesk, Inc. 
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -103,6 +103,8 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 #ifdef TVS_BYPASS_PREVIEW
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
 #endif

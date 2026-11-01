@@ -13,6 +13,7 @@
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
 #endif
+#include "BypassSideDetail.h"
 namespace {
 using namespace tvsBypassPreview;
 static std::wstring wide(const std::string& s){
@@ -105,7 +106,7 @@ struct Dialog {
   }else t<<L"Izaberite jedinice crteža i unesite izolacije. Podaci iz objekata ostaju neizmijenjeni.\r\n"<<wide(f.reason);
   SetDlgItemTextW(window,600,t.str().c_str());
  }
- void invalidate(){engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");InvalidateRect(window,NULL,TRUE);}
+ void invalidate(){engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");InvalidateRect(window,NULL,TRUE);}
  void capture(){for(int j=0;j<FieldCount;++j)values[j]=text(100+j);
   units=(int)SendDlgItemMessage(window,502,CB_GETCURSEL,0,0);angle=(int)SendDlgItemMessage(window,501,CB_GETCURSEL,0,0);side=(int)SendDlgItemMessage(window,500,CB_GETCURSEL,0,0);
   confirmed=IsDlgButtonChecked(window,503)==BST_CHECKED;}
@@ -131,7 +132,7 @@ struct Dialog {
    refreshResult();}
   catch(...){invalidate();SetDlgItemTextW(window,800,L"Greška računanja. Nema DWG izmjena.");}
   EnableWindow(GetDlgItem(window,700),TRUE);EnableWindow(GetDlgItem(window,702),TRUE);
-  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());InvalidateRect(window,NULL,TRUE);
+  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());InvalidateRect(window,NULL,TRUE);
  }
  void refreshResult(){
   std::wstring value=advanced?wide(view.status)+L"\r\n"+wide(view.details):wide(summary(view,options));
@@ -175,7 +176,7 @@ struct Dialog {
   child(L"BUTTON",L"Pronađi prolaz",BS_PUSHBUTTON|WS_TABSTOP,700,12,616,150,30);
   child(L"BUTTON",L"Pokušaj kraći prolaz",BS_PUSHBUTTON|WS_TABSTOP,702,174,616,170,30);
   child(L"BUTTON",L"Pregled u crtežu",BS_PUSHBUTTON|WS_TABSTOP,701,356,616,165,30);EnableWindow(GetDlgItem(h,701),view.ready&&engine.ready());
-  child(L"BUTTON",L"Umetni (nedostupno)",BS_PUSHBUTTON,703,12,666,180,30);EnableWindow(GetDlgItem(h,703),FALSE);
+  child(L"BUTTON",L"Umetni detalj…",BS_PUSHBUTTON|WS_TABSTOP,703,12,666,180,30);EnableWindow(GetDlgItem(h,703),view.ready&&engine.ready());
   child(L"BUTTON",L"Otkaži / zatvori",BS_PUSHBUTTON|WS_TABSTOP,IDCANCEL,348,666,173,30);
   child(L"BUTTON",L"Napredno / dijagnostika",BS_AUTOCHECKBOX|WS_TABSTOP,504,12,112,280,22);CheckDlgButton(h,504,advanced?BST_CHECKED:BST_UNCHECKED);
   child(L"STATIC",L"Uzdužni presjek — fizičke kote, ista razmjera s/z",0,602,590,90,590,20);
@@ -185,7 +186,7 @@ struct Dialog {
   SendMessage(c,CB_ADDSTRING,0,(LPARAM)L"Konture (dijagnostika, bez zaklanjanja)");
   SendMessage(c,CB_ADDSTRING,0,(LPARAM)L"Sve ivice — dijagnostika (bez zaklanjanja)");SendMessage(c,CB_SETCURSEL,allEdges?1:0,0);
   child(L"EDIT",view.ready?(wide(view.status)+L"\r\n"+wide(view.details)).c_str():L"Rezultat nije izračunat. Nema trajnog upisa.",ES_MULTILINE|ES_READONLY|WS_VSCROLL,800,590,556,590,109);
-  child(L"STATIC",L"DEV: upis nije implementiran. Osnova je dijagnostička, bez zaklanjanja.\r\nIzabrana originalna trasa ostaje vidljiva ispod transient pregleda.",0,603,590,675,590,34);
+  child(L"STATIC",L"DEV: Umetni detalj upisuje staticki blok. TVS obilazak nije implementiran.\r\nIzabrana originalna trasa ostaje vidljiva ispod transient pregleda.",0,603,590,675,590,34);
   fieldLayout();refreshResult();loading=false;
  }
  void paint(){
@@ -258,7 +259,7 @@ struct Dialog {
    if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;InvalidateRect(h,NULL,TRUE);return TRUE;}
    if(id==507&&code==CBN_SELCHANGE){self->allEdges=SendDlgItemMessage(h,507,CB_GETCURSEL,0,0)==1;return TRUE;}
    if(id==700||id==702){self->calculate(id==702);return TRUE;}
-   if(id==701&&self->view.ready&&self->engine.ready()){self->capture();EndDialog(h,701);return TRUE;}
+   if((id==701||id==703)&&self->view.ready&&self->engine.ready()){self->capture();EndDialog(h,id);return TRUE;}
   }return FALSE;
  }
  INT_PTR show(HWND owner){
@@ -270,11 +271,16 @@ struct Dialog {
  }
 };
 }
+void tvsBypassDetailCheckCommand(){
+ try{auto used=tvsSideDetail::inventory(acdbHostApplicationServices()->workingDatabase());
+  acutPrintf(L"\nBocni detalji: %u lokalnih referenci. %ls",static_cast<unsigned>(used.labels.size()),used.duplicated?L"DUPLIKATI: COPY nije nezavisni detalj; uklonite kopije.":L"Oznake/GUID-i bez otkrivenih duplikata. XREF i ponovljene parent instance nisu globalno provjereni.");
+ }catch(...){acutPrintf(L"\nProvjera detalja nije zavrsena; zapis je mozda neispravan ili nedostupan.");}
+}
 void tvsBypassPreviewCommand(){
  try{
   AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
   if(!db||db->tilemode()==false){acutPrintf(L"\nDEV pregled radi samo u Model prostoru.");return;}
-  acutPrintf(L"\nRazvojni pregled — upis nije implementiran. Izabrani objekti ostaju neizmijenjeni.");
+  acutPrintf(L"\nDEV BYPASS: dozvoljen je standardni staticki bocni detalj. Trajni TVS obilazak nije implementiran.");
   Snapshot s;AcDbObjectId route,obstacle;
   if(!readPipe(L"\nIzaberite pravi horizontalni TVS kanal kao referencu nove trase: ",s.route,route))return;
   if(!readPipe(L"\nIzaberite jednu pravougaonu horizontalnu TVS prepreku: ",s.obstacle,obstacle))return;
@@ -290,7 +296,14 @@ void tvsBypassPreviewCommand(){
    dict->close();}
   Dialog dialog(s,reverse,tvsUnits::factor(db),known);
   HWND owner=acedGetAcadFrame()->GetSafeHwnd();
-  while(dialog.show(owner)==701){
+  for(;;){
+   INT_PTR action=dialog.show(owner);
+   if(action==703){
+    try{if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);}
+    catch(...){acutPrintf(L"\nUmetanje detalja nije zavrseno. Transakcija je prekinuta; provjerite poruke i probajte ponovo.");}
+    break; // One insertion per command: a single command Undo boundary.
+   }
+   if(action!=701)break;
    Transient preview;
    if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes)){acutPrintf(L"\nTransient pregled nije moguće prikazati. Nema DWG izmjena.");return;}
    acutPrintf(L"\nPrivremena OSNOVA — DIJAGNOSTIKA, BEZ ZAKLANJANJA. Pune: gabariti; crtice: simbolički spojevi/pomoćne linije; dugo-kratko: ose. Originalna trasa ostaje vidljiva. Nema DWG upisa.");
@@ -300,3 +313,4 @@ void tvsBypassPreviewCommand(){
  }catch(...){acutPrintf(L"\nGreška razvojnog pregleda. Privremena grafika je uklonjena; nema DWG upisa.");}
 }
 #endif
+

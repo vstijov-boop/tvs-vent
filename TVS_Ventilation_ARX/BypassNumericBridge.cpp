@@ -30,6 +30,15 @@ static Curve rectangle(int member,bool iso,double l,double r,double bottom,doubl
  Curve c;c.member=member;c.insulation=iso;c.points={Vertex(l,bottom),Vertex(r,bottom),Vertex(r,top),Vertex(l,top),Vertex(l,bottom)};return c;
 }
 static bool integer(double v,double max){return finite(v)&&v>=1&&v<=max&&std::floor(v)==v;}
+static void exactPath(const tvsBypass::Body& b,bool insulation,std::vector<DetailPath>& paths){
+ DetailPath p;p.member=static_cast<int>(b.role);p.insulation=insulation;p.axis=false;p.closed=true;
+ p.points={at(b,0,0),at(b,1,0),at(b,1,1),at(b,0,1)};
+ double bulge=b.kind==tvsBypass::Body::Sector?std::tan(b.sign*b.theta/4):0;
+ p.bulges={bulge,0,-bulge,0};paths.push_back(p);
+ if(!insulation){
+  p.axis=true;p.closed=false;p.points={at(b,0,.5),at(b,1,.5)};p.bulges={bulge,0};paths.push_back(p);
+ }
+}
 View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const Options& o,bool improve){
  State& stateRef=*static_cast<State*>(state);View failed;failed.status="Nedostaju ili su nevažeći potvrđeni ulazi.";
  if(!tvsBypass::bounded::supported()){failed.status="Nepodržano numeričko okruženje: potrebno FE_TONEAREST, bez FTZ/DAZ.";return failed;}
@@ -91,11 +100,13 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
  for(const auto& a:checked.axis)out.axis.push_back(Vertex(middle(a.s),middle(a.z)));
  for(int j=0;j<2;++j){out.slopePhysical[j]=checked.offsets[j].straightLength;out.slopeProjected[j]=checked.offsets[j].projectedLength;}
  for(const tvsBypass::Body& body:checked.members){
+  exactPath(body,true,out.detailPaths);
   outline(body,true,out.profile);
   tvsBypass::Body metal=body;
   if(metal.kind==tvsBypass::Body::Sector){metal.inner=metal.inner+tvsBypass::I(o.insulation);metal.outer=metal.outer-tvsBypass::I(o.insulation);}
   else metal.half=metal.half-tvsBypass::I(o.insulation);
   outline(metal,false,out.profile);
+  exactPath(metal,false,out.detailPaths);
   tvsBypass::Box box=body.enclosure(tvsBypass::I(0,1),tvsBypass::I(0,1));
   out.plan.push_back(rectangle(static_cast<int>(body.role),true,box.s.lo,box.s.hi,-f.width/2-o.insulation,f.width/2+o.insulation));out.plan.back().kind=DiagnosticLine;
   tvsBypass::Box bare=metal.enclosure(tvsBypass::I(0,1),tvsBypass::I(0,1));
@@ -124,3 +135,4 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
 }
 }
 #endif
+
