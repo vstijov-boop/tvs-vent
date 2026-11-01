@@ -57,3 +57,17 @@ To nije Undo/Redo proba; STAB-01 ostaje odložen.
 
 Korisnik je prijavio da INT-00 Z funkcioniše dobro. Verzija AutoCAD-a i pojedinačne
 runtime stavke te korisničke probe nisu potvrđeni i ne pretpostavljaju se.
+
+## Zaostali ili oštećeni roditelj — ciljana ispravka poslije aa12514
+
+Read-only provjera odvaja valjanost članova od veze sa izabranim kanalom.
+Potpun poznati V1 raspored referenci bez reference na izabrani kanal ne blokira
+nepovezan kanal ni kada su članovi obrisani ili je roditelj ostao bez cijelog obilaska.
+Pozitivna referenca iz nevažećeg zapisa konzervativno odbija operaciju.
+Ako roditelj nije čitljiv ili je raspored referenci nepotpun/nepoznate verzije,
+poruka VEZA NEUTVRDJENA navodi ključ roditelja i status: nezavisnost se ne može
+dokazati i operacija se odbija. To može blokirati i nepovezan kanal u potpuno
+oštećenom DWG-u; provjera ne prećutkuje niti automatski briše/popravlja taj zapis.
+Automatski cleanup nije uveden. Nove runtime probe brisanja/save-reopen ostaju
+za praktični test; regresije koriste SDK zamjene. TVS_OFFSET ne poziva pinned();
+jegov postojeći servis i provjere nisu mijenjani ovom ispravkom.

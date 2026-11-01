@@ -132,3 +132,15 @@ Referenca: `bypass-preview/SIDE_DETAIL_RESULTS.md` i dopuna
 
 Uputstvo: [BYPASS_DEV_GUIDE.md](BYPASS_DEV_GUIDE.md). Testovi sa SDK zamjenama
 ne potvrđuju native filing ili praktičan prolazak ovih stavki. STAB-01 ostaje odložen.
+
+## Ciljana provjera poslije aa12514 — roditeljski scope
+
+- [x] Regresija starog pinned(): nevažeći roditelj blokira nepovezan kanal.
+- [x] DEV read-only ispravka: potpun poznati raspored referenci određuje nezavisnost
+  prije odbijanja zbog nevažećeg članstva; stvarne/pozitivne granice ostaju zaštićene.
+- [x] Zaostali roditelj nakon brisanja svih članova ne blokira nepovezan kanal kada
+  su reference čitljive; nema automatskog čišćenja DWG zapisa. SDK zamjene, ne native proba.
+- [ ] Praktično: valjan bypass, obrisani članovi/cijeli obilazak, nepovezan kanal i
+  zaštićena granica; provjeriti poruke i odsustvo DWG promjena pri odbijanju.
+- Ograničenje: potpuno nečitljiv/nepoznat raspored nema dokaz nezavisnosti;
+  VEZA NEUTVRDJENA navodi ključ/status i konzervativno odbija operaciju.

@@ -75,6 +75,30 @@ static bool boundaryPinned(const Record& r,const AcDbObjectId& source,bool first
     }
     return false;
 }
+enum ReferenceRelation { UnrelatedReference,RelatedReference,UnknownReference };
+// Scope membership independently of member validity. A complete V1 reference
+// layout is enough to prove independence, even when its members are erased or
+// its identity/geometry is invalid. Never infer independence from a partial read.
+static ReferenceRelation referenceRelation(const resbuf* data,const ads_name source){
+    bool complete=true;int j=0;
+    for(const resbuf* p=data;p;p=p->rbnext,++j){
+        // A positive soft reference remains relevant even in a malformed layout.
+        if(p->restype==330&&p->resval.rlname[0]==source[0]&&p->resval.rlname[1]==source[1])return RelatedReference;
+        if(j>=27||p->restype!=typeAt(j))complete=false;
+        if(j==0&&(p->restype!=90||p->resval.rlong!=1))complete=false;
+    }
+    return complete&&j==27?UnrelatedReference:UnknownReference;
+}
+static ReferenceRelation parentRelation(const AcDbObjectId& parent,const AcDbObjectId& source){
+    ads_name selected;if(acdbGetAdsName(selected,source)!=Acad::eOk)return UnknownReference;
+    AcDbObjectPointer<AcDbXrecord> record(parent,AcDb::kForRead);
+    if(record.openStatus()!=Acad::eOk)return UnknownReference;
+    resbuf* data=NULL;
+    const Acad::ErrorStatus es=record->rbChain(&data);
+    const ReferenceRelation result=es==Acad::eOk&&data?referenceRelation(data,selected):UnknownReference;
+    if(data)acutRelRb(data);
+    return result;
+}
 bool pinned(const AcDbObjectId& source,bool first){
     if(source.isNull()||!source.database())return true;
     AcDbObjectPointer<AcDbDictionary> nod(source.database()->namedObjectsDictionaryId(),AcDb::kForRead);
@@ -83,7 +107,16 @@ bool pinned(const AcDbObjectId& source,bool first){
     if(!it)return true;
     for(;!it->done();it->next()){
         if(_wcsnicmp(it->name(),L"TVS_BYPASS_",11))continue;
-        Record r;const Status s=read(it->objectId(),r);if(s!=Valid)return true;
+        Record r;const Status s=read(it->objectId(),r);
+        if(s!=Valid){
+            const ReferenceRelation relation=parentRelation(it->objectId(),source);
+            if(relation==UnrelatedReference)continue;
+            if(relation==RelatedReference)
+                acutPrintf(L"\nTVS BYPASS: roditelj %ls (%ls), POVEZAN NEVAZECI ZAPIS: referenca na izabrani kanal. Operacija odbijena; zapis nije mijenjan.",it->name(),statusText(s));
+            else
+                acutPrintf(L"\nTVS BYPASS: roditelj %ls (%ls), VEZA NEUTVRDJENA: nije dostupan potpun V1 raspored referenci. Ne moze se dokazati da je zapis nepovezan; operacija odbijena. Zapis nije mijenjan.",it->name(),statusText(s));
+            return true;
+        }
         if(boundaryPinned(r,source,first))return true;
     }
     return false;
