@@ -144,3 +144,12 @@ ne potvrđuju native filing ili praktičan prolazak ovih stavki. STAB-01 ostaje 
   zaštićena granica; provjeriti poruke i odsustvo DWG promjena pri odbijanju.
 - Ograničenje: potpuno nečitljiv/nepoznat raspored nema dokaz nezavisnosti;
   VEZA NEUTVRDJENA navodi ključ/status i konzervativno odbija operaciju.
+
+## Prihvati — korisnički runtime neuspjeh na 843901e
+
+- Korisnik u AutoCAD 2022 dobija BYPASS nije upisan, bez trajnog rezultata.
+- [x] Izolovana konkretna greška: ponovno kreiranje postojećih V1 extension dictionaries
+  vraća eAlreadyInDb. Stvarni parent writer test pada prije i prolazi poslije ispravke.
+- [x] Čuvaju se postojeći V1 zapisi, kreira samo nedostajući rječnik; rollback ostaje.
+- [ ] Praktično potvrditi Prihvati u novom restartovanom DEV 2022 procesu, pa nastavak
+  kroz oba toka crtanja. SDK zamjene/build nisu ta runtime potvrda.

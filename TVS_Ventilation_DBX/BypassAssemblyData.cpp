@@ -179,7 +179,12 @@ Acad::ErrorStatus write(AcDbDatabase* db,Record& r,AcDbObject* members[7],AcDbOb
     AcDbObject* raw=NULL;Acad::ErrorStatus es=tx->getObject(raw,db->namedObjectsDictionaryId(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
     AcDbDictionary* nod=AcDbDictionary::cast(raw);if(!nod)return Acad::eInvalidInput;
     CString key=L"TVS_BYPASS_"+r.guid;es=newRecord(nod,key,nodes[0],tx,parent);if(es!=Acad::eOk)return es;
-    for(int j=0;j<7;++j){es=members[j]->createExtensionDictionary();if(es!=Acad::eOk)return es;
+    for(int j=0;j<7;++j){
+        // V1 members already own TVS_OFFSET_MEMBER; reuse that dictionary.
+        // createExtensionDictionary() returns eAlreadyInDb for an existing one.
+        if(members[j]->extensionDictionary().isNull()){
+            es=members[j]->createExtensionDictionary();if(es!=Acad::eOk)return es;
+        }
         raw=NULL;es=tx->getObject(raw,members[j]->extensionDictionary(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
         AcDbDictionary* dict=AcDbDictionary::cast(raw);if(!dict||dict->has(memberKey()))return Acad::eInvalidInput;
         resbuf linkData[3]={};linkData[0].restype=90;linkData[0].resval.rlong=1;linkData[0].rbnext=&linkData[1];

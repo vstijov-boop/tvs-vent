@@ -71,3 +71,13 @@ oštećenom DWG-u; provjera ne prećutkuje niti automatski briše/popravlja taj 
 Automatski cleanup nije uveden. Nove runtime probe brisanja/save-reopen ostaju
 za praktični test; regresije koriste SDK zamjene. TVS_OFFSET ne poziva pinned();
 jegov postojeći servis i provjere nisu mijenjani ovom ispravkom.
+
+## Prihvati — ispravka ponovnog kreiranja rječnika
+
+Korisnička AutoCAD 2022 proba prijavila je BYPASS nije upisan poslije Prihvati.
+Parent writer je ponovo pozivao createExtensionDictionary na šest V1 članova
+koji već imaju TVS_OFFSET_MEMBER rječnik. SDK vraća eAlreadyInDb; transakcija se
+prekidala. Writer sada koristi postojeći rječnik, a kreira ga samo gdje nedostaje.
+Nova regresija izvršava stvarni parent writer, čuva postojeće V1 zapise i provjerava
+roditelja sa svih sedam backlink-ova. Novi paket zahtijeva svježu AutoCAD sesiju;
+praktično prihvatanje nove verzije još nije potvrđeno.

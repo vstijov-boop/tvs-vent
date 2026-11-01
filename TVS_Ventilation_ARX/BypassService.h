@@ -114,7 +114,11 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     }
     source->assertWriteEnabled();if(reverse)source->FirstPoint=cutIn;else source->LastPoint=cutIn;source->recordGraphicsModified();
     if(inject(2))return false;
-    AcDbObjectId parent;if(tvsBypassData::write(base.db,record,members,parent)!=Acad::eOk)return false;
+    AcDbObjectId parent;const Acad::ErrorStatus parentStatus=tvsBypassData::write(base.db,record,members,parent);
+    if(parentStatus!=Acad::eOk){
+        acutPrintf(L"\nTVS BYPASS: upis roditelja/backlink-ova nije uspio (SDK status=%d). Transakcija se ponistava.",static_cast<int>(parentStatus));
+        return false;
+    }
     if(inject(3))return false;
     if(!tx.commit())return false;
     sourceConnections.commit();if(neighborConnections)neighborConnections->commit();
