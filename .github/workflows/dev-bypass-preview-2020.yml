@@ -116,7 +116,7 @@ jobs:
           }
           New-Item -ItemType Directory -Force dist-bypass-preview | Out-Null
           Copy-Item "$output/*.arx", "$output/*.dbx" dist-bypass-preview
-          Copy-Item development/OFFSET_PROOF_GUIDE.md, development/OFFSET_INTEGRATION_GUIDE.md, development/bypass-preview/GUIDE.md dist-bypass-preview
+          Copy-Item development/OFFSET_PROOF_GUIDE.md, development/OFFSET_INTEGRATION_GUIDE.md, development/bypass-preview/GUIDE.md, development/bypass-preview/UI_READABILITY.md dist-bypass-preview
           "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nDEVELOPMENT ONLY: TVSBypassPreview=true; TVS_BYPASS_PREVIEW. No bypass DWG writes. TVSOffsetProof=true / TVSOffsetIntegration=true / TVS_OFFSET_INTEGRATION`nNo AutoCAD runtime tests executed by CI. Development integration: runtime verification still required." | Out-File dist-bypass-preview/BUILD.txt -Encoding utf8
       - uses: actions/upload-artifact@v4
         if: always()

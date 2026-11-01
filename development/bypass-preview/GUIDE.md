@@ -29,3 +29,7 @@ Prije/poslije svake probe brojiti Model-space entitete, npr. (sslength (ssget "_
 Praktični rezultat zapisati: verzija / jedinice / UCS / ulazi / status / vizuelni presjek / preview / broj entiteta prije-poslije / Esc-Cancel / prolaz-pad.
 
 Snimci stvarnog AutoCAD dijaloga nijesu napravljeni bez dostupnog AutoCAD runtime-a. Izolovani i build testovi nijesu zamjena za ovu matricu.
+
+## Revizija čitljivosti v2
+
+Kote i Ose uključuju/isključuju samo grafičke oznake. Napredno / dijagnostika prikazuje razvojne parametre i puni rezultat, dok osnovni prikaz čuva projektantske ulaze i sažetak. Donji tasteri ostaju na stalnim mjestima. Režimi Konture / Sve ivice su izričito DIJAGNOSTIČKI, BEZ zaklanjanja; crtice su simbolika spojeva/pomoćnih gabarita, a ne skrivene ivice. Originalna trasa ostaje vidljiva. Detalji i matrica revizije: development/bypass-preview/UI_READABILITY.md u repozitorijumu.
