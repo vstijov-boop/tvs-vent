@@ -55,12 +55,12 @@ static AcGePoint3d point(Vertex p,double factor){return AcGePoint3d(p.s/factor,p
 static std::unique_ptr<AcDbPolyline> polyline(const DetailPath& path,double factor){
  std::unique_ptr<AcDbPolyline> p(new AcDbPolyline());p->setDatabaseDefaults();
  for(size_t i=0;i<path.points.size();++i)require(p->addVertexAt(static_cast<unsigned>(i),AcGePoint2d(path.points[i].s/factor,path.points[i].z/factor),path.bulges[i]));
- require(p->setClosed(path.closed));require(p->setColorIndex(path.member==7?1:path.axis?2:path.insulation?8:path.member==9?4:3));
+ p->setClosed(path.closed);require(p->setColorIndex(path.member==7?1:path.axis?2:path.insulation?8:path.member==9?4:3));
  return p;
 }
 static std::unique_ptr<AcDbMText> note(const DetailNote& n,const SideDetail& d){
  std::unique_ptr<AcDbMText> p(new AcDbMText());p->setDatabaseDefaults();require(p->setLocation(point(n.at,d.factor)));
- require(p->setTextHeight(d.textHeight/d.factor));require(p->setWidth(0));p->setContents(widen(n.text).c_str());return p;
+ p->setTextHeight(d.textHeight/d.factor);require(p->setWidth(0));p->setContents(widen(n.text).c_str());return p;
 }
 class PositionPreview {
  AcGiTransientManager* manager;AcDbIntArray viewports;std::vector<AcDbEntity*> entities;
@@ -93,7 +93,7 @@ static void record(AcDbBlockReference* ref,const std::vector<std::wstring>& stri
  }catch(...){if(head)acutRelRb(head);throw;}if(head)acutRelRb(head);
 }
 static std::wstring scalar(const wchar_t* key,double value){std::wostringstream out;out.imbue(std::locale::classic());out<<key<<L"="<<std::setprecision(17)<<value;return out.str();}
-// DEV-only fault injection: setenv TVS_SIDE_DETAIL_FAIL to 1/2/3/4; clear after rollback tests.
+// DEV-only fault injection: process environment TVS_SIDE_DETAIL_FAIL=1/2/3/4; clear after tests.
 static void failpoint(int stage){wchar_t value[32]=L"";if(GetEnvironmentVariableW(L"TVS_SIDE_DETAIL_FAIL",value,32)&&_wtoi(value)==stage)throw std::runtime_error("Injected detail write failure");}
 static void write(AcDbDatabase* db,const SideDetail& d,const View& view,const Options& options,const std::string& label,bool detailed,const AcGePoint3d& position,const std::wstring& guid,const std::wstring& routeHandle,const std::wstring& obstacleHandle){
  Inventory current=inventory(db);if(current.duplicated)throw std::runtime_error("Duplicate copied detail identity");

@@ -37,18 +37,24 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  // Translate the absolute physical elevation datum to the local drawing origin. Geometry stays 1:1.
  d.minS=d.maxS=v.axis.front().s;d.minZ=d.maxZ=0;
  for(auto& p:d.paths)for(auto& x:p.points){x.s-=v.axis.front().s;x.z-=v.frame.z0;
-  d.minS=std::min(d.minS,x.s);d.maxS=std::max(d.maxS,x.s);d.minZ=std::min(d.minZ,x.z);d.maxZ=std::max(d.maxZ,x.z);}
+  d.minS=(std::min)(d.minS,x.s);d.maxS=(std::max)(d.maxS,x.s);d.minZ=(std::min)(d.minZ,x.z);d.maxZ=(std::max)(d.maxZ,x.z);}
  auto local=[&](Vertex p){return Vertex(p.s-v.axis.front().s,p.z-v.frame.z0);};
- const double pad=std::max(12*textMm,6*arrowMm),pitch=std::max(8*textMm,4*arrowMm);
+ const double pad=(std::max)(12*textMm,6*arrowMm),pitch=(std::max)(8*textMm,4*arrowMm);
  const double bottom=d.minZ-pad,top=d.maxZ+pad;
  auto dim=[&](Vertex a,Vertex b,Vertex rail,const char* prefix){if(std::hypot(a.s-b.s,a.z-b.z)>1e-8)d.dimensions.push_back(DetailDimension{a,b,rail,prefix});};
  dim(local(v.axis.front()),local(v.axis.back()),Vertex(v.W/2,bottom),"W = ");
  dim(local(v.axis[3]),local(v.axis[4]),Vertex((v.axis[3].s+v.axis[4].s)/2-v.axis.front().s,bottom-pitch),"H = ");
  dim(Vertex(0,0),Vertex(0,v.zPass-v.frame.z0),Vertex(d.minS-pad,(v.zPass-v.frame.z0)/2),"D = ");
  if(detailed){
-  // Separate external rails and explicitly positioned dimension text prevent collisions with bodies.
-  dim(local(v.axis[1]),local(v.axis[2]),Vertex(d.minS-2*pad,top),"S1 = ");
-  dim(local(v.axis[5]),local(v.axis[6]),Vertex(d.maxS+2*pad,top+pitch),"S2 = ");
+  // Put each slope dimension outside the supporting line of the complete section bounds.
+  for(int j=0;j<2;++j){Vertex a=local(v.axis[j==0?1:5]),b=local(v.axis[j==0?2:6]);
+   double dx=b.s-a.s,dz=b.z-a.z,len=std::hypot(dx,dz),nx=-dz/len,nz=dx/len;
+   if((j==0&&nx>0)||(j==1&&nx<0)){nx=-nx;nz=-nz;}
+   Vertex mid((a.s+b.s)/2,(a.z+b.z)/2);double support=0;
+   for(double x:{d.minS,d.maxS})for(double z:{d.minZ,d.maxZ})support=(std::max)(support,(x-mid.s)*nx+(z-mid.z)*nz);
+   Vertex rail(mid.s+nx*(support+3*pad),mid.z+nz*(support+3*pad));
+   dim(a,b,rail,j==0?"S1 = ":"S2 = ");
+  }
  }
  double row=top+10*pitch;auto note=[&](const std::string& s){d.notes.push_back(DetailNote{Vertex(d.minS,row),s});row+=2.8*textMm;};
  note(label+" - Obilazak kanala, prolaz "+(o.above?"iznad":"ispod"));
@@ -60,8 +66,8 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  note("Komadi redom: K1 / S1 / K2 / H / K3 / S2 / K4");
  note("S1 = "+displayNumber(v.slopePhysical[0])+"; H = "+displayNumber(v.C)+"; S2 = "+displayNumber(v.slopePhysical[1])+" mm (fizicke duzine)");
  note("Kriticni geometrijski razmak = "+displayGap(v)+"; zahtjev = "+displayNumber(o.clearance)+"; rezerva = "+displayNumber(o.reserve)+" mm");
- double overlapLeft=std::max(v.axis[3].s,-v.frame.obstacleWidth/2-o.obstacleInsulation);
- double overlapRight=std::min(v.axis[4].s,v.frame.obstacleWidth/2+o.obstacleInsulation);
+ double overlapLeft=(std::max)(v.axis[3].s,-v.frame.obstacleWidth/2-o.obstacleInsulation);
+ double overlapRight=(std::min)(v.axis[4].s,v.frame.obstacleWidth/2+o.obstacleInsulation);
  const double gap=std::fabs(v.zPass-v.frame.obstacleZ)-v.frame.height/2-o.insulation-v.frame.obstacleHeight/2-o.obstacleInsulation;
  note(overlapLeft<=overlapRight?"Vertikalni zazor H/prepreka u horizontalnom preklopu = "+displayNumber(gap)+" mm (nije geometrijski minimum)":"Vertikalni zazor H/prepreka: nema horizontalnog preklopa; nije definisan.");
  if(detailed){
