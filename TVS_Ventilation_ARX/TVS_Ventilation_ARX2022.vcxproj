@@ -153,8 +153,9 @@
     <ClCompile><PreprocessorDefinitions>TVS_BYPASS_PREVIEW;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup Condition="'$(TVSBypassPreview)'=='true'">
-    <ClCompile Include="BypassPreviewCommand.cpp" />
+    <ClCompile Include="BypassPreviewCommand.cpp"><AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions></ClCompile>
     <ClCompile Include="BypassNumericBridge.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <FloatingPointModel>Strict</FloatingPointModel>
       <WholeProgramOptimization>false</WholeProgramOptimization>
