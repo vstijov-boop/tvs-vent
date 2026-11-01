@@ -20,7 +20,7 @@ static void verifyNative(AcDbObjectId id,const SideDetail& d,const std::string& 
  AcDbBlockTableRecordIterator* raw=NULL;require(block->newIterator(raw));std::unique_ptr<AcDbBlockTableRecordIterator> it(raw);size_t count=0;
  for(;!it->done();it->step()){
   AcDbEntity* entity=NULL;require(it->getEntity(entity,AcDb::kForRead));AcDbObjectPointer<AcDbEntity> ent;ent.acquire(entity);
-  AcDbAlignedDimension* dimension=AcDbAlignedDimension::cast(entity);if(!dimension)continue;
+  AcDbAlignedDimension* dimension=AcDbAlignedDimension::cast(ent.object());if(!dimension)continue;
   assertTest(count<d.dimensions.size());double measured=0;require(dimension->measurement(measured));
   const auto& q=d.dimensions[count];double expected=std::hypot(q.a.s-q.b.s,q.a.z-q.b.z);
   assertTest(std::fabs(measured*d.factor-expected)<1e-6);assertTest(std::fabs(dimension->dimlfac()-d.factor)<1e-12);assertTest(!dimension->dimBlockId().isNull());++count;
@@ -50,3 +50,4 @@ static void nativeFixture(){
  acutPrintf(L"\nNATIVE_DETAIL_FIXTURE_PASS: %u checked fixtures, native dimension measurements/blocks/DIMLFAC, metadata, 4 rollback stages, duplicate label. Save/reopen/Undo/COPY/visual tests remain separate.",count);
 }
 }
+
