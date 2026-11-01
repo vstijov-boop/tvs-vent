@@ -276,5 +276,134 @@ int main(){
             compile_cpp(cpp, target)
             subprocess.run([str(executable(target))], check=True)
 
+    def test_actual_shared_property_transfer(self):
+        body = function((ROOT/'TVS_Ventilation_ARX/OffsetService.h').read_text(encoding='utf-8-sig'),
+                        'inline bool appearance(')
+        # Known SDK setPropertiesFrom semantics intentionally cover only five basic
+        # properties, so loss of material/weight/transparency/plot style is detected.
+        source = r'''
+#include <cassert>
+#include <iostream>
+#include <string>
+#define CTVSProperty L"TVS_Property"
+namespace Acad {enum ErrorStatus {eOk,eInvalid};}
+namespace AcDb {enum PlotStyleNameType {kByLayer,kById};}
+struct AcDbObjectId {int id;AcDbObjectId(int value=0):id(value){}};
+struct resbuf {std::wstring manufacturer,note;};
+static resbuf* acutBuildList(int,const wchar_t*,int,int,int,const wchar_t* manufacturer,int,int,int,const wchar_t* note,int){
+ resbuf* p=new resbuf;p->manufacturer=manufacturer;p->note=note;return p;}
+static void acutRelRb(resbuf* p){delete p;}
+static int failSetter=0;
+struct TVS_Entity {
+ int color,layer,linetype,visibility,weight,material,alpha,plot;double scale,Flow,WipeoutLength;
+ int Direct;bool Grani,Wipeout,This1D;std::wstring position,manufacturer,note;
+ TVS_Entity():color(0),layer(0),linetype(0),visibility(0),weight(0),material(0),alpha(0),plot(0),scale(0),Flow(0),WipeoutLength(0),Direct(0),Grani(false),Wipeout(false),This1D(false){}
+ Acad::ErrorStatus setPropertiesFrom(const TVS_Entity* p){
+  if(failSetter==1)return Acad::eInvalid;
+  color=p->color;layer=p->layer;linetype=p->linetype;scale=p->scale;visibility=p->visibility;return Acad::eOk;}
+ int lineWeight(){return weight;}AcDbObjectId materialId(){return AcDbObjectId(material);}int transparency(){return alpha;}
+ AcDb::PlotStyleNameType getPlotStyleNameId(AcDbObjectId& id){id=plot;return AcDb::kById;}
+ Acad::ErrorStatus setLineWeight(int value){weight=value;return failSetter==2?Acad::eInvalid:Acad::eOk;}
+ Acad::ErrorStatus setMaterial(AcDbObjectId value){material=value.id;return failSetter==3?Acad::eInvalid:Acad::eOk;}
+ Acad::ErrorStatus setTransparency(int value){alpha=value;return failSetter==4?Acad::eInvalid:Acad::eOk;}
+ Acad::ErrorStatus setPlotStyleName(AcDb::PlotStyleNameType type,AcDbObjectId value){assert(type==AcDb::kById);plot=value.id;return failSetter==5?Acad::eInvalid:Acad::eOk;}
+ Acad::ErrorStatus setXData(resbuf* p){manufacturer=p->manufacturer;note=p->note;return failSetter==6?Acad::eInvalid:Acad::eOk;}
+};
+struct TVS_Pipe:TVS_Entity {};
+namespace tvsOffsetService {
+struct Snapshot {std::wstring manufacturer,note;};
+inline bool checked(Acad::ErrorStatus e){return e==Acad::eOk;}
+''' + body + r'''
+}
+int main(){
+ TVS_Pipe original;original.color=2;original.layer=3;original.linetype=4;original.visibility=1;original.scale=2.5;
+ original.weight=50;original.material=17;original.alpha=100;original.plot=19;
+ original.Flow=123;original.WipeoutLength=35;original.Grani=original.Wipeout=original.This1D=true;original.position=L"UNIQUE-ORIGINAL";
+ tvsOffsetService::Snapshot snapshot;snapshot.manufacturer=L"Shared manufacturer";snapshot.note=L"Shared note";
+ for(int failure=0;failure<=6;++failure){failSetter=failure;TVS_Entity target;
+  const bool ok=tvsOffsetService::appearance(&original,&target,snapshot);
+  if(failure){assert(!ok);continue;}
+  assert(target.color==2&&target.layer==3&&target.linetype==4&&target.visibility==1&&target.scale==2.5);
+  assert(target.weight==50&&target.material==17&&target.alpha==100&&target.plot==19);
+  assert(target.Flow==123&&target.Direct==0&&target.WipeoutLength==35&&target.Grani&&target.Wipeout&&target.This1D);
+  assert(target.position.empty()&&original.position==L"UNIQUE-ORIGINAL");
+  assert(target.manufacturer==snapshot.manufacturer&&target.note==snapshot.note);
+ }
+ std::cout<<"PASS 7 actual property-transfer cases: display/material/plot/flow/shared metadata, no unique position clone, all setter failures propagated; SDK substitutes only\n";
+}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            cpp = pathlib.Path(folder)/'transfer.cpp'
+            cpp.write_text(source, encoding='utf-8')
+            target = pathlib.Path(folder)/'transfer'
+            compile_cpp(cpp, target)
+            subprocess.run([str(executable(target))], check=True)
+
+    def test_actual_transient_preview_cleanup(self):
+        body = function((ROOT/'TVS_Ventilation_ARX/OffsetIntegrationCommand.h').read_text(encoding='utf-8-sig'),
+                        'class Preview') + ';'
+        prelude = r'''
+#include <cassert>
+#include <cstdarg>
+#include <iostream>
+#include <memory>
+#include <set>
+#include <stdexcept>
+#include <vector>
+#include "OFFSET_HEADER"
+struct AcGeVector3d {double x,y,z;AcGeVector3d(double a,double b,double c):x(a),y(b),z(c){}};
+struct AcGePoint3d {double x,y,z;AcGePoint3d(double a=0,double b=0,double c=0):x(a),y(b),z(c){}
+ AcGePoint3d operator+(const AcGeVector3d& v)const{return AcGePoint3d(x+v.x,y+v.y,z+v.z);}};
+struct AcGePoint2d {double x,y;AcGePoint2d(double a,double b):x(a),y(b){}};
+struct CString {void Format(const wchar_t*,...){}operator const wchar_t*()const{return L"test";}};
+namespace Acad {enum ErrorStatus {eOk,eInvalid};}
+static int liveEntities=0,addCalls=0,failAdd=0,throwAdd=0;
+static bool nullManager=false;
+struct AcDbEntity {AcDbEntity(){++liveEntities;}virtual ~AcDbEntity(){--liveEntities;}void setColorIndex(int){}};
+struct AcDbPolyline:AcDbEntity {double z;AcDbPolyline():z(0){}
+ Acad::ErrorStatus addVertexAt(int,const AcGePoint2d&){return Acad::eOk;}
+ void setElevation(double value){z=value;}double elevation(){return z;}};
+struct AcDbText:AcDbEntity {
+ Acad::ErrorStatus setPosition(const AcGePoint3d&){return Acad::eOk;}
+ Acad::ErrorStatus setHeight(double h){assert(h>0);return Acad::eOk;}
+ Acad::ErrorStatus setTextString(const wchar_t*){return Acad::eOk;}};
+struct AcDbIntArray {};
+static const int kAcGiDirectShortTerm=0;
+struct AcGiTransientManager {std::set<AcDbEntity*> entries;
+ bool addTransient(AcDbEntity* e,int,int,AcDbIntArray&){++addCalls;if(addCalls==throwAdd)throw std::runtime_error("test");
+  if(addCalls==failAdd)return false;
+  entries.insert(e);return true;}
+ bool eraseTransient(AcDbEntity* e,AcDbIntArray&){assert(entries.erase(e)==1);return true;}};
+static AcGiTransientManager transientManager;
+static AcGiTransientManager* acgiGetTransientManager(){return nullManager?NULL:&transientManager;}
+namespace tvsOffsetProof {inline AcGePoint3d pt(const tvsOffset::WorldPoint& p){return AcGePoint3d(p.x,p.y,p.z);}}
+namespace tvsOffsetService {struct Snapshot {tvsOffsetOperation::Snapshot physical;};}
+namespace tvsOffsetIntegration {
+'''
+        main = r'''
+}
+int main(){
+ tvsOffsetService::Snapshot snapshot;snapshot.physical.a=400;snapshot.physical.b=200;snapshot.physical.elevation=-400;
+ snapshot.physical.factor=1;snapshot.physical.first=tvsOffset::WorldPoint(-2000,0,37);snapshot.physical.last=tvsOffset::WorldPoint(0,0,37);
+ tvsOffsetOperation::Request request;request.elevation=0;
+ const auto plan=tvsOffsetOperation::prepare(snapshot.physical,request);assert(plan.status==tvsOffsetOperation::Ready);
+ for(int failure=0;failure<8;++failure){
+  addCalls=0;failAdd=failure>=1&&failure<=5?failure:0;throwAdd=failure==6?3:0;nullManager=failure==7;
+  try {tvsOffsetIntegration::Preview preview;const bool ok=preview.show(snapshot,plan);
+   assert(ok==(failure==0));if(ok)assert(transientManager.entries.size()==5);
+  }catch(const std::runtime_error&){assert(failure==6);}
+  assert(liveEntities==0&&transientManager.entries.empty());
+ }
+ std::cout<<"PASS 8 actual preview cleanup cases: normal dismissal, each add failure, thrown manager error and missing manager; no database entities\n";
+}
+'''
+        source = prelude.replace('OFFSET_HEADER', (ROOT/'geometry/OffsetOperation.h').as_posix()) + body + main
+        with tempfile.TemporaryDirectory() as folder:
+            cpp = pathlib.Path(folder)/'preview.cpp'
+            cpp.write_text(source, encoding='utf-8')
+            target = pathlib.Path(folder)/'preview'
+            compile_cpp(cpp, target)
+            subprocess.run([str(executable(target))], check=True)
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

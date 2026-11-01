@@ -56,7 +56,8 @@ To je testni orakul, ne tvrdnja da su svi runtime potrošači ovdje izmjereni.
   Novi članovi orijentisani su od fiksnog kraja ka izabranom izlazu. Flow je ista
   nenegativna skalarna vrijednost. Direct različit od 0 i poseban Form nisu podržani;
   ne nagađa se semantika smjera niti negira protok.
-- Prikazna svojstva preko AcDbEntity setPropertiesFrom, Flow, Grani, Wipeout,
+- Osnovna prikazna svojstva preko AcDbEntity setPropertiesFrom, uz izričit prenos
+  debljine linije, materijala, providnosti i plot stila; Flow, Grani, Wipeout,
   WipeoutLength i This1D prenose se novim članovima. Materijal je AcDbEntity
   materijal; lim/debljina/masa se i dalje izvode postojećim fizičkim obračunom.
 - TVS_Property proizvođač i zajednička napomena prenose se. Jedinstvena pozicija

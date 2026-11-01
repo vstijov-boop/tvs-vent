@@ -19,8 +19,13 @@ default:return L"Nevazeci podaci ili nepodrzana geometrija promjene kote.";}}
 class Preview {
     AcGiTransientManager* manager;AcDbIntArray viewports;std::vector<AcDbEntity*> entities;
     bool add(std::unique_ptr<AcDbEntity> e){
-        if(!manager||!manager->addTransient(e.get(),kAcGiDirectShortTerm,130,viewports))return false;
-        entities.push_back(e.release());return true;
+        if(!manager)return false;
+        entities.push_back(e.get());
+        bool added=false;
+        try {added=manager->addTransient(e.get(),kAcGiDirectShortTerm,130,viewports);}
+        catch(...){entities.pop_back();throw;}
+        if(!added){entities.pop_back();return false;}
+        e.release();return true;
     }
 public:
     Preview():manager(acgiGetTransientManager()){}
@@ -30,7 +35,8 @@ public:
         std::unique_ptr<AcDbPolyline> line(new AcDbPolyline());line->setColorIndex(3);
         const tvsOffset::WorldPoint points[]={p.dto.incomingLast,p.dto.middle.first,p.dto.middle.last,p.exitFirst,p.exitLast};
         for(int j=0;j<5;++j)if(line->addVertexAt(j,AcGePoint2d(points[j].x,points[j].y))!=Acad::eOk)return false;
-        if(line->setElevation(points[0].z)!=Acad::eOk||!add(std::unique_ptr<AcDbEntity>(line.release())))return false;
+        line->setElevation(points[0].z);
+        if(line->elevation()!=points[0].z||!add(std::unique_ptr<AcDbEntity>(line.release())))return false;
         const double elevations[]={snapshot.physical.elevation*f,p.dto.middle.firstElevationMm,p.dto.middle.lastElevationMm,p.acceptedElevation*f};
         for(int j=0;j<4;++j){
             std::unique_ptr<AcDbText> text(new AcDbText());CString label;label.Format(L"P%d Z=%.3f mm",j,elevations[j]);

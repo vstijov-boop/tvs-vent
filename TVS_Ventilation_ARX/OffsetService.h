@@ -219,13 +219,19 @@ inline void initializePipe(TVS_Pipe* p){
 }
 inline bool appearance(TVS_Pipe* source,TVS_Entity* target,const Snapshot& s){
     if(!checked(target->setPropertiesFrom(source)))return false;
+    // setPropertiesFrom copies color/layer/linetype/scale/visibility only.
+    AcDbObjectId plotStyle;const AcDb::PlotStyleNameType plotType=source->getPlotStyleNameId(plotStyle);
+    if(!checked(target->setLineWeight(source->lineWeight()))||!checked(target->setMaterial(source->materialId()))
+        ||!checked(target->setTransparency(source->transparency()))||!checked(target->setPlotStyleName(plotType,plotStyle)))return false;
     target->Flow=source->Flow;target->Direct=0;target->Grani=source->Grani;
     target->Wipeout=source->Wipeout;target->This1D=source->This1D;target->WipeoutLength=source->WipeoutLength;
     // Only known shared properties. Never clone position, quantity overrides or identities.
     if(!s.manufacturer.empty()||!s.note.empty()){
         resbuf* data=acutBuildList(1001,CTVSProperty,1070,5,1000,s.manufacturer.c_str(),
             1070,9,1000,s.note.c_str(),0);
-        if(!data)return false;const Acad::ErrorStatus es=target->setXData(data);acutRelRb(data);if(!checked(es))return false;
+        if(!data)return false;
+        const Acad::ErrorStatus es=target->setXData(data);acutRelRb(data);
+        if(!checked(es))return false;
     }
     return true;
 }
