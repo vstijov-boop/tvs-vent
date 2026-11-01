@@ -3,7 +3,7 @@
 Datum 01.11.2026; osnova koda `bd01b2e208a5ef58e2905ce9854d8a63dac75382`.
 Aktuelni plan: [INTEGRATION_PLAN.md](INTEGRATION_PLAN.md).
 Istorijsko stanje koda: [CODE_STATE.md](CODE_STATE.md). Naknadno je odobrena i
-implementirana samo razvojna faza INT-00; ugovor: [OFFSET_INT00_GUIDE.md](OFFSET_INT00_GUIDE.md).
+implementirana razvojna faza INT-00; ugovor: [OFFSET_INT00_GUIDE.md](OFFSET_INT00_GUIDE.md).
 Rezultati, commit-i i paketi: [OFFSET_INT00_RESULTS.md](OFFSET_INT00_RESULTS.md).
 Praktično prihvatanje nove isporuke je odvojeno od kompilacije i testova sa zamjenama.
 
@@ -34,8 +34,10 @@ Sačuvani nalaz iz već izvršenih proba:
 
 - [x] INT-00 DEV implementacija: zajednički servis/snapshot/writer, očuvana oba Z
   pozivaoca i registrovan TVS_OFFSET. Nije produkciono niti praktično runtime prihvatanje.
-- [ ] INT-01: trajni pravougaoni bypass, samostalna komanda i spoljni konektori.
-- [ ] INT-02: isti servis kao opcija tokom crtanja.
+- [x] INT-01 DEV kod: trajni pravougaoni bypass, TVS_BYPASS i spoljni konektori.
+  Praktično prihvatanje novog paketa ostaje otvoreno.
+- [x] INT-02 DEV kod: isti servis kroz Obilazak/O u TVS_PIPE i TVS_DRAW.
+  Praktičan nastavak oba toka u AutoCAD-u još nije potvrđen.
 - [ ] INT-03: AssemblyId → OB-xx → DetailId, izvor/revizija, ručno osvježavanje.
 - [ ] INT-04a: kružna trasa / pravougaona prepreka; glatka kružna koljena i offset.
 - [ ] INT-04b: pravougaona trasa / stvarna cilindrična prepreka.
@@ -62,9 +64,9 @@ Sljedeće nije izvršeno u AutoCAD-u tokom INT-00 i ostaje otvoreno za pregled:
   ograničenje; INT-00 ne uvodi novu trajnu topološku šemu.
 
 Numerička matrica i testovi stvarnih C++ funkcija sa SDK zamjenama ne označavaju
-ove stavke kao prošle. STAB-01/Redo se sada ne testira. Faze INT-01 i dalje nisu
-odobrene: prije prve bypass šeme slijedi kratko poređenje roditelja nad dvije
-v1 trojke i H naspram posebnog sedmočlanog ugovora.
+ove stavke kao prošle. STAB-01/Redo se sada ne testira. Korisnik je naknadno
+odobrio zaokruženu DEV implementaciju INT-01/02: roditelj nad dvije neizmijenjene
+V1 trojke i H; bez povezanih detalja, kružnih kombinacija i pune hidden-line slike.
 
 ## Preostale provjere prethodne isporuke — NISU prošle
 
@@ -107,10 +109,26 @@ Referenca: `bypass-preview/SIDE_DETAIL_RESULTS.md` i dopuna
 
 ## Stalne granice
 
-- Produkcija se ne mijenja, PR #1 ostaje draft; implementacija čeka pregled plana.
+- Produkcija se ne mijenja, PR #1 ostaje draft; DEV isporuka čeka korisnički pregled.
 - Ne uklanjati transakcijsku zaštitu/rollback; ne uvoditi DWG upise iz dijagnostike.
 - Nema automatskog pomjeranja nizvodne mreže ili spajanja starih detalja po oznaci.
 - COPY statičkog detalja zadržava duplirani identitet; prijaviti konflikt.
 - Hot unload/reload nije podržan testni tok; nova verzija poslije restartovanja.
 - Segmentna/fleksibilna koljena, promjene presjeka, proizvoljna 3D mreža i automatsko
   osvježavanje detalja ostaju zaseban obim.
+
+## Korisnička proba i novi DEV bypass
+
+- Korisnik funkcionalno potvrđuje da INT-00 promjena Z radi dobro. Verzija AutoCAD-a,
+  jedinice i pojedinačne runtime stavke nisu navedeni; nije potvrda cijele matrice.
+- Primjedba da bypass samo prikazuje kandidat bila je tačna za prethodni paket.
+  Novi kod dodaje trajno prihvatanje istog kandidata i nastavak oba toka crtanja.
+- GFX-01 ostaje otvoren: nepotpune vidljive/skrivene fizičke ivice offseta i bypassa.
+  Novi paket ne računa tačnu vidljivost; to je izričito označeno u dijalogu/uputstvu.
+- [ ] Novi bypass runtime: oba smjera, jedinice/UCS/uglovi/strane, spoljašnji priključci,
+  Cancel, stale/lock, rollback, stvarni fizički potrošači i save/reopen.
+- [ ] Nova roditeljska XRecord/backlink validacija i filing u stvarnom AutoCAD-u.
+- [ ] Obilazak/O i sljedeći segment kroz TVS_PIPE i TVS_DRAW u obje ciljane verzije.
+
+Uputstvo: [BYPASS_DEV_GUIDE.md](BYPASS_DEV_GUIDE.md). Testovi sa SDK zamjenama
+ne potvrđuju native filing ili praktičan prolazak ovih stavki. STAB-01 ostaje odložen.

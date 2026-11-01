@@ -39,6 +39,8 @@ nepoznati atributi i zaključani objekti odbijaju se kao kod offset servisa.
 COPY/WBLOCK/INSERT kloniranje novih bypass članova je odbijeno u ovoj DEV verziji;
 time se izbjegava kopija koja bi ostala vezana za originalnog roditelja. Stari
 samostalni offseti zadržavaju svoj postojeći clone ugovor.
+Kraj ostatka koji već dodiruje postojeći bypass roditelj ne smije se mijenjati;
+njegov slobodni spoljašnji kraj može se koristiti za nastavak.
 
 **Prikaz ne računa tačnu vidljivost.** Pune linije su projektovane konture,
 crtice mogu označavati simboličke spojeve/pomoćne gabarite, a ne potvrđene skrivene
