@@ -79,7 +79,7 @@ static double Options::* const fields[FieldCount]={&Options::ri,&Options::insula
  &Options::timeMs,&Options::calls,&Options::cells,&Options::depthStep,&Options::bridgeStep,&Options::maxDepth,&Options::depthLevels,
  &Options::bridgeLevels,&Options::positions,&Options::seedSolves,&Options::proposals,&Options::inset,&Options::wTolerance,&Options::dTolerance};
 static const wchar_t* labels[FieldCount]={L"Unutrašnji radijus koljena Ri (mm)",L"Izolacija trase, mm *",L"Izolacija prepreke, mm *",L"Obavezan razmak, mm",L"Projektna rezerva, mm",
- L"Min. dužina kosog komada (mm)",L"Min. dužina srednjeg komada C (mm)",L"Min. projekcija, mm",L"Početak raspoloživog prozora s (mm)",L"Kraj raspoloživog prozora s (mm)",L"Donja dozvoljena kota Z (mm, opciono)",L"Gornja dozvoljena kota Z (mm, opciono)",
+ L"Min. dužina kosog komada (mm)",L"Min. dužina srednjeg komada C (mm)",L"Min. projekcija, mm",L"Početak prozora s (mm)",L"Kraj prozora s (mm)",L"Donja granica Z, mm (opciono)",L"Gornja granica Z, mm (opciono)",
  L"Vrijeme, ms (max 10000)",L"Checker pozivi (max 128)",L"Ćelije (max 1000000)",L"Korak D, mm",L"Korak C, mm",L"Max. traženi D, mm",L"Nivoi D (max 128)",L"Prijedlozi C (max 16)",L"Položaji (max 16)",L"Seed solve (max 128)",L"Prijedlozi (max 2048)",L"Inset prozora, mm",L"Prag poboljšanja W, mm",L"Prag poboljšanja D, mm"};
 struct Dialog {
  Snapshot snapshot;bool reverse,loading,unitFromRecord,advanced,showDimensions,showAxes,allEdges;double scaleX,scaleY;Engine engine;View view;Options options;
@@ -143,11 +143,16 @@ struct Dialog {
   for(int j=0;j<FieldCount;++j){ShowWindow(GetDlgItem(window,100+j),SW_HIDE);ShowWindow(GetDlgItem(window,1000+j),SW_HIDE);}
   const int* list=advanced?expert:basic;int n=advanced?15:11;
   for(int i=0;i<n;++i){int j=list[i],x=12+(advanced?i/8*280:0),y=140+(advanced?i%8:i)*29;
-   int labelWidth=advanced?172:306,editX=advanced?174:312,editWidth=advanced?92:230;
+   int labelWidth=advanced?172:244,editX=advanced?174:250,editWidth=advanced?92:192;
    SetWindowPos(GetDlgItem(window,1000+j),NULL,(int)(x*scaleX),(int)((y+3)*scaleY),(int)(labelWidth*scaleX),(int)(22*scaleY),SWP_NOZORDER|SWP_SHOWWINDOW);
    SetWindowPos(GetDlgItem(window,100+j),NULL,(int)((x+editX)*scaleX),(int)(y*scaleY),(int)(editWidth*scaleX),(int)(24*scaleY),SWP_NOZORDER|SWP_SHOWWINDOW);
   }
   SetDlgItemTextW(window,601,advanced?L"Razvojni budžeti i numerička dijagnostika.\r\nSva polja ostaju aktivna i kada je ova grupa zatvorena.\r\nOtvorite Osnovne postavke za geometrijske ulaze.":L"Prozor: s=0 je presjek osa. Negativno je prije, pozitivno poslije.\r\nIzolacije morate unijeti (0 kada ih nema). Ostalo: ručno / predlog.\r\nGranice su apsolutne kote spoljnih gabarita; prazno = neaktivno.");
+  int left=advanced?590:470,width=1180-left;
+  auto move=[&](int id,int x,int y,int w,int h){SetWindowPos(GetDlgItem(window,id),NULL,(int)(x*scaleX),(int)(y*scaleY),(int)(w*scaleX),(int)(h*scaleY),SWP_NOZORDER);};
+  move(602,left,90,width,20);move(505,left,112,68,22);move(506,left+76,112,68,22);move(507,left+165,110,width-165,100);
+  move(800,left,556,width,109);move(603,left,675,width,34);move(601,12,480,left-30,68);move(503,12,576,left-30,25);
+  move(700,12,616,130,30);move(702,156,616,145,30);move(701,315,616,143,30);move(IDCANCEL,315,666,143,30);
   InvalidateRect(window,NULL,TRUE);
  }
  void init(HWND h){window=h;loading=true;
@@ -165,30 +170,31 @@ struct Dialog {
   for(int j=0;j<FieldCount;++j){int col=j/13,row=j%13,x=12+col*280,y=128+row*29;
    child(L"STATIC",labels[j],0,1000+j,x,y+3,172,22);child(L"EDIT",values[j].c_str(),ES_AUTOHSCROLL|WS_TABSTOP,100+j,x+174,y,92,24);}
   child(L"STATIC",L"",0,601,12,480,550,68);
-  child(L"BUTTON",L"Potvrđujem jedinice, izolacije, ručne ulaze i razvojne budžete",BS_AUTOCHECKBOX|WS_TABSTOP,503,12,576,555,25);CheckDlgButton(h,503,confirmed?BST_CHECKED:BST_UNCHECKED);
+  child(L"BUTTON",L"Potvrđujem jedinice i sve osnovne/napredne ulaze",BS_AUTOCHECKBOX|WS_TABSTOP,503,12,576,555,25);CheckDlgButton(h,503,confirmed?BST_CHECKED:BST_UNCHECKED);
   child(L"BUTTON",L"Pronađi prolaz",BS_PUSHBUTTON|WS_TABSTOP,700,12,616,150,30);
   child(L"BUTTON",L"Pokušaj kraći prolaz",BS_PUSHBUTTON|WS_TABSTOP,702,174,616,170,30);
   child(L"BUTTON",L"Pregled u crtežu",BS_PUSHBUTTON|WS_TABSTOP,701,356,616,165,30);EnableWindow(GetDlgItem(h,701),view.ready&&engine.ready());
   child(L"BUTTON",L"Umetni (nedostupno)",BS_PUSHBUTTON,703,12,666,180,30);EnableWindow(GetDlgItem(h,703),FALSE);
   child(L"BUTTON",L"Otkaži / zatvori",BS_PUSHBUTTON|WS_TABSTOP,IDCANCEL,348,666,173,30);
   child(L"BUTTON",L"Napredno / dijagnostika",BS_AUTOCHECKBOX|WS_TABSTOP,504,12,112,280,22);CheckDlgButton(h,504,advanced?BST_CHECKED:BST_UNCHECKED);
-  child(L"STATIC",L"Uzdužni presjek — fizičke kote, ista razmjera s/z",0,0,590,90,590,20);
+  child(L"STATIC",L"Uzdužni presjek — fizičke kote, ista razmjera s/z",0,602,590,90,590,20);
   child(L"BUTTON",L"Kote",BS_AUTOCHECKBOX|WS_TABSTOP,505,590,112,68,22);CheckDlgButton(h,505,showDimensions?BST_CHECKED:BST_UNCHECKED);
   child(L"BUTTON",L"Ose",BS_AUTOCHECKBOX|WS_TABSTOP,506,666,112,68,22);CheckDlgButton(h,506,showAxes?BST_CHECKED:BST_UNCHECKED);
   c=child(L"COMBOBOX",L"",CBS_DROPDOWNLIST|WS_TABSTOP,507,755,110,425,100);
   SendMessage(c,CB_ADDSTRING,0,(LPARAM)L"Konture (dijagnostika, bez zaklanjanja)");
   SendMessage(c,CB_ADDSTRING,0,(LPARAM)L"Sve ivice — dijagnostika (bez zaklanjanja)");SendMessage(c,CB_SETCURSEL,allEdges?1:0,0);
-  child(L"EDIT",view.ready?(wide(view.status)+L"\r\n"+wide(view.details)).c_str():L"Rezultat nije izračunat. Nema trajnog upisa.",ES_MULTILINE|ES_READONLY|WS_VSCROLL,800,590,536,590,129);
-  child(L"STATIC",L"DEV: upis nije implementiran. Osnova je dijagnostička, bez zaklanjanja.\r\nIzabrana originalna trasa ostaje vidljiva ispod transient pregleda.",0,0,590,675,590,34);
+  child(L"EDIT",view.ready?(wide(view.status)+L"\r\n"+wide(view.details)).c_str():L"Rezultat nije izračunat. Nema trajnog upisa.",ES_MULTILINE|ES_READONLY|WS_VSCROLL,800,590,556,590,109);
+  child(L"STATIC",L"DEV: upis nije implementiran. Osnova je dijagnostička, bez zaklanjanja.\r\nIzabrana originalna trasa ostaje vidljiva ispod transient pregleda.",0,603,590,675,590,34);
   fieldLayout();refreshResult();loading=false;
  }
  void paint(){
   PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);
-  RECT area={(LONG)(590*scaleX),(LONG)(136*scaleY),(LONG)(1180*scaleX),(LONG)(526*scaleY)};
+  const SectionLayout layout=sectionLayout(scaleX,scaleY,showDimensions,advanced);
+  RECT area={layout.area.left,layout.area.top,layout.area.right,layout.area.bottom};
   FillRect(dc,&area,(HBRUSH)GetStockObject(WHITE_BRUSH));
   HGDIOBJ oldFont=SelectObject(dc,font);int oldBk=SetBkMode(dc,TRANSPARENT);COLORREF oldColor=GetTextColor(dc);
   if(view.ready&&view.axis.size()==8){
-   RECT plot=area;plot.left+=(LONG)(55*scaleX);plot.right-=(LONG)(20*scaleX);plot.top+=(LONG)(30*scaleY);plot.bottom-=(LONG)((showDimensions?145:30)*scaleY);
+   RECT plot={layout.plot.left,layout.plot.top,layout.plot.right,layout.plot.bottom};
    double sl=1e100,sr=-1e100,zl=1e100,zr=-1e100;
    for(const auto& c:view.profile)for(const auto& p:c.points){sl=std::fmin(sl,p.s);sr=std::fmax(sr,p.s);zl=std::fmin(zl,p.z);zr=std::fmax(zr,p.z);}
    if(options.useFloor)zl=std::fmin(zl,options.floor);if(options.useCeiling)zr=std::fmax(zr,options.ceiling);
@@ -225,9 +231,11 @@ struct Dialog {
     std::wstring d=L"D="+wide(displayNumber(view.D));
     LOGFONTW lf={};GetObjectW(font,sizeof(lf),&lf);lf.lfEscapement=900;lf.lfOrientation=900;HFONT vertical=CreateFontIndirectW(&lf);
     HGDIOBJ old=SelectObject(dc,vertical);TextOutW(dc,dx-(int)(12*scaleX),(py(view.axis.front().z)+py(view.zPass))/2+(int)(30*scaleY),d.c_str(),(int)d.size());SelectObject(dc,old);DeleteObject(vertical);
-    auto notes=captions(view,options);int rowH=(int)(15*scaleY),top=area.bottom-6*rowH;
+    auto notes=captions(view,options);
+    LOGFONTW noteSpec={};GetObjectW(font,sizeof(noteSpec),&noteSpec);noteSpec.lfHeight=-(int)(11*(std::min)(scaleX,scaleY));HFONT noteFont=CreateFontIndirectW(&noteSpec);HGDIOBJ previousFont=SelectObject(dc,noteFont);
     for(unsigned j=0;j<notes.size();++j){COLORREF color=notes[j].color==1?RGB(190,40,40):notes[j].color==2?RGB(0,120,65):notes[j].color==3?RGB(130,50,170):RGB(45,45,45);
-     label(area.left+(j%2)*cw,top+(j/2)*rowH,cw,rowH,wide(notes[j].text),color);}
+     const auto& slot=layout.labels[4+j];label(slot.left,slot.top,slot.right-slot.left,slot.bottom-slot.top,wide(notes[j].text),color);}
+    SelectObject(dc,previousFont);DeleteObject(noteFont);
    }
   }
   SetTextColor(dc,oldColor);SetBkMode(dc,oldBk);SelectObject(dc,oldFont);EndPaint(window,&ps);

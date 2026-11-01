@@ -10,7 +10,7 @@ Ovo je prvi korisnički funkcionalni test, ne potvrda kompletne test-matrice. Au
 
 Osnovni panel: iznad/ispod, ugao, Ri, izolacije, obavezan razmak, odvojena rezerva, minimum kosog/srednjeg pravog komada, prozor i opcione fizičke visinske granice. Napredno / dijagnostika otvara panel razvojnih parametara i puni ispis. Sva skrivena polja ostaju aktivna, čuvaju vrijednosti i prolaze istu validaciju. Ne mijenjaju se numerički ugovor, generator, solver, adapter Z, trajni upis ili DWG podaci.
 
-Presjek je povećan. W, C i D su kotne linije; početna/završna kota ose su u gornjem pojasu. Osa prolaza, ugao/Ri, fizičke/projektovane dužine oba nagiba, visina kanala/prepreke, vrh/dno sa izolacijom i aktivne granice su u dvokolonskoj legendi izvan geometrije. Kritični par je zelen sa pokaznom linijom i kružićima; to je najmanji geometrijski razmak između spoljnih gabarita, ne nužno vertikalni zazor. D je razlika kota osa, a ne zazor.
+U osnovnom režimu panel presjeka je proširen sa 590 na 710 projektnih piksela; pri otvaranju naprednih polja pomjera se desno. W, C i D su kotne linije; početna/završna kota ose su u gornjem pojasu. Osa prolaza, ugao/Ri, fizičke/projektovane dužine oba nagiba, visina kanala/prepreke, vrh/dno sa izolacijom i aktivne granice su u trokolonskoj legendi izvan geometrije. Kritični par je zelen sa pokaznom linijom i kružićima; to je najmanji geometrijski razmak između spoljnih gabarita, ne nužno vertikalni zazor. D je razlika kota osa, a ne zazor.
 
 Kote i Ose su nezavisni prekidači prikaza; ne mijenjaju niti ponovo pokreću proračun. Obične mjere imaju jednu decimalu; ograda razmaka se za glavni ispis proširuje na dvije decimale, a puni dijagnostički ispis ostaje dostupan. Potvrđeni status/interval se ne izračunavaju iz zaokruženog teksta. Sve vrijednosti i referentne tačke dolaze iz istog checked Result-a ili potvrđenih ulaznih podataka. Skala s i z ostaje jednaka.
 
@@ -31,7 +31,7 @@ Originalna izabrana trasa ostaje vidljiva ispod preview-a. Ne mijenjaju se njen 
 
 ## Testovi i ručni pregled
 
-Automatizovano: korisnički numerički primjer, prijenos osa/dužina/kritičnog para, zaokruživanje samo za prikaz, klase linija, prednost poklopljene fizičke konture, iznad/ispod × 30/45/60° × smjer0/37° × izolacija0/25mm. Postojeće numeričke regresije ostaju obavezne. Test klase fizička/pomoćna linija nije dokaz hidden-line algoritma — takav algoritam nije dio isporuke.
+Automatizovano: raspored kotnih pojaseva i odsustvo preklapanja njihovih pravougaonika sa geometrijom/međusobno pri skalama .65/.8/1/1.25/1.5/2 i oba panela (ovo nije stvarni Windows DPI/font test); korisnički numerički primjer, prijenos osa/dužina/kritičnog para, zaokruživanje samo za prikaz, klase linija, prednost poklopljene fizičke konture, iznad/ispod × 30/45/60° × smjer0/37° × izolacija0/25mm. Postojeće numeričke regresije ostaju obavezne. Test klase fizička/pomoćna linija nije dokaz hidden-line algoritma — takav algoritam nije dio isporuke.
 
 U AutoCAD-u provjeriti:
 1. U osnovnom panelu izračunati primjer sa slike; provjeriti kote, L/projekciju, W/D/C i zeleni kritični par. U Napredno provjeriti da su svi raniji budžeti/intervali i dalje dostupni.

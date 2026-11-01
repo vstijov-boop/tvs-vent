@@ -7,6 +7,23 @@
 #include <limits>
 #include <algorithm>
 namespace tvsBypassPreview {
+struct PixelRect {int left,top,right,bottom;};
+struct SectionLayout {PixelRect area,plot;std::vector<PixelRect> labels;};
+inline SectionLayout sectionLayout(double sx,double sy,bool dimensions,bool advanced=false){
+ SectionLayout d;d.area=PixelRect{int((advanced?590:470)*sx),int(136*sy),int(1180*sx),int(546*sy)};
+ d.plot=d.area;d.plot.left+=int(55*sx);d.plot.right-=int(20*sx);d.plot.top+=int(30*sy);d.plot.bottom-=int((dimensions?127:30)*sy);
+ if(dimensions){int cw=(d.area.right-d.area.left)/2,h=int(18*sy),rowH=int(18*sy);
+  d.labels.push_back(PixelRect{d.area.left,d.area.top,d.area.left+cw,d.area.top+h});
+  d.labels.push_back(PixelRect{d.area.left+cw,d.area.top,d.area.right,d.area.top+h});
+  int wy=d.plot.bottom+int(18*sy),cy=d.plot.bottom+int(42*sy);
+  d.labels.push_back(PixelRect{d.plot.left,wy-h,d.plot.right,wy});
+  d.labels.push_back(PixelRect{d.area.left,cy-h,d.area.right,cy});
+  for(int j=0;j<12;++j){int colW=(d.area.right-d.area.left)/3,x=d.area.left+(j%3)*colW,y=d.area.bottom-4*rowH+(j/3)*rowH;
+   d.labels.push_back(PixelRect{x,y,x+colW,y+rowH});}
+ }
+ return d;
+}
+inline bool overlap(PixelRect a,PixelRect b){return a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom;}
 inline std::string displayNumber(double x,int decimals=1){std::ostringstream s;s.imbue(std::locale::classic());s<<std::fixed<<std::setprecision(decimals)<<x;return s.str();}
 inline std::string memberName(int n){const char* names[]={"prvo koljeno","prvi nagibni komad","drugo koljeno","srednji komad","treće koljeno","drugi nagibni komad","četvrto koljeno","ulazni susjed","izlazni susjed"};return n>=0&&n<9?names[n]:"nije dostupan";}
 // Display-only interval enclosure at 0.01 mm, never fed back to the checker.
@@ -25,7 +42,7 @@ inline std::vector<Caption> captions(const View& v,const Options& o){
  a.push_back(Caption("Prepreka: visina="+displayNumber(v.frame.obstacleHeight)+" mm",1));
  a.push_back(Caption("Kanal: visina="+displayNumber(v.frame.height)+" mm"));
  a.push_back(Caption("Prepreka vrh/dno: "+displayNumber(v.frame.obstacleZ+v.frame.obstacleHeight/2+o.obstacleInsulation)+" / "+displayNumber(v.frame.obstacleZ-v.frame.obstacleHeight/2-o.obstacleInsulation),1));
- a.push_back(Caption("Koljeno: "+displayNumber(double(o.angle),0)+" deg; Ri="+displayNumber(o.ri)+" mm"));
+ a.push_back(Caption("Koljeno: "+displayNumber(double(o.angle),0)+"°; Ri="+displayNumber(o.ri)+" mm"));
  a.push_back(Caption("Prolaz vrh/dno: "+displayNumber(v.zPass+v.frame.height/2+o.insulation)+" / "+displayNumber(v.zPass-v.frame.height/2-o.insulation)));
  a.push_back(Caption("Nagib 1: L="+displayNumber(v.slopePhysical[0])+"; proj="+displayNumber(v.slopeProjected[0])+" mm"));
  a.push_back(Caption("Nagib 2: L="+displayNumber(v.slopePhysical[1])+"; proj="+displayNumber(v.slopeProjected[1])+" mm"));

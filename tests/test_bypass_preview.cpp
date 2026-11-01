@@ -79,5 +79,14 @@ int main(){
   expect(v.witnessBody.s==v.witnessBody.s&&v.witnessObstacle.z==v.witnessObstacle.z,"critical points finite");
   expect(captions(v,o).size()==12&&!planLines(v,true,true).empty(),"both presentations available");
  }
+ for(bool expert:{false,true})for(double sx:{.65,.8,1.,1.25,1.5,2.})for(double sy:{.65,.8,1.,1.25,1.5,2.}){
+  auto layout=sectionLayout(sx,sy,true,expert);expect(layout.labels.size()==16,"dimension rails have fixed non-overlap slots");
+  for(size_t a=0;a<layout.labels.size();++a){auto r=layout.labels[a];
+   expect(!overlap(r,layout.plot),"dimension text slot outside physical geometry");
+   expect(r.left>=layout.area.left&&r.right<=layout.area.right&&r.top>=layout.area.top&&r.bottom<=layout.area.bottom,"dimension text slot inside section panel");
+   for(size_t b=a+1;b<layout.labels.size();++b)expect(!overlap(r,layout.labels[b]),"dimension slots do not overlap each other");
+  }
+  expect(sectionLayout(sx,sy,false,expert).labels.empty(),"Kote off has no stale annotation slots");
+ }
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
