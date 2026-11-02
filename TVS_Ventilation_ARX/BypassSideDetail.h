@@ -171,8 +171,9 @@ static void insert(AcDbDatabase* db,const View& v,const Options& o,const AcDbObj
   resbuf from={};from.restype=RTSHORT;from.resval.rint=1;resbuf to={};to.restype=RTSHORT;to.resval.rint=0;if(acedTrans(ucs,&from,&to,0,wcs)!=RTNORM)throw std::runtime_error("UCS conversion failed");
   AcGePoint3d position(wcs[0],wcs[1],wcs[2]);int confirm;
   {PositionPreview preview;preview.show(d,position);acedInitGet(0,L"Umetni Pozicija Otkazi");ACHAR answer[32]=L"";
-   confirm=acedGetKword(L"\nPreview detalja: [Umetni/Pozicija/Otkazi] <Otkazi>: ",answer);
-   if(confirm!=RTNORM)return;if(_wcsicmp(answer,L"Pozicija")==0)continue;if(_wcsicmp(answer,L"Umetni")!=0)return;}
+   confirm=acedGetKword(L"\nPreview detalja: [Umetni/Pozicija/Otkazi] <Umetni>: ",answer);
+   if(confirm==RTNONE)wcscpy_s(answer,L"Umetni");else if(confirm!=RTNORM)return; // Enter = Umetni, Esc = cancel
+   if(_wcsicmp(answer,L"Pozicija")==0)continue;if(_wcsicmp(answer,L"Umetni")!=0)return;}
   write(db,d,v,o,label,detailed,position,guid,handle(route),handle(obstacle));
   acutPrintf(L"\nUmetnut staticki detalj %ls. Standardne neasocijativne kote; bez trajnog TVS obilaska. COPY zadrzava identitet snimka.",widen(label).c_str());return;
  }
