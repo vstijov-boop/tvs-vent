@@ -34,7 +34,7 @@ struct Snapshot {tvsOffsetService::Snapshot route;AcDbObjectId obstacle;std::wst
 '''
         code+=function(bypass,'struct Commit')+';\n'
         code+=function(bypass,'inline int connector(')+'\n'
-        fs=bypass.index('inline std::wstring& lastFailure(');code+=bypass[fs:bypass.index('inline bool inject(',fs)]+'\n'
+        fs=bypass.index('inline std::wstring& lastFailure(');code+=bypass[fs:bypass.index('inline bool write(',fs)]+'\n'
         code+=r'''
 static int failStage=0;
 inline bool inject(int stage){return stage==failStage;}
@@ -185,11 +185,16 @@ int main(){
 struct AcDbObjectId {int value;};
 struct AcGePoint3d {double x,y,z;AcGePoint3d(double a=0,double b=0,double c=0):x(a),y(b),z(c){}};
 struct TVS_Pipe {int id;AcGePoint3d FirstPoint,LastPoint;AcDbObjectId objectId(){AcDbObjectId r={id};return r;}};
-struct TVSBypassOutput {TVS_Pipe* pipe;double elevation,angle;};
+struct TVSBypassOutput {AcDbObjectId id;TVS_Pipe* pipe;double elevation,angle;};
 static TVS_Pipe original,output;
-static bool accept=false;
+static bool accept=false,openFails=false;
+namespace Acad {enum ErrorStatus {eOk,eInvalid};}
+namespace AcDb {enum OpenMode {kForRead};}
+static int shortOpens=0;
+template<class T> struct AcDbObjectPointer {T* p;AcDbObjectPointer(AcDbObjectId id,AcDb::OpenMode):p(!openFails&&id.value==2?&output:NULL){++shortOpens;}
+ Acad::ErrorStatus openStatus()const{return p?Acad::eOk:Acad::eInvalid;}T* operator->(){return p;}};
 static double globalElevMid=-400,globalElev=-400,globalAxis=33;
-static bool tvsBypassDuringDrawing(AcDbObjectId id,TVSBypassOutput& r){assert(id.value==1);r.pipe=&output;r.elevation=-400;r.angle=45;return accept;}
+static bool tvsBypassDuringDrawing(AcDbObjectId id,TVSBypassOutput& r){assert(id.value==1);r.id=output.objectId();r.pipe=&output;r.elevation=-400;r.angle=45;return accept;}
 '''
         for i,body in enumerate(callers):
             code+=f'\nstatic void caller{i}(TVS_Pipe*& pipi,AcGePoint3d& A1,AcGePoint3d& A2,double* pt1){{TVSBypassOutput result;'+body+'}\n'
@@ -197,15 +202,15 @@ static bool tvsBypassDuringDrawing(AcDbObjectId id,TVSBypassOutput& r){assert(id
 int main(){
  original.id=1;original.FirstPoint=AcGePoint3d(0,0,37);original.LastPoint=AcGePoint3d(4000,0,37);
  output.id=2;output.FirstPoint=AcGePoint3d(2700,0,37);output.LastPoint=original.LastPoint;
- for(int caller=0;caller<2;++caller)for(int success=0;success<2;++success){
-  accept=success!=0;globalElevMid=globalElev=-400;globalAxis=33;
+ for(int caller=0;caller<2;++caller)for(int success=0;success<2;++success)for(int fallback=0;fallback<2;++fallback){
+  accept=success!=0;openFails=fallback!=0;shortOpens=0;globalElevMid=globalElev=-400;globalAxis=33;
   TVS_Pipe* pipe=&original;AcGePoint3d a1(-1,-1,37),a2(4000,0,37);double point[3]={4000,0,37};
   if(caller)caller1(pipe,a1,a2,point);else caller0(pipe,a1,a2,point);
   assert(globalElevMid==-400&&globalElev==-400&&a2.x==4000&&point[0]==4000&&point[2]==37);
-  if(success)assert(pipe==&output&&a1.x==2700&&globalAxis==45);
+  if(success)assert(pipe==&output&&a1.x==2700&&globalAxis==45&&shortOpens==1);
   else assert(pipe==&original&&a1.x==-1&&a1.y==-1&&globalAxis==33);
  }
- std::cout<<"PASS 4 actual drawing bypass caller cases: same service, source elevation/far endpoint preserved, success selects exit, Cancel/failure preserves continuation; no AutoCAD runtime\n";
+ std::cout<<"PASS 8 actual drawing bypass caller cases: endpoints via ObjectId short open (pointer fallback), same service, source elevation/far endpoint preserved, success selects exit, Cancel/failure preserves continuation; no AutoCAD runtime\n";
 }
 '''
         with tempfile.TemporaryDirectory() as folder:

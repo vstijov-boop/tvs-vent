@@ -321,7 +321,7 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
     tvsBypassService::Commit result;
     if(!tvsBypassService::write(native,dialog.view,dialog.options,result)){
      acutPrintf(L"\nBYPASS nije upisan (faza i razlog su navedeni iznad). Nema djelimicnog upisa.");return false;}
-    if(output){output->pipe=result.resident;output->elevation=result.elevation;output->angle=result.angle;}
+    if(output){output->id=result.output;output->pipe=result.resident;output->elevation=result.elevation;output->angle=result.angle;}
     acutPrintf(L"\nBYPASS upisan: cetiri koljena, dva kosa i H; dvije V1 trojke, jedan roditelj. Pocetna/izlazna kota ista.");
     return true;
    }

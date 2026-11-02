@@ -36,6 +36,13 @@ inline int connector(TVS_Entity* p,int role){
     }
     return result;
 }
+#ifdef TVS_BYPASS_FAULT_INJECTION
+// DEV-only rollback probe (defined only for the TVSBypassPreview package). The
+// variable is read once per process: set TVS_BYPASS_FAIL before AutoCAD starts.
+inline bool inject(int stage){static const int configured=[]{wchar_t text[24]={0};GetEnvironmentVariableW(L"TVS_BYPASS_FAIL",text,24);return _wtoi(text);}();return configured==stage;}
+#else
+inline bool inject(int){return false;}
+#endif
 // Every rejection names its phase; SDK failures add the real ErrorStatus.
 inline std::wstring& lastFailure(){static std::wstring value;return value;}
 inline bool fail(const wchar_t* phase,const wchar_t* reason){
@@ -44,7 +51,6 @@ inline bool fail(const wchar_t* phase,const wchar_t* reason){
 inline bool fail(const wchar_t* phase,const wchar_t* reason,Acad::ErrorStatus status){
     wchar_t text[400];std::swprintf(text,400,L"[%ls] %ls (ErrorStatus %d: %ls)",phase,reason,static_cast<int>(status),acadErrorStatusText(status));
     lastFailure()=text;acutPrintf(L"\nTVS BYPASS %ls Nema izmjena.",text);return false;}
-inline bool inject(int stage){wchar_t text[24]={0};GetEnvironmentVariableW(L"TVS_BYPASS_FAIL",text,24);return _wtoi(text)==stage;}
 inline bool write(const Snapshot& s,const View& view,const Options& options,Commit& output){
     lastFailure().clear();
     if(!view.ready||view.axis.size()!=8||!view.offsets[0].ready()||!view.offsets[1].ready())return fail(L"snapshot",L"Kandidat nije potpun; ponovite Pronadji prolaz.");

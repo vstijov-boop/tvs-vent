@@ -1772,8 +1772,13 @@ public:
             if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
                 TVSBypassOutput result;
                 if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                    // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
+                    // loop keeps carrying a pointer, so pipi still takes the committed object.
+                    AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
+                    if(next.openStatus()==Acad::eOk){A1=next->FirstPoint;A2=next->LastPoint;}
+                    else{A1=result.pipe->FirstPoint;A2=result.pipe->LastPoint;}
                     pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
-                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
                 }
             }
 #endif
@@ -1993,8 +1998,13 @@ public:
             if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
                 TVSBypassOutput result;
                 if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                    // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
+                    // loop keeps carrying a pointer, so pipi still takes the committed object.
+                    AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
+                    if(next.openStatus()==Acad::eOk){A1=next->FirstPoint;A2=next->LastPoint;}
+                    else{A1=result.pipe->FirstPoint;A2=result.pipe->LastPoint;}
                     pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
-                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
                 }
             }
 #endif
