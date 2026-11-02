@@ -8,6 +8,7 @@
 #include "dbxrecrd.h"
 #include "dbobjptr.h"
 #include "dbtrans.h"
+#include "../geometry/RoundElbow.h"
 #include "../geometry/OffsetGeometry.h"
 #include <set>
 #include <memory>
@@ -65,7 +66,11 @@ static Status read(const AcDbObjectId& id,Record& out){
     }
     return Valid;
 }
+// MA: the horizontal face of a vertical TVS elbow (rectangular or round parameterisation).
 static AcGePoint3d horizontalPort(TVS_TAP* p){
+    if(p->ThisRound){tvsRoundElbow::P ma,mc;
+        tvsRoundElbow::ports(tvsRoundElbow::P(p->MiddlePoint.x,p->MiddlePoint.y),p->Startvector.x,p->Startvector.y,p->Swectangle,p->get_radius()+p->SizeA/2,ma,mc);
+        return AcGePoint3d(ma.x,ma.y,p->MiddlePoint.z);}
     return p->MiddlePoint-AcGeVector3d(-p->Startvector.y,p->Startvector.x,0)*((p->get_radius()+p->SizeB/2)*std::sin(p->Swectangle));
 }
 static bool boundaryPinned(const Record& r,const AcDbObjectId& source,bool first){
@@ -141,7 +146,8 @@ Status validate(const AcDbObject* object,bool geometry){
     if(a.openStatus()!=Acad::eOk||b.openStatus()!=Acad::eOk||c.openStatus()!=Acad::eOk||d.openStatus()!=Acad::eOk||h.openStatus()!=Acad::eOk)return Corrupt;
     if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk)return Incomplete;
     const double f=r.factor;
-    if(h->ThisRound||in->ThisRound||out->ThisRound||h->DuctType!=DuctTypeStill||in->DuctType!=DuctTypeStill||out->DuctType!=DuctTypeStill||h->FirstPoint.distanceTo(h->LastPoint)*f<=.001
+    const bool round=in->ThisRound; // whole assembly round or rectangular, never mixed
+    if(h->ThisRound!=round||out->ThisRound!=round||a->ThisRound!=round||d->ThisRound!=round||h->DuctType!=DuctTypeStill||in->DuctType!=DuctTypeStill||out->DuctType!=DuctTypeStill||h->FirstPoint.distanceTo(h->LastPoint)*f<=.001
         ||std::fabs(a->Elev-d->Elev)*f>.001||std::fabs(b->Elev-c->Elev)*f>.001||std::fabs(h->Elev-b->Elev)*f>.001
         ||std::fabs(a->SizeA-c->SizeA)*f>.001||std::fabs(a->SizeB-c->SizeB)*f>.001
         ||std::fabs(h->SizeA-a->SizeA)*f>.001||std::fabs(h->SizeB-a->SizeB)*f>.001

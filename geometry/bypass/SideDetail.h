@@ -72,13 +72,15 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  note("Sve kote/oznake u mm; geometrija 1:1 u DWG "+std::string(d.factor==1?"mm":d.factor==10?"cm":"m")+". Kote nisu asocijativne.");
  note("Z pocetak = "+displayNumber(v.axis.front().z)+"; Z kraj = "+displayNumber(v.axis.back().z)+"; Z prolaz = "+displayNumber(v.zPass)+" mm (apsolutni datum)");
  const double crossingDeg=std::asin((std::min)(1.0,v.frame.crossingSine()))*180/3.141592653589793;
- note("Kanal A x B = "+displayNumber(v.frame.width)+" x "+displayNumber(v.frame.height)+"; prepreka = "+
+ note((v.frame.routeRound?"Kanal fi "+displayNumber(v.frame.width):"Kanal A x B = "+displayNumber(v.frame.width)+" x "+displayNumber(v.frame.height))+"; prepreka = "+
   (v.frame.obstacleRound?"fi "+displayNumber(v.frame.obstacleWidth):displayNumber(v.frame.obstacleWidth)+" x "+displayNumber(v.frame.obstacleHeight))+" mm"+
   (v.frame.crossingSine()<1?"; ukrstanje "+displayNumber(crossingDeg)+" deg (presjek prepreke izduzen 1/sin)":""));
  note("K1-K4: ugao = "+displayNumber(double(o.angle),0)+" deg; Ri = "+displayNumber(o.ri)+" mm; izolacije kanal/prepreka = "+displayNumber(o.insulation)+" / "+displayNumber(o.obstacleInsulation)+" mm");
  note("Komadi redom: K1 / S1 / K2 / H / K3 / S2 / K4");
  note("S1 = "+displayNumber(v.slopePhysical[0])+"; H = "+displayNumber(v.C)+"; S2 = "+displayNumber(v.slopePhysical[1])+" mm (fizicke duzine)");
- note("Kriticni geometrijski razmak = "+displayGap(v)+"; zahtjev = "+displayNumber(o.clearance)+"; rezerva = "+displayNumber(o.reserve)+" mm");
+ note((exactGap(v)?"Najmanji razmak (presjek = prostorni) = "+displayGap(v):"Garantovana donja granica prostornog razmaka = "+guaranteedGap(v)+" (konzervativno; nije izmjereni minimum)")
+  +"; zahtjev = "+displayNumber(o.clearance)+"; rezerva = "+displayNumber(o.reserve)+" mm");
+ if(!exactGap(v))note("Nacrtan je stvarni presjek prepreke u ravni trase; provjera koristi siri konzervativni gabarit (izduzen i razvucen za sirinu trase).");
  const double sectionHalf=(v.frame.obstacleWidth/2+o.obstacleInsulation)/(v.frame.crossingSine()>0?v.frame.crossingSine():1);
  double overlapLeft=(std::max)(v.axis[3].s,-sectionHalf);
  double overlapRight=(std::min)(v.axis[4].s,sectionHalf);

@@ -11,6 +11,7 @@
 #include <vector>
 #include "../geometry/OffsetOperation.h"
 #include "../TVS_Ventilation_ARX/MoveNetworkGeometry.h"
+#include "../geometry/RoundElbow.h"
 struct AcDbDatabase {};
 static AcDbDatabase database;
 namespace Acad {enum ErrorStatus {eOk,eInvalid};}
@@ -88,7 +89,7 @@ inline void acutPrintf(const wchar_t*,...){}
 inline const wchar_t* acadErrorStatusText(Acad::ErrorStatus s){return s==Acad::eOk?L"eOk":L"eInvalid";}
 namespace tvsOffsetService {
 enum Outcome {Applied,NoChange,Cancelled,Failed};
-struct Snapshot {AcDbDatabase* db;AcDbObjectId source,owner;tvsOffsetOperation::Snapshot physical;std::wstring fingerprint,network,manufacturer,note;Snapshot():db(&database),source(1),owner(99){}};
+struct Snapshot {AcDbDatabase* db;AcDbObjectId source,owner;tvsOffsetOperation::Snapshot physical;std::wstring fingerprint,network,manufacturer,note;bool round;int typeRoundTap;Snapshot():db(&database),source(1),owner(99),round(false),typeRoundTap(1){}};
 struct Commit {AcDbObjectId output,members[3];TVS_Pipe* residentOutput;double elevation,angle,before;Commit():residentOutput(NULL),elevation(0),angle(0),before(0){}};
 static Snapshot live;
 static bool badCapture=false;
@@ -99,7 +100,7 @@ inline bool describe(TVS_Entity* e,tvsMove::Node& n){if(!nodes.count(e->id.id))r
 inline void putId(std::wostringstream& s,AcDbObjectId id){s<<id.id;}
 inline void putPoint(std::wostringstream& s,const AcGePoint3d& p){s<<p.x<<L','<<p.y<<L','<<p.z<<L';';}
 inline bool capture(AcDbObjectId,tvsOffsetOperation::End,Snapshot& s,bool=false){s=live;return !badCapture&&!::fixtureSource.locked;}
-inline bool pipeState(TVS_Pipe*,Snapshot& s){s.fingerprint=live.fingerprint;return !::fixtureSource.locked;}
+inline bool pipeState(TVS_Pipe* p,Snapshot& s,bool=false){s.fingerprint=live.fingerprint;s.round=p&&p->ThisRound;return !::fixtureSource.locked;}
 inline void initialize(TVS_Entity*){}
 inline void initializePipe(TVS_Pipe* p){p->connectors.resize(2);p->connectors[0].cTypeCurrent=1;p->connectors[1].cTypeCurrent=2;}
 inline bool appearance(TVS_Pipe* from,TVS_Entity* to,const Snapshot&){to->Flow=from->Flow;return true;}

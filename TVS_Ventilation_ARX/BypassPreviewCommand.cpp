@@ -124,7 +124,7 @@ struct Dialog {
  void source(){
   Frame f=engine.frame(snapshot,factor(),reverse);std::wostringstream t;
   if(f.valid){
-   t<<L"TRASA "<<f.width<<L" × "<<f.height<<L" mm, osa Z="<<f.z0<<L" mm     |     PREPREKA ";
+   t<<L"TRASA ";if(f.routeRound)t<<L"Ø"<<f.width;else t<<f.width<<L" × "<<f.height;t<<L" mm, osa Z="<<f.z0<<L" mm     |     PREPREKA ";
    if(f.obstacleRound)t<<L"Ø"<<f.obstacleWidth;else t<<f.obstacleWidth<<L" × "<<f.obstacleHeight;
    t<<L" mm, osa Z="<<f.obstacleZ<<L" mm (iz objekata)";
    if(f.crossingSine()<1)t<<L", ukrštanje "<<std::asin(f.crossingSine())*180/3.141592653589793<<L"° (razmak se traži kao razmak/sin u presjeku)";
@@ -366,7 +366,7 @@ void tvsBypassExistingDetailCommand(){
   Snapshot s;
   const AcGePoint3d first=r.reverse?out->FirstPoint:in->FirstPoint,last=r.reverse?in->LastPoint:out->LastPoint;
   s.route.first=Point(first.x,first.y,first.z);s.route.last=Point(last.x,last.y,last.z);
-  s.route.a=in->SizeA;s.route.b=in->SizeB;s.route.elevation=in->get_Elevation();s.route.rectangular=s.route.rigid=s.route.ordinary=true;
+  s.route.a=in->SizeA;s.route.b=in->SizeB;s.route.elevation=in->get_Elevation();s.route.rigid=s.route.ordinary=true;s.route.rectangular=!in->ThisRound;
   const double* q=r.obstacleSnapshot; // obstacle as recorded at acceptance
   s.obstacle.first=Point(q[0],q[1],q[7]);s.obstacle.last=Point(q[2],q[3],q[7]);s.obstacle.elevation=q[4];s.obstacle.a=q[5];s.obstacle.b=q[6];
   s.obstacle.rigid=s.obstacle.ordinary=true;s.obstacle.rectangular=q[6]>0; // TVS round duct: B = 0
@@ -404,7 +404,7 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
   if(permanent){acutPrintf(L"\nTrajni bypass zahtijeva upareni DEV DBX/ARX sa integracijom.");return false;}
 #endif
   Snapshot s;AcDbObjectId route=active,obstacle;
-  if(active.isNull()){if(!readPipe(L"\nIzaberite pravi horizontalni TVS kanal: ",s.route,route))return false;}
+  if(active.isNull()){if(!readPipe(L"\nIzaberite pravi horizontalni TVS kanal (pravougaoni ili kruzni): ",s.route,route))return false;}
   else if(!readSegment(active,s.route))return false;
   if(!readPipe(L"\nIzaberite horizontalnu TVS prepreku (pravougaona ili kruzna): ",s.obstacle,obstacle)||route==obstacle)return false;
   bool reverse=false;
@@ -415,7 +415,7 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
   }
 #ifdef TVS_OFFSET_INTEGRATION
   tvsBypassService::Snapshot native;
-  if(permanent&&(!tvsBypassService::capture(route,obstacle,reverse,native)||!readSegment(route,s.route)||!readSegment(obstacle,s.obstacle)||!tvsBypassService::current(native)))return false;
+  if(permanent&&(!tvsBypassService::capture(route,obstacle,reverse,native,radius.typeRoundTap)||!readSegment(route,s.route)||!readSegment(obstacle,s.obstacle)||!tvsBypassService::current(native)))return false;
 #endif
   bool known=false;AcDbDictionary* dict=NULL;
   if(db->getNamedObjectsDictionary(dict,AcDb::kForRead)==Acad::eOk){AcDbObjectId id;
@@ -424,6 +424,13 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
      for(resbuf* p=data;p;p=p->rbnext)if(p->restype==40&&tvsUnits::validFactor(p->resval.rreal))known=true;
      if(data)acutRelRb(data);}}}dict->close();}
   tvsBypassUx::RadiusSetting radiusSetting;radiusSetting.mode=radius.mode;radiusSetting.k=radius.k;radiusSetting.constantDrawing=radius.constant;
+  if(!s.route.rectangular){
+   // Round route: TVS round radius mode. Only the smooth constant / k*D modes have a resolved
+   // geometry; the specific mode (gored elbow + 45 mm tangent stubs) is refused, not replaced.
+   if(radius.roundMode==RadiusTypeRound_RadiusSpecific){
+    acutPrintf(L"\nTVS BYPASS: kruzna koljena u TVS_SETTINGS su u specificnom rezimu (segmentno koljeno sa ravnim nastavcima 45 mm). "
+     L"Za kruzni obilazak jos nije podrzan; izaberite konstantni ili k*D radijus. Nema izmjena.");return false;}
+   radiusSetting.mode=radius.roundMode==RadiusTypeRound_RadiusConstant?tvsBypassUx::RadiusConstant:radius.roundMode==RadiusTypeRound_RadiusVariable?tvsBypassUx::RadiusVariable:0;}
   // Units always preselected from TVS: the drawing record, or TVS's own default (no record = mm,
   // e.g. TVS_SETTINGS left on mm does not write a record). The user still confirms them.
   Dialog dialog(s,reverse,tvsUnits::factor(db),true,DocVars.docData().bypassMemory,radiusSetting,permanent);

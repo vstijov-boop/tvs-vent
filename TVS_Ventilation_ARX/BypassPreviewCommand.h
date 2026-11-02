@@ -2,7 +2,8 @@
 #ifdef TVS_BYPASS_PREVIEW
 // Active TVS rectangular elbow radius mode (RadiusTypeRect_*), read by the caller in
 // acrxEntryPoint.cpp where the live Settings.h globals belong.
-struct TVSBypassRadius {int mode;double k,constant;TVSBypassRadius():mode(0),k(0),constant(0){}};
+// roundMode: RadiusTypeRound_*; typeRoundTap: TypeRoundTap_* written on round elbows.
+struct TVSBypassRadius {int mode,roundMode,typeRoundTap;double k,constant;TVSBypassRadius():mode(0),roundMode(0),typeRoundTap(1),k(0),constant(0){}};
 void tvsBypassPreviewCommand(const TVSBypassRadius& radius);
 void tvsBypassDetailCheckCommand();
 void tvsBypassDetailTestCommand();

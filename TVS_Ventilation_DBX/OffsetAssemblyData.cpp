@@ -9,6 +9,7 @@
 #include "dbxrecrd.h"
 #include "dbobjptr.h"
 #include "dbtrans.h"
+#include "../geometry/RoundElbow.h"
 #include "../geometry/OffsetAdapter.h"
 #include <set>
 #include <map>
@@ -121,21 +122,31 @@ Status validateCore(const AcDbObject* o,bool geometry){
     }
     delete iterator;if(conflict)return Corrupt;
     double f=tvsUnits::factor(o);double delta=(b->get_Elevation()-a->get_Elevation())*f;
-    if(a->ThisRound||b->ThisRound||p->ThisRound||a->DuctType!=DuctTypeStill||b->DuctType!=DuctTypeStill||p->DuctType!=DuctTypeStill)return GeometryMismatch;
+    // Whole triple rectangular, or whole triple round (bypass of a round duct: smooth
+    // constant-radius TVS elbows, bend dimension = diameter, SizeB = 0).
+    const bool round=p->ThisRound;
+    if(a->ThisRound!=round||b->ThisRound!=round||a->DuctType!=DuctTypeStill||b->DuctType!=DuctTypeStill||p->DuctType!=DuctTypeStill)return GeometryMismatch;
+    if(round&&(p->SizeB!=0||a->SizeB!=0||b->SizeB!=0||a->RadiusTypeRound!=RadiusTypeRound_RadiusConstant||b->RadiusTypeRound!=RadiusTypeRound_RadiusConstant))return GeometryMismatch;
     if(std::fabs(a->SizeA-p->SizeA)*f>.001||std::fabs(a->SizeB-p->SizeB)*f>.001||std::fabs(b->SizeA-p->SizeA)*f>.001||std::fabs(b->SizeB-p->SizeB)*f>.001
         ||std::fabs(a->get_radius()-b->get_radius())*f>.001||std::fabs(a->Swectangle-b->Swectangle)>1e-8)return GeometryMismatch;
     AcGeVector3d axis=p->LastPoint-p->FirstPoint;if(axis.length()<=0)return GeometryMismatch;
     double heading=std::atan2(axis.y,axis.x);
-    tvsOffset::Input in(delta,p->SizeA*f,p->SizeB*f,a->get_radius()*f,a->Swectangle,0);
+    const double bend=round?p->SizeA:p->SizeB;
+    tvsOffset::Input in(delta,p->SizeA*f,bend*f,a->get_radius()*f,a->Swectangle,0);
     tvsOffset::Result result=tvsOffset::solve(in);if(!result.hasGeometry())return GeometryMismatch;
-    tvsOffsetAdapter::Placement place(tvsOffset::WorldPoint(a->MiddlePoint.x,a->MiddlePoint.y,a->MiddlePoint.z),heading,f,a->get_Elevation()*f);
+    // The adapter works in the rectangular parameterisation (MiddlePoint = MC port).
+    auto rectMiddle=[&](const TVS_TAP* tap){if(!round)return tap->MiddlePoint;tvsRoundElbow::P ma,mc;
+        tvsRoundElbow::ports(tvsRoundElbow::P(tap->MiddlePoint.x,tap->MiddlePoint.y),tap->Startvector.x,tap->Startvector.y,tap->Swectangle,tap->get_radius()+tap->SizeA/2,ma,mc);
+        return AcGePoint3d(mc.x,mc.y,tap->MiddlePoint.z);};
+    const AcGePoint3d aMiddle=rectMiddle(a.object()),bMiddle=rectMiddle(b.object());
+    tvsOffsetAdapter::Placement place(tvsOffset::WorldPoint(aMiddle.x,aMiddle.y,aMiddle.z),heading,f,a->get_Elevation()*f);
     tvsOffsetAdapter::Result d=tvsOffsetAdapter::adapt(in,result,place);if(!d.ready())return GeometryMismatch;
     for(int j=0;j<2;++j){TVS_TAP* tap=j==0?a.object():b.object();const tvsOffsetAdapter::Elbow& expected=d.elbows[j];
         if((tap->Startvector-AcGeVector3d(expected.startVector.x,expected.startVector.y,0)).length()>1e-8
             ||(tap->Normvector-AcGeVector3d(0,0,1)).length()>1e-8)return GeometryMismatch;}
     if(!nearPoint(p->FirstPoint,AcGePoint3d(d.middle.first.x,d.middle.first.y,d.middle.first.z),f)
         ||!nearPoint(p->LastPoint,AcGePoint3d(d.middle.last.x,d.middle.last.y,d.middle.last.z),f)
-        ||!nearPoint(b->MiddlePoint,AcGePoint3d(d.elbows[1].middle.x,d.elbows[1].middle.y,d.elbows[1].middle.z),f)
+        ||!nearPoint(bMiddle,AcGePoint3d(d.elbows[1].middle.x,d.elbows[1].middle.y,d.elbows[1].middle.z),f)
         ||std::fabs(members[1].rise-(result.axis[2].z-result.axis[1].z))>.001
         ||a->get_Form()!=(delta>0?Form_Up:Form_Down)||b->get_Form()!=(delta>0?Form_Down:Form_Up))return GeometryMismatch;
     return Valid;

@@ -20,11 +20,13 @@ inline bool obstacleState(const AcDbObjectId& id,std::wstring& value){
     tvsOffsetService::putPoint(s,p->FirstPoint);tvsOffsetService::putPoint(s,p->LastPoint);
     s<<p->SizeA<<L';'<<p->SizeB<<L';'<<p->Elev;value=s.str();return true;
 }
-inline bool capture(const AcDbObjectId& route,const AcDbObjectId& obstacle,bool reverse,Snapshot& s){
+// typeRoundTap: TVS setting written on round elbows (attribute only in constant/k*D modes).
+inline bool capture(const AcDbObjectId& route,const AcDbObjectId& obstacle,bool reverse,Snapshot& s,int typeRoundTap=TypeRoundTap_TapSection){
     if(route==obstacle||tvsBypassData::pinned(route,reverse))return false;
     s.obstacle=obstacle;
-    return tvsOffsetService::capture(route,reverse?tvsOffsetOperation::First:tvsOffsetOperation::Last,s.route,true)
-        &&obstacle.database()==s.route.db&&obstacleState(obstacle,s.obstacleState);
+    if(!tvsOffsetService::capture(route,reverse?tvsOffsetOperation::First:tvsOffsetOperation::Last,s.route,true))return false;
+    s.route.typeRoundTap=typeRoundTap;
+    return obstacle.database()==s.route.db&&obstacleState(obstacle,s.obstacleState);
 }
 inline bool current(const Snapshot& s){std::wstring now;
     return !tvsBypassData::pinned(s.route.source,s.route.physical.end==tvsOffsetOperation::First)
@@ -77,7 +79,7 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
         if(es!=Acad::eOk)return fail(L"snapshot",L"Izabrani kanal se ne moze otvoriti za upis.",es);}
     TVS_Pipe* source=TVS_Pipe::cast(raw);if(!source)return fail(L"snapshot",L"Izabrani objekat nije TVS kanal.");
     tvsOffsetService::Snapshot inside=base;inside.manufacturer.clear();inside.note.clear();
-    if(!tvsOffsetService::pipeState(source,inside)||inside.fingerprint!=base.fingerprint)return fail(L"atributi",L"Atributi ili stanje kanala promijenjeni poslije izbora.");
+    if(!tvsOffsetService::pipeState(source,inside,true)||inside.fingerprint!=base.fingerprint||inside.round!=base.round)return fail(L"atributi",L"Atributi ili stanje kanala promijenjeni poslije izbora.");
     // Legacy connectors are not filed (TVS_Pipe::dwgOutFields/dwgInFields skip them), so
     // neither user UNDO nor save/reopen can restore a changed link. Same contract as
     // TVS_OFFSET: the writer never modifies connectors. An explicit link on the selected

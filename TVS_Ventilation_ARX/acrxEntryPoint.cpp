@@ -91,7 +91,7 @@
 
 #ifdef TVS_BYPASS_PREVIEW
 // Settings.h globals are per translation unit; the live radius mode is this file's copy.
-static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
+static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.roundMode=globalRadiusTypeRound;r.typeRoundTap=globalTypeRoundTap;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
 static void tvsBypassCommandEntry(){tvsBypassCommand(tvsBypassRadiusSettings());}
 static void tvsBypassPreviewCommandEntry(){tvsBypassPreviewCommand(tvsBypassRadiusSettings());}
 #endif

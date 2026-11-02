@@ -56,19 +56,20 @@ static void reset(){
  failCommit=false;tvsOffsetService::badCapture=false;tvsBypassData::failParent=tvsBypassData::pinnedFlag=false;
  tvsBypassService::failStage=0;rollbackHook=&clearMetadata;
 }
+static bool roundRoute=false; // round source: SizeA = D, SizeB = 0 (TVS round duct)
 static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvsBypassService::Snapshot& s,bool linked=false){
  reset();
  const double c=std::cos(heading),n=std::sin(heading);
  auto point=[=](double x,double y){return AcGePoint3d((123+x*c-y*n)/f,(-87+x*n+y*c)/f,37/f);};
  fixtureSource.FirstPoint=point(-2000,0);fixtureSource.LastPoint=point(2000,0);
- fixtureSource.SizeA=400/f;fixtureSource.SizeB=200/f;fixtureSource.Elev=-400/f;fixtureSource.Flow=123;
+ fixtureSource.SizeA=(roundRoute?315:400)/f;fixtureSource.SizeB=roundRoute?0:200/f;fixtureSource.ThisRound=roundRoute;fixtureSource.Elev=-400/f;fixtureSource.Flow=123;
  TVS_Pipe* obstacle=new TVS_Pipe();obstacle->id=2;objects[2]=obstacle;
  obstacle->FirstPoint=point(0,-1500);obstacle->LastPoint=point(0,1500);
  obstacle->SizeA=250/f;obstacle->SizeB=250/f;obstacle->Elev=-400/f;
  tvsOffsetService::live=tvsOffsetService::Snapshot();
  auto& p=tvsOffsetService::live.physical;p.first=tvsOffset::WorldPoint(fixtureSource.FirstPoint.x,fixtureSource.FirstPoint.y,fixtureSource.FirstPoint.z);
  p.last=tvsOffset::WorldPoint(fixtureSource.LastPoint.x,fixtureSource.LastPoint.y,fixtureSource.LastPoint.z);
- p.a=400/f;p.b=200/f;p.elevation=-400/f;p.factor=f;p.end=reverse?tvsOffsetOperation::First:tvsOffsetOperation::Last;
+ p.a=(roundRoute?315:400)/f;p.b=(roundRoute?315:200)/f;tvsOffsetService::live.round=roundRoute;tvsOffsetService::live.typeRoundTap=2;p.elevation=-400/f;p.factor=f;p.end=reverse?tvsOffsetOperation::First:tvsOffsetOperation::Last;
  tvsOffsetService::live.fingerprint=L"source";tvsOffsetService::live.network=L"network";
  s.route=tvsOffsetService::live;s.obstacle=2;tvsBypassService::obstacleState(2,s.obstacleState);
  fixtureSource.connectors.resize(2);
@@ -83,7 +84,7 @@ static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvs
  fixtureSource.connectors[1-selected].connectionID=44;fixtureSource.connectors[1-selected].cTypeAnother=2;
  tvsBypassPreview::Snapshot model;
  auto copy=[](TVS_Pipe* p,tvsBypassPreview::Segment& t){t.first=tvsBypassPreview::Point(p->FirstPoint.x,p->FirstPoint.y,p->FirstPoint.z);
- t.last=tvsBypassPreview::Point(p->LastPoint.x,p->LastPoint.y,p->LastPoint.z);t.a=p->SizeA;t.b=p->SizeB;t.elevation=p->Elev;t.rectangular=t.rigid=t.ordinary=true;};
+ t.last=tvsBypassPreview::Point(p->LastPoint.x,p->LastPoint.y,p->LastPoint.z);t.a=p->SizeA;t.b=p->SizeB;t.elevation=p->Elev;t.rigid=t.ordinary=true;t.rectangular=!p->ThisRound;};
  copy(&fixtureSource,model.route);copy(obstacle,model.obstacle);return model;
 }
 int main(){
@@ -103,8 +104,9 @@ int main(){
   assert(!tvsBypassData::boundaryPinned(r,75,false));
  }
  int cases=0,failures=0;
- for(double factor:{1.,10.,1000.})for(double heading:{0.,.6457718232379019})for(bool reverse:{false,true})
- for(bool above:{false,true})for(int angle:{30,45,60}){
+ int roundCases=0;
+ for(bool round:{false,true})for(double factor:{1.,10.,1000.})for(double heading:{0.,.6457718232379019})for(bool reverse:{false,true})
+ for(bool above:{false,true})for(int angle:{30,45,60}){roundRoute=round;
   tvsBypassService::Snapshot s;auto model=setup(factor,heading,reverse,s);
   tvsBypassPreview::Engine engine;tvsBypassPreview::Options options;options.confirmed=true;options.above=above;options.angle=angle;
   auto frame=engine.frame(model,factor,reverse);options.left=frame.left;options.right=frame.right;
@@ -137,9 +139,20 @@ int main(){
   }
   TVS_Pipe* h=TVS_Pipe::cast(objects[parent.members[3].id]);
   assert(tvsOffsetData::records.count(h->id.id)==0&&std::fabs(h->FirstPoint.distanceTo(h->LastPoint)*factor-view.C)<1e-6);
-  assert(out.elevation==-400/factor&&std::fabs(h->Elev*factor-view.zPass)<1e-6&&total>0);++cases;
+  assert(out.elevation==-400/factor&&std::fabs(h->Elev*factor-view.zPass)<1e-6&&total>0);
+  if(round){ // real round TVS members: Circular(D), SizeB 0, constant radius, TVS tap type
+   for(int m=0;m<7;++m){TVS_Entity* e=TVS_Entity::cast(objects[parent.members[m].id]);assert(e&&e->ThisRound&&e->SizeB==0&&std::fabs(e->SizeA*factor-315)<1e-9);}
+   assert(out.resident->ThisRound&&out.resident->SizeB==0);
+   for(int m:{0,2,4,6}){TVS_TAP* tap=dynamic_cast<TVS_TAP*>(objects[parent.members[m].id]);assert(tap&&tap->RadiusTypeRound==RadiusTypeRound_RadiusConstant&&tap->TypeRoundTap==2);
+    const auto& e=view.offsets[m/4].elbows[(m%4)/2];tvsRoundElbow::P ma,mc;
+    tvsRoundElbow::ports(tvsRoundElbow::P(tap->MiddlePoint.x,tap->MiddlePoint.y),tap->Startvector.x,tap->Startvector.y,tap->Swectangle,tap->RadiusConst+tap->SizeA/2,ma,mc);
+    // TVS round MC equals the adapter (rectangular) MiddlePoint: same ports, same centerline.
+    assert(std::hypot(mc.x-e.middle.x,mc.y-e.middle.y)*factor<1e-6);}
+   ++roundCases;}
+  ++cases;
  }
  std::set<std::wstring> reasons;
+ roundRoute=false;
  for(int fail=1;fail<=11;++fail){
   tvsBypassService::Snapshot s;auto model=setup(1,0,false,s,fail==7);tvsBypassPreview::Engine engine;tvsBypassPreview::Options options;options.confirmed=true;
   options.left=-2000;options.right=2000;auto view=engine.calculate(model,1,false,options,false);assert(view.ready);
@@ -163,7 +176,7 @@ int main(){
   assert(fixtureSource.connectors[1].connectionID==(fail==7?3:0)&&neighbor->connectors[0].connectionID==(fail==7?1:0)&&out.resident==NULL);++failures;
  } assert(reasons.size()==11); // every injected cause is reported distinctly
 
- reset();std::cout<<"PASS PERSISTENT BYPASS "<<cases<<" real checked candidates, same 7 native member DTOs, both ends, rotations/units/angles/sides, parent over 2 V1 triples+H, connectors unchanged (not filed), linked outer end refused, quantities; "<<failures<<" abort/stale/lock guards; SDK substitutes, not AutoCAD runtime\n";
+ reset();std::cout<<"PASS PERSISTENT BYPASS "<<cases<<" real checked candidates ("<<roundCases<<" round route), same 7 native member DTOs, both ends, rotations/units/angles/sides, parent over 2 V1 triples+H, connectors unchanged (not filed), linked outer end refused, quantities; "<<failures<<" abort/stale/lock guards; SDK substitutes, not AutoCAD runtime\n";
 }
 '''
         # Avoid warning-only ambiguities in compact extracted existing code.

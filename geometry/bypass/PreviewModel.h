@@ -15,9 +15,11 @@ struct Frame {
  bool valid;std::string reason;Point origin;double ux,uy,factor,width,height,z0,obstacleWidth,obstacleHeight,obstacleZ,tmin,tmax,left,right;
  // Obstacle: round flag (diameter in obstacleWidth = obstacleHeight) and its plan axis
  // direction in the (s,t) frame: (ods,odt), unit; perpendicular crossing = (0,+-1).
- bool obstacleRound;double ods,odt;
+ // routeRound: round route, diameter in width = height (the section through its axis is a
+ // band of the diameter; the d x d slab is only the conservative envelope for oblique sweeps).
+ bool obstacleRound,routeRound;double ods,odt;
  Frame():valid(false),ux(0),uy(0),factor(0),width(0),height(0),z0(0),obstacleWidth(0),obstacleHeight(0),obstacleZ(0),tmin(0),tmax(0),left(0),right(0),
-  obstacleRound(false),ods(0),odt(1){}
+  obstacleRound(false),routeRound(false),ods(0),odt(1){}
  double crossingSine()const{return std::fabs(odt);}
  double crossingCosine()const{return std::fabs(ods);}
  Point world(double s,double t)const{return Point(origin.x+(s*ux-t*uy)/factor,origin.y+(s*uy+t*ux)/factor,origin.z);}
@@ -30,9 +32,9 @@ inline Frame adapt(const Snapshot& s,double factor,bool reverse){
  for(int j=0;j<2;++j){const Segment& p=*parts[j];
   const double v[]={p.first.x,p.first.y,p.first.z,p.last.x,p.last.y,p.last.z,p.a,p.b,p.elevation};
   for(unsigned k=0;k<9;++k)if(!finite(v[k])){f.reason="nonfinite/out-of-domain object data";return f;}
-  // Route: rigid rectangular. Obstacle: rigid rectangular or round (TVS round: b = 0).
-  if(!p.rigid||!p.ordinary||p.a<=0||(j==0&&(!p.rectangular||p.b<=0))||(j==1&&p.rectangular&&p.b<=0)){
-   f.reason=j==0?"route must be an ordinary rigid rectangular straight TVS channel":"obstacle must be an ordinary rigid straight TVS channel";return f;}
+  // Route and obstacle: rigid rectangular (b > 0) or round (TVS round: b = 0).
+  if(!p.rigid||!p.ordinary||p.a<=0||(p.rectangular&&p.b<=0)||(!p.rectangular&&p.b!=0)){
+   f.reason=j==0?"route must be an ordinary rigid straight TVS channel":"obstacle must be an ordinary rigid straight TVS channel";return f;}
   if(std::fabs(p.last.z-p.first.z)*factor>.001){f.reason="channel is not horizontal in WCS";return f;}
  }
  Point start=reverse?s.route.last:s.route.first,end=reverse?s.route.first:s.route.last;
@@ -54,7 +56,8 @@ inline Frame adapt(const Snapshot& s,double factor,bool reverse){
  f.tmin=std::fmin(t1,t2);f.tmax=std::fmax(t1,t2);
  f.left=-along*factor;f.right=(len-along)*factor;
  // Both native endpoints and elevation ALREADY denote axes. No A/2 or B/2 offset.
- f.width=s.route.a*factor;f.height=s.route.b*factor;f.z0=s.route.elevation*factor;
+ f.routeRound=!s.route.rectangular;
+ f.width=s.route.a*factor;f.height=(f.routeRound?s.route.a:s.route.b)*factor;f.z0=s.route.elevation*factor;
  f.obstacleRound=!s.obstacle.rectangular;
  f.obstacleWidth=s.obstacle.a*factor;f.obstacleHeight=(f.obstacleRound?s.obstacle.a:s.obstacle.b)*factor;f.obstacleZ=s.obstacle.elevation*factor;
  f.valid=true;return f;

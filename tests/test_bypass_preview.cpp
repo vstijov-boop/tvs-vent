@@ -37,7 +37,8 @@ int main(){
  s=example(1,0);s.obstacle.rectangular=false;s.obstacle.b=0;{Frame g=adapt(s,1,false);expect(g.valid&&g.obstacleRound&&g.obstacleWidth==250&&g.obstacleHeight==250,"round obstacle frame");}
  s=example(1,0);s.obstacle.rigid=false;expect(!adapt(s,1,false).valid,"flexible obstacle rejected");
  s=example(1,0);s.obstacle.last.z+=1;expect(!adapt(s,1,false).valid,"vertical obstacle rejected");
- s=example(1,0);s.route.rectangular=false;expect(!adapt(s,1,false).valid,"round unsupported");
+ s=example(1,0);s.route.rectangular=false;expect(!adapt(s,1,false).valid,"round route must have B = 0");
+ s=example(1,0);s.route.rectangular=false;s.route.b=0;s.route.a=315;{Frame g=adapt(s,1,false);expect(g.valid&&g.routeRound&&g.width==315&&g.height==315,"round route frame: diameter in both");}
  s=example(1,0);s.route.ordinary=false;expect(!adapt(s,1,false).valid,"marked slope rejected");
  s=example(1,0);expect(!adapt(s,0,false).valid,"unknown units not zero");s.route.a=std::numeric_limits<double>::quiet_NaN();expect(!adapt(s,1,false).valid,"invalid source");
  Revision rev;expect(!rev.current(),"no initial result");rev.accept();expect(rev.current(),"current result");rev.invalidate();expect(!rev.current(),"input change invalidates");
@@ -149,15 +150,16 @@ int main(){
   View off=as.rebuild(b,unit,false,built,found.D,found.C,bf.right+1);expect(!off.ready&&!as.ready(),"rebuild outside the duct is refused");
  }
  // Bridge end to end with a round and an oblique obstacle; detail paths and section curves.
- for(int kind=0;kind<3;++kind){Snapshot q=example(1,0);
-  if(kind==1){q.obstacle.rectangular=false;q.obstacle.b=0;}
-  if(kind==2){const double b=60*3.14159265358979323846/180;q.obstacle.first=Point(123-1200*std::cos(b),-87-1200*std::sin(b),37);q.obstacle.last=Point(123+1200*std::cos(b),-87+1200*std::sin(b),37);q.obstacle.rectangular=false;q.obstacle.b=0;}
+ for(int kind=0;kind<6;++kind){Snapshot q=example(1,0);
+  if(kind>=3){q.route.rectangular=false;q.route.b=0;q.route.a=315;} // round route x {rect, round, round oblique}
+  if(kind%3==1){q.obstacle.rectangular=false;q.obstacle.b=0;}
+  if(kind%3==2){const double b=60*3.14159265358979323846/180;q.obstacle.first=Point(123-1200*std::cos(b),-87-1200*std::sin(b),37);q.obstacle.last=Point(123+1200*std::cos(b),-87+1200*std::sin(b),37);q.obstacle.rectangular=false;q.obstacle.b=0;}
   Options k;k.confirmed=true;Frame g=adapt(q,1,false);k.left=g.left;k.right=g.right;Engine e;View r=e.calculate(q,1,false,k,false);
   expect(r.ready,"round/oblique obstacle candidate");expect(r.detailPaths.size()==21,"detail paths for the detail writer");
   Options b2=k;b2.minSlope=b2.minBridge=b2.minProjection=0;Engine e2;View again=e2.rebuild(q,1,false,b2,r.D,r.C,r.s0);
   expect(again.ready,"as-built rebuild for round/oblique obstacle");near(again.W,r.W,"rebuild W round/oblique");
   SideDetail sd=sideDetail(r,k,"OB-01",true,3.5,3.5);bool circle=false;for(const auto& path:sd.paths)if(path.member==7&&path.points.size()==2&&path.bulges[0]==1)circle=true;
-  expect(kind==1?circle:!circle,"exact circle only for perpendicular round obstacle");}
+  expect(kind%3==1?circle:!circle,"exact circle only for perpendicular round obstacle");}
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / presentation / layout / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
 
