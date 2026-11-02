@@ -59,6 +59,7 @@ static double globalFlow = 0;
 static double globalLengthTr = 300;
 static double globalLengthW = 50;
 static double globalElevMid = 0;
+static int globalElevRef = 0; // TVS_SETTINGS level reference: 0 axis (Centar), 1 top (Vrh), 2 bottom (Dno); globalElevMid stays the axis
 static double globalElev = globalElevdown;
 static double globalAxis = 90;
 static int globalDuctType = DuctTypeStill;

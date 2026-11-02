@@ -1085,8 +1085,10 @@ public:
 		dg.Wipe = globalWipeout;
 		dg.Grani = globalGrani;
 		dg.D1 = global1D;
-		dg.ElevMid = true;
-		dg.Elev = globalElevMid;
+		// Level reference is remembered; the stored value is always the axis level.
+		const double elevHalf = (globSizeB > 0 ? globSizeB : globSizeA) / 2;
+		dg.ElevUp = globalElevRef == 1; dg.ElevDown = globalElevRef == 2; dg.ElevMid = !(dg.ElevUp || dg.ElevDown);
+		dg.Elev = globalElevMid + (globalElevRef == 1 ? elevHalf : globalElevRef == 2 ? -elevHalf : 0);
 		dg.TapForm = globalTapForm;
 		dg.TypeRoundTap = globalTypeRoundTap;
 		dg.RadiusTypeRound = globalRadiusTypeRound;
@@ -1116,8 +1118,6 @@ public:
 		globalWipeout = dg.Wipe;
 		globalGrani = dg.Grani;
 		global1D = dg.D1;
-		globalElevMid = dg.Elev;
-		globalElev = dg.Elev;
 		globalTapForm = dg.TapForm;
 		globalTypeRoundTap = dg.TypeRoundTap;
 		globalRadiusTypeRound = dg.RadiusTypeRound;
@@ -1131,6 +1131,13 @@ public:
 		else globalDuctType = DuctTypeStill;
 		if (globSizeB == 0) globRound = true;
 		else globRound = false;
+		// Vrh/Dno: entered value is the top/bottom edge of the (new) duct size; convert to axis.
+		globalElevRef = dg.ElevUp == 1 ? 1 : dg.ElevDown == 1 ? 2 : 0;
+		{
+			const double half = (globSizeB > 0 ? globSizeB : globSizeA) / 2;
+			globalElevMid = dg.Elev - (globalElevRef == 1 ? half : globalElevRef == 2 ? -half : 0);
+			globalElev = globalElevMid;
+		}
 		if (a == globSizeA && b == globSizeB)
 			return false;
 		else
