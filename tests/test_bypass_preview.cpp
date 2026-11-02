@@ -116,7 +116,14 @@ int main(){
      near(radius,expected,"circle radius derives from checked body");}
    }
    expect(arcs==20,"four elbows: bare and insulation boundaries plus exact axes");
-   for(size_t j=0;j<d.dimensions.size();++j){const auto& q=d.dimensions[j];expect(q.rail.z<d.minZ||q.rail.z>d.maxZ||q.rail.s<d.minS||q.rail.s>d.maxS,"dimension text external to geometry");}
+   // Layout: W/H/D texts outside the drawing, S texts beside their slope; no text inside a part.
+   for(size_t j=0;j<3;++j){const auto& q=d.dimensions[j];expect(q.rail.z<d.minZ||q.rail.s<d.minS,"W/H/D text below or left of the geometry");}
+   for(size_t j=0;j<d.dimensions.size();++j)for(const auto& path:d.paths){if(!path.closed||path.points.size()<3)continue;bool in=false;
+    for(size_t a=0,b=path.points.size()-1;a<path.points.size();b=a++){const Vertex& P=path.points[a];const Vertex& Q=path.points[b];
+     if(((P.z>d.dimensions[j].rail.z)!=(Q.z>d.dimensions[j].rail.z))&&(d.dimensions[j].rail.s<(Q.s-P.s)*(d.dimensions[j].rail.z-P.z)/(Q.z-P.z)+P.s))in=!in;}
+    expect(!in,"dimension text not on a part");}
+   expect(d.dimensions[1].rail.z>d.dimensions[0].rail.z,"smaller H row next to the part, W outside");
+   for(const auto& n:d.notes)if(n.text.size()>3)expect(n.at.z<d.dimensions[0].rail.z,"note block below the dimensions");
   }
  }
  bool invalid=false;try{sideDetail(View(),Options(),"OB-01",false,3.5,3.5);}catch(const std::runtime_error&){invalid=true;}expect(invalid,"stale result has no insert model");

@@ -48,54 +48,47 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  d.minS=d.maxS=0;d.minZ=d.maxZ=0;
  for(auto& p:d.paths)for(auto& x:p.points){x.s-=v.axis.front().s;x.z-=v.frame.z0;
   d.minS=(std::min)(d.minS,x.s);d.maxS=(std::max)(d.maxS,x.s);d.minZ=(std::min)(d.minZ,x.z);d.maxZ=(std::max)(d.maxZ,x.z);}
+ // A bulge circle has only two vertices: include the true obstacle extent (with insulation).
+ for(const auto& q:obstacleSection(v.frame,o.obstacleInsulation)){const double s=q.first-v.axis.front().s,z=q.second-v.frame.z0;
+  d.minS=(std::min)(d.minS,s);d.maxS=(std::max)(d.maxS,s);d.minZ=(std::min)(d.minZ,z);d.maxZ=(std::max)(d.maxZ,z);}
  auto local=[&](Vertex p){return Vertex(p.s-v.axis.front().s,p.z-v.frame.z0);};
- const double pad=(std::max)(12*textMm,6*arrowMm),pitch=(std::max)(8*textMm,4*arrowMm);
- const double bottom=d.minZ-pad,top=d.maxZ+pad;
+ // Drawing-office layout: smaller dimensions next to the part, larger outside; texts never
+ // on the parts; labels next to their piece without leaders; notes as a block BELOW.
+ const double th=textMm,gapDim=(std::max)(3.5*th,2.5*arrowMm),half=v.frame.height/2+o.insulation;
  auto dim=[&](Vertex a,Vertex b,Vertex rail,const char* prefix){if(std::hypot(a.s-b.s,a.z-b.z)>1e-8)d.dimensions.push_back(DetailDimension{a,b,rail,prefix});};
- dim(local(v.axis.front()),local(v.axis.back()),Vertex(v.W/2,bottom),"W = ");
- dim(local(v.axis[3]),local(v.axis[4]),Vertex((v.axis[3].s+v.axis[4].s)/2-v.axis.front().s,bottom-pitch),"H = ");
- dim(Vertex(0,0),Vertex(0,v.zPass-v.frame.z0),Vertex(d.minS-pad,(v.zPass-v.frame.z0)/2),"D = ");
+ const double rowH=d.minZ-gapDim,rowW=rowH-gapDim;
+ dim(local(v.axis.front()),local(v.axis.back()),Vertex(v.W/2,rowW),"W = ");
+ dim(local(v.axis[3]),local(v.axis[4]),Vertex((v.axis[3].s+v.axis[4].s)/2-v.axis.front().s,rowH),"H = ");
+ dim(Vertex(0,0),Vertex(0,v.zPass-v.frame.z0),Vertex(d.minS-gapDim,(v.zPass-v.frame.z0)/2),"D = ");
+ // Outward side of a piece: away from the obstacle centre (free space beside the bypass).
+ const Vertex obstacleCentre(-v.axis.front().s,v.frame.obstacleZ-v.frame.z0);
+ auto outward=[&](Vertex a,Vertex b,double& nx,double& nz){double dx=b.s-a.s,dz=b.z-a.z,len=std::hypot(dx,dz);
+  nx=-dz/len;nz=dx/len;const Vertex m((a.s+b.s)/2,(a.z+b.z)/2);if((obstacleCentre.s-m.s)*nx+(obstacleCentre.z-m.z)*nz>0){nx=-nx;nz=-nz;}};
  if(detailed){
-  // Put each slope dimension outside the supporting line of the complete section bounds.
-  for(int j=0;j<2;++j){Vertex a=local(v.axis[j==0?1:5]),b=local(v.axis[j==0?2:6]);
-   double dx=b.s-a.s,dz=b.z-a.z,len=std::hypot(dx,dz),nx=-dz/len,nz=dx/len;
-   if((j==0&&nx>0)||(j==1&&nx<0)){nx=-nx;nz=-nz;}
-   Vertex mid((a.s+b.s)/2,(a.z+b.z)/2);double support=0;
-   for(double x:{d.minS,d.maxS})for(double z:{d.minZ,d.maxZ})support=(std::max)(support,(x-mid.s)*nx+(z-mid.z)*nz);
-   Vertex rail(mid.s+nx*(support+3*pad),mid.z+nz*(support+3*pad));
-   dim(a,b,rail,j==0?"S1 = ":"S2 = ");
-  }
+  // Physical slope lengths, aligned and just outside each slope.
+  for(int j=0;j<2;++j){Vertex a=local(v.axis[j==0?1:5]),b=local(v.axis[j==0?2:6]);double nx,nz;outward(a,b,nx,nz);
+   const double off=half+gapDim;dim(a,b,Vertex((a.s+b.s)/2+nx*off,(a.z+b.z)/2+nz*off),j==0?"S1 = ":"S2 = ");}
  }
- double row=top+10*pitch;auto note=[&](const std::string& s){d.notes.push_back(DetailNote{Vertex(d.minS,row),s});row+=2.8*textMm;};
- note(label+" - Obilazak kanala, prolaz "+(o.above?"iznad":"ispod"));
- note("STATICKI SNIMAK; bez zive veze. Pogled: +s desno, fizicki +Z gore; papirni XY nije WCS Z.");
- note("Sve kote/oznake u mm; geometrija 1:1 u DWG "+std::string(d.factor==1?"mm":d.factor==10?"cm":"m")+". Kote nisu asocijativne.");
- note("Z pocetak = "+displayNumber(v.axis.front().z)+"; Z kraj = "+displayNumber(v.axis.back().z)+"; Z prolaz = "+displayNumber(v.zPass)+" mm (apsolutni datum)");
+ double row=rowW-2.5*th;auto note=[&](const std::string& s){d.notes.push_back(DetailNote{Vertex(d.minS,row),s});row-=1.7*th;};
  const double crossingDeg=std::asin((std::min)(1.0,v.frame.crossingSine()))*180/3.141592653589793;
- note((v.frame.routeRound?"Kanal fi "+displayNumber(v.frame.width):"Kanal A x B = "+displayNumber(v.frame.width)+" x "+displayNumber(v.frame.height))+"; prepreka = "+
+ note(label+" - OBILAZAK KANALA, prolaz "+(o.above?"iznad":"ispod")+" prepreke");
+ note((v.frame.routeRound?"Kanal fi "+displayNumber(v.frame.width):"Kanal A x B = "+displayNumber(v.frame.width)+" x "+displayNumber(v.frame.height))+" mm;  prepreka "+
   (v.frame.obstacleRound?"fi "+displayNumber(v.frame.obstacleWidth):displayNumber(v.frame.obstacleWidth)+" x "+displayNumber(v.frame.obstacleHeight))+" mm"+
-  (v.frame.crossingSine()<1?"; ukrstanje "+displayNumber(crossingDeg)+" deg (presjek prepreke izduzen 1/sin)":""));
- note("K1-K4: ugao = "+displayNumber(double(o.angle),0)+" deg; Ri = "+displayNumber(o.ri)+" mm; izolacije kanal/prepreka = "+displayNumber(o.insulation)+" / "+displayNumber(o.obstacleInsulation)+" mm");
- note("Komadi redom: K1 / S1 / K2 / H / K3 / S2 / K4");
- note("S1 = "+displayNumber(v.slopePhysical[0])+"; H = "+displayNumber(v.C)+"; S2 = "+displayNumber(v.slopePhysical[1])+" mm (fizicke duzine)");
- note((exactGap(v)?"Najmanji razmak (presjek = prostorni) = "+displayGap(v):"Garantovana donja granica prostornog razmaka = "+guaranteedGap(v)+" (konzervativno; nije izmjereni minimum)")
-  +"; zahtjev = "+displayNumber(o.clearance)+"; rezerva = "+displayNumber(o.reserve)+" mm");
- if(!exactGap(v))note("Nacrtan je stvarni presjek prepreke u ravni trase; provjera koristi siri konzervativni gabarit (izduzen i razvucen za sirinu trase).");
- const double sectionHalf=(v.frame.obstacleWidth/2+o.obstacleInsulation)/(v.frame.crossingSine()>0?v.frame.crossingSine():1);
- double overlapLeft=(std::max)(v.axis[3].s,-sectionHalf);
- double overlapRight=(std::min)(v.axis[4].s,sectionHalf);
- const double gap=std::fabs(v.zPass-v.frame.obstacleZ)-v.frame.height/2-o.insulation-v.frame.obstacleHeight/2-o.obstacleInsulation;
- note(overlapLeft<=overlapRight?"Vertikalni zazor H/prepreka u horizontalnom preklopu = "+displayNumber(gap)+" mm (nije geometrijski minimum)":"Vertikalni zazor H/prepreka: nema horizontalnog preklopa; nije definisan.");
+  (v.frame.crossingSine()<1?";  ukrstanje "+displayNumber(crossingDeg)+" deg":""));
+ note("Koljena K1-K4: "+displayNumber(double(o.angle),0)+" deg, Ri = "+displayNumber(o.ri)+" mm;  izolacija kanal / prepreka = "+displayNumber(o.insulation)+" / "+displayNumber(o.obstacleInsulation)+" mm");
+ note("Kote ose: pocetak "+displayNumber(v.axis.front().z)+", prolaz "+displayNumber(v.zPass)+", kraj "+displayNumber(v.axis.back().z)+" mm (apsolutno)");
+ note("Fizicke duzine: S1 = "+displayNumber(v.slopePhysical[0])+",  H = "+displayNumber(v.C)+",  S2 = "+displayNumber(v.slopePhysical[1])+" mm");
+ note((exactGap(v)?"Najmanji razmak = "+displayGap(v):"Garantovana donja granica razmaka = "+guaranteedGap(v)+" (konzervativno)")
+  +";  zahtjev "+displayNumber(o.clearance)+" + rezerva "+displayNumber(o.reserve)+" mm");
+ if(!exactGap(v))note("Nacrtan je stvarni presjek prepreke u ravni trase; provjera koristi siri konzervativni gabarit.");
+ note("Staticki snimak, kote neasocijativne, mjere u mm.");
  if(detailed){
   DetailPath witness;witness.member=9;witness.insulation=false;witness.axis=false;witness.closed=false;
   witness.points={local(v.witnessBody),local(v.witnessObstacle)};witness.bulges={0,0};d.paths.push_back(witness);
-  const char* names[]={"K1","S1","K2","H","K3","S2","K4"};
-  // Each member gets a separate row; leaders run to checked centerline ports, never a guessed silhouette.
-  for(int j=0;j<7;++j){Vertex a=local(v.axis[j]),b=local(v.axis[j+1]);
-   Vertex endpoint((a.s+b.s)/2,(a.z+b.z)/2);Vertex tag(d.maxS+3*pad,top+j*pitch);
-   d.notes.push_back(DetailNote{tag,names[j]});DetailPath leader;leader.member=9;leader.insulation=false;leader.axis=false;leader.closed=false;
-   leader.points={endpoint,Vertex(tag.s-pad/2,tag.z),tag};leader.bulges={0,0,0};d.paths.push_back(leader);
-  }
+  // Elbow labels beside each elbow, on its outward side, no leaders.
+  const char* names[]={"K1","K2","K3","K4"};const int index[]={0,2,4,6};
+  for(int j=0;j<4;++j){Vertex a=local(v.axis[index[j]]),b=local(v.axis[index[j]+1]);double nx,nz;outward(a,b,nx,nz);
+   const double off=half+1.2*th;d.notes.push_back(DetailNote{Vertex((a.s+b.s)/2+nx*off-.6*th,(a.z+b.z)/2+nz*off+.5*th),names[j]});}
  }
  return d;
 }
