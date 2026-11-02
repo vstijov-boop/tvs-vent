@@ -21,13 +21,11 @@ unsigned long revision(){return dataRevision;}
 static int writeDepth=0;static std::set<AcDbObjectId> clones;
 WriteScope::WriteScope(){++writeDepth;}WriteScope::~WriteScope(){--writeDepth;}
 void permitClone(const AcDbObjectId& id){clones.insert(id);}void clearClonePermits(){clones.clear();++dataRevision;}
-static std::set<AcDbObjectId> assemblyPermits;static int refusals=0,notPermitted=0,notRigid=0;
+static std::set<AcDbObjectId> assemblyPermits;static int refusals=0;
 void permitAssemblyTransform(const AcDbObjectId& id){assemblyPermits.insert(id);}
 void clearAssemblyTransforms(){assemblyPermits.clear();}
 void noteTransformRefusal(){++refusals;}
 int takeTransformRefusals(){const int n=refusals;refusals=0;return n;}
-void takeRefusalReasons(int& permit,int& rigid){permit=notPermitted;rigid=notRigid;notPermitted=notRigid=0;}
-int permittedCount(){return static_cast<int>(assemblyPermits.size());}
 const ACHAR* statusText(Status s){switch(s){case Legacy:return L"Legacy";case Valid:return L"Valid";case Incomplete:return L"Incomplete";case UnsupportedVersion:return L"UnsupportedVersion";case GeometryMismatch:return L"GeometryMismatch";default:return L"Corrupt";}}
 CString newGuid(){GUID id;OLECHAR value[40]={0};if(FAILED(CoCreateGuid(&id)))return CString();StringFromGUID2(id,value,40);return CString(value);}
 Status read(const AcDbObject* object,Record& out){
@@ -110,9 +108,7 @@ bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
         return true;
     }
     // Original member: only with its whole assembly in the same selection, rigid in plan.
-    if(assemblyPermits.find(id)==assemblyPermits.end()){++notPermitted;return false;}
-    if(!rigidPlan(m)){++notRigid;return false;}
-    return true;
+    return assemblyPermits.find(id)!=assemblyPermits.end()&&rigidPlan(m);
 }
 static bool nearPoint(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
 Status validateCore(const AcDbObject* o,bool geometry){

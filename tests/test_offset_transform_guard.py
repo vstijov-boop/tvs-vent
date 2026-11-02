@@ -19,7 +19,7 @@ struct ID {int value;ID(int v=0):value(v){}bool isNull()const{return value==0;}b
 struct AcDbObject {ID id;bool offset;AcDbObject(int i,bool m):id(i),offset(m){}ID objectId()const{return id;}};
 struct AcGeMatrix3d {double entry[4][4];AcGeMatrix3d(){for(int r=0;r<4;++r)for(int c=0;c<4;++c)entry[r][c]=r==c?1:0;}};
 namespace tvsOffset {bool finite(double x){return x>=-DBL_MAX&&x<=DBL_MAX;}}
-static int writeDepth=0,notPermitted=0,notRigid=0;static std::set<ID> clones,assemblyPermits;static bool marked(const AcDbObject* o){return o->offset;}
+static int writeDepth=0;static std::set<ID> clones,assemblyPermits;static bool marked(const AcDbObject* o){return o->offset;}
 ''' + body + r'''
 int main(){
  AcDbObject original(1,true),copy(2,true),legacy(3,false),scratch(0,true);
