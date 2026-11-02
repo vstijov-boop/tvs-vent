@@ -56,7 +56,9 @@ static bool assemble(const Frame& f,const tvsBypassSearch::Result& r,const Optio
  out.D=r.D;out.C=r.C;out.s0=r.s0;out.W=middle(r.W);out.zPass=middle(r.passElevation);out.gapLo=r.clearance.lo;out.gapHi=r.clearance.hi;
  if(retained)text<<"Zadrzan prethodni potvrđeni kandidat za iste ulaze.\r\n";
  text<<"Kota ose prolaza="<<out.zPass<<" mm; D="<<out.D<<" mm\r\nC="<<out.C<<" mm; W="<<out.W<<" mm; s0="<<out.s0<<" mm\r\n";
- text<<std::setprecision(17)<<"Zazor ["<<r.clearance.lo<<", "<<r.clearance.hi<<"] mm\r\n"<<std::setprecision(6)<<"Obavezan="<<o.clearance<<"; projektna rezerva="<<o.reserve<<" mm\r\n";
+ text<<std::setprecision(17)<<(f.crossingSine()==1?"Zazor (presjek = prostorni) [":"Razmak u presjeku do konzervativnog provjernog gabarita [")<<r.clearance.lo<<", "<<r.clearance.hi<<"] mm\r\n";
+ if(f.crossingSine()!=1)text<<"Garantovana donja granica prostornog razmaka >= "<<f.crossingSine()*r.clearance.lo<<" mm (nije izmjereni minimum)\r\n";
+ text<<std::setprecision(6)<<"Obavezan="<<o.clearance<<"; projektna rezerva="<<o.reserve<<" mm\r\n";
  for(int j=0;j<2;++j)text<<"Nagib "<<j+1<<": Lfiz="<<checked.offsets[j].straightLength<<"; Lproj="<<checked.offsets[j].projectedLength<<" mm\r\n";
  text<<"Koljeno: Losa="<<checked.offsets[0].arcLength<<" mm (4 kom.); most="<<r.C<<" mm\r\n";
  text<<"Kriticni clan="<<static_cast<int>(checked.obstacle.witnessMember)<<"; donja ograda clan="<<static_cast<int>(checked.obstacle.lowerMember)<<"\r\n";

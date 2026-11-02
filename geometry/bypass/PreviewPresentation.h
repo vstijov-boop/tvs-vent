@@ -27,11 +27,18 @@ inline bool overlap(PixelRect a,PixelRect b){return a.left<b.right&&b.left<a.rig
 inline std::string displayNumber(double x,int decimals=1){std::ostringstream s;s.imbue(std::locale::classic());s<<std::fixed<<std::setprecision(decimals)<<x;return s.str();}
 inline std::string memberName(int n){const char* names[]={"prvo koljeno","prvi nagibni komad","drugo koljeno","srednji komad","treće koljeno","drugi nagibni komad","četvrto koljeno","ulazni susjed","izlazni susjed"};return n>=0&&n<9?names[n]:"nije dostupan";}
 // Display-only interval enclosure at 0.01 mm, never fed back to the checker.
+// Perpendicular crossing: the checked section distance IS the 3D distance (prismatic obstacle,
+// tube/slab cut through its axis). Oblique: only sin(beta) x section distance to the conservative
+// checking envelope is guaranteed; never present it as a measured minimum.
+inline bool exactGap(const View& v){return v.frame.crossingSine()==1;}
+inline std::string guaranteedGap(const View& v){
+ return displayNumber(std::fmax(0.0,std::floor(std::nextafter(v.frame.crossingSine()*v.gapLo*100,-std::numeric_limits<double>::infinity()))/100),2)+" mm";}
 inline std::string displayGap(const View& v){return "["+displayNumber(std::fmax(0.0,std::floor(std::nextafter(v.gapLo*100,-std::numeric_limits<double>::infinity()))/100),2)+", "+displayNumber(std::ceil(std::nextafter(v.gapHi*100,std::numeric_limits<double>::infinity()))/100,2)+"] mm";}
 inline std::string summary(const View& v,const Options& o){
  if(!v.ready)return v.status+"\r\nOtvorite Napredno / dijagnostika za razlog i brojače.";
  return v.status+"\r\nOsa prolaza: Z = "+displayNumber(v.zPass)+" mm   |   Zahvat W = "+displayNumber(v.W)+" mm"+
- "\r\nNajmanji potvrđeni geometrijski razmak: "+displayGap(v)+
+ (exactGap(v)?"\r\nNajmanji razmak (presjek u ravni trase = prostorni): "+displayGap(v):
+  "\r\nGarantovana DONJA granica prostornog razmaka: "+guaranteedGap(v)+" (sin x razmak do provjernog gabarita; nije izmjereni minimum)")+
  "\r\nZahtijevan razmak: "+displayNumber(o.clearance)+" mm   |   Dodatna rezerva: "+displayNumber(o.reserve)+" mm"+
  "\r\nKritični član: "+memberName(v.criticalRole)+". Razmak se mjeri između spoljnih gabarita, sa izolacijom.";
 }
