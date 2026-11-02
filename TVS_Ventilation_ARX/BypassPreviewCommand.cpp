@@ -311,7 +311,11 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
      if(data)acutRelRb(data);}}}dict->close();}
   Dialog dialog(s,reverse,tvsUnits::factor(db),known,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
   for(;;){INT_PTR action=dialog.show(owner);
-   if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);return false;}
+   if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);
+    // Accepting flows (TVS_BYPASS, Obilazak) return to the dialog with the same checked
+    // candidate; the static detail stays unlinked. Prihvati re-validates the snapshot.
+    if(permanent)continue;
+    return false;}
 #ifdef TVS_OFFSET_INTEGRATION
    if(action==704&&permanent&&dialog.view.ready&&dialog.engine.ready()){
     tvsBypassService::Commit result;
