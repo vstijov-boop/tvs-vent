@@ -21,7 +21,7 @@ inline bool joints(const tvsOffset::WorldPoint& first,const tvsOffset::WorldPoin
 // stay on the axis station); the tilted end faces are drawn by the adjacent round elbows.
 inline bool roundSides(const tvsOffset::WorldPoint& first,const tvsOffset::WorldPoint& last,double diameter,
                        tvsOffset::WorldPoint sides[2][2]){
-    const double dx=last.x-first.x,dy=last.y-first.y,len=std::hypot(dx,dy);
+    const double dx=last.x-first.x,dy=last.y-first.y,len=std::sqrt(dx*dx+dy*dy); // C++98: DBX geometry header
     if(!(len>0)||!(diameter>0&&diameter<=DBL_MAX))return false;
     const double nx=-dy/len*diameter/2,ny=dx/len*diameter/2;
     for(int k=0;k<2;++k){const double s=k?1:-1;
