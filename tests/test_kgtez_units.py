@@ -63,6 +63,9 @@ class Harness:
             'vlax-variant-value':lambda x:x['variant'],
             'namedobjdict':lambda:None,
             'dictsearch':lambda *a:self.record,
+            'not':lambda x:not x,'and':lambda *v:all(v),'or':lambda *v:any(v),
+            'vl-catch-all-apply':lambda f,args:self.call(str(f),*args),
+            'vl-catch-all-error-p':lambda x:False,
         })
         self.record=None
     def call(self,name,*args):
@@ -131,6 +134,12 @@ class KgtezUnits(unittest.TestCase):
             self.h.env['tvs-elbow-rg']=lambda obj:[150.0,550.0]
             elbow=self.h.call('tvs-info',obj,'TVS_TAP')
             self.assertAlmostEqual(elbow[3],2*(400+200)*350*math.pi/2/1e6)
+            # Native TVS area first: no copy/explode (bypass members refuse COPY).
+            def refused(o):raise AssertionError('copy+explode must not run when SheetArea exists')
+            self.h.env['tvs-elbow-rg']=refused
+            native=self.h.call('tvs-info',dict(obj,sheetarea=0.731),'TVS_TAP')
+            self.assertAlmostEqual(native[3],0.731)
+            self.h.env['tvs-elbow-rg']=lambda obj:[150.0,550.0]
             trans=self.h.call('tvs-info',obj,'TVS_TRANS')
             self.assertAlmostEqual(trans[3],3.3)
             wye=self.h.call('tvs-info',dict(obj,length=50.0),'TVS_WYE')
