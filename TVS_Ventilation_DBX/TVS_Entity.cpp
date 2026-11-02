@@ -52,7 +52,7 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
     assertReadEnabled();
     areaM2 = thicknessMm = massKg = 0.0;
 #ifdef TVS_OFFSET_INTEGRATION
-    const tvsOffsetData::Status integrity=tvsOffsetData::validate(this);
+    const tvsOffsetData::Status integrity=tvsOffsetData::quantityStatus(this);
     if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
         acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
 #endif
@@ -106,7 +106,7 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
     if (!tvsSheetMetal::nonnegative(areaM2) || !tvsSheetMetal::nonnegative(massKg)) {
         areaM2 = thicknessMm = massKg = 0.0;
 #ifdef TVS_OFFSET_INTEGRATION
-    const tvsOffsetData::Status integrity=tvsOffsetData::validate(this);
+    const tvsOffsetData::Status integrity=tvsOffsetData::quantityStatus(this);
     if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
         acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
 #endif

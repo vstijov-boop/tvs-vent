@@ -13,6 +13,10 @@ DLLIMPEXP Acad::ErrorStatus write(AcDbObject* object,const Record& record);
 DLLIMPEXP CString newGuid();
 DLLIMPEXP Status validate(const AcDbObject* object,bool geometry=true);
 DLLIMPEXP Status validateCore(const AcDbObject* object,bool geometry=true);
+// Quantities (mass, specification, property manager): each member is counted from its own
+// filed data. Only unreadable/unsupported records block; changed assembly geometry
+// (moved/extended neighbours, partial moves) or a missing member does not.
+DLLIMPEXP Status quantityStatus(const AcDbObject* object);
 DLLIMPEXP bool physicalLength(const AcDbObject* object,double projected,double& physical);
 DLLIMPEXP bool marked(const AcDbObject* object);
 DLLIMPEXP bool editable(const AcDbObject* object);

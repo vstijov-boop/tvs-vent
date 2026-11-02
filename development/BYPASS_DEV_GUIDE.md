@@ -51,6 +51,12 @@ njegov slobodni spoljašnji kraj može se koristiti za nastavak. Ako roditelj ve
 čuva eksplicitnu spoljašnju vezu tog ostatka, ili izabrani kraj susjeda predstavlja
 njegovu granicu, novi bypass se odbija umjesto neprimjetnog kvarenja stare reference.
 
+**Pomjeranje članova (odluka korisnika).** MOVE i ROTATE oko Z rade za članove obilaska i
+offseta kao za obične kanale; SCALE/MIRROR/nagib se odbijaju. Djelimično pomjeren sklop
+više nije provjereni obilazak: `TVS_BYPASS_DETALJ` ga odbija, a po potrebi se crta nov
+obilazak. Masa, specifikacija i menadžer broje svaki član po njegovim podacima; blokiraju
+samo oštećeni/nepodržani zapisi. `TVS_BYPASS_DETALJ` računa prepreku po trenutnom položaju.
+
 **Skrivene ivice ukrštanja (GFX-01, varijanta 1 — samo bypass).** Writer na donji
 pravi kanal ukrštanja upisuje `TVS_HIDDEN_BY_V1` (iznad: prepreka ispod H; ispod: H ispod
 prepreke), u istoj transakciji. Pri crtanju se dio ivica donjeg kanala koji je u osnovi

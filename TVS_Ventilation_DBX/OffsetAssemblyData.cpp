@@ -80,16 +80,20 @@ Acad::ErrorStatus write(AcDbObject* object,const Record& r){
 
 bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy||tvsBypassData::marked(o);}
 bool editable(const AcDbObject* o){return writeDepth>0||!marked(o)||clones.find(o->objectId())!=clones.end();}
+// Rigid in plan: translation (any) plus rotation about Z; no scale, mirror or tilt.
+static bool rigidPlan(const AcGeMatrix3d& m){
+    for(int r=0;r<4;++r)for(int c=0;c<4;++c)if(!tvsOffset::finite(m.entry[r][c]))return false;
+    const double a=m.entry[0][0],b=m.entry[0][1],c=m.entry[1][0],d=m.entry[1][1];
+    if(std::fabs(a-d)>1e-10||std::fabs(b+c)>1e-10||std::fabs(a*a+c*c-1)>1e-10)return false;
+    if(std::fabs(m.entry[0][2])>1e-10||std::fabs(m.entry[1][2])>1e-10||std::fabs(m.entry[2][0])>1e-10||std::fabs(m.entry[2][1])>1e-10||std::fabs(m.entry[2][2]-1)>1e-10)return false;
+    return std::fabs(m.entry[3][0])<=1e-10&&std::fabs(m.entry[3][1])<=1e-10&&std::fabs(m.entry[3][2])<=1e-10&&std::fabs(m.entry[3][3]-1)<=1e-10;
+}
+// Members move/rotate like ordinary ducts (user decision: a broken bypass is redrawn by the
+// user). Assembly geometry may then no longer match: TVS_BYPASS_DETALJ refuses such a
+// bypass, quantities stay per member (quantityStatus). Scale/mirror/tilt stay refused.
 bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
     if(!marked(o)||writeDepth>0)return true;
-    if(!o->objectId().isNull()&&clones.find(o->objectId())==clones.end())return false;
-    // Only positioning translations of known newly cloned/scratch objects, never scale/rotate.
-    for(int r=0;r<4;++r)for(int c=0;c<4;++c){
-        if(!tvsOffset::finite(m.entry[r][c]))return false;
-        if(c==3&&r<3)continue;
-        if(std::fabs(m.entry[r][c]-(r==c?1.0:0.0))>1e-10)return false;
-    }
-    return true;
+    return rigidPlan(m);
 }
 static bool nearPoint(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
 Status validateCore(const AcDbObject* o,bool geometry){
@@ -156,14 +160,20 @@ Status validate(const AcDbObject* o,bool geometry){
     if(s!=Legacy&&s!=Valid)return s;
     return tvsBypassData::marked(o)?tvsBypassData::validate(o,geometry):s;
 }
+Status quantityStatus(const AcDbObject* o){
+    Status s=validateCore(o,true);
+    if(s==Corrupt||s==UnsupportedVersion)return s;
+    if(tvsBypassData::marked(o)){const Status b=tvsBypassData::validate(o,true);if(b==Corrupt||b==UnsupportedVersion)return b;}
+    return s==Legacy?Legacy:Valid;
+}
 bool physicalLength(const AcDbObject* o,double projected,double& physical){
     Record r;Status s=read(o,r);physical=projected;if(s==Legacy){
         if(!tvsBypassData::marked(o))return true;
-        const Status parent=tvsBypassData::validate(o);return parent==Valid||parent==Incomplete;
+        const Status parent=quantityStatus(o);return parent!=Corrupt&&parent!=UnsupportedVersion;
     }
     if(s!=Valid||r.role!=SlopedStraight){acutPrintf(L"\nTVS OFFSET: neispravni podaci fizičke dužine (%s).",statusText(s));return false;}
     // Incomplete membership still permits the standalone member's own valid quantity.
-    Status integrity=validate(o,writeDepth==0&&clones.find(o->objectId())==clones.end());if(integrity!=Valid&&integrity!=Incomplete){acutPrintf(L"\nTVS OFFSET: neispravno članstvo (%s).",statusText(integrity));return false;}
+    Status integrity=quantityStatus(o);if(integrity==Corrupt||integrity==UnsupportedVersion){acutPrintf(L"\nTVS OFFSET: neispravno članstvo (%s).",statusText(integrity));return false;}
     double h=r.rise/tvsUnits::factor(o);return tvsOffsetRecordRules::physical(projected,h,physical);
 }
 Acad::ErrorStatus remapClones(AcDbIdMapping& map){
