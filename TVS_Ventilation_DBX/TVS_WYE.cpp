@@ -889,7 +889,7 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				pLine3->setEndPoint(pA5);
 				pLine3->setLineWeight(AcDb::LineWeight(15));
 				pLine3->setLayer(this->layerId());
-				pLine3->setLinetype(ltId);
+				setAuxLinetype(pLine3, _T("tvs_centerline"));
 				pLine3->setColor(this->color());
 				entitySet.append(pLine3);
 

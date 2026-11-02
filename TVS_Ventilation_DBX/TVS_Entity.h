@@ -312,7 +312,7 @@ public:
 	void setHideProperty(AcDbEntity *pEnt);
 	// tvs_hidden/tvs_centerline: pattern defined in mm (TVS_LineType.lin); scaled by the
 	// element's own linetype scale and the drawing units (LTSCALE applies on top).
-	void setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name);
+	void setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name) const;
 	void setZigzagProperty(AcDbEntity *pEnt);
 	void setThinProperty(AcDbEntity *pEnt);
 	double get_WipeoutLength(void) const;

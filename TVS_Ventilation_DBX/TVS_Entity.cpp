@@ -1016,7 +1016,7 @@ void TVS_Entity::setMainProperty(AcDbEntity *pEnt)
 	ListOfEntity.append(pEnt);
 }
 
-void TVS_Entity::setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name)
+void TVS_Entity::setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name) const
 {
 	AcDbDatabase *pDb = database() ? database() : acdbHostApplicationServices()->workingDatabase();
 	AcDbLinetypeTable *pLtTable = NULL;
