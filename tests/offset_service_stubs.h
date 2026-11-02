@@ -71,12 +71,12 @@ inline Acad::ErrorStatus write(AcDbObject* o,const Record& r){if(++recordCalls==
 namespace tvsOffsetProof {
 inline AcGePoint3d pt(const tvsOffset::WorldPoint& p){return AcGePoint3d(p.x,p.y,p.z);}
 struct BuildTransaction {
- AcDbBlockTableRecord* space;bool committed;AcGePoint3d beforeFirst,beforeLast;std::vector<int> created;
- BuildTransaction(AcDbDatabase*):space(&block),committed(false),beforeFirst(fixtureSource.FirstPoint),beforeLast(fixtureSource.LastPoint){++txStarts;}
+ AcDbBlockTableRecord* space;bool committed;Acad::ErrorStatus status;AcGePoint3d beforeFirst,beforeLast;std::vector<int> created;
+ BuildTransaction(AcDbDatabase*):space(&block),committed(false),status(Acad::eOk),beforeFirst(fixtureSource.FirstPoint),beforeLast(fixtureSource.LastPoint){++txStarts;}
  ~BuildTransaction(){if(!committed){++aborts;fixtureSource.FirstPoint=beforeFirst;fixtureSource.LastPoint=beforeLast;
  for(int id:created){delete objects[id];objects.erase(id);tvsOffsetData::records.erase(id);}if(rollbackHook)rollbackHook();}}
- bool append(TVS_Entity* p,AcDbObjectId& id){if(++appendCalls==failAppend){delete p;return false;}id=100+appendCalls;p->id=id;objects[id.id]=p;created.push_back(id.id);return true;}
- bool commit(){if(failCommit)return false;committed=true;++commits;return true;}
+ bool append(TVS_Entity* p,AcDbObjectId& id){if(++appendCalls==failAppend){delete p;status=Acad::eInvalid;return false;}id=100+appendCalls;p->id=id;objects[id.id]=p;created.push_back(id.id);return true;}
+ bool commit(){if(failCommit){status=Acad::eInvalid;return false;}committed=true;++commits;return true;}
 };}
 namespace tvsMove {
 inline bool editable(TVS_Entity* e){TVS_Pipe* p=TVS_Pipe::cast(e);return p&&!p->locked;}
@@ -85,6 +85,7 @@ inline tvsMoveGeometry::Point point(const AcGePoint3d& p){return tvsMoveGeometry
 }
 static std::map<int,tvsMove::Node> nodes;
 inline void acutPrintf(const wchar_t*,...){}
+inline const wchar_t* acadErrorStatusText(Acad::ErrorStatus s){return s==Acad::eOk?L"eOk":L"eInvalid";}
 namespace tvsOffsetService {
 enum Outcome {Applied,NoChange,Cancelled,Failed};
 struct Snapshot {AcDbDatabase* db;AcDbObjectId source,owner;tvsOffsetOperation::Snapshot physical;std::wstring fingerprint,network,manufacturer,note;Snapshot():db(&database),source(1),owner(99){}};
