@@ -28,21 +28,25 @@ class BuildTransaction {
     AcTransactionManager* manager;bool active;
 public:
     AcDbBlockTableRecord* space;
-    BuildTransaction(AcDbDatabase* db):manager(actrTransactionManager),active(false),space(NULL){
+    Acad::ErrorStatus status; // last SDK status on a failed step (diagnostics only)
+    BuildTransaction(AcDbDatabase* db):manager(actrTransactionManager),active(false),space(NULL),status(Acad::eOk){
         if(!manager||!manager->startTransaction())return;active=true;
         AcDbObject* object=NULL;
-        if(manager->getObject(object,modelId(db),AcDb::kForWrite)==Acad::eOk)
+        status=manager->getObject(object,modelId(db),AcDb::kForWrite);
+        if(status==Acad::eOk)
             space=AcDbBlockTableRecord::cast(object);
     }
     ~BuildTransaction(){if(active)manager->abortTransaction();}
     bool append(AcDbEntity* entity,AcDbObjectId& id){
         if(!space){delete entity;return false;}
-        if(space->appendAcDbEntity(id,entity)!=Acad::eOk){delete entity;return false;}
-        if(manager->addNewlyCreatedDBRObject(entity,true)!=Acad::eOk){
+        status=space->appendAcDbEntity(id,entity);
+        if(status!=Acad::eOk){delete entity;return false;}
+        status=manager->addNewlyCreatedDBRObject(entity,true);
+        if(status!=Acad::eOk){
             entity->erase();entity->close();return false;}
         return true;
     }
-    bool commit(){if(!active||!space||manager->endTransaction()!=Acad::eOk)return false;active=false;return true;}
+    bool commit(){if(!active||!space)return false;status=manager->endTransaction();if(status!=Acad::eOk)return false;active=false;return true;}
 };
 inline bool add(BuildTransaction& tx,AcDbEntity* e,Session& s){AcDbObjectId id;
     if(!tx.append(e,id))return false;s.created.append(id);return true;}

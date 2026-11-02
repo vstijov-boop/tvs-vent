@@ -55,6 +55,7 @@
 #include "TVSController.h"
 #include "MleaderController.h"
 #include "PropertyAdmin.h"
+#include "TvsLinetypes.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -89,6 +90,12 @@
 //-----------------------------------------------------------------------------
 //----- ObjectARX EntryPoint
 
+#ifdef TVS_BYPASS_PREVIEW
+// Settings.h globals are per translation unit; the live radius mode is this file's copy.
+static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.roundMode=globalRadiusTypeRound;r.typeRoundTap=globalTypeRoundTap;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
+static void tvsBypassCommandEntry(){tvsBypassCommand(tvsBypassRadiusSettings());}
+static void tvsBypassPreviewCommandEntry(){tvsBypassPreviewCommand(tvsBypassRadiusSettings());}
+#endif
 class CTVS_Ventilation_ARXApp : public AcRxArxApp {
 
 public:
@@ -107,15 +114,18 @@ public:
             acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
-        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommand)!=Acad::eOk)
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
-        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS_DETALJ nije uspjela.");
 #endif
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->addReactor(&offsetReactor());
 #endif
+        tvsLinetypes::ensureCurrent(); // drawing already open when the ARX is loaded
         // TODO: Add your initialization code here
 
 		return (retCode);
@@ -148,6 +158,7 @@ public:
 		mctrl.registerApp();
 		TVSController::get()->tvsPropertyController.registerApp();
         PropertyAdmin::initialize();
+        tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
 
 		return (retCode);
 	}
@@ -1077,8 +1088,10 @@ public:
 		dg.Wipe = globalWipeout;
 		dg.Grani = globalGrani;
 		dg.D1 = global1D;
-		dg.ElevMid = true;
-		dg.Elev = globalElevMid;
+		// Level reference is remembered; the stored value is always the axis level.
+		const double elevHalf = (globSizeB > 0 ? globSizeB : globSizeA) / 2;
+		dg.ElevUp = globalElevRef == 1; dg.ElevDown = globalElevRef == 2; dg.ElevMid = !(dg.ElevUp || dg.ElevDown);
+		dg.Elev = globalElevMid + (globalElevRef == 1 ? elevHalf : globalElevRef == 2 ? -elevHalf : 0);
 		dg.TapForm = globalTapForm;
 		dg.TypeRoundTap = globalTypeRoundTap;
 		dg.RadiusTypeRound = globalRadiusTypeRound;
@@ -1108,8 +1121,6 @@ public:
 		globalWipeout = dg.Wipe;
 		globalGrani = dg.Grani;
 		global1D = dg.D1;
-		globalElevMid = dg.Elev;
-		globalElev = dg.Elev;
 		globalTapForm = dg.TapForm;
 		globalTypeRoundTap = dg.TypeRoundTap;
 		globalRadiusTypeRound = dg.RadiusTypeRound;
@@ -1123,6 +1134,13 @@ public:
 		else globalDuctType = DuctTypeStill;
 		if (globSizeB == 0) globRound = true;
 		else globRound = false;
+		// Vrh/Dno: entered value is the top/bottom edge of the (new) duct size; convert to axis.
+		globalElevRef = dg.ElevUp == 1 ? 1 : dg.ElevDown == 1 ? 2 : 0;
+		{
+			const double half = (globSizeB > 0 ? globSizeB : globSizeA) / 2;
+			globalElevMid = dg.Elev - (globalElevRef == 1 ? half : globalElevRef == 2 ? -half : 0);
+			globalElev = globalElevMid;
+		}
 		if (a == globSizeA && b == globSizeB)
 			return false;
 		else
@@ -1771,9 +1789,14 @@ public:
 #ifdef TVS_BYPASS_PREVIEW
             if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
                 TVSBypassOutput result;
-                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings())){
+                    // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
+                    // loop keeps carrying a pointer, so pipi still takes the committed object.
+                    AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
+                    if(next.openStatus()==Acad::eOk){A1=next->FirstPoint;A2=next->LastPoint;}
+                    else{A1=result.pipe->FirstPoint;A2=result.pipe->LastPoint;}
                     pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
-                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
                 }
             }
 #endif
@@ -1992,9 +2015,14 @@ public:
 #ifdef TVS_BYPASS_PREVIEW
             if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
                 TVSBypassOutput result;
-                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings())){
+                    // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
+                    // loop keeps carrying a pointer, so pipi still takes the committed object.
+                    AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
+                    if(next.openStatus()==Acad::eOk){A1=next->FirstPoint;A2=next->LastPoint;}
+                    else{A1=result.pipe->FirstPoint;A2=result.pipe->LastPoint;}
                     pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
-                    A1=pipi->FirstPoint;A2=pipi->LastPoint;pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
                 }
             }
 #endif

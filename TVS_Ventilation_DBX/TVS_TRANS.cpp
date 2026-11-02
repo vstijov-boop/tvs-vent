@@ -808,15 +808,9 @@ Acad::ErrorStatus TVS_TRANS::subExplode(AcDbVoidPtrArray & entitySet) const
 			AcDbLine* pLine2 = new AcDbLine;
 			pLine2->setStartPoint(FirstPoint);
 			pLine2->setEndPoint(LastPoint);
-			AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-			AcDbLinetypeTable *pLtTable;
-			AcDbObjectId ltId;
-			pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-			pLtTable->getAt(_T("tvs_centerline"), ltId);
-			pLtTable->close();
 			pLine2->setLineWeight(AcDb::LineWeight(15));
-			pLine2->setLayer(this->layerId());
-			pLine2->setLinetype(ltId);
+				pLine2->setLayer(this->layerId());
+				setAuxLinetype(pLine2, _T("tvs_centerline"));
 			pLine2->setColor(this->color());
 			entitySet.append(pLine2);
 

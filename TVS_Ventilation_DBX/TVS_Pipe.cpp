@@ -29,6 +29,10 @@
 #include <limits>
 #endif
 #include "TVS_Pipe.h"
+#include "HiddenSpanData.h"
+#include "../geometry/HiddenSpan.h"
+#include <algorithm>
+#include <vector>
 #include "TVS_Ventilation_DBX_i.h"
 #include<vector>
 //-----------------------------------------------------------------------------
@@ -301,6 +305,17 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
     if(offsetStatus!=tvsOffsetData::Legacy){
         if(offsetStatus!=tvsOffsetData::Valid||offset.role!=tvsOffsetData::SlopedStraight){
             AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);
+        }else if(ThisRound){
+            // Round bypass slope: SizeB = 0, so the rectangular joint projection does not apply.
+            tvsOffset::WorldPoint sides[2][2];
+            if(tvsSlopeProjection::roundSides(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
+                tvsOffset::WorldPoint(LastPoint.x,LastPoint.y,LastPoint.z),SizeA,sides)){
+                if(Wipeout){AcDbPolyline* mask=new AcDbPolyline();
+                    mask->addVertexAt(0,AcGePoint2d(FirstPoint.x,FirstPoint.y));mask->addVertexAt(1,AcGePoint2d(LastPoint.x,LastPoint.y));
+                    mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
+                if(!This1D)for(int k=0;k<2;++k)setMainProperty(new AcDbLine(AcGePoint3d(sides[k][0].x,sides[k][0].y,sides[k][0].z),AcGePoint3d(sides[k][1].x,sides[k][1].y,sides[k][1].z)));
+                setCenterProperty(new AcDbLine(FirstPoint,LastPoint));
+            }else{AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);}
         }else {
             tvsOffset::WorldPoint corners[2][4];
             if(tvsSlopeProjection::joints(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
@@ -361,7 +376,45 @@ setWipeoutProperty(mode,wPline);
 		
 		AcDbLine	*Line1 = new AcDbLine(A,B);
 		AcDbLine	*Line2 = new AcDbLine(D,C);
-		if (DuctType==DuctTypeStill) {setMainProperty(Line1); setMainProperty(Line2);}
+		if (DuctType==DuctTypeStill) {
+			// Bypass crossing (GFX-01 variant 1): edge parts under an upper duct are dashed.
+			std::vector<tvsHiddenSpan::Entry> uppers;
+			std::vector<std::pair<double,double> > hidden[2];
+			if (tvsHiddenSpan::read(this, uppers)) {
+				for (size_t k = 0; k < uppers.size(); ++k) {
+					tvsHiddenSpan::Entry e = uppers[k];
+					if (e.upper.isNull() || e.upper.isErased()) continue;
+					TVS_Pipe* live = NULL;
+					if (acdbOpenObject(live, e.upper, AcDb::kForRead) == Acad::eOk) {
+						e.first = live->FirstPoint; e.last = live->LastPoint; e.width = live->SizeA; e.elevation = live->Elev; live->close();
+					}
+					if (!(Elev < e.elevation)) continue;
+					tvsHidden::P q[4];
+					if (!tvsHidden::footprint(tvsHidden::P(e.first.x, e.first.y), tvsHidden::P(e.last.x, e.last.y), e.width, q)) continue;
+					const AcDbLine* edges[2] = { Line1, Line2 };
+					for (int j = 0; j < 2; ++j) {
+						double t0, t1;
+						if (tvsHidden::clip(tvsHidden::P(edges[j]->startPoint().x, edges[j]->startPoint().y), tvsHidden::P(edges[j]->endPoint().x, edges[j]->endPoint().y), q, t0, t1))
+							hidden[j].push_back(std::make_pair(t0, t1));
+					}
+				}
+			}
+			AcDbLine* edges[2] = { Line1, Line2 };
+			for (int j = 0; j < 2; ++j) {
+				if (hidden[j].empty()) { setMainProperty(edges[j]); continue; }
+				std::sort(hidden[j].begin(), hidden[j].end());
+				const AcGePoint3d a = edges[j]->startPoint(), b = edges[j]->endPoint();
+				double at = 0;
+				for (size_t k = 0; k < hidden[j].size(); ++k) {
+					const double t0 = (std::max)(at, hidden[j][k].first), t1 = (std::max)(t0, hidden[j][k].second);
+					if (t0 > at) setMainProperty(new AcDbLine(a + (b - a) * at, a + (b - a) * t0));
+					if (t1 > t0) setHideProperty(new AcDbLine(a + (b - a) * t0, a + (b - a) * t1));
+					at = (std::max)(at, t1);
+				}
+				if (at < 1) setMainProperty(new AcDbLine(a + (b - a) * at, b));
+				delete edges[j];
+			}
+		}
 		if (DuctType==DuctTypeFlex) {setZigzagProperty(Line1); setZigzagProperty(Line2);}
 		
 
@@ -1119,7 +1172,7 @@ TVS_Pipe* TVS_Pipe::add_new(AcGePoint3d &pFirstPoint,
 Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 {
 #ifdef TVS_OFFSET_INTEGRATION
-    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS OFFSET: transformacija originalnog člana je zabranjena; COPY pozicioniranje je odvojeno.");return Acad::eNotApplicable;}
+    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS: clan obilaska/offseta se moze samo pomjeriti ili rotirati oko Z (SCALE/MIRROR nisu dozvoljeni).");return Acad::eNotApplicable;}
 #endif
 	assertWriteEnabled () ;
 

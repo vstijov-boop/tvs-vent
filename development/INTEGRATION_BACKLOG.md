@@ -123,8 +123,8 @@ Referenca: `bypass-preview/SIDE_DETAIL_RESULTS.md` i dopuna
   jedinice i pojedinačne runtime stavke nisu navedeni; nije potvrda cijele matrice.
 - Primjedba da bypass samo prikazuje kandidat bila je tačna za prethodni paket.
   Novi kod dodaje trajno prihvatanje istog kandidata i nastavak oba toka crtanja.
-- GFX-01 ostaje otvoren: nepotpune vidljive/skrivene fizičke ivice offseta i bypassa.
-  Novi paket ne računa tačnu vidljivost; to je izričito označeno u dijalogu/uputstvu.
+- GFX-01 djelimično: bypass ukrštanje crta zaklonjeni dio donjeg kanala isprekidano
+  (varijanta 1, `TVS_HIDDEN_BY_V1`). Opšta vidljivost proizvoljnih kanala ostaje otvorena.
 - [ ] Novi bypass runtime: oba smjera, jedinice/UCS/uglovi/strane, spoljašnji priključci,
   Cancel, stale/lock, rollback, stvarni fizički potrošači i save/reopen.
 - [ ] Nova roditeljska XRecord/backlink validacija i filing u stvarnom AutoCAD-u.
@@ -153,3 +153,11 @@ ne potvrđuju native filing ili praktičan prolazak ovih stavki. STAB-01 ostaje 
 - [x] Čuvaju se postojeći V1 zapisi, kreira samo nedostajući rječnik; rollback ostaje.
 - [ ] Praktično potvrditi Prihvati u novom restartovanom DEV 2022 procesu, pa nastavak
   kroz oba toka crtanja. SDK zamjene/build nisu ta runtime potvrda.
+
+## razvoj-bypass-fixed — integritet (detalji: [BYPASS_FIXED_PROVJERE.md](BYPASS_FIXED_PROVJERE.md))
+
+- [x] Writer ne mijenja nefiled konektore; povezan spoljašnji kraj odbijen `[konektori]`.
+- [x] Dijagnostika writer-a: faza + stvarni ErrorStatus; 11 prekida, 11 različitih razloga.
+- [x] `acdbGetAdsName` statusi u parent writer-u; Umetni detalj vraća dijalog u trajnom toku.
+- [x] Fault injection samo uz `TVS_BYPASS_FAULT_INJECTION`; nastavak po ObjectId.
+- [ ] Native: Undo poslije Prihvati, save/reopen, nulta 330, povezan kraj (TVS_CONNECTTest).

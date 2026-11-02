@@ -12,19 +12,26 @@ Ne prepisivati produkcioni bundle i ne koristiti hot unload/reload.
    Tokom `TVS_PIPE` ili `TVS_DRAW`: opcija `Obilazak` / `O`; izabrati samo prepreku.
 3. Postojeći dijalog: potvrditi stvarne jedinice, eksplicitno unijeti obje izolacije
    (0 ako ih nema), Ri, razmak i ostale ulaze; `Pronađi prolaz`.
-4. `Pregled u crtežu` je privremen; Enter vraća dijalog. **`Prihvati obilazak`**
-   trajno upisuje isti provjereni kandidat, bez nove pretrage. Izmjena ulaza uklanja
+4. `Pregled u crtežu` je privremen; komandna linija nudi `[Prihvati/Dijalog/Odustani]
+   <Dijalog>` (u TVS_BYPASS_PREVIEW samo `[Dijalog/Odustani]`). **`Prihvati`** ili
+   **`Prihvati obilazak`** trajno upisuje isti provjereni kandidat, bez nove pretrage. Izmjena ulaza uklanja
    važenje rezultata; promijenjen kanal/prepreka ili veze odbijaju upis.
 5. U crtanju poslije uspjeha odmah zadati sljedeću tačku. Nastavak je sa sačuvanog
    spoljašnjeg kraja i početne fizičke kote. Cancel/neuspjeh čuva dotadašnji nastavak.
 
 Nastaju četiri koljena, dva kosa člana i H, dvije neizmijenjene V1 trojke i njihov
 roditelj. Originalni kanal ostaje jedan spoljašnji ostatak; drugi ostatak dobija
-novi objekt. Oba spoljašnja položaja/kota/presjek ostaju isti. Eksplicitni izlazni
-pipe susjed dobija samo nužnu recipročnu referencu novog ostatka; geometrija susjeda
-i prepreka se ne mijenjaju. Roditelj čuva obje granične reference. Legacy vektori
-konektora i dalje nisu zasebno filed podaci običnih kanala; novi roditelj ne migrira
-globalnu mrežu niti popravlja druge objekte pri otvaranju.
+novi objekt. Oba spoljašnja položaja/kota/presjek ostaju isti. Geometrija susjeda
+i prepreka se ne mijenja. Roditelj čuva granične reference koje već postoje.
+
+**Konektori (razvoj-bypass-fixed).** Legacy konektori nisu filed podaci
+(`TVS_Pipe::dwgOutFields/dwgInFields` ih preskaču), pa ih ni korisnički UNDO ni
+snimanje/otvaranje ne vraćaju. Zato writer, kao i TVS_OFFSET, ne mijenja nijedan
+konektor. Ako izabrani spoljašnji kraj ima eksplicitnu vezu (postavlja je samo
+TVS_CONNECTTest ili raniji DEV bypass u istoj sesiji), bypass se odbija umjesto
+prevezivanja. Obični nacrtani kanali i kanali iz ponovo otvorenog crteža nemaju
+povezane konektore, pa za njih bypass radi. Kontinuitet unutar sklopa je geometrijski
+i zapisan u roditelju, ne u konektorima; novi ostatak ima nepovezan par konektora.
 
 Fizički obračun kosih članova ostaje postojeći V1 (sopstveni rise svakog člana).
 H je horizontalni fizički kanal. Roditelj nema količinu; sedam članova se ne broje
@@ -44,10 +51,18 @@ njegov slobodni spoljašnji kraj može se koristiti za nastavak. Ako roditelj ve
 čuva eksplicitnu spoljašnju vezu tog ostatka, ili izabrani kraj susjeda predstavlja
 njegovu granicu, novi bypass se odbija umjesto neprimjetnog kvarenja stare reference.
 
-**Prikaz ne računa tačnu vidljivost.** Pune linije su projektovane konture,
-crtice mogu označavati simboličke spojeve/pomoćne gabarite, a ne potvrđene skrivene
-ivice. Puni hidden-line prikaz ostaje otvoren nedostatak GFX-01 i nije dio ovog
-paketa. Statički bočni detalj je dostupan; povezani/osvježavani detalj nije uveden.
+**Pomjeranje članova (odluka korisnika).** MOVE i ROTATE oko Z rade za članove obilaska i
+offseta kao za obične kanale; SCALE/MIRROR/nagib se odbijaju. Djelimično pomjeren sklop
+više nije provjereni obilazak: `TVS_BYPASS_DETALJ` ga odbija, a po potrebi se crta nov
+obilazak. Masa, specifikacija i menadžer broje svaki član po njegovim podacima; blokiraju
+samo oštećeni/nepodržani zapisi. `TVS_BYPASS_DETALJ` računa prepreku po trenutnom položaju.
+
+**Skrivene ivice ukrštanja (GFX-01, varijanta 1 — samo bypass).** Writer na donji
+pravi kanal ukrštanja upisuje `TVS_HIDDEN_BY_V1` (iznad: prepreka ispod H; ispod: H ispod
+prepreke), u istoj transakciji. Pri crtanju se dio ivica donjeg kanala koji je u osnovi
+pokriven gornjim crta isprekidano i tanko (`tvs_hidden`). Gornji kanal se čita uživo;
+obrisan gornji ili donji kanal iznad gornjeg vraća pune ivice. Pomjeranje gornjeg kanala
+osvježava donji tek na REGEN. Opšta vidljivost između proizvoljnih kanala nije uvedena. Statički bočni detalj je dostupan; povezani/osvježavani detalj nije uveden.
 
 Za rollback probu u potrošnoj kopiji: prije pokretanja AutoCAD-a PROCESS env
 `TVS_BYPASS_FAIL` postaviti na 1 (sedam članova), 2 (ostatak i prevezivanje),
@@ -81,3 +96,19 @@ prekidala. Writer sada koristi postojeći rječnik, a kreira ga samo gdje nedost
 Nova regresija izvršava stvarni parent writer, čuva postojeće V1 zapise i provjerava
 roditelja sa svih sedam backlink-ova. Novi paket zahtijeva svježu AutoCAD sesiju;
 praktično prihvatanje nove verzije još nije potvrđeno.
+
+## razvoj-bypass-fixed
+
+Konektori, dijagnostika, ciljane izmjene i praktična checklista:
+[BYPASS_FIXED_PROVJERE.md](BYPASS_FIXED_PROVJERE.md). Rollback proba (`TVS_BYPASS_FAIL`)
+radi samo u DEV paketu sa `TVS_BYPASS_FAULT_INJECTION`.
+
+## TVS_BYPASS_DETALJ — detalj postojećeg obilaska
+
+`TVS_BYPASS_DETALJ` → klik na bilo koji član obilaska (koljeno, kosi član ili H).
+Komanda provjerava roditelja i geometriju članova, rekonstruiše presjek istim checker-om
+na zapisanim D, C i s0 (bez nove pretrage), uz zapisane izolacije/razmak/rezervu i
+prepreku kakva je bila pri prihvatanju, i provjerava poklapanje sa članovima na 0,001 mm.
+Zatim slijedi uobičajeno umetanje: oznaka, kotiranje, tačka. Detalj je statički snimak,
+nije vezan za sklop; poslije izmjene obilaska umetnuti novi. Ri i ugao se čitaju iz
+koljena; minimalne dužine nisu zapisane, pa se ne provjeravaju ponovo.

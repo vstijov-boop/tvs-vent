@@ -180,7 +180,7 @@ namespace {
 bool invalidOffsetMass(const AcDbObjectId& id){
     AcDbObjectPointer<AcDbObject> object(id,AcDb::kForRead);
     if(object.openStatus()!=Acad::eOk)return true;
-    tvsOffsetData::Status status=tvsOffsetData::validate(object.object());
+    tvsOffsetData::Status status=tvsOffsetData::quantityStatus(object.object());
     if(status==tvsOffsetData::Legacy||status==tvsOffsetData::Valid||status==tvsOffsetData::Incomplete)return false;
     acutPrintf(L"\nTVS OFFSET: ukupna masa izbora nije dostupna — %s. Ne prikazuje se djelimičan zbir.",tvsOffsetData::statusText(status));
     return true;

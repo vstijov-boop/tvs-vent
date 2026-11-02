@@ -20,16 +20,34 @@ struct Input {
  double insulation,obstacleInsulation,clearance,D,C,s0,windowLeft,windowRight;
  double obstacleTmin,obstacleTmax,minimumSlope,minimumBridge,minimumProjection;
  bool above;OptionalBound floor,ceiling;Policy policy;
+ // Section combinations (defaults = rectangular obstacle crossing at 90 deg, smooth elbows):
+ // obstacleRound: obstacle is a round duct, diameter = obstacleWidth (= obstacleHeight).
+ // crossingSine/crossingCosine: sin/|cos| of the plan angle between route and obstacle axes.
+ // elbowExcessMm >= 0: how far a polygonal/segmented TVS elbow can protrude beyond the smooth
+ //   arc; added to the assembly guard (clearance, limits, self-separation).
+ // A round route is checked with width = height = diameter (exact for a prismatic obstacle).
+ bool obstacleRound;double crossingSine,crossingCosine,elbowExcessMm;
  Input(double minSlope,double minBridge,double minProjection):width(400),height(200),ri(100),angleDegrees(45),z0(-400),obstacleS(0),
  obstacleZ(-400),obstacleWidth(250),obstacleHeight(250),insulation(0),
  obstacleInsulation(0),clearance(50),D(400),C(400),s0(-800),windowLeft(-1200),
  windowRight(1200),obstacleTmin(-1000),obstacleTmax(1000),minimumSlope(minSlope),
- minimumBridge(minBridge),minimumProjection(minProjection),above(false){}
+ minimumBridge(minBridge),minimumProjection(minProjection),above(false),
+ obstacleRound(false),crossingSine(1),crossingCosine(0),elbowExcessMm(0){}
 };
-struct Region {I left,right,bottom,top;
- Region(I a=I(),I b=I(),I c=I(),I d=I()):left(a),right(b),bottom(c),top(d){}
- Box enclosure()const{return Box(I(left.lo,right.hi),I(bottom.lo,top.hi));}
+// Obstacle section: core rectangle [left,right]x[bottom,top] dilated by radius (0 = plain
+// rectangle). Covers rectangular ducts, round ducts (point/segment core) and, for an oblique
+// crossing, the stretched and swept section (ellipse enclosed by a stadium).
+struct Region {I left,right,bottom,top,radius;
+ Region(I a=I(),I b=I(),I c=I(),I d=I(),I r=I(0)):left(a),right(b),bottom(c),top(d),radius(r){}
+ bool round()const{return radius.hi>0;}
+ Box core()const{return Box(I(left.lo,right.hi),I(bottom.lo,top.hi));}
+ Box enclosure()const{return Box(I(left.lo-radius.hi,right.hi+radius.hi),I(bottom.lo-radius.hi,top.hi+radius.hi));}
 };
+// Certified lower bound of the distance from a box to the region.
+inline double regionLower(const Region& o,const Box& b){
+ if(!o.round())return bounded::boxDistance(b,o.core()).lo;
+ return std::max(0.0,(bounded::boxDistance(b,o.core())-I(o.radius.hi)).lo);
+}
 struct Body {
  enum Kind {Straight,Sector};Kind kind;Role role;
  V first,last,normal,center;I half,inner,outer;double theta;int sign,side;
@@ -94,6 +112,7 @@ inline I regionProjection(const Region& o,V a){
  return o.left*a.s+o.bottom*a.z+I(0,1)*(o.right-o.left)*a.s+I(0,1)*(o.top-o.bottom)*a.z;
 }
 inline bool regionInterior(const Region& o,V p){
+ if(o.round())return bounded::boxDistance(bounded::pointBox(p),o.core()).hi<o.radius.lo;
  return p.s.lo>o.left.hi&&p.s.hi<o.right.lo&&p.z.lo>o.bottom.hi&&p.z.hi<o.top.lo;
 }
 inline V corner(const Region& o,int j){return V(j&1?o.right:o.left,j&2?o.top:o.bottom);}
@@ -101,6 +120,11 @@ inline V regionWitness(const Region& o,V a){
  // A fixed binary64 point in the certified inner box is certainly in O.
  double x=std::max(o.left.hi,std::min(o.right.lo,(a.s.lo+a.s.hi)/2));
  double z=std::max(o.bottom.hi,std::min(o.top.lo,(a.z.lo+a.z.hi)/2));
+ if(!o.round())return V(I(x),I(z));
+ // Dilated region: step from the core point towards a, staying certainly inside the radius.
+ double dx=(a.s.lo+a.s.hi)/2-x,dz=(a.z.lo+a.z.hi)/2-z,len=std::hypot(dx,dz);
+ if(len>0){double k=std::min(1.0,.999*o.radius.lo/len);V w(I(x+dx*k),I(z+dz*k));
+  if(bounded::distance(w,V(I(x),I(z))).hi<.999999*o.radius.lo)return w;}
  return V(I(x),I(z));
 }
 inline std::vector<V> axes(double theta){
@@ -124,6 +148,7 @@ inline bool separated(const Body& a,const Region& b,const Policy& p){
  for(size_t j=0;j<ax.size();++j){
   I x=a.support(ax[j],p.supportSlices),y=bounded::dot(corner(b,0),ax[j]);
   for(int k=1;k<4;++k)y=bounded::hull(y,bounded::dot(corner(b,k),ax[j]));
+  if(b.round()){I grow=I(b.radius.hi)*bounded::root(bounded::square(ax[j].s)+bounded::square(ax[j].z));y=I((I(y.lo)-I(grow.hi)).lo,(I(y.hi)+I(grow.hi)).hi);}
   if(x.hi<=y.lo||y.hi<=x.lo)return true;
  }
  (void)box;return false;
@@ -171,11 +196,11 @@ inline Distance measure(const std::vector<Body>& bodies,const Region& o,const Po
   allSeparated=allSeparated&&separated(bodies[j],o,policy);
   Patch p={j,0,1,0,1,0,0};queue.push(p);
  }
- const Box ob=o.enclosure();
+
  while(!queue.empty()&&out.cells<policy.maxCells){
   Patch p=queue.top();queue.pop();const Body& b=bodies[p.body];++out.cells;
   Box enclosure=b.enclosure(I(p.u0,p.u1),I(p.v0,p.v1));
-  double lower=bounded::boxDistance(enclosure,ob).lo;
+  double lower=regionLower(o,enclosure);
   if(lower>upper)continue;
   double us[]={p.u0,(p.u0+p.u1)/2,p.u1},vs[]={p.v0,(p.v0+p.v1)/2,p.v1};
   for(int a=0;a<3;++a)for(int k=0;k<3;++k){
@@ -199,8 +224,8 @@ inline Distance measure(const std::vector<Body>& bodies,const Region& o,const Po
   double sv=(p.v1-p.v0)*(b.kind==Body::Sector?b.outer.hi-b.inner.lo:2*b.half.hi);
   Patch a=p,c=p;a.depth=c.depth=p.depth+1;
   if(su>=sv){double m=(p.u0+p.u1)/2;a.u1=m;c.u0=m;}else{double m=(p.v0+p.v1)/2;a.v1=m;c.v0=m;}
-  a.lower=bounded::boxDistance(b.enclosure(I(a.u0,a.u1),I(a.v0,a.v1)),ob).lo;
-  c.lower=bounded::boxDistance(b.enclosure(I(c.u0,c.u1),I(c.v0,c.v1)),ob).lo;
+  a.lower=regionLower(o,b.enclosure(I(a.u0,a.u1),I(a.v0,a.v1)));
+  c.lower=regionLower(o,b.enclosure(I(c.u0,c.u1),I(c.v0,c.v1)));
   queue.push(a);queue.push(c);
  }
  if(!out.converged){double low=queue.empty()?upper:queue.top().lower;
@@ -234,6 +259,18 @@ inline double agreement(const std::vector<Body>& bodies){
  return error;
 }
 inline bool scalar(double x){return std::isfinite(x)&&std::fabs(x)<=1e9;}
+// Obstacle section in the route's vertical (s,z) plane. Oblique crossing at plan angle beta:
+// point (s,t,z) of the route is at sigma = s*sin(beta) +- t*cos(beta) from the obstacle axis.
+// Dividing by sin(beta) gives the stretched section, swept by the route half-width in t;
+// distances measured here, times sin(beta), bound the true 3D distance from below.
+inline Region obstacleRegion(const Input& in){
+ const I sinb(in.crossingSine),hz=I(in.obstacleHeight)/I(2)+I(in.obstacleInsulation),hs=I(in.obstacleWidth)/I(2)+I(in.obstacleInsulation);
+ const I sweep=(I(in.width)/I(2)+I(in.insulation))*I(in.crossingCosine)/sinb,S(in.obstacleS),Z(in.obstacleZ);
+ if(!in.obstacleRound){const I half=hs/sinb+sweep;return Region(S-half,S+half,Z-hz,Z+hz);}
+ // Ellipse (a = R/sin, b = R) lies in the stadium with core half-length a - b; plus the sweep.
+ const I core=hs/sinb-hs+sweep;const I c(std::max(0.0,core.lo),std::max(0.0,core.hi));
+ return Region(S-c,S+c,Z,Z,hs);
+}
 inline Result check(const Input& in){
  Result out;
  if(!bounded::supported()){out.status=Unsupported;out.reason="strict IEEE binary64/FE_TONEAREST and gradual underflow required";return out;}
@@ -253,6 +290,10 @@ inline Result check(const Input& in){
  (in.floor.active&&in.ceiling.active&&in.floor.mm>in.ceiling.mm)){out.reason="invalid active height limit";return out;}
  if((in.angleDegrees!=30&&in.angleDegrees!=45&&in.angleDegrees!=60)||in.ri<=in.insulation){
   out.status=Unsupported;out.reason="MVP: 30/45/60 degrees and Ri > insulation >= 0";return out;}
+ if(!scalar(in.crossingSine)||!scalar(in.crossingCosine)||!scalar(in.elbowExcessMm)||in.crossingSine<.25||in.crossingSine>1||
+  in.crossingCosine<0||in.crossingCosine>=1||std::fabs(in.crossingSine*in.crossingSine+in.crossingCosine*in.crossingCosine-1)>1e-9||
+  in.elbowExcessMm<0||in.elbowExcessMm>in.height||(in.obstacleRound&&in.obstacleWidth!=in.obstacleHeight)){
+  out.reason="invalid section combination (crossing angle >= 14.5 deg, elbow excess 0..height, round obstacle W=H)";return out;}
  I transverse=I(in.width)/I(2)+I(in.insulation)+I(in.clearance);
  if(in.obstacleTmin>-transverse.hi||in.obstacleTmax<transverse.hi){
   out.status=Unsupported;out.reason="full transverse overlap including end margin not proven";return out;}
@@ -310,6 +351,7 @@ inline Result check(const Input& in){
   if(overlap>in.policy.jointToleranceMm){out.status=NumericalBoundary;out.reason="adjacent joint half-plane agreement unresolved";return out;}
   guard=std::max(guard,overlap);
  }
+ guard=(I(guard)+I(in.elbowExcessMm)).hi; // segmented elbow corners beyond the smooth arc
  out.jointDeviationUpperMm=guard;
  for(size_t j=0;j<out.members.size();++j){Box b=out.members[j].enclosure(I(0,1),I(0,1));
   if((I(b.s.lo)-I(guard)).lo<in.windowLeft||(I(b.s.hi)+I(guard)).hi>in.windowRight){
@@ -342,13 +384,14 @@ inline Result check(const Input& in){
  std::vector<Body> checked=out.members;
  if(in.windowLeft<in.s0)checked.push_back(straight(V(I(in.windowLeft),z),out.axis[0],V(I(0),I(1)),h,IncomingNeighbor));
  if(end.hi<in.windowRight)checked.push_back(straight(out.axis[7],V(I(in.windowRight),z),V(I(0),I(1)),h,OutgoingNeighbor));
- I oh=I(in.obstacleHeight)/I(2)+I(in.obstacleInsulation),ow=I(in.obstacleWidth)/I(2)+I(in.obstacleInsulation);
- Region obstacle(I(in.obstacleS)-ow,I(in.obstacleS)+ow,I(in.obstacleZ)-oh,I(in.obstacleZ)+oh);
+ Region obstacle=obstacleRegion(in);
  out.obstacle=measure(checked,obstacle,in.policy);
+ // Oblique crossing: true 3D distance >= sin(beta) x section distance, so require clearance/sin.
+ const I need=I(in.clearance)/I(in.crossingSine);
  if(out.obstacle.relation==Overlapping){out.status=Infeasible;out.reason="solid overlap/containment";return out;}
- if((I(out.obstacle.mm.hi)+I(guard)).hi<in.clearance){out.status=Infeasible;out.reason="clearance violated";return out;}
+ if((I(out.obstacle.mm.hi)+I(guard)).hi<need.lo){out.status=Infeasible;out.reason="clearance violated";return out;}
  I guaranteed=I(out.obstacle.mm.lo)-I(guard);
- if(!uncertain&&guaranteed.lo>=in.clearance &&
+ if(!uncertain&&guaranteed.lo>=need.hi &&
     (out.obstacle.relation==PositiveDistance||out.obstacle.relation==Touching)){
   out.status=Feasible;out.reason="constraints proven for bounded model; minimum reach NOT confirmed";return out;}
  out.status=NumericalBoundary;out.reason="boundary, work limit or assembly guard unresolved";return out;

@@ -3,6 +3,7 @@
 #include "OffsetAssemblyData.h"
 #include "TVSMoveCommand.h"
 #include "../geometry/OffsetOperation.h"
+#include "../geometry/RoundElbow.h"
 #include "TVSProperty.h"
 #include <sstream>
 #include <iomanip>
@@ -18,7 +19,10 @@ struct Snapshot {
     AcDbDatabase* db;AcDbObjectId source,owner;
     tvsOffsetOperation::Snapshot physical;
     std::wstring fingerprint,network,manufacturer,note;
-    Snapshot():db(NULL){}
+    // Round source (bypass only): physical.a = physical.b = D for the shared geometry;
+    // members are written as TVS round elements (SizeB = 0). typeRoundTap = TVS setting.
+    bool round;int typeRoundTap;
+    Snapshot():db(NULL),round(false),typeRoundTap(TypeRoundTap_TapSection){}
 };
 struct Commit {AcDbObjectId output,members[3];TVS_Pipe* residentOutput;double elevation,angle,before;
     Commit():residentOutput(NULL),elevation(0),angle(0),before(0){}};
@@ -41,7 +45,11 @@ inline bool properties(TVS_Pipe* source,Snapshot& s,std::wostringstream& out){
     // No unknown dictionary payload can be safely interpreted after changing length.
     if(!source->extensionDictionary().isNull()){
         AcDbObjectPointer<AcDbDictionary> d(source->extensionDictionary(),AcDb::kForRead);
-        if(d.openStatus()!=Acad::eOk||d->numEntries()!=0)return reject(L"Nepodrzani extension podaci kanala.");
+        if(d.openStatus()!=Acad::eOk)return reject(L"Nepodrzani extension podaci kanala.");
+        // Only the display-only hidden-edge mark (TVS_HIDDEN_BY_V1) is known and harmless.
+        AcDbDictionaryIterator* it=d->newIterator();if(!it)return reject(L"Nepodrzani extension podaci kanala.");
+        bool known=true;for(;!it->done();it->next())if(wcscmp(it->name(),L"TVS_HIDDEN_BY_V1")!=0)known=false;delete it;
+        if(!known)return reject(L"Nepodrzani extension podaci kanala.");
     }
     resbuf* raw=source->xData(NULL);
     struct Release {resbuf* p;~Release(){if(p)acutRelRb(p);}} release={raw};
@@ -72,17 +80,19 @@ inline bool properties(TVS_Pipe* source,Snapshot& s,std::wostringstream& out){
     }
     return true;
 }
-inline bool pipeState(TVS_Pipe* p,Snapshot& s){
+// allowRound: only the bypass accepts a rigid round source; TVS_OFFSET (Z) stays rectangular.
+inline bool pipeState(TVS_Pipe* p,Snapshot& s,bool allowRound=false){
     if(!p||p->isA()!=TVS_Pipe::desc()||!tvsMove::editable(p)||tvsOffsetData::marked(p))
         return reject(L"Potreban je obican editabilan TVS kanal, ne clan sklopa.");
-    if(p->ThisRound||p->DuctType!=DuctTypeStill||p->Direct!=0||p->Form!=0
+    if((p->ThisRound&&(!allowRound||p->SizeB!=0))||p->DuctType!=DuctTypeStill||p->Direct!=0||p->Form!=0
         ||!tvsOffset::finite(p->Flow)||p->Flow<0)
-        return reject(L"Podrzan je kruti pravougaoni kanal bez posebnog smjera Direct/Form.");
+        return reject(allowRound?L"Podrzan je kruti pravougaoni ili kruzni kanal bez posebnog smjera Direct/Form.":L"Podrzan je kruti pravougaoni kanal bez posebnog smjera Direct/Form.");
+    s.round=p->ThisRound;
     // Direct=0 is the only documented legacy drawing value. Flow is a nonnegative
     // scalar magnitude; reversing the selected end never negates it or swaps source ports.
     s.physical.first=tvsOffset::WorldPoint(p->FirstPoint.x,p->FirstPoint.y,p->FirstPoint.z);
     s.physical.last=tvsOffset::WorldPoint(p->LastPoint.x,p->LastPoint.y,p->LastPoint.z);
-    s.physical.a=p->SizeA;s.physical.b=p->SizeB;s.physical.elevation=p->get_Elevation();
+    s.physical.a=p->SizeA;s.physical.b=p->ThisRound?p->SizeA:p->SizeB;s.physical.elevation=p->get_Elevation();
     std::wostringstream out;out.imbue(std::locale::classic());out<<std::setprecision(17);
     putPoint(out,p->FirstPoint);putPoint(out,p->LastPoint);putId(out,p->ownerId());
     out<<p->SizeA<<L';'<<p->SizeB<<L';'<<p->Elev<<L';'<<p->ElevUp<<L';'<<p->ElevDown<<L';'
@@ -102,22 +112,44 @@ inline bool describe(TVS_Entity* e,tvsMove::Node& n){
     if(!tvsMove::describe(e,n))return false;
     TVS_TAP* tap=TVS_TAP::cast(e);
     if(tap&&(tap->Form==Form_Up||tap->Form==Form_Down)){
-        const double r=tap->get_radius()+tap->SizeB/2;
+        // Round vertical elbows: bend plane dimension is the diameter (SizeA); only the smooth
+        // constant/variable TVS radius modes have a resolved geometry.
+        const bool round=tap->ThisRound;
+        const double r=tap->get_radius()+(round?tap->SizeA:tap->SizeB)/2;
         const AcGeVector3d start=tap->Startvector;
-        if(tap->ThisRound||tap->DuctType!=DuctTypeStill||!tvsOffset::finite(r)||r<=0
+        if((round&&tap->RadiusTypeRound!=RadiusTypeRound_RadiusConstant&&tap->RadiusTypeRound!=RadiusTypeRound_RadiusVariable)
+            ||tap->DuctType!=DuctTypeStill||!tvsOffset::finite(r)||r<=0
             ||tap->Swectangle<=0||tap->Swectangle>=tvsOffset::pi()/2
             ||std::fabs(start.length()-1)>1e-8||std::fabs(start.z)>1e-8
             ||(tap->Normvector-AcGeVector3d(0,0,1)).length()>1e-8)return false;
         const AcGeVector3d u(-start.y,start.x,0);
         n.ports.clear();n.axes.clear();n.sections.clear();n.kind=2;
-        n.ports.push_back(tvsMove::point(tap->MiddlePoint-u*(r*std::sin(tap->Swectangle))));
-        n.ports.push_back(tvsMove::point(tap->MiddlePoint));
+        if(round){tvsRoundElbow::P ma,mc;
+            tvsRoundElbow::ports(tvsRoundElbow::P(tap->MiddlePoint.x,tap->MiddlePoint.y),start.x,start.y,tap->Swectangle,r,ma,mc);
+            n.ports.push_back(tvsMove::point(AcGePoint3d(ma.x,ma.y,tap->MiddlePoint.z)));
+            n.ports.push_back(tvsMove::point(AcGePoint3d(mc.x,mc.y,tap->MiddlePoint.z)));}
+        else{n.ports.push_back(tvsMove::point(tap->MiddlePoint-u*(r*std::sin(tap->Swectangle))));
+            n.ports.push_back(tvsMove::point(tap->MiddlePoint));}
         n.axes.push_back(tvsMoveGeometry::Point(u.x,u.y,0));
         n.axes.push_back(tvsMoveGeometry::Point(0,0,1)); // sloping port cannot join a horizontal pipe
-        n.sections.push_back(tvsMoveNetwork::Section(tap->SizeA,tap->SizeB,false,tap->Elev));
-        n.sections.push_back(tvsMoveNetwork::Section(tap->SizeA,tap->SizeB,false,
+        n.sections.push_back(tvsMoveNetwork::Section(tap->SizeA,tap->SizeB,round,tap->Elev));
+        n.sections.push_back(tvsMoveNetwork::Section(tap->SizeA,tap->SizeB,round,
             tap->Elev+(tap->Form==Form_Up?1:-1)*r*(1-std::cos(tap->Swectangle))));
     }
+    return true;
+}
+// True when an element that cannot be described does not touch the selected duct.
+inline bool unrelated(TVS_Entity* e,const tvsMove::Node& node,TVS_Pipe* source,const AcGePoint3d ends[2],double tol){
+    for(const auto& c:e->connectors)if(c.connectionID==source->objectId())return false;
+    for(const auto& c:source->connectors)if(c.connectionID==e->objectId())return false;
+    std::vector<tvsMoveGeometry::Point> points(node.ports.begin(),node.ports.end());
+    if(TVS_Pipe* p=TVS_Pipe::cast(e)){points.push_back(tvsMove::point(p->FirstPoint));points.push_back(tvsMove::point(p->LastPoint));
+        // the selected duct's ends must not lie on this pipe either
+        for(int k=0;k<2;++k)if(tvsMoveNetwork::interior(tvsMove::point(ends[k]),tvsMove::point(p->FirstPoint),tvsMove::point(p->LastPoint),tol))return false;}
+    if(points.empty())return false; // nothing known about its position: stay conservative
+    for(const auto& q:points){
+        for(int k=0;k<2;++k)if(tvsMoveGeometry::pointsNear(q,tvsMove::point(ends[k]),tol))return false;
+        if(tvsMoveNetwork::interior(q,tvsMove::point(ends[0]),tvsMove::point(ends[1]),tol))return false;}
     return true;
 }
 inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature,bool bounded=false){
@@ -146,7 +178,11 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature,
         AcDbObjectPointer<AcDbEntity> object;object.acquire(rawEntity);
         TVS_Entity* e=TVS_Entity::cast(object.object());if(!e||e->objectId()==s.source)continue;
         tvsMove::Node node;if(!describe(e,node)||!node.kind||node.ports.size()!=node.axes.size()
-            ||node.ports.size()!=node.sections.size())return reject(L"Nepodrzana TVS geometrija u Model prostoru.");
+            ||node.ports.size()!=node.sections.size()){
+            // An element TVS cannot describe (flex duct, special fitting) only blocks when it
+            // touches the selected duct: a port at/inside the duct or a connector to it.
+            if(!unrelated(e,node,source,ends,tol))return reject(L"Nepodrzana TVS geometrija (npr. flex ili poseban fiting) dodiruje izabrani kanal.");
+            continue;}
         putId(out,e->objectId());
         if(!connections(e,out))return false;
         for(const auto& c:e->connectors)if(c.connectionID==s.source){
@@ -168,7 +204,7 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature,
                <<sec.round<<L';'<<axis.x<<L';'<<axis.y<<L';'<<axis.z<<L';';
             if(std::fabs(sec.elevation-source->Elev)>tol)continue;
             for(int k=0;k<2;++k)if(tvsMoveGeometry::pointsNear(p,tvsMove::point(ends[k]),tol)){
-                if(!node.kind||!tvsMoveNetwork::compatible(sec,tvsMoveNetwork::Section(source->SizeA,source->SizeB,false,source->Elev),tol))
+                if(!node.kind||!tvsMoveNetwork::compatible(sec,tvsMoveNetwork::Section(source->SizeA,source->SizeB,source->ThisRound,source->Elev),tol))
                     return reject(L"Nepodrzan ili nesaglasan prikljucak.");
                 tvsMoveGeometry::Point u,v;
                 if(!tvsMoveGeometry::unit(axis,u)||!tvsMoveGeometry::unit(tvsMoveGeometry::Point(ends[1].x-ends[0].x,ends[1].y-ends[0].y,ends[1].z-ends[0].z),v)
@@ -207,7 +243,7 @@ inline bool capture(const AcDbObjectId& id,tvsOffsetOperation::End end,Snapshot&
     if(p.openStatus()!=Acad::eOk)return reject(L"Kanal nije dostupan.");
     s.owner=p->ownerId();
     if(s.owner!=tvsOffsetProof::modelId(s.db)||s.db->currentSpaceId()!=s.owner)return reject(L"Potreban je direktan kanal u Model prostoru.");
-    if(!pipeState(p.object(),s))return false;
+    if(!pipeState(p.object(),s,bounded))return false;
     tvsOffsetOperation::Request validation;validation.elevation=s.physical.elevation;
     if(tvsOffsetOperation::prepare(s.physical,validation).status!=tvsOffsetOperation::NoChange)
         return reject(L"Neispravan ili nehorizontalan kanal.");
@@ -247,18 +283,22 @@ inline bool appearance(TVS_Pipe* source,TVS_Entity* target,const Snapshot& s){
 inline std::unique_ptr<TVS_TAP> makeElbow(TVS_Pipe* source,const Snapshot& s,const tvsOffsetAdapter::Elbow& e){
     std::unique_ptr<TVS_TAP> tap(new TVS_TAP());initialize(tap.get());tap->setDatabaseDefaults();
     if(!appearance(source,tap.get(),s))return std::unique_ptr<TVS_TAP>();
-    tap->SizeA=e.sizeA;tap->SizeB=e.sizeB;tap->ThisRound=false;tap->DuctType=DuctTypeStill;
-    tap->TypeRoundTap=TypeRoundTap_TapSection;tap->RadiusTypeRect=RadiusTypeRect_RadiusConstant;
+    tap->SizeA=e.sizeA;tap->SizeB=s.round?0:e.sizeB;tap->ThisRound=s.round;tap->DuctType=DuctTypeStill;
+    tap->TypeRoundTap=s.round?s.typeRoundTap:TypeRoundTap_TapSection;tap->RadiusTypeRect=RadiusTypeRect_RadiusConstant;
     tap->RadiusTypeRound=RadiusTypeRound_RadiusConstant;tap->RadiusVariableParameter=.5;tap->RadiusConst=e.innerRadius;
     tap->Swectangle=e.angle;tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,0);tap->Normvector=AcGeVector3d(0,0,1);
-    tap->MiddlePoint=tvsOffsetProof::pt(e.middle);tap->CenterPoint=tap->MiddlePoint;
+    tap->MiddlePoint=tvsOffsetProof::pt(e.middle);
+    if(s.round){ // same ports as the rectangular parameterisation (adapter MiddlePoint = MC)
+        const tvsRoundElbow::P m=tvsRoundElbow::middleFromMc(tvsRoundElbow::P(e.middle.x,e.middle.y),e.startVector.x,e.startVector.y,e.angle,e.innerRadius+e.sizeA/2);
+        tap->MiddlePoint=AcGePoint3d(m.x,m.y,e.middle.z);}
+    tap->CenterPoint=tap->MiddlePoint;
     if(!checked(tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down))||!checked(tap->put_Elevation(e.elevation)))return std::unique_ptr<TVS_TAP>();
     return tap;
 }
 inline std::unique_ptr<TVS_Pipe> makePipe(TVS_Pipe* source,const Snapshot& s,const tvsOffset::WorldPoint& first,const tvsOffset::WorldPoint& last,double elevation){
     std::unique_ptr<TVS_Pipe> p(new TVS_Pipe());initializePipe(p.get());p->setDatabaseDefaults();
     if(!appearance(source,p.get(),s))return std::unique_ptr<TVS_Pipe>();
-    p->SizeA=s.physical.a;p->SizeB=s.physical.b;p->ThisRound=false;p->DuctType=DuctTypeStill;
+    p->SizeA=s.physical.a;p->SizeB=s.round?0:s.physical.b;p->ThisRound=s.round;p->DuctType=DuctTypeStill;
     p->FirstPoint=tvsOffsetProof::pt(first);p->LastPoint=tvsOffsetProof::pt(last);
     if(!checked(p->put_Elevation(elevation)))return std::unique_ptr<TVS_Pipe>();
     p->connectors[0].point=p->FirstPoint;p->connectors[1].point=p->LastPoint;

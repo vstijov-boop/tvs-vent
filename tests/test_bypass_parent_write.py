@@ -24,7 +24,7 @@ class ParentWrite(unittest.TestCase):
 #include <vector>
 typedef wchar_t ACHAR;
 typedef long ads_name[2];
-namespace Acad {enum ErrorStatus {eOk,eInvalidInput,eAlreadyInDb,eFail};}
+namespace Acad {enum ErrorStatus {eOk,eInvalidInput,eAlreadyInDb,eFail,eInvalidAdsName};}
 namespace AcDb {enum OpenMode {kForWrite};}
 struct CString {
  std::wstring text;CString(){}CString(const wchar_t* t):text(t){}
@@ -37,7 +37,9 @@ struct AcDbObjectId {int id;AcDbObjectId(int v=0):id(v){}bool isNull()const{retu
 struct resbuf {short restype;resbuf* rbnext;struct Value {
  long rlong;short rint;double rreal;ads_name rlname;wchar_t* rstring;
  } resval;};
+static int adsCalls=0,failAdsCall=0;
 inline Acad::ErrorStatus acdbGetAdsName(ads_name out,AcDbObjectId id){
+ if(++adsCalls==failAdsCall)return Acad::eInvalidInput;
  if(id.isNull())return Acad::eInvalidInput;
  out[0]=17;out[1]=id.id;return Acad::eOk;
 }
@@ -78,6 +80,8 @@ struct AcDbXrecord:AcDbObject {
  Acad::ErrorStatus setFromRbChain(const resbuf& head){
   if(failChain)return Acad::eFail;
   for(const resbuf* p=&head;p;p=p->rbnext){Field f={};f.type=p->restype;
+   // Native AutoCAD 2022 (user run, d444b5d): a 330 with a zero ads name -> eInvalidAdsName.
+   if(f.type==330&&!p->resval.rlname[0]&&!p->resval.rlname[1])return Acad::eInvalidAdsName;
    if(f.type==330)f.id=static_cast<int>(p->resval.rlname[1]);
    if(f.type==90)f.integer=static_cast<int>(p->resval.rlong);
    if(f.type==70)f.integer=p->resval.rint;
@@ -118,7 +122,7 @@ namespace tvsBypassData {
         code += r'''
 static AcDbDatabase db;
 static void setup(tvsBypassData::Record& r,AcDbObject* members[7],bool hDictionary=false){
- objects.clear();storage.clear();nextId=100;manager=AcDbTransactionManager();failChain=false;
+ objects.clear();storage.clear();nextId=100;manager=AcDbTransactionManager();failChain=false;adsCalls=0;failAdsCall=0;
  keep(new AcDbDictionary(),1);r=tvsBypassData::Record();r.factor=1;r.inlet=50;r.outlet=51;r.obstacle=52;
  for(int j=0;j<7;++j){
   members[j]=new AcDbObject();r.members[j]=keep(members[j],10+j);
@@ -146,7 +150,8 @@ int main(){
   assert(record&&record->translated&&record->fields.size()==27);
   assert(record->fields[4].id==10&&record->fields[5].id==13&&record->fields[6].id==14);
   assert(record->fields[7].id==50&&record->fields[8].id==51&&record->fields[9].id==52);
-  assert(record->fields[23].id==0&&record->fields[24].id==0);
+  // No neighbor: the 330 slot holds the inlet as a placeholder and the port stays 0.
+  assert(record->fields[23].id==50&&record->fields[24].id==50&&record->fields[25].integer==0&&record->fields[26].integer==0);
   for(int j=0;j<7;++j){
    assert(members[j]->creates==(!existingH&&j==3?1:0));
    auto d=AcDbDictionary::cast(objects[members[j]->ext.id]);
@@ -155,7 +160,13 @@ int main(){
   }
   originalsIntact(members,existingH);assert(manager.adds==8);++cases;
  }
- for(int fail=0;fail<6;++fail){
+ {// Explicit neighbor: stored as a resolved 330, its port kept.
+  tvsBypassData::Record r;AcDbObject* members[7];setup(r,members);AcDbObjectId parent;r.neighbors[1]=60;r.ports[1]=1;
+  assert(tvsBypassData::write(&db,r,members,parent)==Acad::eOk);
+  auto record=dynamic_cast<AcDbXrecord*>(objects[parent.id]);
+  assert(record->fields[23].id==50&&record->fields[25].integer==0&&record->fields[24].id==60&&record->fields[26].integer==1);++cases;
+ }
+ for(int fail=0;fail<8;++fail){
   tvsBypassData::Record r;AcDbObject* members[7];setup(r,members);AcDbObjectId parent;
   if(fail==0)members[3]->failCreate=true;
   if(fail==1)manager.failOpen=1;
@@ -163,6 +174,9 @@ int main(){
   if(fail==3)manager.failAdd=1;
   if(fail==4)manager.active=0;
   if(fail==5){auto d=AcDbDictionary::cast(objects[members[0]->ext.id]);d->entries[L"TVS_BYPASS_PARENT"]=777;}
+  // Non-null ads-name statuses: 7th call is the present neighbor (fail 6) or the first parent backlink (fail 7).
+  if(fail==6){r.neighbors[0]=60;r.ports[0]=1;failAdsCall=7;}
+  if(fail==7)failAdsCall=7;
   assert(tvsBypassData::write(&db,r,members,parent)!=Acad::eOk);
   originalsIntact(members);
   if(fail==5){auto d=AcDbDictionary::cast(objects[members[0]->ext.id]);assert(d->entries.at(L"TVS_BYPASS_PARENT")==777);}

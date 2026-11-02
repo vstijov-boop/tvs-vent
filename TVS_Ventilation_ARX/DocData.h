@@ -25,6 +25,9 @@
 //----- See the AsdkDmgr.h / DocData.cpp for more datails
 //-----------------------------------------------------------------------------
 #pragma once
+#ifdef TVS_BYPASS_PREVIEW
+#include "BypassDialogState.h"
+#endif
 
 //-----------------------------------------------------------------------------
 //----- Here you can store the document / database related data.
@@ -33,6 +36,11 @@ class CDocData {
 	//----- TODO: here you can add your variables
 
 public:
+#ifdef TVS_BYPASS_PREVIEW
+	// DEV bypass dialog: last confirmed design settings of THIS document only.
+	// Destroyed with the document; never saved to the drawing.
+	tvsBypassUx::Memory bypassMemory;
+#endif
 	CDocData () ;
 	CDocData (const CDocData &data) ;
 	~CDocData () ;

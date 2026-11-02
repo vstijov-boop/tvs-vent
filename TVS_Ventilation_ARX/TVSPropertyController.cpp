@@ -400,7 +400,7 @@ bool TVSPropertyController::getMass(const AcDbObjectId &objectId, double &val)
     {
         AcDbObjectPointer<AcDbObject> object(objectId,AcDb::kForRead);
         if(object.openStatus()!=Acad::eOk)return false;
-        tvsOffsetData::Status status=tvsOffsetData::validate(object.object());
+        tvsOffsetData::Status status=tvsOffsetData::quantityStatus(object.object());
         if(status!=tvsOffsetData::Legacy&&status!=tvsOffsetData::Valid&&status!=tvsOffsetData::Incomplete){
             acutPrintf(L"\nTVS OFFSET: masa nije dostupna — %s.",tvsOffsetData::statusText(status));return false;}
     }

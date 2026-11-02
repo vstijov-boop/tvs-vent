@@ -7,7 +7,7 @@ inline bool offsetSelectionValid(ads_name set){
     for(Adesk::Int32 j=0;j<count;++j){ads_name name;AcDbObjectId id;
         if(acedSSName(set,j,name)!=RTNORM||acdbGetObjectId(id,name)!=Acad::eOk)return false;
         AcDbObjectPointer<AcDbObject> object(id,AcDb::kForRead);if(object.openStatus()!=Acad::eOk)return false;
-        tvsOffsetData::Status s=tvsOffsetData::validate(object.object());
+        tvsOffsetData::Status s=tvsOffsetData::quantityStatus(object.object());
         if(s!=tvsOffsetData::Legacy&&s!=tvsOffsetData::Valid&&s!=tvsOffsetData::Incomplete){
             acutPrintf(L"\nTVS OFFSET: izvoz/obračun prekinut — %s. Nema horizontalnog fallback-a.",tvsOffsetData::statusText(s));return false;}
         if(s==tvsOffsetData::Incomplete)acutPrintf(L"\nTVS OFFSET: nepotpun sklop; obračun samo preostalih pojedinačnih elemenata.");

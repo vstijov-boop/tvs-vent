@@ -26,9 +26,19 @@ int main(){
   near(end.y,(-87+100*std::sin(heading)+50*std::cos(heading))/unit,"nonzero transverse projection y");
  }
  Snapshot s=example(1,0);s.route.first.x=-700;s.route.last.x=900;Frame f=adapt(s,1,false);near(f.left,-823,"asymmetric left");near(f.right,777,"asymmetric right");
- s=example(1,0);s.obstacle.last.x+=10;expect(!adapt(s,1,false).valid,"skew unsupported");
+ s=example(1,0);s.obstacle.last.x+=10;expect(adapt(s,1,false).valid&&adapt(s,1,false).crossingSine()<1,"slight skew is an oblique crossing");
+ // Oblique crossing: origin at the plan axis intersection, sin/cos of the plan angle.
+ for(double beta:{60.,45.,30.})for(bool reverse:{false,true}){const double b=beta*3.14159265358979323846/180;
+  Snapshot q=example(1,0);q.obstacle.first=Point(123+300-1200*std::cos(b),-87-1200*std::sin(b),37);q.obstacle.last=Point(123+300+1200*std::cos(b),-87+1200*std::sin(b),37);
+  Frame g=adapt(q,1,reverse);expect(g.valid,"oblique valid");near(g.origin.x,123+300,"oblique intersection x");near(g.origin.y,-87,"oblique intersection y");
+  near(g.crossingSine(),std::sin(b),"crossing sine");near(g.crossingCosine(),std::fabs(std::cos(b)),"crossing cosine");}
+ s=example(1,0);s.obstacle.first=Point(123-1200,-87-100,37);s.obstacle.last=Point(123+1200,-87+100,37);expect(!adapt(s,1,false).valid,"below 14.5 deg rejected");
+ // Round obstacle: TVS round duct has B = 0; diameter in both section sizes.
+ s=example(1,0);s.obstacle.rectangular=false;s.obstacle.b=0;{Frame g=adapt(s,1,false);expect(g.valid&&g.obstacleRound&&g.obstacleWidth==250&&g.obstacleHeight==250,"round obstacle frame");}
+ s=example(1,0);s.obstacle.rigid=false;expect(!adapt(s,1,false).valid,"flexible obstacle rejected");
  s=example(1,0);s.obstacle.last.z+=1;expect(!adapt(s,1,false).valid,"vertical obstacle rejected");
- s=example(1,0);s.route.rectangular=false;expect(!adapt(s,1,false).valid,"round unsupported");
+ s=example(1,0);s.route.rectangular=false;expect(!adapt(s,1,false).valid,"round route must have B = 0");
+ s=example(1,0);s.route.rectangular=false;s.route.b=0;s.route.a=315;{Frame g=adapt(s,1,false);expect(g.valid&&g.routeRound&&g.width==315&&g.height==315,"round route frame: diameter in both");}
  s=example(1,0);s.route.ordinary=false;expect(!adapt(s,1,false).valid,"marked slope rejected");
  s=example(1,0);expect(!adapt(s,0,false).valid,"unknown units not zero");s.route.a=std::numeric_limits<double>::quiet_NaN();expect(!adapt(s,1,false).valid,"invalid source");
  Revision rev;expect(!rev.current(),"no initial result");rev.accept();expect(rev.current(),"current result");rev.invalidate();expect(!rev.current(),"input change invalidates");
@@ -106,7 +116,20 @@ int main(){
      near(radius,expected,"circle radius derives from checked body");}
    }
    expect(arcs==20,"four elbows: bare and insulation boundaries plus exact axes");
-   for(size_t j=0;j<d.dimensions.size();++j){const auto& q=d.dimensions[j];expect(q.rail.z<d.minZ||q.rail.z>d.maxZ||q.rail.s<d.minS||q.rail.s>d.maxS,"dimension text external to geometry");}
+   // Layout: W/H/D texts outside the drawing, S texts beside their slope; no text inside a part.
+   for(size_t j=0;j<3;++j){const auto& q=d.dimensions[j];expect(q.rail.z<d.minZ||q.rail.s<d.minS,"W/H/D text below or left of the geometry");}
+   for(size_t j=0;j<d.dimensions.size();++j)for(const auto& path:d.paths){if(!path.closed||path.points.size()<3)continue;bool in=false;
+    for(size_t a=0,b=path.points.size()-1;a<path.points.size();b=a++){const Vertex& P=path.points[a];const Vertex& Q=path.points[b];
+     if(((P.z>d.dimensions[j].rail.z)!=(Q.z>d.dimensions[j].rail.z))&&(d.dimensions[j].rail.s<(Q.s-P.s)*(d.dimensions[j].rail.z-P.z)/(Q.z-P.z)+P.s))in=!in;}
+    expect(!in,"dimension text not on a part");}
+   expect(d.dimensions[1].rail.z>d.dimensions[0].rail.z,"smaller H row next to the part, W outside");
+   expect(d.levelTexts.size()==8,"level marks: start/pass/end top+bottom and obstacle top+bottom");
+   {const int dec=unit==1000?3:unit==10?1:0;const double bare=v.frame.height/2;
+    expect(d.levelTexts[0].text==displayNumber((v.axis.front().z+bare)/unit,dec),"start top level in drawing units");
+    expect(d.levelTexts[5].text==displayNumber((v.zPass-bare)/unit,dec),"passage bottom level in drawing units");
+    for(const auto& n:d.levelTexts){expect(n.at.z>d.dimensions[1].rail.z,"level texts above the dimension rows");
+     expect(d.dimensions[2].rail.s<n.at.s,"D rail left of the level marks");}}
+   for(const auto& n:d.notes)if(n.text.size()>3)expect(n.at.z<d.dimensions[0].rail.z,"note block below the dimensions");
   }
  }
  bool invalid=false;try{sideDetail(View(),Options(),"OB-01",false,3.5,3.5);}catch(const std::runtime_error&){invalid=true;}expect(invalid,"stale result has no insert model");
@@ -120,6 +143,36 @@ int main(){
   }
   expect(sectionLayout(sx,sy,false,expert).labels.empty(),"Kote off has no stale annotation slots");
  }
+ // As-built rebuild (TVS_BYPASS_DETALJ): recorded D, C, s0 and record policy, minimums
+ // not stored (0) -> the same checked geometry, axes and native ports, without a search.
+ for(double unit:{1.,10.,1000.})for(bool above:{false,true})for(int angle:{30,45,60}){
+  Snapshot b=example(unit,.3);Options q;q.confirmed=true;q.above=above;q.angle=angle;Frame bf=adapt(b,unit,false);q.left=bf.left;q.right=bf.right;
+  Engine search;View found=search.calculate(b,unit,false,q,false);expect(found.ready,"search candidate for rebuild");
+  Options built;built.ri=q.ri;built.insulation=q.insulation;built.obstacleInsulation=q.obstacleInsulation;built.clearance=q.clearance;built.reserve=q.reserve;
+  built.angle=angle;built.above=above;built.confirmed=true;built.minSlope=built.minBridge=built.minProjection=0;built.left=bf.left;built.right=bf.right;
+  // The command derives s0 from the inlet cut point (= first incoming port) and D/C from H.
+  const auto& cut=found.offsets[0].incomingLast;near(((cut.x-bf.origin.x)*bf.ux+(cut.y-bf.origin.y)*bf.uy)*unit,found.s0,"s0 is the cut point");
+  const auto& h0=found.offsets[0].outgoingFirst;const auto& h1=found.offsets[1].incomingLast;
+  near(std::hypot(h1.x-h0.x,h1.y-h0.y)*unit,found.C,"C is the H length");near(std::fabs(found.zPass-bf.z0),found.D,"D is |zPass-z0|");
+  Engine as;View again=as.rebuild(b,unit,false,built,found.D,found.C,found.s0);
+  expect(again.ready&&as.ready(),"rebuild reproduces a checked candidate");
+  near(again.W,found.W,"rebuild W");near(again.zPass,found.zPass,"rebuild pass elevation");expect(again.axis.size()==found.axis.size(),"rebuild axes");
+  for(size_t k=0;k<found.axis.size();++k){near(again.axis[k].s,found.axis[k].s,"rebuild axis s");near(again.axis[k].z,found.axis[k].z,"rebuild axis z");}
+  for(int j=0;j<2;++j){near(again.offsets[j].incomingLast.x,found.offsets[j].incomingLast.x,"rebuild port x");near(again.offsets[j].outgoingFirst.y,found.offsets[j].outgoingFirst.y,"rebuild port y");}
+  expect(!again.detailPaths.empty()&&again.detailPaths.size()==found.detailPaths.size(),"rebuild detail paths");
+  View off=as.rebuild(b,unit,false,built,found.D,found.C,bf.right+1);expect(!off.ready&&!as.ready(),"rebuild outside the duct is refused");
+ }
+ // Bridge end to end with a round and an oblique obstacle; detail paths and section curves.
+ for(int kind=0;kind<6;++kind){Snapshot q=example(1,0);
+  if(kind>=3){q.route.rectangular=false;q.route.b=0;q.route.a=315;} // round route x {rect, round, round oblique}
+  if(kind%3==1){q.obstacle.rectangular=false;q.obstacle.b=0;}
+  if(kind%3==2){const double b=60*3.14159265358979323846/180;q.obstacle.first=Point(123-1200*std::cos(b),-87-1200*std::sin(b),37);q.obstacle.last=Point(123+1200*std::cos(b),-87+1200*std::sin(b),37);q.obstacle.rectangular=false;q.obstacle.b=0;}
+  Options k;k.confirmed=true;Frame g=adapt(q,1,false);k.left=g.left;k.right=g.right;Engine e;View r=e.calculate(q,1,false,k,false);
+  expect(r.ready,"round/oblique obstacle candidate");expect(r.detailPaths.size()==21,"detail paths for the detail writer");
+  Options b2=k;b2.minSlope=b2.minBridge=b2.minProjection=0;Engine e2;View again=e2.rebuild(q,1,false,b2,r.D,r.C,r.s0);
+  expect(again.ready,"as-built rebuild for round/oblique obstacle");near(again.W,r.W,"rebuild W round/oblique");
+  SideDetail sd=sideDetail(r,k,"OB-01",true,3.5,3.5);bool circle=false;for(const auto& path:sd.paths)if(path.member==7&&path.points.size()==2&&path.bulges[0]==1)circle=true;
+  expect(kind%3==1?circle:!circle,"exact circle only for perpendicular round obstacle");}
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / presentation / layout / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
 

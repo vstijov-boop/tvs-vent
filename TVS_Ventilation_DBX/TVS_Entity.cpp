@@ -52,7 +52,7 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
     assertReadEnabled();
     areaM2 = thicknessMm = massKg = 0.0;
 #ifdef TVS_OFFSET_INTEGRATION
-    const tvsOffsetData::Status integrity=tvsOffsetData::validate(this);
+    const tvsOffsetData::Status integrity=tvsOffsetData::quantityStatus(this);
     if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
         acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
 #endif
@@ -106,7 +106,7 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
     if (!tvsSheetMetal::nonnegative(areaM2) || !tvsSheetMetal::nonnegative(massKg)) {
         areaM2 = thicknessMm = massKg = 0.0;
 #ifdef TVS_OFFSET_INTEGRATION
-    const tvsOffsetData::Status integrity=tvsOffsetData::validate(this);
+    const tvsOffsetData::Status integrity=tvsOffsetData::quantityStatus(this);
     if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
         acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
 #endif
@@ -1016,36 +1016,34 @@ void TVS_Entity::setMainProperty(AcDbEntity *pEnt)
 	ListOfEntity.append(pEnt);
 }
 
+void TVS_Entity::setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name) const
+{
+	AcDbDatabase *pDb = database() ? database() : acdbHostApplicationServices()->workingDatabase();
+	AcDbLinetypeTable *pLtTable = NULL;
+	AcDbObjectId ltId;
+	if (pDb && pDb->getSymbolTable(pLtTable, AcDb::kForRead) == Acad::eOk) {
+		pLtTable->getAt(name, ltId);
+		pLtTable->close();
+	}
+	pEnt->setLinetype(ltId);
+	pEnt->setLinetypeScale(this->linetypeScale() / tvsUnits::factor(pDb));
+}
+
 void TVS_Entity::setCenterProperty(AcDbEntity *pEnt)
 {
-	AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-	AcDbLinetypeTable *pLtTable;
-	AcDbObjectId ltId;
-	pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-	pLtTable->getAt(_T("tvs_centerline"), ltId);
-
-	pLtTable->close();
 	pEnt->setLineWeight(AcDb::LineWeight(15));
 	pEnt->setLayer(this->layerId());
-	pEnt->setLinetype(ltId);
+	setAuxLinetype(pEnt, _T("tvs_centerline"));
 	pEnt->setColor(this->color());
 	ListOfEntity.append(pEnt);
 }
 
 void TVS_Entity::setHideProperty(AcDbEntity *pEnt)
 {
-	AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-	AcDbLinetypeTable *pLtTable;
-	AcDbObjectId ltId;
-	pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-	pLtTable->getAt(_T("tvs_hidden"), ltId);
-
-	pLtTable->close();
 	pEnt->setLineWeight(AcDb::LineWeight(15));
 	pEnt->setLayer(this->layerId());
-	pEnt->setLinetype(ltId);
+	setAuxLinetype(pEnt, _T("tvs_hidden"));
 	pEnt->setColor(this->color());
-	pEnt->setLinetypeScale(this->linetypeScale());
 	ListOfEntity.append(pEnt);
 }
 

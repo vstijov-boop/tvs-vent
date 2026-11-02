@@ -72,10 +72,11 @@ public:
  ~PositionPreview(){for(auto p:entities){manager->eraseTransient(p,viewports);delete p;}}
  void show(const SideDetail& d,const AcGePoint3d& position){
   if(!manager)throw std::runtime_error("No transient manager");
-  entities.reserve(d.paths.size()+d.notes.size()+2*d.dimensions.size());
+  entities.reserve(d.paths.size()+d.notes.size()+d.levelTexts.size()+2*d.dimensions.size());
   AcGeMatrix3d transform=AcGeMatrix3d::translation(position.asVector());
   for(const auto& p:d.paths)add(polyline(p,d.factor),transform);
   for(const auto& n:d.notes)add(note(n,d),transform);
+  for(const auto& n:d.levelTexts)add(note(n,d),transform);
   // Positioning preview only: rails represent the future native dimensions, no DWG writes.
   for(const auto& q:d.dimensions){DetailPath p;p.member=9;p.insulation=false;p.axis=false;p.closed=false;
    Vertex a(q.a.s,q.rail.z),b(q.b.s,q.rail.z);if(q.a.s==q.b.s){a=Vertex(q.rail.s,q.a.z);b=Vertex(q.rail.s,q.b.z);}
@@ -130,6 +131,7 @@ static AcDbObjectId write(AcDbDatabase* db,const SideDetail& d,const View& view,
   AcDbObjectPointer<AcDbBlockTableRecord> block(blockId,AcDb::kForWrite);require(block.openStatus());
   for(const auto& path:d.paths){auto p=polyline(path,d.factor);require(p->setLayer(layerId));append(block.object(),std::move(p));}
   for(const auto& n:d.notes){auto p=note(n,d);require(p->setTextStyle(textId));require(p->setLayer(layerId));append(block.object(),std::move(p));}
+  for(const auto& n:d.levelTexts){auto p=note(n,d);require(p->setTextStyle(textId));require(p->setLayer(layerId));append(block.object(),std::move(p));}
   for(const auto& q:d.dimensions){std::wstring text=widen(q.prefix)+L"<> mm";
    std::unique_ptr<AcDbAlignedDimension> p(new AcDbAlignedDimension(point(q.a,d.factor),point(q.b,d.factor),point(q.rail,d.factor),text.c_str(),styleId));
    p->setDatabaseDefaults(db);require(p->setDimensionStyle(styleId));require(p->setLayer(layerId));
@@ -171,8 +173,9 @@ static void insert(AcDbDatabase* db,const View& v,const Options& o,const AcDbObj
   resbuf from={};from.restype=RTSHORT;from.resval.rint=1;resbuf to={};to.restype=RTSHORT;to.resval.rint=0;if(acedTrans(ucs,&from,&to,0,wcs)!=RTNORM)throw std::runtime_error("UCS conversion failed");
   AcGePoint3d position(wcs[0],wcs[1],wcs[2]);int confirm;
   {PositionPreview preview;preview.show(d,position);acedInitGet(0,L"Umetni Pozicija Otkazi");ACHAR answer[32]=L"";
-   confirm=acedGetKword(L"\nPreview detalja: [Umetni/Pozicija/Otkazi] <Otkazi>: ",answer);
-   if(confirm!=RTNORM)return;if(_wcsicmp(answer,L"Pozicija")==0)continue;if(_wcsicmp(answer,L"Umetni")!=0)return;}
+   confirm=acedGetKword(L"\nPreview detalja: [Umetni/Pozicija/Otkazi] <Umetni>: ",answer);
+   if(confirm==RTNONE)wcscpy_s(answer,L"Umetni");else if(confirm!=RTNORM)return; // Enter = Umetni, Esc = cancel
+   if(_wcsicmp(answer,L"Pozicija")==0)continue;if(_wcsicmp(answer,L"Umetni")!=0)return;}
   write(db,d,v,o,label,detailed,position,guid,handle(route),handle(obstacle));
   acutPrintf(L"\nUmetnut staticki detalj %ls. Standardne neasocijativne kote; bez trajnog TVS obilaska. COPY zadrzava identitet snimka.",widen(label).c_str());return;
  }

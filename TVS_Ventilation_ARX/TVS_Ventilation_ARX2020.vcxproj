@@ -150,7 +150,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(TVSBypassPreview)'=='true'">
-    <ClCompile><PreprocessorDefinitions>TVS_BYPASS_PREVIEW;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+    <ClCompile><PreprocessorDefinitions>TVS_BYPASS_PREVIEW;TVS_BYPASS_FAULT_INJECTION;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup Condition="'$(TVSBypassPreview)'=='true'">
     <ClCompile Include="BypassPreviewCommand.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions></ClCompile>

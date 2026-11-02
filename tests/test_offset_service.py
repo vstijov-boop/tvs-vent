@@ -22,7 +22,7 @@ class OffsetServiceTests(unittest.TestCase):
     def test_actual_service_guards_topology_and_transaction(self):
         text = (ROOT/'TVS_Ventilation_ARX/OffsetService.h').read_text(encoding='utf-8-sig')
         extracted = '\n'.join(function(text, s) for s in [
-            'inline bool connections(', 'inline bool topology(', 'inline bool current(', 'inline std::unique_ptr<TVS_TAP> makeElbow(', 'inline std::unique_ptr<TVS_Pipe> makePipe(', 'inline Outcome write('])
+            'inline bool connections(', 'inline bool unrelated(', 'inline bool topology(', 'inline bool current(', 'inline std::unique_ptr<TVS_TAP> makeElbow(', 'inline std::unique_ptr<TVS_Pipe> makePipe(', 'inline Outcome write('])
         # Layout-only formatting for the extracted existing compact C++ statements.
         extracted = extracted.replace(';if(', ';\n    if(')
         main = r'''
@@ -92,6 +92,13 @@ int main(){
  std::wstring signature;assert(!topology(live,&fixtureSource,signature));++assertions;
  reset();neighbor(0);nodes[2].ports[1]=tvsMoveGeometry::Point(-1000,0,37);
  assert(!topology(live,&fixtureSource,signature));++assertions;
+ // An element TVS cannot describe (kind 0, e.g. flex) blocks only when it touches the duct.
+ {reset();TVS_Pipe* flex=new TVS_Pipe();flex->id=5;flex->FirstPoint=AcGePoint3d(-1000,3000,37);flex->LastPoint=AcGePoint3d(500,3000,37);objects[5]=flex;
+  tvsMove::Node unknown;unknown.ports.push_back(tvsMove::point(flex->FirstPoint));unknown.ports.push_back(tvsMove::point(flex->LastPoint));nodes[5]=unknown;
+  assert(topology(live,&fixtureSource,signature));++assertions;
+  flex->LastPoint=fixtureSource.LastPoint;nodes[5].ports[1]=tvsMove::point(flex->LastPoint);assert(!topology(live,&fixtureSource,signature));++assertions;
+  flex->LastPoint=AcGePoint3d(-1000,0,37);flex->FirstPoint=AcGePoint3d(-1000,500,37);nodes[5].ports[0]=tvsMove::point(flex->FirstPoint);nodes[5].ports[1]=tvsMove::point(flex->LastPoint);
+  assert(!topology(live,&fixtureSource,signature));++assertions;}
  for(int e=0;e<2;++e)for(int failure=0;failure<11;++failure){
   std::cout<<"write end="<<e<<" failure="<<failure<<"\n";
   reset();live.physical.end=tvsOffsetOperation::End(e);Snapshot before=live;
@@ -237,7 +244,9 @@ struct resbuf {int restype;struct {int rint;double rreal;const wchar_t* rstring;
 static int allocated=0,released=0,dictionaryEntries=0;
 static resbuf* node(int type){++allocated;return new resbuf(type);}
 static void acutRelRb(resbuf* p){while(p){resbuf* next=p->rbnext;delete p;++released;p=next;}}
-struct AcDbDictionary {int numEntries(){return dictionaryEntries;}};
+static const wchar_t* dictionaryName=L"Other";
+struct AcDbDictionaryIterator {int at;AcDbDictionaryIterator():at(0){}bool done(){return at>=dictionaryEntries;}void next(){++at;}const wchar_t* name(){return dictionaryName;}};
+struct AcDbDictionary {int numEntries(){return dictionaryEntries;}AcDbDictionaryIterator* newIterator(){return new AcDbDictionaryIterator();}};
 template<class T>struct AcDbObjectPointer {T value;AcDbObjectPointer(AcDbObjectId,AcDb::OpenMode){}
  Acad::ErrorStatus openStatus(){return Acad::eOk;}T* operator->(){return &value;}};
 struct TVS_Pipe {resbuf* data;bool dictionary;TVS_Pipe():data(NULL),dictionary(false){}
@@ -276,6 +285,8 @@ int main(){
  {Snapshot s;resbuf* data=app();data->rbnext=node(1070);assert(!run(data,s));++cases;}
  {Snapshot s;resbuf* data=app();number(data,5,0);assert(!run(data,s));++cases;}
  {Snapshot s;TVS_Pipe p;p.dictionary=true;dictionaryEntries=1;std::wostringstream out;assert(!properties(&p,s,out));++cases;}
+ // A former obstacle carries only the display-only hidden-edge mark: accepted.
+ {Snapshot s;TVS_Pipe p;p.dictionary=true;dictionaryEntries=1;dictionaryName=L"TVS_HIDDEN_BY_V1";std::wostringstream out;assert(properties(&p,s,out));++cases;dictionaryName=L"Other";}
  assert(allocated==released);
  std::cout<<"PASS "<<cases<<" actual read-only attribute-policy cases: shared manufacturer/note, unique position retained, ambiguous overrides/unknown apps/duplicates/dictionaries refused, buffers released; SDK substitutes only\n";
 }

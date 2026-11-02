@@ -8,6 +8,7 @@
 #include "dbxrecrd.h"
 #include "dbobjptr.h"
 #include "dbtrans.h"
+#include "../geometry/RoundElbow.h"
 #include "../geometry/OffsetGeometry.h"
 #include <set>
 #include <memory>
@@ -52,6 +53,7 @@ static Status read(const AcDbObjectId& id,Record& out){
         p=p->rbnext;
     }
     if(p)ok=false;acutRelRb(b);if(!ok)return Corrupt;if(version!=1)return UnsupportedVersion;
+    for(int k=0;k<2;++k)if(out.ports[k]==0)out.neighbors[k]=AcDbObjectId::kNull; // placeholder slot
     GUID parsed;if(out.guid.GetLength()!=38||FAILED(CLSIDFromString(const_cast<ACHAR*>(out.guid.GetString()),&parsed))||out.revision<1
         ||!tvsUnits::validFactor(out.factor)||out.factor!=tvsUnits::factor(r.object()))return Corrupt;
     for(double v:out.policy)if(!tvsOffset::finite(v)||v<0)return Corrupt;
@@ -64,7 +66,11 @@ static Status read(const AcDbObjectId& id,Record& out){
     }
     return Valid;
 }
+// MA: the horizontal face of a vertical TVS elbow (rectangular or round parameterisation).
 static AcGePoint3d horizontalPort(TVS_TAP* p){
+    if(p->ThisRound){tvsRoundElbow::P ma,mc;
+        tvsRoundElbow::ports(tvsRoundElbow::P(p->MiddlePoint.x,p->MiddlePoint.y),p->Startvector.x,p->Startvector.y,p->Swectangle,p->get_radius()+p->SizeA/2,ma,mc);
+        return AcGePoint3d(ma.x,ma.y,p->MiddlePoint.z);}
     return p->MiddlePoint-AcGeVector3d(-p->Startvector.y,p->Startvector.x,0)*((p->get_radius()+p->SizeB/2)*std::sin(p->Swectangle));
 }
 static bool boundaryPinned(const Record& r,const AcDbObjectId& source,bool first){
@@ -140,7 +146,8 @@ Status validate(const AcDbObject* object,bool geometry){
     if(a.openStatus()!=Acad::eOk||b.openStatus()!=Acad::eOk||c.openStatus()!=Acad::eOk||d.openStatus()!=Acad::eOk||h.openStatus()!=Acad::eOk)return Corrupt;
     if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk)return Incomplete;
     const double f=r.factor;
-    if(h->ThisRound||in->ThisRound||out->ThisRound||h->DuctType!=DuctTypeStill||in->DuctType!=DuctTypeStill||out->DuctType!=DuctTypeStill||h->FirstPoint.distanceTo(h->LastPoint)*f<=.001
+    const bool round=in->ThisRound; // whole assembly round or rectangular, never mixed
+    if(h->ThisRound!=round||out->ThisRound!=round||a->ThisRound!=round||d->ThisRound!=round||h->DuctType!=DuctTypeStill||in->DuctType!=DuctTypeStill||out->DuctType!=DuctTypeStill||h->FirstPoint.distanceTo(h->LastPoint)*f<=.001
         ||std::fabs(a->Elev-d->Elev)*f>.001||std::fabs(b->Elev-c->Elev)*f>.001||std::fabs(h->Elev-b->Elev)*f>.001
         ||std::fabs(a->SizeA-c->SizeA)*f>.001||std::fabs(a->SizeB-c->SizeB)*f>.001
         ||std::fabs(h->SizeA-a->SizeA)*f>.001||std::fabs(h->SizeB-a->SizeB)*f>.001
@@ -162,6 +169,11 @@ Status validate(const AcDbObject* object,bool geometry){
     }
     return Valid;
 }
+Status assembly(const AcDbObject* member,Record& record){
+    const Status s=validate(member,true);if(s!=Valid)return s;
+    AcDbObjectId parent;int role=-1;if(link(member,parent,role)!=Valid)return Corrupt;
+    return read(parent,record);
+}
 static Acad::ErrorStatus newRecord(AcDbDictionary* dict,const ACHAR* key,const resbuf& data,AcDbTransactionManager* tx,AcDbObjectId& id){
     AcDbXrecord* r=new AcDbXrecord();Acad::ErrorStatus es=r->setFromRbChain(data);if(es!=Acad::eOk){delete r;return es;}
     r->setXlateReferences(true);es=dict->setAt(key,r,id);if(es!=Acad::eOk){delete r;return es;}
@@ -175,7 +187,14 @@ Acad::ErrorStatus write(AcDbDatabase* db,Record& r,AcDbObject* members[7],AcDbOb
     const AcDbObjectId refs[]={r.members[0],r.members[3],r.members[4],r.inlet,r.outlet,r.obstacle};
     for(int j=0;j<6;++j)if(acdbGetAdsName(nodes[j+4].resval.rlname,refs[j])!=Acad::eOk)return Acad::eInvalidInput;
     nodes[10].resval.rint=r.reverse?1:0;for(int j=0;j<4;++j)nodes[11+j].resval.rreal=r.policy[j];for(int j=0;j<8;++j)nodes[15+j].resval.rreal=r.obstacleSnapshot[j];
-    for(int j=0;j<2;++j){if(!r.neighbors[j].isNull())acdbGetAdsName(nodes[23+j].resval.rlname,r.neighbors[j]);nodes[25+j].resval.rint=static_cast<short>(r.ports[j]);}
+    for(int j=0;j<2;++j){
+        // AutoCAD rejects a 330 with a zero ads name (eInvalidAdsName, confirmed in 2022). A
+        // missing neighbor therefore stores the inlet as placeholder with port 0; read()
+        // treats port 0 as "no neighbor". Same V1 layout, no new assembly data.
+        const bool present=!r.neighbors[j].isNull();
+        if(present&&r.ports[j]!=1&&r.ports[j]!=2)return Acad::eInvalidInput;
+        if(acdbGetAdsName(nodes[23+j].resval.rlname,present?r.neighbors[j]:r.inlet)!=Acad::eOk)return Acad::eInvalidInput;
+        nodes[25+j].resval.rint=static_cast<short>(present?r.ports[j]:0);}
     AcDbObject* raw=NULL;Acad::ErrorStatus es=tx->getObject(raw,db->namedObjectsDictionaryId(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
     AcDbDictionary* nod=AcDbDictionary::cast(raw);if(!nod)return Acad::eInvalidInput;
     CString key=L"TVS_BYPASS_"+r.guid;es=newRecord(nod,key,nodes[0],tx,parent);if(es!=Acad::eOk)return es;
@@ -188,7 +207,7 @@ Acad::ErrorStatus write(AcDbDatabase* db,Record& r,AcDbObject* members[7],AcDbOb
         raw=NULL;es=tx->getObject(raw,members[j]->extensionDictionary(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
         AcDbDictionary* dict=AcDbDictionary::cast(raw);if(!dict||dict->has(memberKey()))return Acad::eInvalidInput;
         resbuf linkData[3]={};linkData[0].restype=90;linkData[0].resval.rlong=1;linkData[0].rbnext=&linkData[1];
-        linkData[1].restype=330;acdbGetAdsName(linkData[1].resval.rlname,parent);linkData[1].rbnext=&linkData[2];linkData[2].restype=70;linkData[2].resval.rint=static_cast<short>(j);
+        linkData[1].restype=330;if(acdbGetAdsName(linkData[1].resval.rlname,parent)!=Acad::eOk)return Acad::eInvalidInput;linkData[1].rbnext=&linkData[2];linkData[2].restype=70;linkData[2].resval.rint=static_cast<short>(j);
         AcDbObjectId id;es=newRecord(dict,memberKey(),linkData[0],tx,id);if(es!=Acad::eOk)return es;
     }
     return Acad::eOk;
