@@ -62,6 +62,7 @@
 #include <iostream>
 #include "commonDef.h"
 #include "DrawingUnits.h"
+#include "../geometry/FlexHose.h"
 
 #include <algorithm>
 using namespace std;
@@ -315,6 +316,8 @@ public:
 	void setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name) const;
 	void setZigzagProperty(AcDbEntity *pEnt);
 	void setThinProperty(AcDbEntity *pEnt);
+	// Flexible hose (geometry/FlexHose.h): bead edges as bulged polylines, thin ring lines, at plan level z.
+	void setFlexDrawing(const tvsFlex::Drawing& drawing, double z);
 	double get_WipeoutLength(void) const;
 	Acad::ErrorStatus put_WipeoutLength(double newVal);
 	virtual void setFlex(const bool &isFlex);

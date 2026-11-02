@@ -390,8 +390,12 @@ Adesk::Boolean TVS_TAP::subWorldDraw(AcGiWorldDraw *mode) {
 
 
 
-				setZigzagProperty(arcie1);
-				setZigzagProperty(arcie2);
+				// Air hose elbow: convex beads around the bend (geometry/FlexHose.h); zigzag fallback.
+				tvsFlex::Drawing hose;
+				if (tvsFlex::elbow(CenterPoint.x, CenterPoint.y, Radius + SizeA / 2, startangle, Swectangle, SizeA, tvsFlex::defaultPitch(), hose)) {
+					setFlexDrawing(hose, CenterPoint.z); delete arcie1; delete arcie2;
+				}
+				else { setZigzagProperty(arcie1); setZigzagProperty(arcie2); }
 				setCenterProperty(arcie3);
 				// 			setMainProperty(pLine1);
 				// 			setMainProperty(pLine2);

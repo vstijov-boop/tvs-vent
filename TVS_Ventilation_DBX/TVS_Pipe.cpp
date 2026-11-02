@@ -415,7 +415,16 @@ setWipeoutProperty(mode,wPline);
 				delete edges[j];
 			}
 		}
-		if (DuctType==DuctTypeFlex) {setZigzagProperty(Line1); setZigzagProperty(Line2);}
+		if (DuctType==DuctTypeFlex) {
+			// Air hose: convex beads of pitch k*D (geometry/FlexHose.h); zigzag only as fallback.
+			AcGeVector3d axis(LastPoint.x - FirstPoint.x, LastPoint.y - FirstPoint.y, 0);
+			const double length = axis.length();
+			tvsFlex::Drawing hose;
+			if (length > 0 && tvsFlex::straight(FirstPoint.x, FirstPoint.y, axis.x / length, axis.y / length, length, SizeA, tvsFlex::defaultPitch(), hose)) {
+				setFlexDrawing(hose, FirstPoint.z); delete Line1; delete Line2;
+			}
+			else { setZigzagProperty(Line1); setZigzagProperty(Line2); }
+		}
 		
 
 		

@@ -1067,6 +1067,23 @@ void TVS_Entity::setZigzagProperty(AcDbEntity *pEnt)
 	ListOfEntity.append(pEnt);
 }
 
+void TVS_Entity::setFlexDrawing(const tvsFlex::Drawing& drawing, double z)
+{
+	for (int side = 0; side < 2; ++side) {
+		const std::vector<tvsFlex::Vertex>& edge = drawing.edges[side];
+		if (edge.size() < 2) continue;
+		AcDbPolyline* pl = new AcDbPolyline(static_cast<unsigned int>(edge.size()));
+		for (size_t j = 0; j < edge.size(); ++j)
+			pl->addVertexAt(static_cast<unsigned int>(j), AcGePoint2d(edge[j].x, edge[j].y), edge[j].bulge);
+		pl->setElevation(z);
+		setMainProperty(pl);
+	}
+	for (size_t j = 0; j < drawing.rings.size(); ++j) {
+		const tvsFlex::Line& l = drawing.rings[j];
+		setThinProperty(new AcDbLine(AcGePoint3d(l.x0, l.y0, z), AcGePoint3d(l.x1, l.y1, z)));
+	}
+}
+
 void TVS_Entity::setThinProperty( AcDbEntity *pEnt )
 {
 	pEnt->setLineWeight(AcDb::LineWeight(15));
