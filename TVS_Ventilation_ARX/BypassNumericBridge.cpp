@@ -46,6 +46,7 @@ static tvsBypass::Input problem(const Frame& f,const Options& o){
  in.obstacleS=0;in.obstacleZ=f.obstacleZ;in.obstacleWidth=f.obstacleWidth;in.obstacleHeight=f.obstacleHeight;
  in.obstacleTmin=f.tmin;in.obstacleTmax=f.tmax;in.insulation=o.insulation;in.obstacleInsulation=o.obstacleInsulation;in.clearance=o.clearance;
  in.windowLeft=o.left;in.windowRight=o.right;in.floor.active=o.useFloor;in.floor.mm=o.floor;in.ceiling.active=o.useCeiling;in.ceiling.mm=o.ceiling;
+ in.obstacleRound=f.obstacleRound;in.crossingSine=f.crossingSine();in.crossingCosine=f.crossingCosine();
  return in;
 }
 // View of one checked candidate: shared by the search and by an as-built rebuild.
@@ -92,9 +93,15 @@ static bool assemble(const Frame& f,const tvsBypassSearch::Result& r,const Optio
     c.kind=JointSymbol;
     c.points.push_back(Vertex(middle(ports[k].s),-f.width/2-o.insulation));c.points.push_back(Vertex(middle(ports[k].s),f.width/2+o.insulation));out.plan.push_back(c);}}
  }
- out.profile.push_back(rectangle(7,false,-f.obstacleWidth/2,f.obstacleWidth/2,f.obstacleZ-f.obstacleHeight/2,f.obstacleZ+f.obstacleHeight/2));
- out.profile.push_back(rectangle(7,true,-f.obstacleWidth/2-o.obstacleInsulation,f.obstacleWidth/2+o.obstacleInsulation,f.obstacleZ-f.obstacleHeight/2-o.obstacleInsulation,f.obstacleZ+f.obstacleHeight/2+o.obstacleInsulation));
- out.plan.push_back(rectangle(7,true,-f.obstacleWidth/2-o.obstacleInsulation,f.obstacleWidth/2+o.obstacleInsulation,f.tmin,f.tmax));
+ // True obstacle section in this plane (rectangle / circle; stretched by 1/sin when oblique).
+ for(int iso=0;iso<2;++iso){Curve c;c.member=7;c.insulation=iso!=0;
+  for(const auto& q:obstacleSection(f,iso?o.obstacleInsulation:0))c.points.push_back(Vertex(q.first,q.second));
+  c.points.push_back(c.points.front());out.profile.push_back(c);}
+ {// Plan footprint along the obstacle axis (ods,odt) between its transverse ends.
+  const double hw=f.obstacleWidth/2+o.obstacleInsulation,nx=-f.odt,nz=f.ods;
+  const double a=f.tmin/f.odt,b=f.tmax/f.odt;Curve c;c.member=7;c.insulation=true;
+  c.points={Vertex(a*f.ods+hw*nx,f.tmin+hw*nz),Vertex(b*f.ods+hw*nx,f.tmax+hw*nz),Vertex(b*f.ods-hw*nx,f.tmax-hw*nz),Vertex(a*f.ods-hw*nx,f.tmin-hw*nz)};
+  c.points.push_back(c.points.front());out.plan.push_back(c);}
  // The union footprint has constant width. Individual fitting envelopes are diagnostics.
  double left=out.plan.front().points.front().s,right=left;
  for(const auto& c:out.plan)if(c.member<7)for(const auto& vertex:c.points){left=std::min(left,vertex.s);right=std::max(right,vertex.s);}

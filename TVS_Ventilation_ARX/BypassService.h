@@ -13,7 +13,8 @@ struct Snapshot {tvsOffsetService::Snapshot route;AcDbObjectId obstacle;std::wst
 struct Commit {AcDbObjectId output,parent;TVS_Pipe* resident;double elevation,angle;Commit():resident(NULL),elevation(0),angle(0){}};
 inline bool obstacleState(const AcDbObjectId& id,std::wstring& value){
     AcDbObjectPointer<TVS_Pipe> p(id,AcDb::kForRead);
-    if(p.openStatus()!=Acad::eOk||p->isA()!=TVS_Pipe::desc()||p->ThisRound||p->DuctType!=DuctTypeStill
+    // Rectangular or round rigid obstacle (round: SizeB = 0); its state is fingerprinted below.
+    if(p.openStatus()!=Acad::eOk||p->isA()!=TVS_Pipe::desc()||p->DuctType!=DuctTypeStill
         ||p->ownerId()!=tvsOffsetProof::modelId(p->database())||tvsOffsetData::marked(p.object()))return false;
     std::wostringstream s;s.imbue(std::locale::classic());s<<std::setprecision(17);
     tvsOffsetService::putPoint(s,p->FirstPoint);tvsOffsetService::putPoint(s,p->LastPoint);

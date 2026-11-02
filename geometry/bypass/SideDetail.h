@@ -25,6 +25,16 @@ inline DetailPath detailRectangle(double l,double r,double bottom,double top,boo
  DetailPath p;p.member=7;p.insulation=insulation;p.axis=false;p.closed=true;
  p.points={Vertex(l,bottom),Vertex(r,bottom),Vertex(r,top),Vertex(l,top)};p.bulges={0,0,0,0};return p;
 }
+// Obstacle section for the detail: exact bulge circle for a perpendicular round duct,
+// rectangle or polygonal ellipse otherwise (same shape as the checked section).
+inline DetailPath detailObstacle(const Frame& f,double insulation,bool iso){
+ if(f.obstacleRound&&f.crossingSine()==1){const double r=f.obstacleWidth/2+insulation;
+  DetailPath p;p.member=7;p.insulation=iso;p.axis=false;p.closed=true;
+  p.points={Vertex(-r,f.obstacleZ),Vertex(r,f.obstacleZ)};p.bulges={1,1};return p;}
+ DetailPath p;p.member=7;p.insulation=iso;p.axis=false;p.closed=true;
+ for(const auto& q:obstacleSection(f,insulation)){p.points.push_back(Vertex(q.first,q.second));p.bulges.push_back(0);}
+ return p;
+}
 // All internal coordinates/annotations are mm; only the final DWG adapter divides by factor.
 inline SideDetail sideDetail(const View& v,const Options& o,const std::string& label,bool detailed,double textMm,double arrowMm){
  if(!v.ready||!v.frame.valid||v.axis.size()!=8||v.detailPaths.size()!=21||!detailLabelValid(label)||
@@ -32,8 +42,8 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  textMm<.5||textMm>100||arrowMm<.5||arrowMm>100)throw std::runtime_error("Invalid detail snapshot/options");
  SideDetail d;d.textHeight=textMm;d.arrowSize=arrowMm;d.factor=v.frame.factor;
  d.paths=v.detailPaths;
- d.paths.push_back(detailRectangle(-v.frame.obstacleWidth/2,v.frame.obstacleWidth/2,v.frame.obstacleZ-v.frame.obstacleHeight/2,v.frame.obstacleZ+v.frame.obstacleHeight/2,false));
- d.paths.push_back(detailRectangle(-v.frame.obstacleWidth/2-o.obstacleInsulation,v.frame.obstacleWidth/2+o.obstacleInsulation,v.frame.obstacleZ-v.frame.obstacleHeight/2-o.obstacleInsulation,v.frame.obstacleZ+v.frame.obstacleHeight/2+o.obstacleInsulation,true));
+ d.paths.push_back(detailObstacle(v.frame,0,false));
+ d.paths.push_back(detailObstacle(v.frame,o.obstacleInsulation,true));
  // Translate the absolute physical elevation datum to the local drawing origin. Geometry stays 1:1.
  d.minS=d.maxS=0;d.minZ=d.maxZ=0;
  for(auto& p:d.paths)for(auto& x:p.points){x.s-=v.axis.front().s;x.z-=v.frame.z0;
@@ -61,13 +71,17 @@ inline SideDetail sideDetail(const View& v,const Options& o,const std::string& l
  note("STATICKI SNIMAK; bez zive veze. Pogled: +s desno, fizicki +Z gore; papirni XY nije WCS Z.");
  note("Sve kote/oznake u mm; geometrija 1:1 u DWG "+std::string(d.factor==1?"mm":d.factor==10?"cm":"m")+". Kote nisu asocijativne.");
  note("Z pocetak = "+displayNumber(v.axis.front().z)+"; Z kraj = "+displayNumber(v.axis.back().z)+"; Z prolaz = "+displayNumber(v.zPass)+" mm (apsolutni datum)");
- note("Kanal A x B = "+displayNumber(v.frame.width)+" x "+displayNumber(v.frame.height)+"; prepreka = "+displayNumber(v.frame.obstacleWidth)+" x "+displayNumber(v.frame.obstacleHeight)+" mm");
+ const double crossingDeg=std::asin((std::min)(1.0,v.frame.crossingSine()))*180/3.141592653589793;
+ note("Kanal A x B = "+displayNumber(v.frame.width)+" x "+displayNumber(v.frame.height)+"; prepreka = "+
+  (v.frame.obstacleRound?"fi "+displayNumber(v.frame.obstacleWidth):displayNumber(v.frame.obstacleWidth)+" x "+displayNumber(v.frame.obstacleHeight))+" mm"+
+  (v.frame.crossingSine()<1?"; ukrstanje "+displayNumber(crossingDeg)+" deg (presjek prepreke izduzen 1/sin)":""));
  note("K1-K4: ugao = "+displayNumber(double(o.angle),0)+" deg; Ri = "+displayNumber(o.ri)+" mm; izolacije kanal/prepreka = "+displayNumber(o.insulation)+" / "+displayNumber(o.obstacleInsulation)+" mm");
  note("Komadi redom: K1 / S1 / K2 / H / K3 / S2 / K4");
  note("S1 = "+displayNumber(v.slopePhysical[0])+"; H = "+displayNumber(v.C)+"; S2 = "+displayNumber(v.slopePhysical[1])+" mm (fizicke duzine)");
  note("Kriticni geometrijski razmak = "+displayGap(v)+"; zahtjev = "+displayNumber(o.clearance)+"; rezerva = "+displayNumber(o.reserve)+" mm");
- double overlapLeft=(std::max)(v.axis[3].s,-v.frame.obstacleWidth/2-o.obstacleInsulation);
- double overlapRight=(std::min)(v.axis[4].s,v.frame.obstacleWidth/2+o.obstacleInsulation);
+ const double sectionHalf=(v.frame.obstacleWidth/2+o.obstacleInsulation)/(v.frame.crossingSine()>0?v.frame.crossingSine():1);
+ double overlapLeft=(std::max)(v.axis[3].s,-sectionHalf);
+ double overlapRight=(std::min)(v.axis[4].s,sectionHalf);
  const double gap=std::fabs(v.zPass-v.frame.obstacleZ)-v.frame.height/2-o.insulation-v.frame.obstacleHeight/2-o.obstacleInsulation;
  note(overlapLeft<=overlapRight?"Vertikalni zazor H/prepreka u horizontalnom preklopu = "+displayNumber(gap)+" mm (nije geometrijski minimum)":"Vertikalni zazor H/prepreka: nema horizontalnog preklopa; nije definisan.");
  if(detailed){

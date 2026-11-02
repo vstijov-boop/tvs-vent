@@ -124,7 +124,11 @@ struct Dialog {
  void source(){
   Frame f=engine.frame(snapshot,factor(),reverse);std::wostringstream t;
   if(f.valid){
-   t<<L"TRASA "<<f.width<<L" × "<<f.height<<L" mm, osa Z="<<f.z0<<L" mm     |     PREPREKA "<<f.obstacleWidth<<L" × "<<f.obstacleHeight<<L" mm, osa Z="<<f.obstacleZ<<L" mm (iz objekata)\r\n";
+   t<<L"TRASA "<<f.width<<L" × "<<f.height<<L" mm, osa Z="<<f.z0<<L" mm     |     PREPREKA ";
+   if(f.obstacleRound)t<<L"Ø"<<f.obstacleWidth;else t<<f.obstacleWidth<<L" × "<<f.obstacleHeight;
+   t<<L" mm, osa Z="<<f.obstacleZ<<L" mm (iz objekata)";
+   if(f.crossingSine()<1)t<<L", ukrštanje "<<std::asin(f.crossingSine())*180/3.141592653589793<<L"° (razmak se traži kao razmak/sin u presjeku)";
+   t<<L"\r\n";
    t<<L"Jedinice: "<<(unitFromRecord?L"TVS zapis crteža":unitDefault?L"TVS podrazumijevano mm (crtež nema zapis jedinica)":L"ručni izbor")<<L" — provjerite i potvrdite. s=0 je presjek osa; +s prati "<<(reverse?L"prvi":L"posljednji")<<L" kraj trase.\r\n";
    t<<L"Sve mjere i fizičke kote ispod su u mm. Presjek nije uvećan po visini; crtačka ravan Z="<<f.origin.z<<L" jedinica.";
    if(!riSource.empty())t<<L"   Ri: "<<riSource<<(riEdited?L" (ručno izmijenjen)":L"");
@@ -365,7 +369,7 @@ void tvsBypassExistingDetailCommand(){
   s.route.a=in->SizeA;s.route.b=in->SizeB;s.route.elevation=in->get_Elevation();s.route.rectangular=s.route.rigid=s.route.ordinary=true;
   const double* q=r.obstacleSnapshot; // obstacle as recorded at acceptance
   s.obstacle.first=Point(q[0],q[1],q[7]);s.obstacle.last=Point(q[2],q[3],q[7]);s.obstacle.elevation=q[4];s.obstacle.a=q[5];s.obstacle.b=q[6];
-  s.obstacle.rectangular=s.obstacle.rigid=s.obstacle.ordinary=true;
+  s.obstacle.rigid=s.obstacle.ordinary=true;s.obstacle.rectangular=q[6]>0; // TVS round duct: B = 0
   Options o;o.ri=elbow->get_radius()*f;o.clearance=r.policy[0];o.insulation=r.policy[1];o.obstacleInsulation=r.policy[2];o.reserve=r.policy[3];
   const double degrees=elbow->Swectangle*180/tvsOffset::pi();int angle=0;
   for(int a:{30,45,60})if(std::fabs(degrees-a)<1e-6)angle=a;
@@ -402,7 +406,7 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
   Snapshot s;AcDbObjectId route=active,obstacle;
   if(active.isNull()){if(!readPipe(L"\nIzaberite pravi horizontalni TVS kanal: ",s.route,route))return false;}
   else if(!readSegment(active,s.route))return false;
-  if(!readPipe(L"\nIzaberite pravougaonu horizontalnu TVS prepreku: ",s.obstacle,obstacle)||route==obstacle)return false;
+  if(!readPipe(L"\nIzaberite horizontalnu TVS prepreku (pravougaona ili kruzna): ",s.obstacle,obstacle)||route==obstacle)return false;
   bool reverse=false;
   if(active.isNull()){
    acedInitGet(0,L"Prvi Posljednji");ACHAR answer[80]=L"";

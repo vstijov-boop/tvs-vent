@@ -26,7 +26,16 @@ int main(){
   near(end.y,(-87+100*std::sin(heading)+50*std::cos(heading))/unit,"nonzero transverse projection y");
  }
  Snapshot s=example(1,0);s.route.first.x=-700;s.route.last.x=900;Frame f=adapt(s,1,false);near(f.left,-823,"asymmetric left");near(f.right,777,"asymmetric right");
- s=example(1,0);s.obstacle.last.x+=10;expect(!adapt(s,1,false).valid,"skew unsupported");
+ s=example(1,0);s.obstacle.last.x+=10;expect(adapt(s,1,false).valid&&adapt(s,1,false).crossingSine()<1,"slight skew is an oblique crossing");
+ // Oblique crossing: origin at the plan axis intersection, sin/cos of the plan angle.
+ for(double beta:{60.,45.,30.})for(bool reverse:{false,true}){const double b=beta*3.14159265358979323846/180;
+  Snapshot q=example(1,0);q.obstacle.first=Point(123+300-1200*std::cos(b),-87-1200*std::sin(b),37);q.obstacle.last=Point(123+300+1200*std::cos(b),-87+1200*std::sin(b),37);
+  Frame g=adapt(q,1,reverse);expect(g.valid,"oblique valid");near(g.origin.x,123+300,"oblique intersection x");near(g.origin.y,-87,"oblique intersection y");
+  near(g.crossingSine(),std::sin(b),"crossing sine");near(g.crossingCosine(),std::fabs(std::cos(b)),"crossing cosine");}
+ s=example(1,0);s.obstacle.first=Point(123-1200,-87-100,37);s.obstacle.last=Point(123+1200,-87+100,37);expect(!adapt(s,1,false).valid,"below 14.5 deg rejected");
+ // Round obstacle: TVS round duct has B = 0; diameter in both section sizes.
+ s=example(1,0);s.obstacle.rectangular=false;s.obstacle.b=0;{Frame g=adapt(s,1,false);expect(g.valid&&g.obstacleRound&&g.obstacleWidth==250&&g.obstacleHeight==250,"round obstacle frame");}
+ s=example(1,0);s.obstacle.rigid=false;expect(!adapt(s,1,false).valid,"flexible obstacle rejected");
  s=example(1,0);s.obstacle.last.z+=1;expect(!adapt(s,1,false).valid,"vertical obstacle rejected");
  s=example(1,0);s.route.rectangular=false;expect(!adapt(s,1,false).valid,"round unsupported");
  s=example(1,0);s.route.ordinary=false;expect(!adapt(s,1,false).valid,"marked slope rejected");
@@ -139,6 +148,16 @@ int main(){
   expect(!again.detailPaths.empty()&&again.detailPaths.size()==found.detailPaths.size(),"rebuild detail paths");
   View off=as.rebuild(b,unit,false,built,found.D,found.C,bf.right+1);expect(!off.ready&&!as.ready(),"rebuild outside the duct is refused");
  }
+ // Bridge end to end with a round and an oblique obstacle; detail paths and section curves.
+ for(int kind=0;kind<3;++kind){Snapshot q=example(1,0);
+  if(kind==1){q.obstacle.rectangular=false;q.obstacle.b=0;}
+  if(kind==2){const double b=60*3.14159265358979323846/180;q.obstacle.first=Point(123-1200*std::cos(b),-87-1200*std::sin(b),37);q.obstacle.last=Point(123+1200*std::cos(b),-87+1200*std::sin(b),37);q.obstacle.rectangular=false;q.obstacle.b=0;}
+  Options k;k.confirmed=true;Frame g=adapt(q,1,false);k.left=g.left;k.right=g.right;Engine e;View r=e.calculate(q,1,false,k,false);
+  expect(r.ready,"round/oblique obstacle candidate");expect(r.detailPaths.size()==21,"detail paths for the detail writer");
+  Options b2=k;b2.minSlope=b2.minBridge=b2.minProjection=0;Engine e2;View again=e2.rebuild(q,1,false,b2,r.D,r.C,r.s0);
+  expect(again.ready,"as-built rebuild for round/oblique obstacle");near(again.W,r.W,"rebuild W round/oblique");
+  SideDetail sd=sideDetail(r,k,"OB-01",true,3.5,3.5);bool circle=false;for(const auto& path:sd.paths)if(path.member==7&&path.points.size()==2&&path.bulges[0]==1)circle=true;
+  expect(kind==1?circle:!circle,"exact circle only for perpendicular round obstacle");}
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / presentation / layout / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
 
