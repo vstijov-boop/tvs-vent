@@ -24,7 +24,7 @@ class ParentWrite(unittest.TestCase):
 #include <vector>
 typedef wchar_t ACHAR;
 typedef long ads_name[2];
-namespace Acad {enum ErrorStatus {eOk,eInvalidInput,eAlreadyInDb,eFail};}
+namespace Acad {enum ErrorStatus {eOk,eInvalidInput,eAlreadyInDb,eFail,eInvalidAdsName};}
 namespace AcDb {enum OpenMode {kForWrite};}
 struct CString {
  std::wstring text;CString(){}CString(const wchar_t* t):text(t){}
@@ -80,6 +80,8 @@ struct AcDbXrecord:AcDbObject {
  Acad::ErrorStatus setFromRbChain(const resbuf& head){
   if(failChain)return Acad::eFail;
   for(const resbuf* p=&head;p;p=p->rbnext){Field f={};f.type=p->restype;
+   // Native AutoCAD 2022 (user run, d444b5d): a 330 with a zero ads name -> eInvalidAdsName.
+   if(f.type==330&&!p->resval.rlname[0]&&!p->resval.rlname[1])return Acad::eInvalidAdsName;
    if(f.type==330)f.id=static_cast<int>(p->resval.rlname[1]);
    if(f.type==90)f.integer=static_cast<int>(p->resval.rlong);
    if(f.type==70)f.integer=p->resval.rint;
@@ -148,7 +150,8 @@ int main(){
   assert(record&&record->translated&&record->fields.size()==27);
   assert(record->fields[4].id==10&&record->fields[5].id==13&&record->fields[6].id==14);
   assert(record->fields[7].id==50&&record->fields[8].id==51&&record->fields[9].id==52);
-  assert(record->fields[23].id==0&&record->fields[24].id==0);
+  // No neighbor: the 330 slot holds the inlet as a placeholder and the port stays 0.
+  assert(record->fields[23].id==50&&record->fields[24].id==50&&record->fields[25].integer==0&&record->fields[26].integer==0);
   for(int j=0;j<7;++j){
    assert(members[j]->creates==(!existingH&&j==3?1:0));
    auto d=AcDbDictionary::cast(objects[members[j]->ext.id]);
@@ -161,7 +164,7 @@ int main(){
   tvsBypassData::Record r;AcDbObject* members[7];setup(r,members);AcDbObjectId parent;r.neighbors[1]=60;r.ports[1]=1;
   assert(tvsBypassData::write(&db,r,members,parent)==Acad::eOk);
   auto record=dynamic_cast<AcDbXrecord*>(objects[parent.id]);
-  assert(record->fields[23].id==0&&record->fields[24].id==60&&record->fields[26].integer==1);++cases;
+  assert(record->fields[23].id==50&&record->fields[25].integer==0&&record->fields[24].id==60&&record->fields[26].integer==1);++cases;
  }
  for(int fail=0;fail<8;++fail){
   tvsBypassData::Record r;AcDbObject* members[7];setup(r,members);AcDbObjectId parent;

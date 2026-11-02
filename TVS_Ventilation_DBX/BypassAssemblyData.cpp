@@ -52,6 +52,7 @@ static Status read(const AcDbObjectId& id,Record& out){
         p=p->rbnext;
     }
     if(p)ok=false;acutRelRb(b);if(!ok)return Corrupt;if(version!=1)return UnsupportedVersion;
+    for(int k=0;k<2;++k)if(out.ports[k]==0)out.neighbors[k]=AcDbObjectId::kNull; // placeholder slot
     GUID parsed;if(out.guid.GetLength()!=38||FAILED(CLSIDFromString(const_cast<ACHAR*>(out.guid.GetString()),&parsed))||out.revision<1
         ||!tvsUnits::validFactor(out.factor)||out.factor!=tvsUnits::factor(r.object()))return Corrupt;
     for(double v:out.policy)if(!tvsOffset::finite(v)||v<0)return Corrupt;
@@ -176,9 +177,13 @@ Acad::ErrorStatus write(AcDbDatabase* db,Record& r,AcDbObject* members[7],AcDbOb
     for(int j=0;j<6;++j)if(acdbGetAdsName(nodes[j+4].resval.rlname,refs[j])!=Acad::eOk)return Acad::eInvalidInput;
     nodes[10].resval.rint=r.reverse?1:0;for(int j=0;j<4;++j)nodes[11+j].resval.rreal=r.policy[j];for(int j=0;j<8;++j)nodes[15+j].resval.rreal=r.obstacleSnapshot[j];
     for(int j=0;j<2;++j){
-        // Missing neighbor: 330 with a zero name (read() maps it back to kNull). Present: must resolve.
-        if(!r.neighbors[j].isNull()&&acdbGetAdsName(nodes[23+j].resval.rlname,r.neighbors[j])!=Acad::eOk)return Acad::eInvalidInput;
-        nodes[25+j].resval.rint=static_cast<short>(r.ports[j]);}
+        // AutoCAD rejects a 330 with a zero ads name (eInvalidAdsName, confirmed in 2022). A
+        // missing neighbor therefore stores the inlet as placeholder with port 0; read()
+        // treats port 0 as "no neighbor". Same V1 layout, no new assembly data.
+        const bool present=!r.neighbors[j].isNull();
+        if(present&&r.ports[j]!=1&&r.ports[j]!=2)return Acad::eInvalidInput;
+        if(acdbGetAdsName(nodes[23+j].resval.rlname,present?r.neighbors[j]:r.inlet)!=Acad::eOk)return Acad::eInvalidInput;
+        nodes[25+j].resval.rint=static_cast<short>(present?r.ports[j]:0);}
     AcDbObject* raw=NULL;Acad::ErrorStatus es=tx->getObject(raw,db->namedObjectsDictionaryId(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
     AcDbDictionary* nod=AcDbDictionary::cast(raw);if(!nod)return Acad::eInvalidInput;
     CString key=L"TVS_BYPASS_"+r.guid;es=newRecord(nod,key,nodes[0],tx,parent);if(es!=Acad::eOk)return es;

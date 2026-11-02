@@ -119,3 +119,13 @@ Praktične UX provjere (nastavak liste iznad):
 12. Između računanja i Prihvati pomjeriti kanal/prepreku (u drugom pokušaju) →
     `[snapshot]` odbijanje, bez izmjena.
 13. 125 % i 150 % skaliranje: dijalog čitljiv, bez treptanja pri kucanju.
+
+## Native nalaz AutoCAD 2022 (paket d444b5d)
+
+Korisnička proba: `Pregled → Prihvati` →
+`TVS BYPASS [metapodaci] Upis roditelja/backlink-ova nije uspio. (ErrorStatus 31: eInvalidAdsName)`.
+Uzrok: `AcDbXrecord::setFromRbChain` odbija 330 sa nultim ads imenom — upravo slučaj
+kanala bez susjeda (sumnja iz pregleda je potvrđena). Ispravka bez novih podataka sklopa:
+nepostojeći susjed u istom V1 slotu čuva inlet kao rezervisanu referencu sa portom 0;
+`read()` port 0 tumači kao „nema susjeda“. Raniji DEV roditelji sa nultom 330 ne postoje,
+jer takav upis nikad nije uspio. Regresija sada modeluje ovo SDK ponašanje.
