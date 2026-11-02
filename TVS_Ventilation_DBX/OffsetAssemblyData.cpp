@@ -21,11 +21,6 @@ unsigned long revision(){return dataRevision;}
 static int writeDepth=0;static std::set<AcDbObjectId> clones;
 WriteScope::WriteScope(){++writeDepth;}WriteScope::~WriteScope(){--writeDepth;}
 void permitClone(const AcDbObjectId& id){clones.insert(id);}void clearClonePermits(){clones.clear();++dataRevision;}
-static std::set<AcDbObjectId> assemblyPermits;static int refusals=0;
-void permitAssemblyTransform(const AcDbObjectId& id){assemblyPermits.insert(id);}
-void clearAssemblyTransforms(){assemblyPermits.clear();}
-void noteTransformRefusal(){++refusals;}
-int takeTransformRefusals(){const int n=refusals;refusals=0;return n;}
 const ACHAR* statusText(Status s){switch(s){case Legacy:return L"Legacy";case Valid:return L"Valid";case Incomplete:return L"Incomplete";case UnsupportedVersion:return L"UnsupportedVersion";case GeometryMismatch:return L"GeometryMismatch";default:return L"Corrupt";}}
 CString newGuid(){GUID id;OLECHAR value[40]={0};if(FAILED(CoCreateGuid(&id)))return CString();StringFromGUID2(id,value,40);return CString(value);}
 Status read(const AcDbObject* object,Record& out){
@@ -85,30 +80,16 @@ Acad::ErrorStatus write(AcDbObject* object,const Record& r){
 
 bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy||tvsBypassData::marked(o);}
 bool editable(const AcDbObject* o){return writeDepth>0||!marked(o)||clones.find(o->objectId())!=clones.end();}
-// Rigid in plan: translation (any) plus rotation about Z; no scale, mirror or tilt.
-static bool rigidPlan(const AcGeMatrix3d& m){
-    for(int r=0;r<4;++r)for(int c=0;c<4;++c)if(!tvsOffset::finite(m.entry[r][c]))return false;
-    const double a=m.entry[0][0],b=m.entry[0][1],c=m.entry[1][0],d=m.entry[1][1];
-    if(std::fabs(a-d)>1e-10||std::fabs(b+c)>1e-10||std::fabs(a*a+c*c-1)>1e-10)return false;
-    if(std::fabs(m.entry[0][2])>1e-10||std::fabs(m.entry[1][2])>1e-10||std::fabs(m.entry[2][0])>1e-10||std::fabs(m.entry[2][1])>1e-10||std::fabs(m.entry[2][2]-1)>1e-10)return false;
-    return std::fabs(m.entry[3][0])<=1e-10&&std::fabs(m.entry[3][1])<=1e-10&&std::fabs(m.entry[3][2])<=1e-10&&std::fabs(m.entry[3][3]-1)<=1e-10;
-}
 bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
     if(!marked(o)||writeDepth>0)return true;
-    const AcDbObjectId id=o->objectId();
-    // Scratch transformed copies (drag preview) are not database objects.
-    if(id.isNull())return rigidPlan(m);
-    if(clones.find(id)!=clones.end()){
-        // Only positioning translations of known newly cloned objects, never scale/rotate.
-        for(int r=0;r<4;++r)for(int c=0;c<4;++c){
-            if(!tvsOffset::finite(m.entry[r][c]))return false;
-            if(c==3&&r<3)continue;
-            if(std::fabs(m.entry[r][c]-(r==c?1.0:0.0))>1e-10)return false;
-        }
-        return true;
+    if(!o->objectId().isNull()&&clones.find(o->objectId())==clones.end())return false;
+    // Only positioning translations of known newly cloned/scratch objects, never scale/rotate.
+    for(int r=0;r<4;++r)for(int c=0;c<4;++c){
+        if(!tvsOffset::finite(m.entry[r][c]))return false;
+        if(c==3&&r<3)continue;
+        if(std::fabs(m.entry[r][c]-(r==c?1.0:0.0))>1e-10)return false;
     }
-    // Original member: only with its whole assembly in the same selection, rigid in plan.
-    return assemblyPermits.find(id)!=assemblyPermits.end()&&rigidPlan(m);
+    return true;
 }
 static bool nearPoint(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
 Status validateCore(const AcDbObject* o,bool geometry){

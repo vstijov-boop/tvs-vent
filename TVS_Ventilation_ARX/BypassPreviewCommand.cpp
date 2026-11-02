@@ -367,14 +367,7 @@ void tvsBypassExistingDetailCommand(){
   const AcGePoint3d first=r.reverse?out->FirstPoint:in->FirstPoint,last=r.reverse?in->LastPoint:out->LastPoint;
   s.route.first=Point(first.x,first.y,first.z);s.route.last=Point(last.x,last.y,last.z);
   s.route.a=in->SizeA;s.route.b=in->SizeB;s.route.elevation=in->get_Elevation();s.route.rigid=s.route.ordinary=true;s.route.rectangular=!in->ThisRound;
-  // Obstacle at its CURRENT position: the whole bypass may have been moved/rotated (with or
-  // without the obstacle). The recorded snapshot is the fallback when the obstacle is gone.
-  double q[8];for(int j=0;j<8;++j)q[j]=r.obstacleSnapshot[j];
-  {AcDbObjectPointer<TVS_Pipe> live(r.obstacle,AcDb::kForRead);
-   if(live.openStatus()==Acad::eOk){const double now[]={live->FirstPoint.x,live->FirstPoint.y,live->LastPoint.x,live->LastPoint.y,live->Elev,live->SizeA,live->SizeB,live->FirstPoint.z};
-    bool moved=false;for(int j=0;j<8;++j){if(std::fabs(now[j]-q[j])*f>.001)moved=true;q[j]=now[j];}
-    if(moved)acutPrintf(L"\nTVS BYPASS DETALJ: prepreka ili obilazak promijenjeni poslije upisa; detalj se racuna i provjerava prema trenutnom polozaju.");}
-   else acutPrintf(L"\nTVS BYPASS DETALJ: prepreka nije dostupna; koristi se snimak iz trenutka upisa.");}
+  const double* q=r.obstacleSnapshot; // obstacle as recorded at acceptance
   s.obstacle.first=Point(q[0],q[1],q[7]);s.obstacle.last=Point(q[2],q[3],q[7]);s.obstacle.elevation=q[4];s.obstacle.a=q[5];s.obstacle.b=q[6];
   s.obstacle.rigid=s.obstacle.ordinary=true;s.obstacle.rectangular=q[6]>0; // TVS round duct: B = 0
   Options o;o.ri=elbow->get_radius()*f;o.clearance=r.policy[0];o.insulation=r.policy[1];o.obstacleInsulation=r.policy[2];o.reserve=r.policy[3];

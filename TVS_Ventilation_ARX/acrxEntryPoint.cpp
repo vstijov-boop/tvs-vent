@@ -123,7 +123,7 @@ public:
 #endif
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION
-        acedEditor->addReactor(&offsetReactor());tvsAssemblyMove::attachAll(true);
+        acedEditor->addReactor(&offsetReactor());
 #endif
         tvsLinetypes::ensureCurrent(); // drawing already open when the ARX is loaded
         // TODO: Add your initialization code here
@@ -137,7 +137,7 @@ public:
 #endif
         PropertyAdmin::uninitialize();
 #ifdef TVS_OFFSET_INTEGRATION
-        acedEditor->removeReactor(&offsetReactor());tvsAssemblyMove::attachAll(false);tvsOffsetData::clearClonePermits();
+        acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
 #endif
 		// TODO: Add your code here
 
@@ -149,13 +149,6 @@ public:
 		return (retCode);
 	}
 
-#ifdef TVS_OFFSET_INTEGRATION
-	virtual AcRx::AppRetCode On_kUnloadDwgMsg(void * pkt)
-	{
-		tvsAssemblyMove::detach(acDocManager?acDocManager->curDocument():NULL);
-		return AcRxArxApp::On_kUnloadDwgMsg(pkt);
-	}
-#endif
 	virtual AcRx::AppRetCode On_kLoadDwgMsg(void * pkt)
 	{
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kLoadDwgMsg(pkt);
@@ -166,9 +159,6 @@ public:
 		TVSController::get()->tvsPropertyController.registerApp();
         PropertyAdmin::initialize();
         tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
-#ifdef TVS_OFFSET_INTEGRATION
-        tvsAssemblyMove::attach(acDocManager?acDocManager->curDocument():NULL); // whole-assembly MOVE/ROTATE
-#endif
 
 		return (retCode);
 	}

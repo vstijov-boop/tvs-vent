@@ -14,7 +14,5 @@ DLLIMPEXP tvsOffsetData::Status validate(const AcDbObject* object,bool geometry=
 // Validated parent record of a bypass member (geometry checked). Read-only.
 DLLIMPEXP tvsOffsetData::Status assembly(const AcDbObject* member,Record& record);
 DLLIMPEXP Acad::ErrorStatus write(AcDbDatabase* db,Record& record,AcDbObject* members[7],AcDbObjectId& parent);
-// All seven member ids of the bypass `member` belongs to (parent + V1 triples read, no geometry check).
-DLLIMPEXP bool members(const AcDbObject* member,AcDbObjectId out[7]);
 }
 #endif

@@ -1172,7 +1172,7 @@ TVS_Pipe* TVS_Pipe::add_new(AcGePoint3d &pFirstPoint,
 Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 {
 #ifdef TVS_OFFSET_INTEGRATION
-    if(!tvsOffsetData::allowTransform(this,xform)){tvsOffsetData::noteTransformRefusal();return Acad::eNotApplicable;}
+    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS OFFSET: transformacija originalnog člana je zabranjena; COPY pozicioniranje je odvojeno.");return Acad::eNotApplicable;}
 #endif
 	assertWriteEnabled () ;
 
