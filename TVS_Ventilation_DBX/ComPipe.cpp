@@ -134,7 +134,12 @@ STDMETHODIMP CComPipe::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 		// стандартное 
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Kanal"));
+		{
+			// Flexible hose: say so in the Properties palette (same object type, DuctType flex).
+			AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForRead);
+			const bool flex = pSq.openStatus() == Acad::eOk && pSq->DuctType == DuctTypeFlex;
+			*propName = ::SysAllocString(flex ? L"Fleksibilni kanal" : _T("Kanal"));
+		}
 		break; 
 
 	case (DISPID_A): 
