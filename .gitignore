@@ -175,3 +175,6 @@ packages/
 *.db-shm
 *.db-shm
 
+
+# Python test cache
+__pycache__/
