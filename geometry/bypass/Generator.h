@@ -91,7 +91,9 @@ inline Result generate(const tvsBypass::Input& problem,const Policy& policy){
   out.status=Unsupported;return finish(out,start,"full transverse overlap not proven");}
  const I h=I(problem.height)/I(2)+I(problem.insulation);
  const I oh=I(problem.obstacleHeight)/I(2)+I(problem.obstacleInsulation);
- const I target=I(problem.clearance)+I(policy.designReserveMm);
+ // Same section model as the checker (oblique: clearance and reserve scaled by 1/sin).
+ const tvsBypass::Region section=tvsBypass::obstacleRegion(problem);
+ const I target=(I(problem.clearance)+I(policy.designReserveMm))/I(problem.crossingSine);
  // Necessary vertical offset at the horizontal crossing. Proposal seed only, not a feasibility proof.
  I need=problem.above?I(problem.obstacleZ)+oh+h+target-I(problem.z0):
  I(problem.z0)+h-(I(problem.obstacleZ)-oh)+target;
@@ -123,7 +125,7 @@ inline Result generate(const tvsBypass::Input& problem,const Policy& policy){
    if(out.seedSolveCalls>=policy.maxSeedSolves)return finish(out,start,"seed solve budget",uncertain);
    ++out.seedSolveCalls;solved=offset(problem,d);if(!solved.hasGeometry())continue;
   }
-  const double ow=(I(problem.obstacleWidth)+I(2)*I(problem.obstacleInsulation)).hi;
+  const double ow=(section.enclosure().s.hi-section.enclosure().s.lo);
   const double cmin=std::max(problem.minimumBridge,policy.bridgeStepMm);
   const double safe=std::max(cmin,(I(ow)+I(2)*(target+I(problem.insulation))).hi);
   std::vector<double> bridges;bridges.push_back(safe);bridges.push_back(std::max(cmin,ow));
