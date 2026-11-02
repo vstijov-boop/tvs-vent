@@ -15,13 +15,13 @@
 #include <vector>
 namespace tvsAssemblyMove {
 inline std::set<AcDbObjectId>& selected(){static std::set<AcDbObjectId> s;return s;}
+inline int& partial(){static int n=0;return n;}
 #ifdef TVS_BYPASS_PREVIEW
 inline bool& marked(){static bool m=false;return m;} // a marked member was seen this command
 inline void diag(const wchar_t* where){if(marked())acutPrintf(L"\nTVS SKLOP DIAG [%ls]: izbor=%d, dozvoljeno clanova=%d, djelimicnih sklopova=%d",where,static_cast<int>(selected().size()),tvsOffsetData::permittedCount(),partial());}
 #else
 inline void diag(const wchar_t*){}
 #endif
-inline int& partial(){static int n=0;return n;}
 inline void permitComplete(){
     tvsOffsetData::clearAssemblyTransforms();partial()=0;std::set<AcDbObjectId> done;
     for(const AcDbObjectId& id:selected()){
