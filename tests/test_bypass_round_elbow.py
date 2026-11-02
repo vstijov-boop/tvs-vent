@@ -45,4 +45,25 @@ int main(){int n=0;const double pi=3.14159265358979323846;
             cpp=pathlib.Path(folder)/'round.cpp';cpp.write_text(code)
             target=pathlib.Path(folder)/'round';compile_cpp(cpp,target)
             subprocess.run([str(executable(target))],check=True)
+    def test_round_slope_is_drawn(self):
+        # User run (23055593): round slopes were invisible because the rectangular joint
+        # projection needs SizeB > 0. The round branch must come before it.
+        src=squash((ROOT/'TVS_Ventilation_DBX/TVS_Pipe.cpp').read_text(encoding='utf-8-sig',errors='replace'))
+        self.assertLess(src.index('}elseif(ThisRound){'),src.index('tvsSlopeProjection::joints('))
+        self.assertIn('tvsSlopeProjection::roundSides(',src)
+        code='#include "'+(ROOT/'geometry/SlopeProjection.h').as_posix()+'"\n'+r'''
+#include <cassert>
+#include <iostream>
+int main(){using tvsOffset::WorldPoint;WorldPoint s[2][2],c[2][4];
+ assert(!tvsSlopeProjection::joints(WorldPoint(0,0,5),WorldPoint(300,400,5),315,0,120,c)); // the old failure
+ assert(tvsSlopeProjection::roundSides(WorldPoint(0,0,5),WorldPoint(300,400,5),315,s));
+ for(int k=0;k<2;++k){double nx=s[k][0].x,ny=s[k][0].y;assert(std::fabs(std::hypot(nx,ny)-157.5)<1e-9&&std::fabs(nx*300+ny*400)<1e-9);
+  assert(std::fabs(s[k][1].x-s[k][0].x-300)<1e-9&&std::fabs(s[k][1].y-s[k][0].y-400)<1e-9&&s[k][0].z==5);}
+ assert(!tvsSlopeProjection::roundSides(WorldPoint(1,1,0),WorldPoint(1,1,0),315,s));
+ std::cout<<"PASS ROUND SLOPE SIDES"<<std::endl;}
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            cpp=pathlib.Path(folder)/'sides.cpp';cpp.write_text(code)
+            target=pathlib.Path(folder)/'sides';compile_cpp(cpp,target)
+            subprocess.run([str(executable(target))],check=True)
 if __name__=='__main__':unittest.main()

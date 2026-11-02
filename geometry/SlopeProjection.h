@@ -16,5 +16,19 @@ inline bool joints(const tvsOffset::WorldPoint& first,const tvsOffset::WorldPoin
             if(!tvsOffset::finite(points[j][k].x)||!tvsOffset::finite(points[j][k].y)||!tvsOffset::finite(points[j][k].z))return false;}}
     return true;
 }
+// Round sloped straight (V1 member of a round bypass): plan silhouette of a tube of diameter
+// D is two side lines at +-D/2 between the end points (side points of a tilted end circle
+// stay on the axis station); the tilted end faces are drawn by the adjacent round elbows.
+inline bool roundSides(const tvsOffset::WorldPoint& first,const tvsOffset::WorldPoint& last,double diameter,
+                       tvsOffset::WorldPoint sides[2][2]){
+    const double dx=last.x-first.x,dy=last.y-first.y,len=std::hypot(dx,dy);
+    if(!(len>0)||!(diameter>0&&diameter<=DBL_MAX))return false;
+    const double nx=-dy/len*diameter/2,ny=dx/len*diameter/2;
+    for(int k=0;k<2;++k){const double s=k?1:-1;
+        sides[k][0]=tvsOffset::WorldPoint(first.x+s*nx,first.y+s*ny,first.z);
+        sides[k][1]=tvsOffset::WorldPoint(last.x+s*nx,last.y+s*ny,first.z);
+        if(!tvsOffset::finite(sides[k][0].x)||!tvsOffset::finite(sides[k][0].y)||!tvsOffset::finite(sides[k][1].x)||!tvsOffset::finite(sides[k][1].y))return false;}
+    return true;
+}
 }
 #endif

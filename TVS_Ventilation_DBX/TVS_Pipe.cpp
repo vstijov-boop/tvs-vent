@@ -301,6 +301,17 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
     if(offsetStatus!=tvsOffsetData::Legacy){
         if(offsetStatus!=tvsOffsetData::Valid||offset.role!=tvsOffsetData::SlopedStraight){
             AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);
+        }else if(ThisRound){
+            // Round bypass slope: SizeB = 0, so the rectangular joint projection does not apply.
+            tvsOffset::WorldPoint sides[2][2];
+            if(tvsSlopeProjection::roundSides(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
+                tvsOffset::WorldPoint(LastPoint.x,LastPoint.y,LastPoint.z),SizeA,sides)){
+                if(Wipeout){AcDbPolyline* mask=new AcDbPolyline();
+                    mask->addVertexAt(0,AcGePoint2d(FirstPoint.x,FirstPoint.y));mask->addVertexAt(1,AcGePoint2d(LastPoint.x,LastPoint.y));
+                    mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
+                if(!This1D)for(int k=0;k<2;++k)setMainProperty(new AcDbLine(AcGePoint3d(sides[k][0].x,sides[k][0].y,sides[k][0].z),AcGePoint3d(sides[k][1].x,sides[k][1].y,sides[k][1].z)));
+                setCenterProperty(new AcDbLine(FirstPoint,LastPoint));
+            }else{AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);}
         }else {
             tvsOffset::WorldPoint corners[2][4];
             if(tvsSlopeProjection::joints(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
