@@ -55,6 +55,7 @@
 #include "TVSController.h"
 #include "MleaderController.h"
 #include "PropertyAdmin.h"
+#include "TvsLinetypes.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -124,6 +125,7 @@ public:
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->addReactor(&offsetReactor());
 #endif
+        tvsLinetypes::ensureCurrent(); // drawing already open when the ARX is loaded
         // TODO: Add your initialization code here
 
 		return (retCode);
@@ -156,6 +158,7 @@ public:
 		mctrl.registerApp();
 		TVSController::get()->tvsPropertyController.registerApp();
         PropertyAdmin::initialize();
+        tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
 
 		return (retCode);
 	}
