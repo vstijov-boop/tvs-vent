@@ -14,4 +14,12 @@ class Linetypes(unittest.TestCase):
   self.assertIn('if(table->has(p.name))continue;',h,'existing linetypes are never replaced')
   src=(root/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8',errors='replace')
   self.assertEqual(src.count('tvsLinetypes::ensureCurrent();'),2,'on ARX load and on each drawing load')
+  dbx=root/'TVS_Ventilation_DBX'
+  entity=(dbx/'TVS_Entity.cpp').read_text(encoding='utf-8',errors='replace')
+  self.assertIn('pEnt->setLinetypeScale(this->linetypeScale() / tvsUnits::factor(pDb));',entity,'mm pattern: element scale / drawing units')
+  self.assertNotIn('/factor',h,'ARX-created records stay in mm like the .lin file')
+  for f in ('TVS_Entity.cpp','TVS_WYE.cpp','TVS_TRANS.cpp','TVS_TAP.cpp','TVS_Pipe.cpp'):
+   live=[l for l in (dbx/f).read_text(encoding='utf-8',errors='replace').splitlines() if not l.strip().startswith('//')]
+   for l in live:
+    if 'tvs_centerline' in l or 'tvs_hidden' in l:self.assertIn('setAuxLinetype(',l,f+': '+l.strip())
 if __name__=='__main__':unittest.main()

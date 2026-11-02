@@ -876,15 +876,9 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				AcDbLine* pLine22 = new AcDbLine;
 				pLine22->setStartPoint(pA1);
 				pLine22->setEndPoint(pA3);
-				AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-				AcDbLinetypeTable *pLtTable;
-				AcDbObjectId ltId;
-				pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-				pLtTable->getAt(_T("tvs_centerline"), ltId);
-				pLtTable->close();
 				pLine22->setLineWeight(AcDb::LineWeight(15));
 				pLine22->setLayer(this->layerId());
-				pLine22->setLinetype(ltId);
+				setAuxLinetype(pLine22, _T("tvs_centerline"));
 				pLine22->setColor(this->color());
 				entitySet.append(pLine22);
 
@@ -926,15 +920,9 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				AcDbLine* pLine5 = new AcDbLine;
 				pLine5->setStartPoint(pA3);
 				pLine5->setEndPoint(pA1);
-				AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-				AcDbLinetypeTable *pLtTable;
-				AcDbObjectId ltId;
-				pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-				pLtTable->getAt(_T("tvs_centerline"), ltId);
-				pLtTable->close();
 				pLine5->setLineWeight(AcDb::LineWeight(15));
 				pLine5->setLayer(this->layerId());
-				pLine5->setLinetype(ltId);
+				setAuxLinetype(pLine5, _T("tvs_centerline"));
 				pLine5->setColor(this->color());
 				entitySet.append(pLine5);
 
@@ -971,15 +959,9 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				AcDbLine* pLine7 = new AcDbLine;
 				pLine7->setStartPoint(pMa);
 				pLine7->setEndPoint(pA5);
-				AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-				AcDbLinetypeTable *pLtTable;
-				AcDbObjectId ltId;
-				pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-				pLtTable->getAt(_T("tvs_centerline"), ltId);
-				pLtTable->close();
 				pLine7->setLineWeight(AcDb::LineWeight(15));
 				pLine7->setLayer(this->layerId());
-				pLine7->setLinetype(ltId);
+				setAuxLinetype(pLine7, _T("tvs_centerline"));
 				pLine7->setColor(this->color());
 				entitySet.append(pLine7);
 
