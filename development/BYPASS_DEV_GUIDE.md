@@ -87,3 +87,9 @@ prekidala. Writer sada koristi postojeći rječnik, a kreira ga samo gdje nedost
 Nova regresija izvršava stvarni parent writer, čuva postojeće V1 zapise i provjerava
 roditelja sa svih sedam backlink-ova. Novi paket zahtijeva svježu AutoCAD sesiju;
 praktično prihvatanje nove verzije još nije potvrđeno.
+
+## razvoj-bypass-fixed
+
+Konektori, dijagnostika, ciljane izmjene i praktična checklista:
+[BYPASS_FIXED_PROVJERE.md](BYPASS_FIXED_PROVJERE.md). Rollback proba (`TVS_BYPASS_FAIL`)
+radi samo u DEV paketu sa `TVS_BYPASS_FAULT_INJECTION`.
