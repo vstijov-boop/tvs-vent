@@ -123,6 +123,12 @@ int main(){
      if(((P.z>d.dimensions[j].rail.z)!=(Q.z>d.dimensions[j].rail.z))&&(d.dimensions[j].rail.s<(Q.s-P.s)*(d.dimensions[j].rail.z-P.z)/(Q.z-P.z)+P.s))in=!in;}
     expect(!in,"dimension text not on a part");}
    expect(d.dimensions[1].rail.z>d.dimensions[0].rail.z,"smaller H row next to the part, W outside");
+   expect(d.levelTexts.size()==8,"level marks: start/pass/end top+bottom and obstacle top+bottom");
+   {const int dec=unit==1000?3:unit==10?1:0;const double bare=v.frame.height/2;
+    expect(d.levelTexts[0].text==displayNumber((v.axis.front().z+bare)/unit,dec),"start top level in drawing units");
+    expect(d.levelTexts[5].text==displayNumber((v.zPass-bare)/unit,dec),"passage bottom level in drawing units");
+    for(const auto& n:d.levelTexts){expect(n.at.z>d.dimensions[1].rail.z,"level texts above the dimension rows");
+     expect(d.dimensions[2].rail.s<n.at.s,"D rail left of the level marks");}}
    for(const auto& n:d.notes)if(n.text.size()>3)expect(n.at.z<d.dimensions[0].rail.z,"note block below the dimensions");
   }
  }
