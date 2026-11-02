@@ -39,51 +39,18 @@ static void exactPath(const tvsBypass::Body& b,bool insulation,std::vector<Detai
   p.axis=true;p.closed=false;p.points={at(b,0,.5),at(b,1,.5)};p.bulges={bulge,0};paths.push_back(p);
  }
 }
-View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const Options& o,bool improve){
- State& stateRef=*static_cast<State*>(state);View failed;failed.status="Nedostaju ili su nevažeći potvrđeni ulazi.";
- if(!tvsBypass::bounded::supported()){failed.status="Nepodržano numeričko okruženje: potrebno FE_TONEAREST, bez FTZ/DAZ.";return failed;}
- tvsBypass::bounded::Environment environment;if(!environment.active)return failed;
- std::vector<double> key={factor,double(reverse)};
- for(const Segment* segment:{&snapshot.route,&snapshot.obstacle}){
-  const double v[]={segment->first.x,segment->first.y,segment->first.z,segment->last.x,segment->last.y,segment->last.z,
-  segment->a,segment->b,segment->elevation,double(segment->rectangular),double(segment->rigid),double(segment->ordinary)};
-  key.insert(key.end(),v,v+12);
- }
- const double policy[]={o.ri,o.insulation,o.obstacleInsulation,o.clearance,o.reserve,o.minSlope,o.minBridge,o.minProjection,o.left,o.right,
- o.floor,o.ceiling,o.timeMs,o.calls,o.cells,o.depthStep,o.bridgeStep,o.maxDepth,o.depthLevels,o.bridgeLevels,o.positions,o.seedSolves,o.proposals,
- o.inset,o.wTolerance,o.dTolerance,double(o.angle),double(o.above),double(o.useFloor),double(o.useCeiling),double(o.confirmed)};
- key.insert(key.end(),policy,policy+31);
- if(key!=stateRef.key){invalidate();stateRef.key=key;}
- Frame f=adapt(snapshot,factor,reverse);failed.frame=f;
- if(!f.valid){failed.details=f.reason;return failed;}
- if(!o.confirmed||!integer(o.calls,128)||!integer(o.cells,1000000)||!integer(o.seedSolves,128)||!integer(o.proposals,2048)||
- !integer(o.depthLevels,128)||!integer(o.bridgeLevels,16)||!integer(o.positions,16)||!finite(o.timeMs)||o.timeMs<1||o.timeMs>10000)return failed;
+// Checker input from the frame and the user/record policy (D, C, s0 are set by the caller).
+static tvsBypass::Input problem(const Frame& f,const Options& o){
  tvsBypass::Input in(o.minSlope,o.minBridge,o.minProjection);
  in.width=f.width;in.height=f.height;in.ri=o.ri;in.z0=f.z0;in.angleDegrees=o.angle;in.above=o.above;
  in.obstacleS=0;in.obstacleZ=f.obstacleZ;in.obstacleWidth=f.obstacleWidth;in.obstacleHeight=f.obstacleHeight;
  in.obstacleTmin=f.tmin;in.obstacleTmax=f.tmax;in.insulation=o.insulation;in.obstacleInsulation=o.obstacleInsulation;in.clearance=o.clearance;
  in.windowLeft=o.left;in.windowRight=o.right;in.floor.active=o.useFloor;in.floor.mm=o.floor;in.ceiling.active=o.useCeiling;in.ceiling.mm=o.ceiling;
- tvsBypassSearch::Policy p(o.reserve,o.depthStep,o.bridgeStep);p.stopAtFirstFeasible=!improve;
- p.maxElapsedMs=o.timeMs;p.maxCheckerCalls=static_cast<unsigned>(o.calls);p.maxTotalCells=static_cast<std::uint64_t>(o.cells);
- p.maxSeedSolves=static_cast<unsigned>(o.seedSolves);p.maxProposals=static_cast<unsigned>(o.proposals);
- p.depthLevels=static_cast<unsigned>(o.depthLevels);p.bridgeLevels=static_cast<unsigned>(o.bridgeLevels);p.positionLevels=static_cast<unsigned>(o.positions);
- p.maximumSearchDepthMm=o.maxDepth;p.windowInsetMm=o.inset;p.improvementWToleranceMm=o.wTolerance;p.improvementDToleranceMm=o.dTolerance;
- tvsBypassSearch::Result found=tvsBypassSearch::generate(in,p);
- bool retained=improve&&stateRef.revision.current()&&stateRef.best&&(!found.hasCandidate||
- !tvsBypassSearch::better(found.candidate,found.checked,*stateRef.best,p));
- if(!retained){stateRef.best.reset();stateRef.revision.ready=false;
-  if(found.hasCandidate)stateRef.best.reset(new tvsBypassSearch::Result(found));}
- View out;out.frame=f;out.elapsedMs=found.elapsedMs;out.calls=found.attempts;out.cells=found.processedCells;
- std::ostringstream text;text<<std::fixed<<std::setprecision(6);
- text<<"Zavrsetak: "<<found.termination<<"\r\nPozivi="<<found.attempts<<", celije="<<found.processedCells<<", vrijeme="<<found.elapsedMs<<" ms\r\n";
- if(!stateRef.best){
-  switch(found.status){case tvsBypassSearch::NoCandidateFoundWithinBudget:out.status="Kandidat nije pronađen u zadatom budžetu.";break;
-  case tvsBypassSearch::Unresolved:out.status="Numerička granica je nerazriješena — prolaz nije potvrđen.";break;
-  case tvsBypassSearch::Unsupported:out.status="Nepodržani ulazi ili numeričko okruženje.";break;
-  default:out.status="Nevažeći ulazi.";}
-  out.details=text.str();stateRef.view=out;return out;
- }
- const tvsBypassSearch::Result& r=*stateRef.best;const tvsBypass::Result& checked=r.checked;
+ return in;
+}
+// View of one checked candidate: shared by the search and by an as-built rebuild.
+static bool assemble(const Frame& f,const tvsBypassSearch::Result& r,const Options& o,double factor,bool retained,View& out,std::ostringstream& text){
+ const tvsBypass::Result& checked=r.checked;
  out.ready=true;out.status="Izvodljiv kandidat — minimalni zahvat nije potvrđen.";
  out.D=r.D;out.C=r.C;out.s0=r.s0;out.W=middle(r.W);out.zPass=middle(r.passElevation);out.gapLo=r.clearance.lo;out.gapHi=r.clearance.hi;
  if(retained)text<<"Zadrzan prethodni potvrđeni kandidat za iste ulaze.\r\n";
@@ -105,7 +72,7 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
       o.angle*tvsOffset::pi()/180,o.minSlope);
   out.offsets[j]=tvsOffsetAdapter::adapt(input,checked.offsets[j],
       tvsOffsetAdapter::Placement(tvsOffset::WorldPoint(q.x,q.y,q.z),std::atan2(f.uy,f.ux),factor,out.axis[first].z));
-  if(!out.offsets[j].ready()){invalidate();return failed;}
+  if(!out.offsets[j].ready())return false;
  }
  for(int j=0;j<2;++j){out.slopePhysical[j]=checked.offsets[j].straightLength;out.slopeProjected[j]=checked.offsets[j].projectedLength;}
  for(const tvsBypass::Body& body:checked.members){
@@ -140,7 +107,74 @@ View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const
  Curve witness;witness.member=9;witness.insulation=false;witness.kind=DiagnosticLine;
  witness.points.push_back(Vertex(middle(checked.obstacle.onBody.s),middle(checked.obstacle.onBody.z)));
  witness.points.push_back(Vertex(middle(checked.obstacle.onObstacle.s),middle(checked.obstacle.onObstacle.z)));out.profile.push_back(witness);
+ return true;
+}
+View Engine::calculate(const Snapshot& snapshot,double factor,bool reverse,const Options& o,bool improve){
+ State& stateRef=*static_cast<State*>(state);View failed;failed.status="Nedostaju ili su nevažeći potvrđeni ulazi.";
+ if(!tvsBypass::bounded::supported()){failed.status="Nepodržano numeričko okruženje: potrebno FE_TONEAREST, bez FTZ/DAZ.";return failed;}
+ tvsBypass::bounded::Environment environment;if(!environment.active)return failed;
+ std::vector<double> key={factor,double(reverse)};
+ for(const Segment* segment:{&snapshot.route,&snapshot.obstacle}){
+  const double v[]={segment->first.x,segment->first.y,segment->first.z,segment->last.x,segment->last.y,segment->last.z,
+  segment->a,segment->b,segment->elevation,double(segment->rectangular),double(segment->rigid),double(segment->ordinary)};
+  key.insert(key.end(),v,v+12);
+ }
+ const double policy[]={o.ri,o.insulation,o.obstacleInsulation,o.clearance,o.reserve,o.minSlope,o.minBridge,o.minProjection,o.left,o.right,
+ o.floor,o.ceiling,o.timeMs,o.calls,o.cells,o.depthStep,o.bridgeStep,o.maxDepth,o.depthLevels,o.bridgeLevels,o.positions,o.seedSolves,o.proposals,
+ o.inset,o.wTolerance,o.dTolerance,double(o.angle),double(o.above),double(o.useFloor),double(o.useCeiling),double(o.confirmed)};
+ key.insert(key.end(),policy,policy+31);
+ if(key!=stateRef.key){invalidate();stateRef.key=key;}
+ Frame f=adapt(snapshot,factor,reverse);failed.frame=f;
+ if(!f.valid){failed.details=f.reason;return failed;}
+ if(!o.confirmed||!integer(o.calls,128)||!integer(o.cells,1000000)||!integer(o.seedSolves,128)||!integer(o.proposals,2048)||
+ !integer(o.depthLevels,128)||!integer(o.bridgeLevels,16)||!integer(o.positions,16)||!finite(o.timeMs)||o.timeMs<1||o.timeMs>10000)return failed;
+ tvsBypass::Input in=problem(f,o);
+ tvsBypassSearch::Policy p(o.reserve,o.depthStep,o.bridgeStep);p.stopAtFirstFeasible=!improve;
+ p.maxElapsedMs=o.timeMs;p.maxCheckerCalls=static_cast<unsigned>(o.calls);p.maxTotalCells=static_cast<std::uint64_t>(o.cells);
+ p.maxSeedSolves=static_cast<unsigned>(o.seedSolves);p.maxProposals=static_cast<unsigned>(o.proposals);
+ p.depthLevels=static_cast<unsigned>(o.depthLevels);p.bridgeLevels=static_cast<unsigned>(o.bridgeLevels);p.positionLevels=static_cast<unsigned>(o.positions);
+ p.maximumSearchDepthMm=o.maxDepth;p.windowInsetMm=o.inset;p.improvementWToleranceMm=o.wTolerance;p.improvementDToleranceMm=o.dTolerance;
+ tvsBypassSearch::Result found=tvsBypassSearch::generate(in,p);
+ bool retained=improve&&stateRef.revision.current()&&stateRef.best&&(!found.hasCandidate||
+ !tvsBypassSearch::better(found.candidate,found.checked,*stateRef.best,p));
+ if(!retained){stateRef.best.reset();stateRef.revision.ready=false;
+  if(found.hasCandidate)stateRef.best.reset(new tvsBypassSearch::Result(found));}
+ View out;out.frame=f;out.elapsedMs=found.elapsedMs;out.calls=found.attempts;out.cells=found.processedCells;
+ std::ostringstream text;text<<std::fixed<<std::setprecision(6);
+ text<<"Zavrsetak: "<<found.termination<<"\r\nPozivi="<<found.attempts<<", celije="<<found.processedCells<<", vrijeme="<<found.elapsedMs<<" ms\r\n";
+ if(!stateRef.best){
+  switch(found.status){case tvsBypassSearch::NoCandidateFoundWithinBudget:out.status="Kandidat nije pronađen u zadatom budžetu.";break;
+  case tvsBypassSearch::Unresolved:out.status="Numerička granica je nerazriješena — prolaz nije potvrđen.";break;
+  case tvsBypassSearch::Unsupported:out.status="Nepodržani ulazi ili numeričko okruženje.";break;
+  default:out.status="Nevažeći ulazi.";}
+  out.details=text.str();stateRef.view=out;return out;
+ }
+ const tvsBypassSearch::Result& r=*stateRef.best;
+ if(!assemble(f,r,o,factor,retained,out,text)){invalidate();return failed;}
  stateRef.revision.accept();stateRef.view=out;return out;
+}
+// As-built view of an existing bypass: the same checker on the recorded D, C and s0,
+// no search. The caller compares the result with the members before using it.
+View Engine::rebuild(const Snapshot& snapshot,double factor,bool reverse,const Options& o,double D,double C,double s0){
+ State& stateRef=*static_cast<State*>(state);View failed;failed.status="Postojeći obilazak nije moguće rekonstruisati.";
+ invalidate();stateRef.key.clear();
+ if(!tvsBypass::bounded::supported()){failed.status="Nepodržano numeričko okruženje: potrebno FE_TONEAREST, bez FTZ/DAZ.";return failed;}
+ tvsBypass::bounded::Environment environment;if(!environment.active)return failed;
+ Frame f=adapt(snapshot,factor,reverse);failed.frame=f;
+ if(!f.valid){failed.details=f.reason;return failed;}
+ tvsBypass::Input in=problem(f,o);in.D=D;in.C=C;in.s0=s0;
+ tvsBypass::Result checked=tvsBypass::check(in);
+ std::ostringstream text;text<<std::fixed<<std::setprecision(6);
+ text<<"Rekonstrukcija postojeceg obilaska: D="<<D<<", C="<<C<<", s0="<<s0<<" mm; celije="<<checked.obstacle.cells<<"\r\n";
+ if(checked.status!=tvsBypass::Feasible||!checked.geometryReady){failed.details=text.str()+checked.reason;return failed;}
+ tvsBypassSearch::Result r(in);r.status=tvsBypassSearch::Found;r.hasCandidate=true;r.candidate=in;r.checked=checked;
+ r.D=D;r.C=C;r.s0=s0;r.W=checked.run;r.passElevation=checked.passElevation;r.attempts=1;r.processedCells=checked.obstacle.cells;
+ tvsBypass::I gap=checked.obstacle.mm-tvsBypass::I(checked.jointDeviationUpperMm,checked.jointDeviationUpperMm);
+ r.clearance=tvsBypass::I(std::max(0.0,gap.lo),(tvsBypass::I(checked.obstacle.mm.hi)+tvsBypass::I(checked.jointDeviationUpperMm)).hi);
+ View out;out.frame=f;out.calls=1;out.cells=checked.obstacle.cells;
+ if(!assemble(f,r,o,factor,false,out,text)){invalidate();return failed;}
+ out.status="Postojeći obilazak (as-built) — isti checker na zapisanim D, C, s0.";
+ stateRef.best.reset(new tvsBypassSearch::Result(r));stateRef.revision.accept();stateRef.view=out;return out;
 }
 }
 #endif

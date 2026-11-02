@@ -76,6 +76,7 @@ public:
  Engine();~Engine();void invalidate();bool ready()const;
  Frame frame(const Snapshot&,double factor,bool reverse)const;
  View calculate(const Snapshot&,double factor,bool reverse,const Options&,bool improve);
+ View rebuild(const Snapshot&,double factor,bool reverse,const Options&,double D,double C,double s0);
 };
 }
 #endif

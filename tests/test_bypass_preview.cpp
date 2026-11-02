@@ -120,6 +120,25 @@ int main(){
   }
   expect(sectionLayout(sx,sy,false,expert).labels.empty(),"Kote off has no stale annotation slots");
  }
+ // As-built rebuild (TVS_BYPASS_DETALJ): recorded D, C, s0 and record policy, minimums
+ // not stored (0) -> the same checked geometry, axes and native ports, without a search.
+ for(double unit:{1.,10.,1000.})for(bool above:{false,true})for(int angle:{30,45,60}){
+  Snapshot b=example(unit,.3);Options q;q.confirmed=true;q.above=above;q.angle=angle;Frame bf=adapt(b,unit,false);q.left=bf.left;q.right=bf.right;
+  Engine search;View found=search.calculate(b,unit,false,q,false);expect(found.ready,"search candidate for rebuild");
+  Options built;built.ri=q.ri;built.insulation=q.insulation;built.obstacleInsulation=q.obstacleInsulation;built.clearance=q.clearance;built.reserve=q.reserve;
+  built.angle=angle;built.above=above;built.confirmed=true;built.minSlope=built.minBridge=built.minProjection=0;built.left=bf.left;built.right=bf.right;
+  // The command derives s0 from the inlet cut point (= first incoming port) and D/C from H.
+  const auto& cut=found.offsets[0].incomingLast;near(((cut.x-bf.origin.x)*bf.ux+(cut.y-bf.origin.y)*bf.uy)*unit,found.s0,"s0 is the cut point");
+  const auto& h0=found.offsets[0].outgoingFirst;const auto& h1=found.offsets[1].incomingLast;
+  near(std::hypot(h1.x-h0.x,h1.y-h0.y)*unit,found.C,"C is the H length");near(std::fabs(found.zPass-bf.z0),found.D,"D is |zPass-z0|");
+  Engine as;View again=as.rebuild(b,unit,false,built,found.D,found.C,found.s0);
+  expect(again.ready&&as.ready(),"rebuild reproduces a checked candidate");
+  near(again.W,found.W,"rebuild W");near(again.zPass,found.zPass,"rebuild pass elevation");expect(again.axis.size()==found.axis.size(),"rebuild axes");
+  for(size_t k=0;k<found.axis.size();++k){near(again.axis[k].s,found.axis[k].s,"rebuild axis s");near(again.axis[k].z,found.axis[k].z,"rebuild axis z");}
+  for(int j=0;j<2;++j){near(again.offsets[j].incomingLast.x,found.offsets[j].incomingLast.x,"rebuild port x");near(again.offsets[j].outgoingFirst.y,found.offsets[j].outgoingFirst.y,"rebuild port y");}
+  expect(!again.detailPaths.empty()&&again.detailPaths.size()==found.detailPaths.size(),"rebuild detail paths");
+  View off=as.rebuild(b,unit,false,built,found.D,found.C,bf.right+1);expect(!off.ready&&!as.ready(),"rebuild outside the duct is refused");
+ }
  std::cout<<"PASS PREVIEW "<<checks<<" adapter / presentation / layout / revision / real numeric-bridge checks; no SDK runtime"<<std::endl;
 }
 
