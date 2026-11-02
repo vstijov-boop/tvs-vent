@@ -355,6 +355,19 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
   tvsBypassUx::RadiusSetting radiusSetting;radiusSetting.mode=radius.mode;radiusSetting.k=radius.k;radiusSetting.constantDrawing=radius.constant;
   Dialog dialog(s,reverse,tvsUnits::factor(db),known,DocVars.docData().bypassMemory,radiusSetting,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
   for(;;){INT_PTR action=dialog.show(owner);
+   if(action==701){
+    // Accepting flows: [Prihvati/Dijalog/Odustani]; TVS_BYPASS_PREVIEW: [Dijalog/Odustani].
+    const bool canAccept=permanent&&dialog.canAccept;tvsBypassUx::PreviewChoice choice=tvsBypassUx::Cancel;
+    {Transient preview;if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes))return false;
+     acutPrintf(L"\nPrivremena osnova BEZ tacne vidljivosti/zaklanjanja. Crtice su simbolika, ne dokaz skrivenih ivica. Original ostaje vidljiv.");
+     acedInitGet(0,canAccept?L"Prihvati Dijalog Odustani":L"Dijalog Odustani");ACHAR answer[64]=L"";
+     const int status=acedGetKword(canAccept?L"\nPregled [Prihvati/Dijalog/Odustani] <Dijalog>: ":L"\nPregled [Dijalog/Odustani] <Dijalog>: ",answer);
+     preview.clear(); // no transient survives Enter, a keyword or Esc
+     choice=tvsBypassUx::previewChoice(status==RTNORM,status==RTNONE,answer,canAccept);}
+    if(choice==tvsBypassUx::Cancel)return false;
+    if(choice==tvsBypassUx::BackToDialog)continue; // same inputs and result
+    action=704; // same checked candidate -> the one writer below, with its snapshot checks; no new search
+   }
    if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);
     // Accepting flows (TVS_BYPASS, Obilazak) return to the dialog with the same checked
     // candidate; the static detail stays unlinked. Prihvati re-validates the snapshot.
@@ -370,11 +383,7 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
     return true;
    }
 #endif
-   if(action!=701)return false;
-   Transient preview;if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes))return false;
-   acutPrintf(L"\nPrivremena osnova BEZ tacne vidljivosti/zaklanjanja. Crtice su simbolika, ne dokaz skrivenih ivica. Original ostaje vidljiv.");
-   ACHAR text[256];int status=acedGetString(0,L"\nEnter vraca dijalog i Prihvati; Esc uklanja pregled: ",text);
-   preview.clear();if(status!=RTNORM&&status!=RTNONE)return false;
+   return false;
   }
  }catch(...){acutPrintf(L"\nBYPASS prekinut. Nepotvrdjena transakcija/grafika je uklonjena.");return false;}
 }

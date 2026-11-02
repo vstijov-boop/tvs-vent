@@ -72,6 +72,16 @@ int main(){
         run=function(src,'static bool runBypass(')
         # Exactly one writer call: Prihvati from the dialog and from the preview share it.
         self.assertEqual(run.count('tvsBypassService::write('),1)
+        self.assertIn('tvsBypassUx::previewChoice(',run)
+        # Transient graphics are cleared before acting on any preview answer.
+        clear=run.index('preview.clear()');choice=run.index('tvsBypassUx::previewChoice(')
+        self.assertLess(clear,choice)
+        # Accept from the preview requires the accepting flow; preview-only never writes.
+        self.assertIn('permanent&&dialog.canAccept',run)
+        self.assertRegex(run,r"(?s)if\(action==701\)\{.*?action=704;.*?\}\s*if\(action==703\)")
+        self.assertIn('if(action==704&&permanent&&dialog.view.ready&&dialog.engine.ready())',run)
+        # The preview keyword prompt itself never offers Prihvati outside the accepting flow.
+        self.assertIn('canAccept?L"Prihvati Dijalog Odustani":L"Dijalog Odustani"',run)
         # Detail -> dialog keeps the same candidate in accepting flows.
         self.assertRegex(run,r"(?s)if\(action==703\)\{.*?if\(permanent\)continue;")
 
