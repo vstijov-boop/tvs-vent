@@ -20,11 +20,17 @@ Ne prepisivati produkcioni bundle i ne koristiti hot unload/reload.
 
 Nastaju četiri koljena, dva kosa člana i H, dvije neizmijenjene V1 trojke i njihov
 roditelj. Originalni kanal ostaje jedan spoljašnji ostatak; drugi ostatak dobija
-novi objekt. Oba spoljašnja položaja/kota/presjek ostaju isti. Eksplicitni izlazni
-pipe susjed dobija samo nužnu recipročnu referencu novog ostatka; geometrija susjeda
-i prepreka se ne mijenjaju. Roditelj čuva obje granične reference. Legacy vektori
-konektora i dalje nisu zasebno filed podaci običnih kanala; novi roditelj ne migrira
-globalnu mrežu niti popravlja druge objekte pri otvaranju.
+novi objekt. Oba spoljašnja položaja/kota/presjek ostaju isti. Geometrija susjeda
+i prepreka se ne mijenja. Roditelj čuva granične reference koje već postoje.
+
+**Konektori (razvoj-bypass-fixed).** Legacy konektori nisu filed podaci
+(`TVS_Pipe::dwgOutFields/dwgInFields` ih preskaču), pa ih ni korisnički UNDO ni
+snimanje/otvaranje ne vraćaju. Zato writer, kao i TVS_OFFSET, ne mijenja nijedan
+konektor. Ako izabrani spoljašnji kraj ima eksplicitnu vezu (postavlja je samo
+TVS_CONNECTTest ili raniji DEV bypass u istoj sesiji), bypass se odbija umjesto
+prevezivanja. Obični nacrtani kanali i kanali iz ponovo otvorenog crteža nemaju
+povezane konektore, pa za njih bypass radi. Kontinuitet unutar sklopa je geometrijski
+i zapisan u roditelju, ne u konektorima; novi ostatak ima nepovezan par konektora.
 
 Fizički obračun kosih članova ostaje postojeći V1 (sopstveni rise svakog člana).
 H je horizontalni fizički kanal. Roditelj nema količinu; sedam članova se ne broje

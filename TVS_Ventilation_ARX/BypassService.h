@@ -27,15 +27,6 @@ inline bool current(const Snapshot& s){std::wstring now;
     return !tvsBypassData::pinned(s.route.source,s.route.physical.end==tvsOffsetOperation::First)
         &&tvsOffsetService::current(s.route,true)&&obstacleState(s.obstacle,now)&&now==s.obstacleState;
 }
-// Connector vectors are legacy non-filed state. Swap restores them without allocation
-// on any abort, including failure after the neighboring reciprocal link changed.
-class ConnectorRollback {
-    TVS_Entity* object;std::vector<TVS_Connector> before;bool accepted;
-public:
-    ConnectorRollback(TVS_Entity* p):object(p),before(p->connectors),accepted(false){}
-    ~ConnectorRollback(){if(!accepted)object->connectors.swap(before);}
-    void commit(){accepted=true;}
-};
 inline int connector(TVS_Entity* p,int role){
     int result=-1;
     for(size_t j=0;j<p->connectors.size();++j){
@@ -63,7 +54,13 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     TVS_Pipe* source=TVS_Pipe::cast(raw);if(!source)return false;
     tvsOffsetService::Snapshot inside=base;inside.manufacturer.clear();inside.note.clear();
     if(!tvsOffsetService::pipeState(source,inside)||inside.fingerprint!=base.fingerprint)return false;
-    ConnectorRollback sourceConnections(source);
+    // Legacy connectors are not filed (TVS_Pipe::dwgOutFields/dwgInFields skip them), so
+    // neither user UNDO nor save/reopen can restore a changed link. Same contract as
+    // TVS_OFFSET: the writer never modifies connectors. An explicit link on the selected
+    // outer end would need relinking, so it is refused instead.
+    const int selectedRole=reverse?conPipeStart:conPipeEnd;const int selected=connector(source,selectedRole);
+    if(selected>=0&&!source->connectors[selected].connectionID.isNull())
+        return tvsOffsetService::reject(L"Izabrani spoljasnji kraj ima eksplicitnu konektorsku vezu; prevezivanje nije podrzano jer se konektori ne snimaju i Undo ih ne vraca.");
     AcDbObject* members[7]={NULL,NULL,NULL,NULL,NULL,NULL,NULL};tvsBypassData::Record record;
     record.factor=f;record.reverse=reverse;record.inlet=base.source;record.obstacle=s.obstacle;
     for(int j=0;j<2;++j){const int role=j?(reverse?conPipeStart:conPipeEnd):(reverse?conPipeEnd:conPipeStart);
@@ -98,20 +95,9 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     if(!tail)return false;
     TVS_Pipe* exit=tail.release();
     if(!tx.append(exit,record.outlet))return false;
-    const int selectedRole=reverse?conPipeStart:conPipeEnd;const int selected=connector(source,selectedRole);
-    TVS_Pipe* neighbor=NULL;std::unique_ptr<ConnectorRollback> neighborConnections;
-    if(selected>=0){const TVS_Connector old=source->connectors[selected];
-        const int exitIndex=connector(exit,selectedRole);if(exitIndex<0)return false;
-        exit->connectors[exitIndex]=old;exit->connectors[exitIndex].point=outerPoint;
-        if(!old.connectionID.isNull()){
-            raw=NULL;if(actrTransactionManager->getObject(raw,old.connectionID,AcDb::kForWrite)!=Acad::eOk)return false;
-            neighbor=TVS_Pipe::cast(raw);if(!neighbor||!tvsMove::editable(neighbor))return false;
-            const int back=connector(neighbor,old.cTypeAnother);if(back<0||neighbor->connectors[back].connectionID!=base.source)return false;
-            neighborConnections.reset(new ConnectorRollback(neighbor));neighbor->assertWriteEnabled();
-            neighbor->connectors[back].connectionID=record.outlet; // no neighbor geometry changes
-        }
-        source->connectors[selected].connectionID=AcDbObjectId::kNull;source->connectors[selected].cTypeAnother=0;source->connectors[selected].point=cutIn;
-    }
+    // Connectors stay untouched: source keeps its (unlinked) outer connector, the new
+    // outlet keeps the fresh unlinked pair from makePipe. Continuity inside the assembly
+    // is geometric and recorded by the filed parent, not by connectors.
     source->assertWriteEnabled();if(reverse)source->FirstPoint=cutIn;else source->LastPoint=cutIn;source->recordGraphicsModified();
     if(inject(2))return false;
     AcDbObjectId parent;const Acad::ErrorStatus parentStatus=tvsBypassData::write(base.db,record,members,parent);
@@ -121,7 +107,6 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     }
     if(inject(3))return false;
     if(!tx.commit())return false;
-    sourceConnections.commit();if(neighborConnections)neighborConnections->commit();
     output.output=record.outlet;output.parent=parent;output.resident=exit;output.elevation=base.physical.elevation;output.angle=options.angle;
     return true;
 }

@@ -33,7 +33,6 @@ using tvsBypassPreview::View;using tvsBypassPreview::Options;
 struct Snapshot {tvsOffsetService::Snapshot route;AcDbObjectId obstacle;std::wstring obstacleState;};
 '''
         code+=function(bypass,'struct Commit')+';\n'
-        code+=function(bypass,'class ConnectorRollback')+';\n'
         code+=function(bypass,'inline int connector(')+'\n'
         code+=r'''
 static int failStage=0;
@@ -56,7 +55,7 @@ static void reset(){
  failCommit=false;tvsOffsetService::badCapture=false;tvsBypassData::failParent=tvsBypassData::pinnedFlag=false;
  tvsBypassService::failStage=0;rollbackHook=&clearMetadata;
 }
-static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvsBypassService::Snapshot& s){
+static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvsBypassService::Snapshot& s,bool linked=false){
  reset();
  const double c=std::cos(heading),n=std::sin(heading);
  auto point=[=](double x,double y){return AcGePoint3d((123+x*c-y*n)/f,(-87+x*n+y*c)/f,37/f);};
@@ -76,8 +75,9 @@ static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvs
  const int selected=reverse?0:1;const AcGePoint3d far=selected==0?fixtureSource.FirstPoint:fixtureSource.LastPoint;
  TVS_Pipe* neighbor=new TVS_Pipe();neighbor->id=3;objects[3]=neighbor;neighbor->FirstPoint=far;
  neighbor->LastPoint=far+AcGeVector3d((reverse?-1:1)*c*300/f,(reverse?-1:1)*n*300/f,0);
- TVS_Connector back;back.connectionID=1;back.cTypeCurrent=1;back.cTypeAnother=selected+1;back.point=far;neighbor->connectors.push_back(back);
- fixtureSource.connectors[selected].connectionID=3;fixtureSource.connectors[selected].cTypeAnother=1;
+ // Geometric outer neighbor always touches the far end; an explicit reciprocal link only when requested.
+ TVS_Connector back;back.connectionID=linked?1:0;back.cTypeCurrent=1;back.cTypeAnother=linked?selected+1:0;back.point=far;neighbor->connectors.push_back(back);
+ if(linked){fixtureSource.connectors[selected].connectionID=3;fixtureSource.connectors[selected].cTypeAnother=1;}
  // Opposite external reference is retained verbatim (the boundary validator is tested separately).
  fixtureSource.connectors[1-selected].connectionID=44;fixtureSource.connectors[1-selected].cTypeAnother=2;
  tvsBypassPreview::Snapshot model;
@@ -110,16 +110,20 @@ int main(){
   const auto view=engine.calculate(model,factor,reverse,options,false);assert(view.ready);
   const AcGePoint3d fixed=reverse?fixtureSource.LastPoint:fixtureSource.FirstPoint,far=reverse?fixtureSource.FirstPoint:fixtureSource.LastPoint;
   TVS_Pipe* neighbor=TVS_Pipe::cast(objects[3]);const AcGePoint3d neighborFirst=neighbor->FirstPoint,neighborLast=neighbor->LastPoint;
-  const TVS_Connector opposite=fixtureSource.connectors[reverse?1:0];
+  const std::vector<TVS_Connector> sourceBefore=fixtureSource.connectors,neighborBefore=neighbor->connectors;
+  auto same=[](const std::vector<TVS_Connector>& a,const std::vector<TVS_Connector>& b){if(a.size()!=b.size())return false;
+   for(size_t k=0;k<a.size();++k){if(a[k].connectionID!=b[k].connectionID||a[k].cTypeCurrent!=b[k].cTypeCurrent||a[k].cTypeAnother!=b[k].cTypeAnother||a[k].point.distanceTo(b[k].point)!=0)return false;}
+   return true;};
   tvsBypassService::Commit out;assert(tvsBypassService::write(s,view,options,out));
   assert(commits==1&&aborts==0&&objects.size()==12&&tvsOffsetData::records.size()==6&&tvsBypassData::parents.size()==1);
   const auto parent=tvsBypassData::parents[out.parent.id];assert(parent.inlet==1&&parent.outlet==out.output&&parent.obstacle==2);
-  assert(parent.neighbors[0]==44&&parent.neighbors[1]==3&&parent.ports[1]==1);
+  assert(parent.neighbors[0]==44&&parent.neighbors[1].isNull()&&parent.ports[1]==0);
   assert((reverse?fixtureSource.LastPoint:fixtureSource.FirstPoint).distanceTo(fixed)==0);
   assert((reverse?out.resident->FirstPoint:out.resident->LastPoint).distanceTo(far)==0);
   assert(neighbor->FirstPoint.distanceTo(neighborFirst)==0&&neighbor->LastPoint.distanceTo(neighborLast)==0);
-  assert(neighbor->connectors[0].connectionID==out.output);
-  assert(fixtureSource.connectors[reverse?1:0].connectionID==opposite.connectionID);
+  // Connector contract: nothing non-filed changes, so UNDO/reopen cannot leave a stale link.
+  assert(same(fixtureSource.connectors,sourceBefore)&&same(neighbor->connectors,neighborBefore));
+  assert(out.resident->connectors.size()==2&&out.resident->connectors[0].connectionID.isNull()&&out.resident->connectors[1].connectionID.isNull());
   assert(tvsOffsetData::records[parent.members[0].id].guid.text!=tvsOffsetData::records[parent.members[4].id].guid.text);
   double total=0;
   for(int pair=0;pair<2;++pair){const int start=pair?4:0;TVS_Pipe* p=TVS_Pipe::cast(objects[parent.members[start+1].id]);
@@ -135,14 +139,14 @@ int main(){
   assert(out.elevation==-400/factor&&std::fabs(h->Elev*factor-view.zPass)<1e-6&&total>0);++cases;
  }
  for(int fail=1;fail<=11;++fail){
-  tvsBypassService::Snapshot s;auto model=setup(1,0,false,s);tvsBypassPreview::Engine engine;tvsBypassPreview::Options options;options.confirmed=true;
+  tvsBypassService::Snapshot s;auto model=setup(1,0,false,s,fail==7);tvsBypassPreview::Engine engine;tvsBypassPreview::Options options;options.confirmed=true;
   options.left=-2000;options.right=2000;auto view=engine.calculate(model,1,false,options,false);assert(view.ready);
   TVS_Pipe* neighbor=TVS_Pipe::cast(objects[3]);const AcGePoint3d first=fixtureSource.FirstPoint,last=fixtureSource.LastPoint;
   if(fail<=3)tvsBypassService::failStage=fail;
   if(fail==4)failAppend=4;
   if(fail==5)failRecord=4;
   if(fail==6)tvsBypassData::failParent=true;
-  if(fail==7)neighbor->locked=true;
+  // fail==7: explicitly linked outer end is refused (no relinking of non-filed connectors).
   if(fail==8)tvsOffsetService::live.fingerprint=L"changed";
   if(fail==9)TVS_Pipe::cast(objects[2])->Elev+=1;
   if(fail==10)tvsBypassData::pinnedFlag=true;
@@ -150,9 +154,9 @@ int main(){
   tvsBypassService::Commit out;assert(!tvsBypassService::write(s,view,options,out));
   assert(commits==0&&objects.size()==4&&tvsOffsetData::records.empty()&&tvsBypassData::parents.empty());
   assert(fixtureSource.FirstPoint.distanceTo(first)==0&&fixtureSource.LastPoint.distanceTo(last)==0);
-  assert(fixtureSource.connectors[1].connectionID==3&&neighbor->connectors[0].connectionID==1&&out.resident==NULL);++failures;
+  assert(fixtureSource.connectors[1].connectionID==(fail==7?3:0)&&neighbor->connectors[0].connectionID==(fail==7?1:0)&&out.resident==NULL);++failures;
  }
- reset();std::cout<<"PASS PERSISTENT BYPASS "<<cases<<" real checked candidates, same 7 native member DTOs, both ends, rotations/units/angles/sides, parent over 2 V1 triples+H, external reciprocal link and quantities; "<<failures<<" abort/stale/lock guards; SDK substitutes, not AutoCAD runtime\n";
+ reset();std::cout<<"PASS PERSISTENT BYPASS "<<cases<<" real checked candidates, same 7 native member DTOs, both ends, rotations/units/angles/sides, parent over 2 V1 triples+H, connectors unchanged (not filed), linked outer end refused, quantities; "<<failures<<" abort/stale/lock guards; SDK substitutes, not AutoCAD runtime\n";
 }
 '''
         # Avoid warning-only ambiguities in compact extracted existing code.
