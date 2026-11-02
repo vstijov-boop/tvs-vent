@@ -132,7 +132,10 @@ struct Dialog {
   }else t<<L"Izaberite jedinice crteža i unesite izolacije. Podaci iz objekata ostaju neizmijenjeni.\r\n"<<wide(f.reason);
   SetDlgItemTextW(window,600,t.str().c_str());
  }
- void invalidate(){engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);EnableWindow(GetDlgItem(window,704),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");InvalidateRect(window,NULL,TRUE);}
+ // Repaint only the section area, without erasing: keystrokes no longer flash the dialog.
+ void redrawSection(){const SectionLayout layout=sectionLayout(scaleX,scaleY,showDimensions,advanced);
+  RECT area={layout.area.left,layout.area.top,layout.area.right,layout.area.bottom};InvalidateRect(window,&area,FALSE);}
+ void invalidate(){const bool wasReady=view.ready;engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);EnableWindow(GetDlgItem(window,704),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");if(wasReady)redrawSection();}
  void capture(){for(int j=0;j<FieldCount;++j)values[j]=text(100+j);
   units=(int)SendDlgItemMessage(window,502,CB_GETCURSEL,0,0);angle=(int)SendDlgItemMessage(window,501,CB_GETCURSEL,0,0);side=(int)SendDlgItemMessage(window,500,CB_GETCURSEL,0,0);
   confirmed=IsDlgButtonChecked(window,503)==BST_CHECKED;}
@@ -156,11 +159,12 @@ struct Dialog {
   if(!parse()){std::wstring error=text(800);invalidate();SetDlgItemTextW(window,800,error.c_str());return;}
   EnableWindow(GetDlgItem(window,700),FALSE);EnableWindow(GetDlgItem(window,702),FALSE);
   SetDlgItemTextW(window,800,L"Računanje... Rok je kooperativan; aktivni checker poziv se ne prekida. Dijalog čeka završetak.");UpdateWindow(window);
+  struct WaitCursor {HCURSOR old;WaitCursor():old(SetCursor(LoadCursor(NULL,IDC_WAIT))){}~WaitCursor(){SetCursor(old);}} wait;
   try{view=engine.calculate(snapshot,factor(),reverse,options,improve);
    refreshResult();}
   catch(...){invalidate();SetDlgItemTextW(window,800,L"Greška računanja. Nema DWG izmjena.");}
   EnableWindow(GetDlgItem(window,700),TRUE);EnableWindow(GetDlgItem(window,702),TRUE);
-  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,704),canAccept&&view.ready&&engine.ready());InvalidateRect(window,NULL,TRUE);
+  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,704),canAccept&&view.ready&&engine.ready());redrawSection();
  }
  void refreshResult(){
   std::wstring value=advanced?wide(view.status)+L"\r\n"+wide(view.details):wide(summary(view,options));
@@ -187,7 +191,10 @@ struct Dialog {
  void init(HWND h){window=h;loading=true;
   RECT work;SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
   MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);if(GetMonitorInfoW(MonitorFromWindow(GetParent(h),MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;
-  SetWindowPos(h,NULL,work.left+10,work.top+10,(std::min)(1220L,work.right-work.left-20),(std::min)(760L,work.bottom-work.top-20),SWP_NOZORDER);
+  // Layout base is 96 DPI; size grows with the monitor scale so text stays readable at 125-200 %.
+  int dpi=96;if(HDC screen=GetDC(NULL)){dpi=GetDeviceCaps(screen,LOGPIXELSY);ReleaseDC(NULL,screen);}if(dpi<96)dpi=96;
+  const LONG width=MulDiv(1220,dpi,96),height=MulDiv(760,dpi,96);
+  SetWindowPos(h,NULL,work.left+10,work.top+10,(std::min)(width,work.right-work.left-20),(std::min)(height,work.bottom-work.top-20),SWP_NOZORDER);
   RECT client;GetClientRect(h,&client);scaleX=client.right/1204.0;scaleY=client.bottom/720.0;
   if(!font)font=CreateFontW(-(int)(13*(std::min)(scaleX,scaleY)),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI");
   child(L"STATIC",L"",SS_LEFT,600,12,10,1180,75);source();
@@ -206,6 +213,7 @@ struct Dialog {
   child(L"BUTTON",L"Pregled u crtežu",BS_PUSHBUTTON|WS_TABSTOP,701,356,616,165,30);EnableWindow(GetDlgItem(h,701),view.ready&&engine.ready());
   child(L"BUTTON",L"Umetni detalj…",BS_PUSHBUTTON|WS_TABSTOP,703,12,666,180,30);EnableWindow(GetDlgItem(h,703),view.ready&&engine.ready());
   child(L"BUTTON",L"Prihvati obilazak",BS_PUSHBUTTON|WS_TABSTOP,704,165,666,145,30);EnableWindow(GetDlgItem(h,704),canAccept&&view.ready&&engine.ready());
+  if(!canAccept)ShowWindow(GetDlgItem(h,704),SW_HIDE); // TVS_BYPASS_PREVIEW never writes
   child(L"BUTTON",L"Otkaži / zatvori",BS_PUSHBUTTON|WS_TABSTOP,IDCANCEL,318,666,140,30);
   child(L"BUTTON",L"Napredno / dijagnostika",BS_AUTOCHECKBOX|WS_TABSTOP,504,12,112,280,22);CheckDlgButton(h,504,advanced?BST_CHECKED:BST_UNCHECKED);
   child(L"STATIC",L"Uzdužni presjek — fizičke kote, ista razmjera s/z",0,602,590,90,590,20);
@@ -219,9 +227,14 @@ struct Dialog {
   fieldLayout();refreshResult();loading=false;
  }
  void paint(){
-  PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);
+  PAINTSTRUCT ps;HDC screen=BeginPaint(window,&ps);
   const SectionLayout layout=sectionLayout(scaleX,scaleY,showDimensions,advanced);
   RECT area={layout.area.left,layout.area.top,layout.area.right,layout.area.bottom};
+  // Off-screen section, copied in one blit (falls back to direct drawing).
+  RECT client;GetClientRect(window,&client);
+  HDC dc=CreateCompatibleDC(screen);HBITMAP bitmap=dc?CreateCompatibleBitmap(screen,(std::max)(1L,client.right),(std::max)(1L,client.bottom)):NULL;
+  if(!dc||!bitmap){if(bitmap)DeleteObject(bitmap);if(dc)DeleteDC(dc);dc=screen;bitmap=NULL;}
+  HGDIOBJ oldBitmap=bitmap?SelectObject(dc,bitmap):NULL;
   FillRect(dc,&area,(HBRUSH)GetStockObject(WHITE_BRUSH));
   HGDIOBJ oldFont=SelectObject(dc,font);int oldBk=SetBkMode(dc,TRANSPARENT);COLORREF oldColor=GetTextColor(dc);
   if(view.ready&&view.axis.size()==8){
@@ -269,7 +282,9 @@ struct Dialog {
     SelectObject(dc,previousFont);DeleteObject(noteFont);
    }
   }
-  SetTextColor(dc,oldColor);SetBkMode(dc,oldBk);SelectObject(dc,oldFont);EndPaint(window,&ps);
+  SetTextColor(dc,oldColor);SetBkMode(dc,oldBk);SelectObject(dc,oldFont);
+  if(bitmap){BitBlt(screen,area.left,area.top,area.right-area.left,area.bottom-area.top,dc,area.left,area.top,SRCCOPY);SelectObject(dc,oldBitmap);DeleteObject(bitmap);DeleteDC(dc);}
+  EndPaint(window,&ps);
  }
  static INT_PTR CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){
   Dialog* self=(Dialog*)GetWindowLongPtr(h,DWLP_USER);
@@ -289,7 +304,7 @@ struct Dialog {
     else if(id==100)self->source();
     return TRUE;}
    if(id==504&&code==BN_CLICKED){self->advanced=IsDlgButtonChecked(h,504)==BST_CHECKED;self->fieldLayout();self->refreshResult();return TRUE;}
-   if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;InvalidateRect(h,NULL,TRUE);return TRUE;}
+   if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;self->redrawSection();return TRUE;}
    if(id==507&&code==CBN_SELCHANGE){self->allEdges=SendDlgItemMessage(h,507,CB_GETCURSEL,0,0)==1;return TRUE;}
    if(id==700||id==702){self->calculate(id==702);return TRUE;}
    if((id==701||id==703||(id==704&&self->canAccept))&&self->view.ready&&self->engine.ready()){self->capture();EndDialog(h,id);return TRUE;}
