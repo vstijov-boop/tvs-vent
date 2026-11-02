@@ -34,7 +34,16 @@ struct Snapshot {tvsOffsetService::Snapshot route;AcDbObjectId obstacle;std::wst
 '''
         code+=function(bypass,'struct Commit')+';\n'
         code+=function(bypass,'inline int connector(')+'\n'
-        fs=bypass.index('inline std::wstring& lastFailure(');code+=bypass[fs:bypass.index('inline bool write(',fs)]+'\n'
+        fs=bypass.index('inline std::wstring& lastFailure(');helpers=bypass[fs:bypass.index('inline bool write(',fs)]
+        assert '// Hidden edges of the crossing' in helpers
+        code+=helpers[:helpers.index('// Hidden edges of the crossing')]+'\n'
+        # Hidden-edge marking is DBX metadata (tested by test_hidden_span); here only its call contract.
+        code+=r'''
+static int hiddenCalls=0;static bool failHidden=false,hiddenAbove=false;static AcDbObjectId hiddenH;
+inline bool markHidden(const AcDbObjectId& o,bool above,TVS_Pipe* h){++hiddenCalls;hiddenAbove=above;hiddenH=h->objectId();assert(o.id==2);
+ if(failHidden)return fail(L"metapodaci",L"Oznaka skrivenih ivica nije upisana.",Acad::eInvalid);
+ return true;}
+'''
         code+=r'''
 static int failStage=0;
 inline bool inject(int stage){return stage==failStage;}
@@ -54,7 +63,7 @@ static void reset(){
  fixtureSource=TVS_Pipe();fixtureSource.id=1;block.id=99;objects[1]=&fixtureSource;objects[99]=&block;
  failAppend=appendCalls=failRecord=recordCalls=commits=aborts=txStarts=0;
  failCommit=false;tvsOffsetService::badCapture=false;tvsBypassData::failParent=tvsBypassData::pinnedFlag=false;
- tvsBypassService::failStage=0;rollbackHook=&clearMetadata;
+ tvsBypassService::failStage=0;tvsBypassService::hiddenCalls=0;tvsBypassService::failHidden=false;rollbackHook=&clearMetadata;
 }
 static bool roundRoute=false; // round source: SizeA = D, SizeB = 0 (TVS round duct)
 static tvsBypassPreview::Snapshot setup(double f,double heading,bool reverse,tvsBypassService::Snapshot& s,bool linked=false){
@@ -120,6 +129,7 @@ int main(){
   tvsBypassService::Commit out;assert(tvsBypassService::write(s,view,options,out));
   assert(commits==1&&aborts==0&&objects.size()==12&&tvsOffsetData::records.size()==6&&tvsBypassData::parents.size()==1);
   const auto parent=tvsBypassData::parents[out.parent.id];assert(parent.inlet==1&&parent.outlet==out.output&&parent.obstacle==2);
+  assert(tvsBypassService::hiddenCalls==1&&tvsBypassService::hiddenAbove==above&&tvsBypassService::hiddenH==parent.members[3]);
   assert(parent.neighbors[0]==44&&parent.neighbors[1].isNull()&&parent.ports[1]==0);
   assert((reverse?fixtureSource.LastPoint:fixtureSource.FirstPoint).distanceTo(fixed)==0);
   assert((reverse?out.resident->FirstPoint:out.resident->LastPoint).distanceTo(far)==0);
@@ -153,7 +163,7 @@ int main(){
  }
  std::set<std::wstring> reasons;
  roundRoute=false;
- for(int fail=1;fail<=11;++fail){
+ for(int fail=1;fail<=12;++fail){
   tvsBypassService::Snapshot s;auto model=setup(1,0,false,s,fail==7);tvsBypassPreview::Engine engine;tvsBypassPreview::Options options;options.confirmed=true;
   options.left=-2000;options.right=2000;auto view=engine.calculate(model,1,false,options,false);assert(view.ready);
   TVS_Pipe* neighbor=TVS_Pipe::cast(objects[3]);const AcGePoint3d first=fixtureSource.FirstPoint,last=fixtureSource.LastPoint;
@@ -166,15 +176,16 @@ int main(){
   if(fail==9)TVS_Pipe::cast(objects[2])->Elev+=1;
   if(fail==10)tvsBypassData::pinnedFlag=true;
   if(fail==11)failCommit=true;
+  if(fail==12)tvsBypassService::failHidden=true;
   tvsBypassService::Commit out;assert(!tvsBypassService::write(s,view,options,out));
   {const std::wstring why=tvsBypassService::lastFailure();assert(!why.empty()&&why[0]==L'[');reasons.insert(why);
-   const wchar_t* phase=fail<=3?L"[DEV]":fail==4?L"[append]":fail<=6?L"[metapodaci]":fail==7?L"[konektori]":fail<=10?L"[snapshot]":L"[commit]";
+   const wchar_t* phase=fail<=3?L"[DEV]":fail==4?L"[append]":fail<=6||fail==12?L"[metapodaci]":fail==7?L"[konektori]":fail<=10?L"[snapshot]":L"[commit]";
    if(why.find(phase)!=0){std::wcerr<<L"case "<<fail<<L": "<<why<<L"\n";std::abort();}
-   if((fail==4||fail==5||fail==6||fail==11)&&why.find(L"ErrorStatus")==std::wstring::npos)std::abort();}
+   if((fail==4||fail==5||fail==6||fail==11||fail==12)&&why.find(L"ErrorStatus")==std::wstring::npos)std::abort();}
   assert(commits==0&&objects.size()==4&&tvsOffsetData::records.empty()&&tvsBypassData::parents.empty());
   assert(fixtureSource.FirstPoint.distanceTo(first)==0&&fixtureSource.LastPoint.distanceTo(last)==0);
   assert(fixtureSource.connectors[1].connectionID==(fail==7?3:0)&&neighbor->connectors[0].connectionID==(fail==7?1:0)&&out.resident==NULL);++failures;
- } assert(reasons.size()==11); // every injected cause is reported distinctly
+ } assert(reasons.size()==12); // every injected cause is reported distinctly
 
  reset();std::cout<<"PASS PERSISTENT BYPASS "<<cases<<" real checked candidates ("<<roundCases<<" round route), same 7 native member DTOs, both ends, rotations/units/angles/sides, parent over 2 V1 triples+H, connectors unchanged (not filed), linked outer end refused, quantities; "<<failures<<" abort/stale/lock guards; SDK substitutes, not AutoCAD runtime\n";
 }

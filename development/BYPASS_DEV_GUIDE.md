@@ -51,10 +51,12 @@ njegov slobodni spoljašnji kraj može se koristiti za nastavak. Ako roditelj ve
 čuva eksplicitnu spoljašnju vezu tog ostatka, ili izabrani kraj susjeda predstavlja
 njegovu granicu, novi bypass se odbija umjesto neprimjetnog kvarenja stare reference.
 
-**Prikaz ne računa tačnu vidljivost.** Pune linije su projektovane konture,
-crtice mogu označavati simboličke spojeve/pomoćne gabarite, a ne potvrđene skrivene
-ivice. Puni hidden-line prikaz ostaje otvoren nedostatak GFX-01 i nije dio ovog
-paketa. Statički bočni detalj je dostupan; povezani/osvježavani detalj nije uveden.
+**Skrivene ivice ukrštanja (GFX-01, varijanta 1 — samo bypass).** Writer na donji
+pravi kanal ukrštanja upisuje `TVS_HIDDEN_BY_V1` (iznad: prepreka ispod H; ispod: H ispod
+prepreke), u istoj transakciji. Pri crtanju se dio ivica donjeg kanala koji je u osnovi
+pokriven gornjim crta isprekidano i tanko (`tvs_hidden`). Gornji kanal se čita uživo;
+obrisan gornji ili donji kanal iznad gornjeg vraća pune ivice. Pomjeranje gornjeg kanala
+osvježava donji tek na REGEN. Opšta vidljivost između proizvoljnih kanala nije uvedena. Statički bočni detalj je dostupan; povezani/osvježavani detalj nije uveden.
 
 Za rollback probu u potrošnoj kopiji: prije pokretanja AutoCAD-a PROCESS env
 `TVS_BYPASS_FAIL` postaviti na 1 (sedam članova), 2 (ostatak i prevezivanje),

@@ -4,6 +4,7 @@
 #include "TVSTestOffset.h"
 #include "OffsetService.h"
 #include "BypassAssemblyData.h"
+#include "HiddenSpanData.h"
 #include "../geometry/bypass/PreviewModel.h"
 #include <cwchar>
 #include <string>
@@ -54,6 +55,19 @@ inline bool fail(const wchar_t* phase,const wchar_t* reason){
 inline bool fail(const wchar_t* phase,const wchar_t* reason,Acad::ErrorStatus status){
     wchar_t text[400];std::swprintf(text,400,L"[%ls] %ls (ErrorStatus %d: %ls)",phase,reason,static_cast<int>(status),acadErrorStatusText(status));
     lastFailure()=text;acutPrintf(L"\nTVS BYPASS %ls Nema izmjena.",text);return false;}
+// Hidden edges of the crossing (GFX-01 variant 1): the lower duct records the upper one.
+// Above: obstacle under H; below: H under the obstacle. Runs inside the writer transaction,
+// so rollback/UNDO remove it with the bypass. Drawing: TVS_Pipe::subWorldDraw.
+inline bool markHidden(const AcDbObjectId& obstacleId,bool above,TVS_Pipe* h){
+    AcDbObject* raw=NULL;const Acad::ErrorStatus open=actrTransactionManager->getObject(raw,obstacleId,above?AcDb::kForWrite:AcDb::kForRead);
+    TVS_Pipe* obstacle=TVS_Pipe::cast(raw);
+    if(open!=Acad::eOk||!obstacle)return fail(L"metapodaci",L"Prepreka se ne moze otvoriti za oznaku skrivenih ivica.",open!=Acad::eOk?open:Acad::eNotThatKindOfClass);
+    TVS_Pipe* lower=above?obstacle:h;TVS_Pipe* upper=above?h:obstacle;
+    tvsHiddenSpan::Entry e;e.upper=upper->objectId();e.first=upper->FirstPoint;e.last=upper->LastPoint;e.width=upper->SizeA;e.elevation=upper->Elev;
+    const Acad::ErrorStatus es=tvsHiddenSpan::append(lower,e);
+    if(es!=Acad::eOk)return fail(L"metapodaci",L"Oznaka skrivenih ivica nije upisana.",es);
+    lower->recordGraphicsModified();return true;
+}
 inline bool write(const Snapshot& s,const View& view,const Options& options,Commit& output){
     lastFailure().clear();
     if(!view.ready||view.axis.size()!=8||!view.offsets[0].ready()||!view.offsets[1].ready())return fail(L"snapshot",L"Kandidat nije potpun; ponovite Pronadji prolaz.");
@@ -115,6 +129,7 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
     TVS_Pipe* h=bridge.release();
     if(!tx.append(h,record.members[3]))return fail(L"append",L"Srednji clan H nije dodat u crtez.",tx.status);
     members[3]=h;
+    if(!markHidden(s.obstacle,options.above,h))return false;
     if(inject(1))return fail(L"DEV",L"Proba prekida 1.");
     const tvsOffset::WorldPoint farWorld(outerPoint.x,outerPoint.y,outerPoint.z);
     auto tail=tvsOffsetService::makePipe(source,base,reverse?farWorld:second.outgoingFirst,reverse?second.outgoingFirst:farWorld,base.physical.elevation);
