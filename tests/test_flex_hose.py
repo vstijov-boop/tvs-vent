@@ -34,13 +34,25 @@ int main(int argc,char**){
  // Joint: last straight valley = first elbow valley (same side), within 1e-9.
  assert(std::hypot(s.edges[1].back().x-e.edges[0].front().x,s.edges[1].back().y-e.edges[0].front().y)<1e-9);
  assert(std::hypot(s.edges[0].back().x-e.edges[1].front().x,s.edges[0].back().y-e.edges[1].front().y)<1e-9);
+ {// Cuffs (manzetne): 40 mm, 5 mm wider each side; beads only between them.
+  Drawing c;assert(straight(0,0,1,0,1200,D,k,c,Cuffs(40,40,5)));assert(c.cuffs.size()==2);
+  assert(std::fabs(c.edges[0].front().x-40)<1e-9&&std::fabs(c.edges[0].back().x-1160)<1e-9);
+  assert(std::fabs(c.cuffs[0][0].y-(D/2+5))<1e-9&&std::fabs(c.cuffs[0][1].x-40)<1e-9&&std::fabs(c.cuffs[1][1].x-1200)<1e-9);
+  assert(std::fabs(maxOffset(c.edges[0],0,1,0,0)-D/2)<1e-6);
+  Drawing one;assert(straight(0,0,1,0,1200,D,k,one,Cuffs(40,0,5))&&one.cuffs.size()==1&&std::fabs(one.edges[0].back().x-1200)<1e-9);
+  // Short piece: cuffs shrink so at least one cell remains.
+  Drawing sh;assert(straight(0,0,1,0,100,D,k,sh,Cuffs(40,40,5)));assert(sh.edges[0].front().x<=25+1e-9&&sh.edges[0].back().x>=75-1e-9);
+  // Elbow cuffs: sectors of 40 mm axis arc at both ends; beads start after them.
+  Drawing ec;assert(elbow(0,0,D,0,3.141592653589793/2,D,k,ec,Cuffs(40,40,5)));assert(ec.cuffs.size()==2);
+  assert(std::fabs(std::atan2(ec.edges[0].front().y,ec.edges[0].front().x)-40/D)<1e-9);
+  assert(std::fabs(std::hypot(ec.cuffs[0][0].x,ec.cuffs[0][0].y)-(D+D/2+5))<1e-9&&std::fabs(std::hypot(ec.cuffs[0][2].x,ec.cuffs[0][2].y)-(D-D/2-5))<1e-9);}
  if(argc>1){ // dump for the visual check
   for(const Drawing* g:{&s,&e}){for(int j=0;j<2;++j){std::printf("E");for(auto& v:g->edges[j])std::printf(" %%.6f %%.6f %%.9f",v.x,v.y,v.bulge);std::printf("\n");}
    for(auto& l:g->rings)std::printf("R %%.6f %%.6f %%.6f %%.6f\n",l.x0,l.y0,l.x1,l.y1);}return 0;}
  // Degenerate input draws nothing (caller keeps the old drawing).
  assert(!straight(0,0,1,0,0,D,k,s)&&!elbow(0,0,D/2,0,1,D,k,e)&&!elbow(0,0,D,0,0,D,k,e));
  assert(cellCount(1e9,D,k)==2000);
- std::puts("PASS FLEX HOSE envelope D, valleys, elbow radii, straight/elbow joint, limits");
+ std::puts("PASS FLEX HOSE envelope D, valleys, elbow radii, straight/elbow joint, cuffs, limits");
 }
 '''
 def build(folder):

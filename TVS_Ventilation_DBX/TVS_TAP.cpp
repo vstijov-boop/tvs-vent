@@ -28,6 +28,7 @@
 #include <limits>
 #endif
 #include "TVS_TAP.h"
+#include "FlexCuffData.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_TAP::kCurrentVersionNumber = TVS_Version;
@@ -392,7 +393,10 @@ Adesk::Boolean TVS_TAP::subWorldDraw(AcGiWorldDraw *mode) {
 
 				// Air hose elbow: convex beads around the bend (geometry/FlexHose.h); zigzag fallback.
 				tvsFlex::Drawing hose;
-				if (tvsFlex::elbow(CenterPoint.x, CenterPoint.y, Radius + SizeA / 2, startangle, Swectangle, SizeA, tvsFlex::defaultPitch(), hose)) {
+				bool cuffStart = false, cuffEnd = false; tvsFlexCuff::read(this, cuffStart, cuffEnd); // start = MA side
+				const double unit = tvsUnits::factor(this), cuff = tvsFlexCuff::lengthMm() / unit;
+				const tvsFlex::Cuffs cuffs(cuffStart ? cuff : 0, cuffEnd ? cuff : 0, tvsFlexCuff::extraMm() / unit);
+				if (tvsFlex::elbow(CenterPoint.x, CenterPoint.y, Radius + SizeA / 2, startangle, Swectangle, SizeA, tvsFlex::defaultPitch(), hose, cuffs)) {
 					setFlexDrawing(hose, CenterPoint.z); delete arcie1; delete arcie2;
 				}
 				else { setZigzagProperty(arcie1); setZigzagProperty(arcie2); }

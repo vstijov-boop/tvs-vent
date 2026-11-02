@@ -30,6 +30,7 @@
 #endif
 #include "TVS_Pipe.h"
 #include "HiddenSpanData.h"
+#include "FlexCuffData.h"
 #include "../geometry/HiddenSpan.h"
 #include <algorithm>
 #include <vector>
@@ -420,7 +421,10 @@ setWipeoutProperty(mode,wPline);
 			AcGeVector3d axis(LastPoint.x - FirstPoint.x, LastPoint.y - FirstPoint.y, 0);
 			const double length = axis.length();
 			tvsFlex::Drawing hose;
-			if (length > 0 && tvsFlex::straight(FirstPoint.x, FirstPoint.y, axis.x / length, axis.y / length, length, SizeA, tvsFlex::defaultPitch(), hose)) {
+			bool cuffStart = false, cuffEnd = false; tvsFlexCuff::read(this, cuffStart, cuffEnd);
+			const double unit = tvsUnits::factor(this), cuff = tvsFlexCuff::lengthMm() / unit;
+			const tvsFlex::Cuffs cuffs(cuffStart ? cuff : 0, cuffEnd ? cuff : 0, tvsFlexCuff::extraMm() / unit);
+			if (length > 0 && tvsFlex::straight(FirstPoint.x, FirstPoint.y, axis.x / length, axis.y / length, length, SizeA, tvsFlex::defaultPitch(), hose, cuffs)) {
 				setFlexDrawing(hose, FirstPoint.z); delete Line1; delete Line2;
 			}
 			else { setZigzagProperty(Line1); setZigzagProperty(Line2); }

@@ -56,6 +56,7 @@
 #include "MleaderController.h"
 #include "PropertyAdmin.h"
 #include "TvsLinetypes.h"
+#include "FlexCuffCommand.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -1848,6 +1849,17 @@ public:
     static void Ventilation_ARXTVS_TEST_OFFSET_CHECK(){tvsOffsetProof::check();}
     static void Ventilation_ARXTVS_TEST_OFFSET_FAIL(){tvsOffsetProof::create(true);}
 #endif
+    // Flex hose cuffs: marks ends that do not continue into flex (display + specification).
+    static void Ventilation_ARXTVS_FLEX_MANZETNE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsFlexCuffCommand::run();
+    }
+    static void Ventilation_ARXTVS_FLEX_MANZETNA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsFlexCuffCommand::toggle();
+    }
     static void Ventilation_ARXTVS_STRETCH(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
@@ -3335,6 +3347,15 @@ public:
 								if (spec.add(pEnt) == true)
 								{
 									speclistflex.append(spec);
+									// Cuffs marked by TVS_FLEX_MANZETNE: one piece per marked end.
+									bool cuffStart = false, cuffEnd = false;
+									if (tvsFlexCuff::read(pEnt, cuffStart, cuffEnd) && (cuffStart || cuffEnd)) {
+										SPEC cuff;
+										wcscpy_s(cuff.grad, grad);
+										wcscpy_s(cuff.d, d);
+										cuff.addCuffs(pEnt, spec.SizeA, int(cuffStart) + int(cuffEnd));
+										speclistflex.append(cuff);
+									}
 								}
 							}
 
@@ -4088,6 +4109,8 @@ ACED_ADSSYMBOL_ENTRY_AUTO(CTVS_Ventilation_ARXApp, MyLispFunction, false)
 
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH, TVS_STRETCH, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
 
 #ifdef TVS_OFFSET_PROOF
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET, TVS_TEST_OFFSET, ACRX_CMD_MODAL, NULL)

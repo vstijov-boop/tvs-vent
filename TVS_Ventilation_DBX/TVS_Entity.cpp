@@ -1078,6 +1078,14 @@ void TVS_Entity::setFlexDrawing(const tvsFlex::Drawing& drawing, double z)
 		pl->setElevation(z);
 		setMainProperty(pl);
 	}
+	for (size_t c = 0; c < drawing.cuffs.size(); ++c) {
+		const std::vector<tvsFlex::Vertex>& q = drawing.cuffs[c];
+		AcDbPolyline* pl = new AcDbPolyline(static_cast<unsigned int>(q.size()));
+		for (size_t j = 0; j < q.size(); ++j)
+			pl->addVertexAt(static_cast<unsigned int>(j), AcGePoint2d(q[j].x, q[j].y), q[j].bulge);
+		pl->setClosed(Adesk::kTrue); pl->setElevation(z);
+		setMainProperty(pl);
+	}
 	for (size_t j = 0; j < drawing.rings.size(); ++j) {
 		const tvsFlex::Line& l = drawing.rings[j];
 		setThinProperty(new AcDbLine(AcGePoint3d(l.x0, l.y0, z), AcGePoint3d(l.x1, l.y1, z)));

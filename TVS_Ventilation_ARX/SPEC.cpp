@@ -18,6 +18,7 @@ using namespace std;
 #define TapRect 4
 #define Trans 5
 #define Wye 6
+#define FlexCuff 7
 #define TypeInt 0
 #define TypeDouble1 1
 #define TypeDouble2 2
@@ -60,6 +61,22 @@ void SPEC::setParam2(double param,int type)
 {
 	param2=param;
 	param2Type=type;
+}
+
+void SPEC::addCuffs(AcDbEntity * pEnt, double diameterMm, int count)
+{
+	status = FlexCuff;
+	SizeA = diameterMm; SizeB = 0; SizeA2 = SizeA3 = 0; Swectangle = 0; Length = 0; Area = 0;
+	sheetMass = sheetThickness = sheetUnitMass = 0.0;
+	setName(L"Manžetna (obujmica) fleksibilnog kanala");
+	setLable(d);
+	appendLable(SizeA);
+	setUnit1(_T("kom"));
+	setUnit2(_T(""));
+	setParam1(count, TypeInt);
+	setParam2(0, TypeInt);
+	sEnt = pEnt;
+	entityList.append(sEnt);
 }
 
 bool SPEC::add(AcDbEntity * pEnt)
