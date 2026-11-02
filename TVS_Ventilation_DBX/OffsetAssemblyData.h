@@ -26,6 +26,8 @@ DLLIMPEXP void permitAssemblyTransform(const AcDbObjectId& id);
 DLLIMPEXP void clearAssemblyTransforms();
 DLLIMPEXP void noteTransformRefusal();
 DLLIMPEXP int takeTransformRefusals();
+DLLIMPEXP void takeRefusalReasons(int& notPermitted,int& notRigid);
+DLLIMPEXP int permittedCount();
 DLLIMPEXP Acad::ErrorStatus remapClones(AcDbIdMapping& map);
 DLLIMPEXP const ACHAR* statusText(Status status);
 // Internal construction scope is process-local, never serialized.

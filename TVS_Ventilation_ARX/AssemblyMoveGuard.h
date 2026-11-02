@@ -15,6 +15,12 @@
 #include <vector>
 namespace tvsAssemblyMove {
 inline std::set<AcDbObjectId>& selected(){static std::set<AcDbObjectId> s;return s;}
+#ifdef TVS_BYPASS_PREVIEW
+inline bool& marked(){static bool m=false;return m;} // a marked member was seen this command
+inline void diag(const wchar_t* where){if(marked())acutPrintf(L"\nTVS SKLOP DIAG [%ls]: izbor=%d, dozvoljeno clanova=%d, djelimicnih sklopova=%d",where,static_cast<int>(selected().size()),tvsOffsetData::permittedCount(),partial());}
+#else
+inline void diag(const wchar_t*){}
+#endif
 inline int& partial(){static int n=0;return n;}
 inline void permitComplete(){
     tvsOffsetData::clearAssemblyTransforms();partial()=0;std::set<AcDbObjectId> done;
@@ -22,6 +28,9 @@ inline void permitComplete(){
         if(done.count(id))continue;
         std::vector<AcDbObjectId> need;
         {AcDbObjectPointer<AcDbObject> o(id,AcDb::kForRead);if(o.openStatus()!=Acad::eOk||!tvsOffsetData::marked(o.object()))continue;
+#ifdef TVS_BYPASS_PREVIEW
+         marked()=true;
+#endif
          AcDbObjectId all[7];
          if(tvsBypassData::members(o.object(),all))need.assign(all,all+7);
          else{tvsOffsetData::Record r;if(tvsOffsetData::read(o.object(),r)==tvsOffsetData::Valid)need.assign(r.members,r.members+3);}}
@@ -41,10 +50,14 @@ inline void begin(){
     reset();resbuf* grip=NULL;resbuf* pick=NULL;
     if(acedSSGetFirst(&grip,&pick)==RTNORM){addSet(grip);addSet(pick);}
     if(grip)acutRelRb(grip);if(pick)acutRelRb(pick);
-    permitComplete();
+    permitComplete();diag(L"start");
 }
 inline void end(){
-    const int refused=tvsOffsetData::takeTransformRefusals();
+    const int refused=tvsOffsetData::takeTransformRefusals();int notPermitted=0,notRigid=0;tvsOffsetData::takeRefusalReasons(notPermitted,notRigid);
+#ifdef TVS_BYPASS_PREVIEW
+    if(marked()||refused)acutPrintf(L"\nTVS SKLOP DIAG [kraj]: odbijeno=%d (nije dozvoljeno=%d, nije kruto=%d), dozvoljeno clanova=%d",refused,notPermitted,notRigid,tvsOffsetData::permittedCount());
+    marked()=false;
+#endif
     if(refused>0)acutPrintf(L"\nTVS: %d clan(ova) obilaska/offseta nije pomjereno. Sklop se pomjera samo cijeli (svi clanovi u izboru), MOVE/ROTATE oko Z; SCALE/MIRROR i djelimicni izbor nisu dozvoljeni.",refused);
     reset();
 }
@@ -53,12 +66,18 @@ public:
     virtual void endSSGet(Acad::PromptStatus status,int,AcEdSelectionSetService&,const AcDbObjectIdArray& ids) override{
         if(status!=Acad::eNormal)return;selected().clear();add(ids);
         resbuf* grip=NULL;resbuf* pick=NULL;if(acedSSGetFirst(&grip,&pick)==RTNORM){addSet(grip);}if(grip)acutRelRb(grip);if(pick)acutRelRb(pick);
-        permitComplete();
+        permitComplete();diag(L"ssget");
     }
 };
 inline SelectionFilter& filter(){static SelectionFilter f;return f;}
 inline std::set<AcApDocument*>& attached(){static std::set<AcApDocument*> d;return d;}
-inline void attach(AcApDocument* doc){if(doc&&attached().insert(doc).second)addSSgetFilterInputContextReactor(doc,&filter());}
+inline void attach(AcApDocument* doc){if(doc&&attached().insert(doc).second){const Acad::ErrorStatus es=addSSgetFilterInputContextReactor(doc,&filter());
+#ifdef TVS_BYPASS_PREVIEW
+    acutPrintf(L"\nTVS SKLOP DIAG: filter izbora za crtez %ls (%d).",es==Acad::eOk?L"prikljucen":L"NIJE prikljucen",static_cast<int>(es));
+#else
+    (void)es;
+#endif
+}}
 inline void detach(AcApDocument* doc){if(doc&&attached().erase(doc))removeSSgetFilterInputContextReactor(doc,&filter());}
 inline void attachAll(bool on){
     if(!acDocManager)return;AcApDocumentIterator* it=acDocManager->newAcApDocumentIterator();if(!it)return;
