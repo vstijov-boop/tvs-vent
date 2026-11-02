@@ -181,28 +181,31 @@
            (/ len 1000.0)))
     ;; koljeno: obim * radijus ose * ugao
     ((= on "TVS_TAP")
-     (setq vertical nil)
+     (setq vertical nil native nil)
      (if (vlax-property-available-p obj 'Form)
        (setq vertical (member (vlax-get-property obj 'Form) '(2 3))))
+     ;; Native sheet area from TVS first (exact for every elbow, also obilazak/offset members
+     ;; that refuse COPY); copy+explode geometry only as fallback, formula last.
+     (if (vlax-property-available-p obj 'SheetArea)
+       (progn
+         (setq native (vl-catch-all-apply 'vlax-get-property (list obj 'SheetArea)))
+         (if (vl-catch-all-error-p native) (setq native nil))
+         (if (= (type native) 'VARIANT) (setq native (vlax-variant-value native)))
+         (if (not (and (numberp native) (> native 0.0))) (setq native nil))))
      (setq bend (if vertical b a)
            ang (vlax-get-property obj 'Angle)
-           rg  (if vertical nil (if *tvs-elbow-geom* (tvs-elbow-rg obj) nil))   ; (Ri Ro) iz geometrije koljena
+           rg  (if (or native vertical (not *tvs-elbow-geom*)) nil
+                 (progn (setq rg (vl-catch-all-apply 'tvs-elbow-rg (list obj)))
+                        (if (vl-catch-all-error-p rg) nil rg)))   ; (Ri Ro) iz geometrije koljena
            rc  (cond (rg (/ (+ (car rg) (cadr rg)) 2.0))      ; radijus ose iz crteza
                      ((= *tvs-rmode* "os") (* *tvs-rk* bend))
                      (T (+ (* *tvs-rk* bend) (/ bend 2.0))))
-           ar  (/ (* 2.0 (+ a b) rc (* ang (/ pi 180.0))) 1.0e6))
-     ;; Up/down drawing is a projection, not a developed arc. Prefer native sheet area.
-     (if vertical
-       (if (vlax-property-available-p obj 'SheetArea)
-         (progn
-           (setq native (vlax-get-property obj 'SheetArea))
-           (if (= (type native) 'VARIANT) (setq native (vlax-variant-value native)))
-           (if (numberp native)
-             (if (> native 0.0) (setq ar native))))))
+           ar  (if native native (/ (* 2.0 (+ a b) rc (* ang (/ pi 180.0))) 1.0e6)))
      (if *tvs-debug*
        (princ (strcat "\n[koljeno " (tvs-fmt a) "x" (tvs-fmt b) " ugao " (rtos ang 2 2)
-                      (if rg (strcat "  Ri=" (rtos (car rg) 2 1) "  Ro=" (rtos (cadr rg) 2 1))
-                             "  (bez geometrije)")
+                      (cond (native "  (TVS SheetArea)")
+                            (rg (strcat "  Ri=" (rtos (car rg) 2 1) "  Ro=" (rtos (cadr rg) 2 1)))
+                            (T "  (formula)"))
                       "  Rc=" (rtos rc 2 1) "  P=" (rtos ar 2 3) " m2]")))
      (list "Koljeno" 2
            (strcat (tvs-fmt a) "x" (tvs-fmt b) " ugao " (rtos ang 2 1))
