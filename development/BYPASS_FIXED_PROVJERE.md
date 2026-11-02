@@ -129,3 +129,7 @@ kanala bez susjeda (sumnja iz pregleda je potvrđena). Ispravka bez novih podata
 nepostojeći susjed u istom V1 slotu čuva inlet kao rezervisanu referencu sa portom 0;
 `read()` port 0 tumači kao „nema susjeda“. Raniji DEV roditelji sa nultom 330 ne postoje,
 jer takav upis nikad nije uspio. Regresija sada modeluje ovo SDK ponašanje.
+
+14. `TVS_BYPASS_DETALJ` na članu postojećeg obilaska (i poslije save/reopen): detalj
+    jednak onom iz dijaloga za isti obilazak. Na običnom kanalu ili poslije ručnog
+    pomjeranja člana: odbijanje bez umetanja.

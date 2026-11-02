@@ -163,6 +163,11 @@ Status validate(const AcDbObject* object,bool geometry){
     }
     return Valid;
 }
+Status assembly(const AcDbObject* member,Record& record){
+    const Status s=validate(member,true);if(s!=Valid)return s;
+    AcDbObjectId parent;int role=-1;if(link(member,parent,role)!=Valid)return Corrupt;
+    return read(parent,record);
+}
 static Acad::ErrorStatus newRecord(AcDbDictionary* dict,const ACHAR* key,const resbuf& data,AcDbTransactionManager* tx,AcDbObjectId& id){
     AcDbXrecord* r=new AcDbXrecord();Acad::ErrorStatus es=r->setFromRbChain(data);if(es!=Acad::eOk){delete r;return es;}
     r->setXlateReferences(true);es=dict->setAt(key,r,id);if(es!=Acad::eOk){delete r;return es;}

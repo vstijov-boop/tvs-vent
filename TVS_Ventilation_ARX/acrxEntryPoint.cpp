@@ -117,6 +117,8 @@ public:
             acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS_DETALJ nije uspjela.");
 #endif
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION

@@ -85,5 +85,17 @@ int main(){
         # Detail -> dialog keeps the same candidate in accepting flows.
         self.assertRegex(run,r"(?s)if\(action==703\)\{.*?if\(permanent\)continue;")
 
+    def test_existing_detail_command(self):
+        src=DIALOG.read_text(encoding='utf-8-sig')
+        body=function(src,'void tvsBypassExistingDetailCommand(')
+        # Read-only lookup of a validated parent, rebuild without search, proven against members.
+        self.assertIn('tvsBypassData::assembly(',body)
+        self.assertIn('engine.rebuild(',body)
+        self.assertNotIn('calculate(',body)
+        self.assertNotIn('tvsBypassService::write(',body)
+        self.assertRegex(body,r"(?s)deviation<=\.001.*?tvsSideDetail::insert\(")
+        entry=(ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+        self.assertIn('L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand',entry)
+
 if __name__=='__main__':
     unittest.main()

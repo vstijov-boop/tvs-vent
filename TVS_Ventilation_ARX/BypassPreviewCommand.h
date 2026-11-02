@@ -6,6 +6,7 @@ struct TVSBypassRadius {int mode;double k,constant;TVSBypassRadius():mode(0),k(0
 void tvsBypassPreviewCommand(const TVSBypassRadius& radius);
 void tvsBypassDetailCheckCommand();
 void tvsBypassDetailTestCommand();
+void tvsBypassExistingDetailCommand();
 void tvsBypassCommand(const TVSBypassRadius& radius);
 class TVS_Pipe;
 // id is authoritative for the continuation; pipe is the legacy closed-object pointer

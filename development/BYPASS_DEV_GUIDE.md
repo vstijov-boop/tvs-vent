@@ -94,3 +94,13 @@ praktično prihvatanje nove verzije još nije potvrđeno.
 Konektori, dijagnostika, ciljane izmjene i praktična checklista:
 [BYPASS_FIXED_PROVJERE.md](BYPASS_FIXED_PROVJERE.md). Rollback proba (`TVS_BYPASS_FAIL`)
 radi samo u DEV paketu sa `TVS_BYPASS_FAULT_INJECTION`.
+
+## TVS_BYPASS_DETALJ — detalj postojećeg obilaska
+
+`TVS_BYPASS_DETALJ` → klik na bilo koji član obilaska (koljeno, kosi član ili H).
+Komanda provjerava roditelja i geometriju članova, rekonstruiše presjek istim checker-om
+na zapisanim D, C i s0 (bez nove pretrage), uz zapisane izolacije/razmak/rezervu i
+prepreku kakva je bila pri prihvatanju, i provjerava poklapanje sa članovima na 0,001 mm.
+Zatim slijedi uobičajeno umetanje: oznaka, kotiranje, tačka. Detalj je statički snimak,
+nije vezan za sklop; poslije izmjene obilaska umetnuti novi. Ri i ugao se čitaju iz
+koljena; minimalne dužine nisu zapisane, pa se ne provjeravaju ponovo.

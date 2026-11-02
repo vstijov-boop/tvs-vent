@@ -335,6 +335,63 @@ void tvsBypassDetailCheckCommand(){
   acutPrintf(L"\nBocni detalji: %u lokalnih referenci. %ls",static_cast<unsigned>(used.labels.size()),used.duplicated?L"DUPLIKATI: COPY nije nezavisni detalj; uklonite kopije.":L"Oznake/GUID-i bez otkrivenih duplikata. XREF i ponovljene parent instance nisu globalno provjereni.");
  }catch(...){acutPrintf(L"\nProvjera detalja nije zavrsena; zapis je mozda neispravan ili nedostupan.");}
 }
+// TVS_BYPASS_DETALJ: static side detail of an EXISTING bypass. Rebuilds the as-built section
+// from the filed parent and member geometry (same checker, recorded D/C/s0, no search), proves
+// it matches the members to 0.001 mm, then uses the normal detail insertion. Never edits DWG
+// objects other than inserting the unlinked detail.
+void tvsBypassExistingDetailCommand(){
+#ifndef TVS_OFFSET_INTEGRATION
+ acutPrintf(L"\nTVS_BYPASS_DETALJ zahtijeva upareni DEV DBX/ARX sa integracijom.");
+#else
+ try{
+  AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
+  if(!db||!db->tilemode()){acutPrintf(L"\nTVS_BYPASS_DETALJ radi u Model prostoru.");return;}
+  ads_name name;ads_point pick;if(acedEntSel(L"\nIzaberite clan postojeceg obilaska: ",name,pick)!=RTNORM)return;
+  AcDbObjectId picked;if(acdbGetObjectId(picked,name)!=Acad::eOk)return;
+  tvsBypassData::Record r;
+  {AcDbObjectPointer<AcDbObject> member(picked,AcDb::kForRead);
+   if(member.openStatus()!=Acad::eOk){acutPrintf(L"\nTVS BYPASS DETALJ: objekat nije dostupan.");return;}
+   const tvsOffsetData::Status st=tvsBypassData::assembly(member.object(),r);
+   if(st!=tvsOffsetData::Valid){acutPrintf(L"\nTVS BYPASS DETALJ: izabrani objekat nije ispravan clan obilaska (%ls). Detalj nije umetnut.",tvsOffsetData::statusText(st));return;}}
+  const double f=r.factor;
+  AcDbObjectPointer<TVS_Pipe> in(r.inlet,AcDb::kForRead),out(r.outlet,AcDb::kForRead),h(r.members[3],AcDb::kForRead);
+  AcDbObjectPointer<TVS_TAP> elbow(r.members[0],AcDb::kForRead);
+  if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk||h.openStatus()!=Acad::eOk||elbow.openStatus()!=Acad::eOk){
+   acutPrintf(L"\nTVS BYPASS DETALJ: ulaz, izlaz ili clan sklopa nije dostupan.");return;}
+  // Original straight route = inlet fixed end .. outlet far end, as before the cut.
+  Snapshot s;
+  const AcGePoint3d first=r.reverse?out->FirstPoint:in->FirstPoint,last=r.reverse?in->LastPoint:out->LastPoint;
+  s.route.first=Point(first.x,first.y,first.z);s.route.last=Point(last.x,last.y,last.z);
+  s.route.a=in->SizeA;s.route.b=in->SizeB;s.route.elevation=in->get_Elevation();s.route.rectangular=s.route.rigid=s.route.ordinary=true;
+  const double* q=r.obstacleSnapshot; // obstacle as recorded at acceptance
+  s.obstacle.first=Point(q[0],q[1],q[7]);s.obstacle.last=Point(q[2],q[3],q[7]);s.obstacle.elevation=q[4];s.obstacle.a=q[5];s.obstacle.b=q[6];
+  s.obstacle.rectangular=s.obstacle.rigid=s.obstacle.ordinary=true;
+  Options o;o.ri=elbow->get_radius()*f;o.clearance=r.policy[0];o.insulation=r.policy[1];o.obstacleInsulation=r.policy[2];o.reserve=r.policy[3];
+  const double degrees=elbow->Swectangle*180/tvsOffset::pi();int angle=0;
+  for(int a:{30,45,60})if(std::fabs(degrees-a)<1e-6)angle=a;
+  if(!angle){acutPrintf(L"\nTVS BYPASS DETALJ: ugao koljena %.6f nije 30/45/60.",degrees);return;}
+  o.angle=angle;o.above=h->Elev>in->Elev;o.minSlope=o.minBridge=o.minProjection=0;o.confirmed=true; // minimums were checked at acceptance
+  Engine engine;const Frame fr=engine.frame(s,f,r.reverse);
+  if(!fr.valid){acutPrintf(L"\nTVS BYPASS DETALJ: %ls",wide(fr.reason).c_str());return;}
+  o.left=fr.left;o.right=fr.right;
+  const AcGePoint3d cut=r.reverse?in->FirstPoint:in->LastPoint;
+  const double D=std::fabs(h->Elev-in->Elev)*f,C=h->FirstPoint.distanceTo(h->LastPoint)*f;
+  const double s0=((cut.x-fr.origin.x)*fr.ux+(cut.y-fr.origin.y)*fr.uy)*f;
+  const View v=engine.rebuild(s,f,r.reverse,o,D,C,s0);
+  if(!v.ready){acutPrintf(L"\nTVS BYPASS DETALJ: %ls %ls",wide(v.status).c_str(),wide(v.details).c_str());return;}
+  // The rebuilt section must be the drawn one.
+  auto at=[](const tvsOffset::WorldPoint& w){return AcGePoint3d(w.x,w.y,w.z);};
+  const AcGePoint3d outStart=r.reverse?out->LastPoint:out->FirstPoint;
+  double deviation=(std::max)((std::max)(cut.distanceTo(at(v.offsets[0].incomingLast)),outStart.distanceTo(at(v.offsets[1].outgoingFirst))),
+   (std::max)(h->FirstPoint.distanceTo(at(v.offsets[0].outgoingFirst)),h->LastPoint.distanceTo(at(v.offsets[1].incomingLast))))*f;
+  deviation=(std::max)(deviation,std::fabs(v.zPass-h->Elev*f));
+  if(!(deviation<=.001)){acutPrintf(L"\nTVS BYPASS DETALJ: rekonstrukcija odstupa od nacrtanih clanova (%.6f mm). Detalj nije umetnut.",deviation);return;}
+  acutPrintf(L"\nPostojeci obilazak: D=%.1f, C=%.1f mm, ugao %d, Ri=%.1f mm, %ls. Detalj je staticki snimak, nije vezan za sklop.",D,C,angle,o.ri,o.above?L"iznad":L"ispod");
+  in.close();out.close();h.close();elbow.close();
+  tvsSideDetail::insert(db,v,o,r.inlet,r.obstacle);
+ }catch(...){acutPrintf(L"\nTVS BYPASS DETALJ prekinut. Nepotvrdjena transakcija/grafika je uklonjena.");}
+#endif
+}
 static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput* output,const TVSBypassRadius& radius){
  try{
   AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
