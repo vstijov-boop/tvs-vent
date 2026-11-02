@@ -12,8 +12,9 @@ Ne prepisivati produkcioni bundle i ne koristiti hot unload/reload.
    Tokom `TVS_PIPE` ili `TVS_DRAW`: opcija `Obilazak` / `O`; izabrati samo prepreku.
 3. Postojeći dijalog: potvrditi stvarne jedinice, eksplicitno unijeti obje izolacije
    (0 ako ih nema), Ri, razmak i ostale ulaze; `Pronađi prolaz`.
-4. `Pregled u crtežu` je privremen; Enter vraća dijalog. **`Prihvati obilazak`**
-   trajno upisuje isti provjereni kandidat, bez nove pretrage. Izmjena ulaza uklanja
+4. `Pregled u crtežu` je privremen; na komandnoj liniji `Pregled [Prihvati/Dijalog/Odustani]
+   <Dijalog>`. `Prihvati` (ili **`Prihvati obilazak`** u dijalogu) trajno upisuje isti
+   provjereni kandidat, bez nove pretrage. Izmjena ulaza uklanja
    važenje rezultata; promijenjen kanal/prepreka ili veze odbijaju upis.
 5. U crtanju poslije uspjeha odmah zadati sljedeću tačku. Nastavak je sa sačuvanog
    spoljašnjeg kraja i početne fizičke kote. Cancel/neuspjeh čuva dotadašnji nastavak.
@@ -81,3 +82,22 @@ prekidala. Writer sada koristi postojeći rječnik, a kreira ga samo gdje nedost
 Nova regresija izvršava stvarni parent writer, čuva postojeće V1 zapise i provjerava
 roditelja sa svih sedam backlink-ova. Novi paket zahtijeva svježu AutoCAD sesiju;
 praktično prihvatanje nove verzije još nije potvrđeno.
+
+## Grana razvoj-bypass-fixed — sređivanje poslije a352072
+
+- Svaki odbijeni upis štampa konkretan razlog (`TVS BYPASS: <razlog> Nema izmjena.`),
+  uključujući SDK status roditelja. Ranije je svih ~25 izlaza davalo istu poruku.
+- `pinned()` prvo čita samo raspored referenci; pun `read()` (sidra, V1 trojke) samo
+  za roditelje koji referenciraju izabrani kanal. Ista semantika, 36 postojećih slučajeva.
+- Parent writer odbija upis ako se postojeći susjed ili roditelj ne može pretvoriti u ime.
+- `TVS_BYPASS_FAIL` se čita jednom po procesu (postaviti prije pokretanja AutoCAD-a).
+- Dijalog: Ri predlog = B/2 (Rc = 1,0 × B, kao kod koljena gore/dolje); posljednji
+  potvrđeni ulazi pamte se u sesiji (prozor s se uvijek računa iz geometrije);
+  veličina prati DPI monitora; presjek se crta van ekrana i osvježava samo on;
+  čekajući kursor tokom računanja; `Prihvati obilazak` sakriveno u TVS_BYPASS_PREVIEW.
+
+Otvoreno, nije riješeno ovom granom:
+- Konektori nisu filed podaci: korisnički UNDO poslije Prihvati ne vraća recipročnu vezu
+  susjeda (ostaje na obrisanom ostatku). Rollback pokriva samo prekid transakcije.
+- Bypass bez susjeda upisuje nultu 330 referencu; potvrditi save/reopen u AutoCAD-u.
+- Članovi sklopa nisu međusobno povezani konektorima.

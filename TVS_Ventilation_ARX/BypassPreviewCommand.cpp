@@ -86,13 +86,21 @@ static double Options::* const fields[FieldCount]={&Options::ri,&Options::insula
 static const wchar_t* labels[FieldCount]={L"Unutrašnji radijus koljena Ri (mm)",L"Izolacija trase, mm *",L"Izolacija prepreke, mm *",L"Obavezan razmak, mm",L"Projektna rezerva, mm",
  L"Min. dužina kosog komada (mm)",L"Min. dužina srednjeg komada C (mm)",L"Min. projekcija, mm",L"Početak prozora s (mm)",L"Kraj prozora s (mm)",L"Donja granica Z, mm (opciono)",L"Gornja granica Z, mm (opciono)",
  L"Vrijeme, ms (max 10000)",L"Checker pozivi (max 128)",L"Ćelije (max 1000000)",L"Korak D, mm",L"Korak C, mm",L"Max. traženi D, mm",L"Nivoi D (max 128)",L"Prijedlozi C (max 16)",L"Položaji (max 16)",L"Seed solve (max 128)",L"Prijedlozi (max 2048)",L"Inset prozora, mm",L"Prag poboljšanja W, mm",L"Prag poboljšanja D, mm"};
+// Last confirmed inputs in this AutoCAD session. Geometry-dependent window s is never reused.
+struct Remembered {bool valid;std::wstring values[FieldCount];int angle,side;Remembered():valid(false),angle(1),side(0){}};
+static Remembered& remembered(){static Remembered value;return value;}
 struct Dialog {
  Snapshot snapshot;bool reverse,loading,unitFromRecord,advanced,showDimensions,showAxes,allEdges,canAccept;double scaleX,scaleY;Engine engine;View view;Options options;
  std::wstring values[FieldCount];int units,angle,side;bool confirmed;HWND window;HFONT font;
  Dialog(const Snapshot& s,bool r,double factor,bool known,bool accept=false):snapshot(s),reverse(r),loading(true),unitFromRecord(known),advanced(false),showDimensions(true),showAxes(true),allEdges(false),canAccept(accept),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL){
   for(int j=0;j<FieldCount;++j)values[j]=number(options.*fields[j]);
   values[1]=values[2]=L"";values[10]=values[11]=L"";
-  Frame f=engine.frame(s,factor,r);if(known&&f.valid){values[8]=number(f.left);values[9]=number(f.right);}else values[8]=values[9]=L"";
+  Frame f=engine.frame(s,factor,r);
+  // Vertical bend: Rc = 1.0 x B, so Ri = B/2 (same rule as Gore/Dolje elbows).
+  const bool ductRadius=known&&f.valid&&f.height>0;if(ductRadius)values[0]=number(f.height/2);
+  const Remembered& last=remembered();
+  if(last.valid){for(int j=0;j<FieldCount;++j)if(j!=8&&j!=9&&(j!=0||!ductRadius))values[j]=last.values[j];angle=last.angle;side=last.side;}
+  if(known&&f.valid){values[8]=number(f.left);values[9]=number(f.right);}else values[8]=values[9]=L"";
  }
  ~Dialog(){if(font)DeleteObject(font);}
  double factor()const{return units==0?1:units==1?10:units==2?1000:0;}
@@ -110,7 +118,9 @@ struct Dialog {
   }else t<<L"Izaberite jedinice crteža i unesite izolacije. Podaci iz objekata ostaju neizmijenjeni.\r\n"<<wide(f.reason);
   SetDlgItemTextW(window,600,t.str().c_str());
  }
- void invalidate(){engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);EnableWindow(GetDlgItem(window,704),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");InvalidateRect(window,NULL,TRUE);}
+ void redrawSection(){const SectionLayout layout=sectionLayout(scaleX,scaleY,showDimensions,advanced);
+  RECT area={layout.area.left,layout.area.top,layout.area.right,layout.area.bottom};InvalidateRect(window,&area,FALSE);}
+ void invalidate(){const bool wasReady=view.ready;engine.invalidate();view=View();EnableWindow(GetDlgItem(window,701),FALSE);EnableWindow(GetDlgItem(window,703),FALSE);EnableWindow(GetDlgItem(window,704),FALSE);SetDlgItemTextW(window,800,L"Ulazi su promijenjeni. Rezultat ne važi; pokrenite računanje.");if(wasReady)redrawSection();}
  void capture(){for(int j=0;j<FieldCount;++j)values[j]=text(100+j);
   units=(int)SendDlgItemMessage(window,502,CB_GETCURSEL,0,0);angle=(int)SendDlgItemMessage(window,501,CB_GETCURSEL,0,0);side=(int)SendDlgItemMessage(window,500,CB_GETCURSEL,0,0);
   confirmed=IsDlgButtonChecked(window,503)==BST_CHECKED;}
@@ -126,17 +136,20 @@ struct Dialog {
     SetDlgItemTextW(window,800,error.c_str());SetFocus(GetDlgItem(window,100+j));return false;}
    options.*fields[j]=x;
   }
-  options.confirmed=true;options.useFloor=!values[10].empty();options.useCeiling=!values[11].empty();options.angle=30+15*angle;options.above=side==1;return true;
+  options.confirmed=true;options.useFloor=!values[10].empty();options.useCeiling=!values[11].empty();options.angle=30+15*angle;options.above=side==1;
+  Remembered& last=remembered();last.valid=true;for(int j=0;j<FieldCount;++j)last.values[j]=values[j];last.angle=angle;last.side=side;
+  return true;
  }
  void calculate(bool improve){
   if(!parse()){std::wstring error=text(800);invalidate();SetDlgItemTextW(window,800,error.c_str());return;}
   EnableWindow(GetDlgItem(window,700),FALSE);EnableWindow(GetDlgItem(window,702),FALSE);
   SetDlgItemTextW(window,800,L"Računanje... Rok je kooperativan; aktivni checker poziv se ne prekida. Dijalog čeka završetak.");UpdateWindow(window);
+  struct WaitCursor {HCURSOR old;WaitCursor():old(SetCursor(LoadCursor(NULL,IDC_WAIT))){}~WaitCursor(){SetCursor(old);}} wait;
   try{view=engine.calculate(snapshot,factor(),reverse,options,improve);
    refreshResult();}
   catch(...){invalidate();SetDlgItemTextW(window,800,L"Greška računanja. Nema DWG izmjena.");}
   EnableWindow(GetDlgItem(window,700),TRUE);EnableWindow(GetDlgItem(window,702),TRUE);
-  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,704),canAccept&&view.ready&&engine.ready());InvalidateRect(window,NULL,TRUE);
+  EnableWindow(GetDlgItem(window,701),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,703),view.ready&&engine.ready());EnableWindow(GetDlgItem(window,704),canAccept&&view.ready&&engine.ready());redrawSection();
  }
  void refreshResult(){
   std::wstring value=advanced?wide(view.status)+L"\r\n"+wide(view.details):wide(summary(view,options));
@@ -163,7 +176,10 @@ struct Dialog {
  void init(HWND h){window=h;loading=true;
   RECT work;SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
   MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);if(GetMonitorInfoW(MonitorFromWindow(GetParent(h),MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;
-  SetWindowPos(h,NULL,work.left+10,work.top+10,(std::min)(1220L,work.right-work.left-20),(std::min)(760L,work.bottom-work.top-20),SWP_NOZORDER);
+  // Base layout is 96 DPI; grow with the monitor scale instead of shrinking text on 125-200 %.
+  int dpi=96;if(HDC screen=GetDC(NULL)){dpi=GetDeviceCaps(screen,LOGPIXELSY);ReleaseDC(NULL,screen);}if(dpi<96)dpi=96;
+  const LONG width=MulDiv(1220,dpi,96),height=MulDiv(760,dpi,96);
+  SetWindowPos(h,NULL,work.left+10,work.top+10,(std::min)(width,work.right-work.left-20),(std::min)(height,work.bottom-work.top-20),SWP_NOZORDER);
   RECT client;GetClientRect(h,&client);scaleX=client.right/1204.0;scaleY=client.bottom/720.0;
   if(!font)font=CreateFontW(-(int)(13*(std::min)(scaleX,scaleY)),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI");
   child(L"STATIC",L"",SS_LEFT,600,12,10,1180,75);source();
@@ -182,6 +198,7 @@ struct Dialog {
   child(L"BUTTON",L"Pregled u crtežu",BS_PUSHBUTTON|WS_TABSTOP,701,356,616,165,30);EnableWindow(GetDlgItem(h,701),view.ready&&engine.ready());
   child(L"BUTTON",L"Umetni detalj…",BS_PUSHBUTTON|WS_TABSTOP,703,12,666,180,30);EnableWindow(GetDlgItem(h,703),view.ready&&engine.ready());
   child(L"BUTTON",L"Prihvati obilazak",BS_PUSHBUTTON|WS_TABSTOP,704,165,666,145,30);EnableWindow(GetDlgItem(h,704),canAccept&&view.ready&&engine.ready());
+  if(!canAccept)ShowWindow(GetDlgItem(h,704),SW_HIDE);
   child(L"BUTTON",L"Otkaži / zatvori",BS_PUSHBUTTON|WS_TABSTOP,IDCANCEL,318,666,140,30);
   child(L"BUTTON",L"Napredno / dijagnostika",BS_AUTOCHECKBOX|WS_TABSTOP,504,12,112,280,22);CheckDlgButton(h,504,advanced?BST_CHECKED:BST_UNCHECKED);
   child(L"STATIC",L"Uzdužni presjek — fizičke kote, ista razmjera s/z",0,602,590,90,590,20);
@@ -195,9 +212,14 @@ struct Dialog {
   fieldLayout();refreshResult();loading=false;
  }
  void paint(){
-  PAINTSTRUCT ps;HDC dc=BeginPaint(window,&ps);
+  PAINTSTRUCT ps;HDC screen=BeginPaint(window,&ps);
   const SectionLayout layout=sectionLayout(scaleX,scaleY,showDimensions,advanced);
   RECT area={layout.area.left,layout.area.top,layout.area.right,layout.area.bottom};
+  // Off-screen section: keystrokes no longer repaint (and flash) the whole dialog.
+  RECT client;GetClientRect(window,&client);
+  HDC dc=CreateCompatibleDC(screen);HBITMAP bitmap=dc?CreateCompatibleBitmap(screen,(std::max)(1L,client.right),(std::max)(1L,client.bottom)):NULL;
+  if(!dc||!bitmap){if(bitmap)DeleteObject(bitmap);if(dc)DeleteDC(dc);dc=screen;bitmap=NULL;}
+  HGDIOBJ oldBitmap=bitmap?SelectObject(dc,bitmap):NULL;
   FillRect(dc,&area,(HBRUSH)GetStockObject(WHITE_BRUSH));
   HGDIOBJ oldFont=SelectObject(dc,font);int oldBk=SetBkMode(dc,TRANSPARENT);COLORREF oldColor=GetTextColor(dc);
   if(view.ready&&view.axis.size()==8){
@@ -245,7 +267,9 @@ struct Dialog {
     SelectObject(dc,previousFont);DeleteObject(noteFont);
    }
   }
-  SetTextColor(dc,oldColor);SetBkMode(dc,oldBk);SelectObject(dc,oldFont);EndPaint(window,&ps);
+  SetTextColor(dc,oldColor);SetBkMode(dc,oldBk);SelectObject(dc,oldFont);
+  if(bitmap){BitBlt(screen,area.left,area.top,area.right-area.left,area.bottom-area.top,dc,area.left,area.top,SRCCOPY);SelectObject(dc,oldBitmap);DeleteObject(bitmap);DeleteDC(dc);}
+  EndPaint(window,&ps);
  }
  static INT_PTR CALLBACK proc(HWND h,UINT m,WPARAM w,LPARAM l){
   Dialog* self=(Dialog*)GetWindowLongPtr(h,DWLP_USER);
@@ -261,7 +285,7 @@ struct Dialog {
     if(id==502){self->unitFromRecord=false;Frame f=self->engine.frame(self->snapshot,self->factor(),self->reverse);self->loading=true;
      if(f.valid){SetDlgItemTextW(h,108,number(f.left).c_str());SetDlgItemTextW(h,109,number(f.right).c_str());}self->loading=false;self->source();}return TRUE;}
    if(id==504&&code==BN_CLICKED){self->advanced=IsDlgButtonChecked(h,504)==BST_CHECKED;self->fieldLayout();self->refreshResult();return TRUE;}
-   if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;InvalidateRect(h,NULL,TRUE);return TRUE;}
+   if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;self->redrawSection();return TRUE;}
    if(id==507&&code==CBN_SELCHANGE){self->allEdges=SendDlgItemMessage(h,507,CB_GETCURSEL,0,0)==1;return TRUE;}
    if(id==700||id==702){self->calculate(id==702);return TRUE;}
    if((id==701||id==703||(id==704&&self->canAccept))&&self->view.ready&&self->engine.ready()){self->capture();EndDialog(h,id);return TRUE;}
@@ -311,22 +335,30 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
      if(data)acutRelRb(data);}}}dict->close();}
   Dialog dialog(s,reverse,tvsUnits::factor(db),known,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
   for(;;){INT_PTR action=dialog.show(owner);
+   if(action==701){
+    Transient preview;if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes))return false;
+    acutPrintf(L"\nPrivremena osnova BEZ tacne vidljivosti/zaklanjanja. Crtice su simbolika, ne dokaz skrivenih ivica. Original ostaje vidljiv.");
+    const bool canAccept=permanent&&dialog.canAccept;
+    acedInitGet(0,canAccept?L"Prihvati Dijalog Odustani":L"Dijalog Odustani");ACHAR answer[64]=L"";
+    const int status=acedGetKword(canAccept?L"\nPregled [Prihvati/Dijalog/Odustani] <Dijalog>: ":L"\nPregled [Dijalog/Odustani] <Dijalog>: ",answer);
+    preview.clear();
+    if(status!=RTNORM&&status!=RTNONE)return false;
+    if(status==RTNORM&&_wcsicmp(answer,L"Odustani")==0)return false;
+    if(!(status==RTNORM&&canAccept&&_wcsicmp(answer,L"Prihvati")==0))continue; // back to the dialog
+    action=704; // accept the same checked candidate shown in the preview
+   }
    if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);return false;}
 #ifdef TVS_OFFSET_INTEGRATION
    if(action==704&&permanent&&dialog.view.ready&&dialog.engine.ready()){
     tvsBypassService::Commit result;
     if(!tvsBypassService::write(native,dialog.view,dialog.options,result)){
-     acutPrintf(L"\nBYPASS nije upisan: snapshot/raspoloziva duzina/atributi ili transakcija. Nema djelimicnog upisa.");return false;}
+     acutPrintf(L"\nBYPASS nije upisan (razlog je naveden iznad). Nema djelimicnog upisa.");return false;}
     if(output){output->pipe=result.resident;output->elevation=result.elevation;output->angle=result.angle;}
     acutPrintf(L"\nBYPASS upisan: cetiri koljena, dva kosa i H; dvije V1 trojke, jedan roditelj. Pocetna/izlazna kota ista.");
     return true;
    }
 #endif
-   if(action!=701)return false;
-   Transient preview;if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes))return false;
-   acutPrintf(L"\nPrivremena osnova BEZ tacne vidljivosti/zaklanjanja. Crtice su simbolika, ne dokaz skrivenih ivica. Original ostaje vidljiv.");
-   ACHAR text[256];int status=acedGetString(0,L"\nEnter vraca dijalog i Prihvati; Esc uklanja pregled: ",text);
-   preview.clear();if(status!=RTNORM&&status!=RTNONE)return false;
+   return false;
   }
  }catch(...){acutPrintf(L"\nBYPASS prekinut. Nepotvrdjena transakcija/grafika je uklonjena.");return false;}
 }

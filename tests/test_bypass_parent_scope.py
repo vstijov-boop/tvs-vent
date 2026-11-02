@@ -102,8 +102,9 @@ public:
  AcDbXrecord* operator->(){return &object;}
 };
 namespace tvsBypassData {
+static int reads=0;
 static Status read(const AcDbObjectId& id,Record& out){
- const auto& f=fixtures.at(id.value);out=f.record;return f.status;
+ ++reads;const auto& f=fixtures.at(id.value);out=f.record;return f.status;
 }
 '''
         code += function(source, 'static int typeAt(') + '\n'
@@ -131,7 +132,8 @@ static void expect(int source,bool first,bool blocked){
 int main(){
  using namespace tvsOffsetData;
  fixtures[1]=make(Valid);
- expect(90,false,false);expect(10,false,true);expect(11,true,true);expect(11,false,false);
+ tvsBypassData::reads=0;expect(90,false,false);assert(tvsBypassData::reads==0); // unrelated parent: no full read
+ expect(10,false,true);assert(tvsBypassData::reads==1);expect(10,false,true);expect(11,true,true);expect(11,false,false);
  for(Status status:{Incomplete,Corrupt}){
   // Deleted anchor / unreadable V1 membership, but the parent's complete references remain readable.
   fixtures[1]=make(status);diagnostics.clear();

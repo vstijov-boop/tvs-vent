@@ -107,10 +107,12 @@ bool pinned(const AcDbObjectId& source,bool first){
     if(!it)return true;
     for(;!it->done();it->next()){
         if(_wcsnicmp(it->name(),L"TVS_BYPASS_",11))continue;
+        // Cheap scope first: a complete V1 layout without a reference to the source cannot
+        // pin it, so the full read (anchors and V1 triples) runs only for related parents.
+        const ReferenceRelation relation=parentRelation(it->objectId(),source);
+        if(relation==UnrelatedReference)continue;
         Record r;const Status s=read(it->objectId(),r);
         if(s!=Valid){
-            const ReferenceRelation relation=parentRelation(it->objectId(),source);
-            if(relation==UnrelatedReference)continue;
             if(relation==RelatedReference)
                 acutPrintf(L"\nTVS BYPASS: roditelj %ls (%ls), POVEZAN NEVAZECI ZAPIS: referenca na izabrani kanal. Operacija odbijena; zapis nije mijenjan.",it->name(),statusText(s));
             else
@@ -175,7 +177,10 @@ Acad::ErrorStatus write(AcDbDatabase* db,Record& r,AcDbObject* members[7],AcDbOb
     const AcDbObjectId refs[]={r.members[0],r.members[3],r.members[4],r.inlet,r.outlet,r.obstacle};
     for(int j=0;j<6;++j)if(acdbGetAdsName(nodes[j+4].resval.rlname,refs[j])!=Acad::eOk)return Acad::eInvalidInput;
     nodes[10].resval.rint=r.reverse?1:0;for(int j=0;j<4;++j)nodes[11+j].resval.rreal=r.policy[j];for(int j=0;j<8;++j)nodes[15+j].resval.rreal=r.obstacleSnapshot[j];
-    for(int j=0;j<2;++j){if(!r.neighbors[j].isNull())acdbGetAdsName(nodes[23+j].resval.rlname,r.neighbors[j]);nodes[25+j].resval.rint=static_cast<short>(r.ports[j]);}
+    for(int j=0;j<2;++j){
+        // A missing neighbor stays a zero 330 name (read() maps it to kNull); a present one must resolve.
+        if(!r.neighbors[j].isNull()&&acdbGetAdsName(nodes[23+j].resval.rlname,r.neighbors[j])!=Acad::eOk)return Acad::eInvalidInput;
+        nodes[25+j].resval.rint=static_cast<short>(r.ports[j]);}
     AcDbObject* raw=NULL;Acad::ErrorStatus es=tx->getObject(raw,db->namedObjectsDictionaryId(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
     AcDbDictionary* nod=AcDbDictionary::cast(raw);if(!nod)return Acad::eInvalidInput;
     CString key=L"TVS_BYPASS_"+r.guid;es=newRecord(nod,key,nodes[0],tx,parent);if(es!=Acad::eOk)return es;
@@ -188,7 +193,7 @@ Acad::ErrorStatus write(AcDbDatabase* db,Record& r,AcDbObject* members[7],AcDbOb
         raw=NULL;es=tx->getObject(raw,members[j]->extensionDictionary(),AcDb::kForWrite);if(es!=Acad::eOk)return es;
         AcDbDictionary* dict=AcDbDictionary::cast(raw);if(!dict||dict->has(memberKey()))return Acad::eInvalidInput;
         resbuf linkData[3]={};linkData[0].restype=90;linkData[0].resval.rlong=1;linkData[0].rbnext=&linkData[1];
-        linkData[1].restype=330;acdbGetAdsName(linkData[1].resval.rlname,parent);linkData[1].rbnext=&linkData[2];linkData[2].restype=70;linkData[2].resval.rint=static_cast<short>(j);
+        linkData[1].restype=330;if(acdbGetAdsName(linkData[1].resval.rlname,parent)!=Acad::eOk)return Acad::eInvalidInput;linkData[1].rbnext=&linkData[2];linkData[2].restype=70;linkData[2].resval.rint=static_cast<short>(j);
         AcDbObjectId id;es=newRecord(dict,memberKey(),linkData[0],tx,id);if(es!=Acad::eOk)return es;
     }
     return Acad::eOk;

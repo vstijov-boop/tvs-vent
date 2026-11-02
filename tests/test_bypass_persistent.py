@@ -12,7 +12,7 @@ class PersistentBypass(unittest.TestCase):
         data=(ROOT/'TVS_Ventilation_DBX/BypassAssemblyData.h').read_text(encoding='utf-8-sig')
         parent=(ROOT/'TVS_Ventilation_DBX/BypassAssemblyData.cpp').read_text(encoding='utf-8-sig')
         stub=(ROOT/'tests/offset_service_stubs.h').read_text().replace('#include "../','#include "'+ROOT.as_posix()+'/')
-        code=stub+'\n#define TVS_BYPASS_PREVIEW\n#include "'+(ROOT/'TVS_Ventilation_ARX/BypassNumericBridge.cpp').as_posix()+'"\n'
+        code='#include <set>\n#include <cwchar>\n'+stub+'\n#define TVS_BYPASS_PREVIEW\n#include "'+(ROOT/'TVS_Ventilation_ARX/BypassNumericBridge.cpp').as_posix()+'"\n'
         code+='\nnamespace tvsOffsetService {\n'
         for name in ['inline bool current(', 'inline std::unique_ptr<TVS_TAP> makeElbow(', 'inline std::unique_ptr<TVS_Pipe> makePipe(']:
             code+=function(offset,name)+'\n'
@@ -35,6 +35,7 @@ struct Snapshot {tvsOffsetService::Snapshot route;AcDbObjectId obstacle;std::wst
         code+=function(bypass,'struct Commit')+';\n'
         code+=function(bypass,'class ConnectorRollback')+';\n'
         code+=function(bypass,'inline int connector(')+'\n'
+        code+=function(bypass,'inline std::wstring& lastFailure(')+'\n'+function(bypass,'inline bool fail(')+'\n'
         code+=r'''
 static int failStage=0;
 inline bool inject(int stage){return stage==failStage;}
@@ -134,6 +135,7 @@ int main(){
   assert(tvsOffsetData::records.count(h->id.id)==0&&std::fabs(h->FirstPoint.distanceTo(h->LastPoint)*factor-view.C)<1e-6);
   assert(out.elevation==-400/factor&&std::fabs(h->Elev*factor-view.zPass)<1e-6&&total>0);++cases;
  }
+ std::set<std::wstring> reasons;
  for(int fail=1;fail<=11;++fail){
   tvsBypassService::Snapshot s;auto model=setup(1,0,false,s);tvsBypassPreview::Engine engine;tvsBypassPreview::Options options;options.confirmed=true;
   options.left=-2000;options.right=2000;auto view=engine.calculate(model,1,false,options,false);assert(view.ready);
@@ -148,10 +150,13 @@ int main(){
   if(fail==10)tvsBypassData::pinnedFlag=true;
   if(fail==11)failCommit=true;
   tvsBypassService::Commit out;assert(!tvsBypassService::write(s,view,options,out));
+  assert(!tvsBypassService::lastFailure().empty());reasons.insert(tvsBypassService::lastFailure());
   assert(commits==0&&objects.size()==4&&tvsOffsetData::records.empty()&&tvsBypassData::parents.empty());
   assert(fixtureSource.FirstPoint.distanceTo(first)==0&&fixtureSource.LastPoint.distanceTo(last)==0);
   assert(fixtureSource.connectors[1].connectionID==3&&neighbor->connectors[0].connectionID==1&&out.resident==NULL);++failures;
  }
+ // Distinct causes must stay distinguishable for the user (stale inputs share one message).
+ assert(reasons.size()>=9);
  reset();std::cout<<"PASS PERSISTENT BYPASS "<<cases<<" real checked candidates, same 7 native member DTOs, both ends, rotations/units/angles/sides, parent over 2 V1 triples+H, external reciprocal link and quantities; "<<failures<<" abort/stale/lock guards; SDK substitutes, not AutoCAD runtime\n";
 }
 '''

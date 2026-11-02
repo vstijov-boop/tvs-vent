@@ -153,3 +153,11 @@ ne potvrđuju native filing ili praktičan prolazak ovih stavki. STAB-01 ostaje 
 - [x] Čuvaju se postojeći V1 zapisi, kreira samo nedostajući rječnik; rollback ostaje.
 - [ ] Praktično potvrditi Prihvati u novom restartovanom DEV 2022 procesu, pa nastavak
   kroz oba toka crtanja. SDK zamjene/build nisu ta runtime potvrda.
+
+## razvoj-bypass-fixed
+
+- [x] Konkretni razlozi odbijanja upisa; regresija traži >=9 različitih razloga za 11 prekida.
+- [x] `pinned()` bez punog čitanja nepovezanih roditelja; regresija broji čitanja.
+- [x] Dijalog: Ri = B/2, pamćenje ulaza, DPI, bez treptanja, Prihvati iz pregleda.
+- [ ] Windows build 2020/2022 za dijalog (nema SDK-free testa za Win32 dio).
+- [ ] Praktično: UNDO poslije Prihvati (veza susjeda), bypass bez susjeda + save/reopen.

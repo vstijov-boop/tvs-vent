@@ -5,6 +5,8 @@
 #include "OffsetService.h"
 #include "BypassAssemblyData.h"
 #include "../geometry/bypass/PreviewModel.h"
+#include <cwchar>
+#include <string>
 namespace tvsBypassService {
 using tvsBypassPreview::View;using tvsBypassPreview::Options;
 struct Snapshot {tvsOffsetService::Snapshot route;AcDbObjectId obstacle;std::wstring obstacleState;};
@@ -43,26 +45,32 @@ inline int connector(TVS_Entity* p,int role){
     }
     return result;
 }
-inline bool inject(int stage){wchar_t text[24]={0};GetEnvironmentVariableW(L"TVS_BYPASS_FAIL",text,24);return _wtoi(text)==stage;}
+// DEV rollback probe. The variable is read once per process: set it before AutoCAD starts.
+inline bool inject(int stage){static const int configured=[]{wchar_t text[24]={0};GetEnvironmentVariableW(L"TVS_BYPASS_FAIL",text,24);return _wtoi(text);}();return configured==stage;}
+// Every rejected write names its cause; a bare false hid the eAlreadyInDb failure.
+inline std::wstring& lastFailure(){static std::wstring value;return value;}
+inline bool fail(const wchar_t* reason){lastFailure()=reason;acutPrintf(L"\nTVS BYPASS: %ls Nema izmjena.",reason);return false;}
 inline bool write(const Snapshot& s,const View& view,const Options& options,Commit& output){
-    if(!view.ready||view.axis.size()!=8||!view.offsets[0].ready()||!view.offsets[1].ready()||!current(s))return false;
+    lastFailure().clear();
+    if(!view.ready||view.axis.size()!=8||!view.offsets[0].ready()||!view.offsets[1].ready())return fail(L"Kandidat nije potpun; pokrenite Pronađi prolaz ponovo.");
+    if(!current(s))return fail(L"Kanal, prepreka ili njihove veze su promijenjeni ili zaštićeni postojećim bypassom.");
     const auto& base=s.route;const double f=base.physical.factor;const bool reverse=base.physical.end==tvsOffsetOperation::First;
     if(view.frame.factor!=f||view.frame.width!=base.physical.a*f||view.frame.height!=base.physical.b*f
-        ||view.frame.z0!=base.physical.elevation*f)return tvsOffsetService::reject(L"Jedinice/snapshot kandidata ne odgovaraju bazi.");
+        ||view.frame.z0!=base.physical.elevation*f)return fail(L"Jedinice/snapshot kandidata ne odgovaraju bazi.");
     const auto& first=view.offsets[0];const auto& second=view.offsets[1];
     const AcGePoint3d oldFirst=tvsOffsetProof::pt(base.physical.first),oldLast=tvsOffsetProof::pt(base.physical.last);
     const AcGePoint3d fixed=reverse?oldLast:oldFirst,outerPoint=reverse?oldFirst:oldLast;
-    const AcGeVector3d delta=outerPoint-fixed;const double available=delta.length();if(!(available>0))return false;
+    const AcGeVector3d delta=outerPoint-fixed;const double available=delta.length();if(!(available>0))return fail(L"Izabrani kanal nema dužinu.");
     const AcGeVector3d u=delta/available;
     const AcGePoint3d cutIn=tvsOffsetProof::pt(first.incomingLast),cutOut=tvsOffsetProof::pt(second.outgoingFirst);
     const double a=(cutIn-fixed).dotProduct(u),b=(cutOut-fixed).dotProduct(u);
     if(a*f<1||(available-b)*f<1||b<=a||(cutIn-(fixed+u*a)).length()*f>.001||(cutOut-(fixed+u*b)).length()*f>.001)
-        return tvsOffsetService::reject(L"Kandidat mora biti unutar izabranog kanala uz oba ostatka >=1 mm.");
-    tvsOffsetProof::BuildTransaction tx(base.db);if(!tx.space)return false;tvsOffsetData::WriteScope allow;
-    AcDbObject* raw=NULL;if(actrTransactionManager->getObject(raw,base.source,AcDb::kForWrite)!=Acad::eOk)return false;
-    TVS_Pipe* source=TVS_Pipe::cast(raw);if(!source)return false;
+        return fail(L"Kandidat mora biti unutar izabranog kanala uz oba ostatka >=1 mm.");
+    tvsOffsetProof::BuildTransaction tx(base.db);if(!tx.space)return fail(L"Transakcija/Model prostor nije dostupan.");tvsOffsetData::WriteScope allow;
+    AcDbObject* raw=NULL;if(actrTransactionManager->getObject(raw,base.source,AcDb::kForWrite)!=Acad::eOk)return fail(L"Izabrani kanal se ne može otvoriti za upis (zaključan sloj ili otvoren objekat).");
+    TVS_Pipe* source=TVS_Pipe::cast(raw);if(!source)return fail(L"Izabrani objekat nije TVS kanal.");
     tvsOffsetService::Snapshot inside=base;inside.manufacturer.clear();inside.note.clear();
-    if(!tvsOffsetService::pipeState(source,inside)||inside.fingerprint!=base.fingerprint)return false;
+    if(!tvsOffsetService::pipeState(source,inside)||inside.fingerprint!=base.fingerprint)return fail(L"Atributi kanala su promijenjeni poslije izbora.");
     ConnectorRollback sourceConnections(source);
     AcDbObject* members[7]={NULL,NULL,NULL,NULL,NULL,NULL,NULL};tvsBypassData::Record record;
     record.factor=f;record.reverse=reverse;record.inlet=base.source;record.obstacle=s.obstacle;
@@ -70,57 +78,57 @@ inline bool write(const Snapshot& s,const View& view,const Options& options,Comm
         const int ix=connector(source,role);if(ix>=0&&!source->connectors[ix].connectionID.isNull()){
             record.neighbors[j]=source->connectors[ix].connectionID;record.ports[j]=source->connectors[ix].cTypeAnother;}}
     record.policy[0]=options.clearance;record.policy[1]=options.insulation;record.policy[2]=options.obstacleInsulation;record.policy[3]=options.reserve;
-    {AcDbObjectPointer<TVS_Pipe> obstacle(s.obstacle,AcDb::kForRead);if(obstacle.openStatus()!=Acad::eOk)return false;
+    {AcDbObjectPointer<TVS_Pipe> obstacle(s.obstacle,AcDb::kForRead);if(obstacle.openStatus()!=Acad::eOk)return fail(L"Prepreka se ne može pročitati.");
      const double values[]={obstacle->FirstPoint.x,obstacle->FirstPoint.y,obstacle->LastPoint.x,obstacle->LastPoint.y,obstacle->Elev,obstacle->SizeA,obstacle->SizeB,obstacle->FirstPoint.z};
      for(int j=0;j<8;++j)record.obstacleSnapshot[j]=values[j];}
     for(int group=0;group<2;++group){const int start=group?4:0;const auto& dto=view.offsets[group];
-        for(int k=0;k<2;++k){auto tap=tvsOffsetService::makeElbow(source,base,dto.elbows[k]);if(!tap)return false;
-            const int role=start+(k?2:0);TVS_TAP* p=tap.release();if(!tx.append(p,record.members[role]))return false;members[role]=p;}
+        for(int k=0;k<2;++k){auto tap=tvsOffsetService::makeElbow(source,base,dto.elbows[k]);if(!tap)return fail(L"Koljeno nije kreirano.");
+            const int role=start+(k?2:0);TVS_TAP* p=tap.release();if(!tx.append(p,record.members[role]))return fail(L"Koljeno nije dodato u crtež.");members[role]=p;}
         auto slope=tvsOffsetService::makePipe(source,base,dto.middle.first,dto.middle.last,(dto.middle.firstElevationMm+dto.middle.lastElevationMm)/2/f);
-        if(!slope)return false;
+        if(!slope)return fail(L"Kosi član nije kreiran.");
         TVS_Pipe* p=slope.release();
-        if(!tx.append(p,record.members[start+1]))return false;
+        if(!tx.append(p,record.members[start+1]))return fail(L"Kosi član nije dodat u crtež.");
         members[start+1]=p;
-        CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return false;
+        CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return fail(L"GUID V1 trojke nije kreiran.");
         for(int k=0;k<3;++k){tvsOffsetData::Record v1;v1.guid=guid;v1.role=k;
             for(int j=0;j<3;++j)v1.members[j]=record.members[start+j];
             v1.rise=k==1?dto.middle.lastElevationMm-dto.middle.firstElevationMm:0;
-            if(tvsOffsetData::write(members[start+k],v1)!=Acad::eOk)return false;}
+            if(tvsOffsetData::write(members[start+k],v1)!=Acad::eOk)return fail(L"V1 zapis člana nije upisan.");}
     }
     auto bridge=tvsOffsetService::makePipe(source,base,first.outgoingFirst,second.incomingLast,view.zPass/f);
-    if(!bridge)return false;
+    if(!bridge)return fail(L"Srednji član H nije kreiran.");
     TVS_Pipe* h=bridge.release();
-    if(!tx.append(h,record.members[3]))return false;
+    if(!tx.append(h,record.members[3]))return fail(L"Srednji član H nije dodat u crtež.");
     members[3]=h;
-    if(inject(1))return false;
+    if(inject(1))return fail(L"DEV proba prekida 1.");
     const tvsOffset::WorldPoint farWorld(outerPoint.x,outerPoint.y,outerPoint.z);
     auto tail=tvsOffsetService::makePipe(source,base,reverse?farWorld:second.outgoingFirst,reverse?second.outgoingFirst:farWorld,base.physical.elevation);
-    if(!tail)return false;
+    if(!tail)return fail(L"Spoljašnji ostatak nije kreiran.");
     TVS_Pipe* exit=tail.release();
-    if(!tx.append(exit,record.outlet))return false;
+    if(!tx.append(exit,record.outlet))return fail(L"Spoljašnji ostatak nije dodat u crtež.");
     const int selectedRole=reverse?conPipeStart:conPipeEnd;const int selected=connector(source,selectedRole);
     TVS_Pipe* neighbor=NULL;std::unique_ptr<ConnectorRollback> neighborConnections;
     if(selected>=0){const TVS_Connector old=source->connectors[selected];
-        const int exitIndex=connector(exit,selectedRole);if(exitIndex<0)return false;
+        const int exitIndex=connector(exit,selectedRole);if(exitIndex<0)return fail(L"Konektor novog ostatka nije jednoznačan.");
         exit->connectors[exitIndex]=old;exit->connectors[exitIndex].point=outerPoint;
         if(!old.connectionID.isNull()){
-            raw=NULL;if(actrTransactionManager->getObject(raw,old.connectionID,AcDb::kForWrite)!=Acad::eOk)return false;
-            neighbor=TVS_Pipe::cast(raw);if(!neighbor||!tvsMove::editable(neighbor))return false;
-            const int back=connector(neighbor,old.cTypeAnother);if(back<0||neighbor->connectors[back].connectionID!=base.source)return false;
+            raw=NULL;if(actrTransactionManager->getObject(raw,old.connectionID,AcDb::kForWrite)!=Acad::eOk)return fail(L"Susjedni kanal se ne može otvoriti za upis.");
+            neighbor=TVS_Pipe::cast(raw);if(!neighbor||!tvsMove::editable(neighbor))return fail(L"Susjed nije TVS kanal ili je zaključan.");
+            const int back=connector(neighbor,old.cTypeAnother);if(back<0||neighbor->connectors[back].connectionID!=base.source)return fail(L"Veza susjeda nije recipročna.");
             neighborConnections.reset(new ConnectorRollback(neighbor));neighbor->assertWriteEnabled();
             neighbor->connectors[back].connectionID=record.outlet; // no neighbor geometry changes
         }
         source->connectors[selected].connectionID=AcDbObjectId::kNull;source->connectors[selected].cTypeAnother=0;source->connectors[selected].point=cutIn;
     }
     source->assertWriteEnabled();if(reverse)source->FirstPoint=cutIn;else source->LastPoint=cutIn;source->recordGraphicsModified();
-    if(inject(2))return false;
+    if(inject(2))return fail(L"DEV proba prekida 2.");
     AcDbObjectId parent;const Acad::ErrorStatus parentStatus=tvsBypassData::write(base.db,record,members,parent);
     if(parentStatus!=Acad::eOk){
-        acutPrintf(L"\nTVS BYPASS: upis roditelja/backlink-ova nije uspio (SDK status=%d). Transakcija se ponistava.",static_cast<int>(parentStatus));
-        return false;
+        wchar_t reason[96];std::swprintf(reason,96,L"Upis roditelja/backlink-ova nije uspio (SDK status=%d).",static_cast<int>(parentStatus));
+        return fail(reason);
     }
-    if(inject(3))return false;
-    if(!tx.commit())return false;
+    if(inject(3))return fail(L"DEV proba prekida 3.");
+    if(!tx.commit())return fail(L"Potvrda transakcije nije uspjela.");
     sourceConnections.commit();if(neighborConnections)neighborConnections->commit();
     output.output=record.outlet;output.parent=parent;output.resident=exit;output.elevation=base.physical.elevation;output.angle=options.angle;
     return true;
