@@ -89,3 +89,33 @@ nulta 330 u stvarnom Xrecord-u. Regresije koriste SDK zamjene; CI samo kompajlir
    `[DEV] Proba prekida N`, bez novih objekata. Ukloniti varijablu i restartovati.
 
 Za svaku stavku zapisati verziju AutoCAD-a i tačan tekst poruke.
+
+## UX dorada dijaloga (na fixed osnovi)
+
+Selektivno prenesen UI dio sa `razvoj-bypass-ux-deferred`; writer i servis ostaju sa
+fixed grane.
+
+- **Pamćenje:** posljednja potvrđena projektna podešavanja (izolacije, razmak, rezerva,
+  minimalne dužine, ugao, strana, napredni budžeti) čuvaju se u `CDocData` — samo za
+  taj crtež i samo dok je otvoren; ništa se ne upisuje u DWG. Ri, prozor s i granice Z
+  se ne pamte; dimenzije, kote, smjer i jedinice uvijek dolaze iz novog izbora.
+  Zapamćene izolacije su u zaglavlju označene kao prijedlog.
+- **Ri:** prijedlog po aktivnom TVS režimu radijusa pravougaonog koljena (konstantni,
+  k*B, specifični); inače Rc = 1,0 × B, Ri = B/2. Ručno upisan Ri se ne prepisuje
+  (ni poslije promjene jedinica). Izvor prijedloga piše u zaglavlju.
+- **Čitljivost/treptanje:** veličina prati DPI monitora; presjek se crta van ekrana i
+  osvježava samo on; kursor čekanja tokom računanja.
+- **Pregled:** `[Prihvati/Dijalog/Odustani]` — Prihvati koristi isti writer i iste
+  snapshot provjere; preview-only komanda nema Prihvati.
+
+Praktične UX provjere (nastavak liste iznad):
+
+8. Dva otvorena crteža: računati u A, otvoriti dijalog u B — B nema prijedloge iz A.
+9. U istom crtežu drugi kanal druge dimenzije: izolacije predložene, Ri/prozor/kote nove.
+10. TVS_SETTINGS: promijeniti režim radijusa (konstantni / k*B) → novi Ri prijedlog;
+    ručno upisan Ri ostaje i poslije promjene jedinica.
+11. Pregled → Enter → dijalog sa istim rezultatom; Pregled → Prihvati → „BYPASS upisan“;
+    Pregled → Odustani / Esc → bez upisa i bez zaostale privremene grafike.
+12. Između računanja i Prihvati pomjeriti kanal/prepreku (u drugom pokušaju) →
+    `[snapshot]` odbijanje, bez izmjena.
+13. 125 % i 150 % skaliranje: dijalog čitljiv, bez treptanja pri kucanju.

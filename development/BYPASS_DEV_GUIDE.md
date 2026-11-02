@@ -12,8 +12,9 @@ Ne prepisivati produkcioni bundle i ne koristiti hot unload/reload.
    Tokom `TVS_PIPE` ili `TVS_DRAW`: opcija `Obilazak` / `O`; izabrati samo prepreku.
 3. Postojeći dijalog: potvrditi stvarne jedinice, eksplicitno unijeti obje izolacije
    (0 ako ih nema), Ri, razmak i ostale ulaze; `Pronađi prolaz`.
-4. `Pregled u crtežu` je privremen; Enter vraća dijalog. **`Prihvati obilazak`**
-   trajno upisuje isti provjereni kandidat, bez nove pretrage. Izmjena ulaza uklanja
+4. `Pregled u crtežu` je privremen; komandna linija nudi `[Prihvati/Dijalog/Odustani]
+   <Dijalog>` (u TVS_BYPASS_PREVIEW samo `[Dijalog/Odustani]`). **`Prihvati`** ili
+   **`Prihvati obilazak`** trajno upisuje isti provjereni kandidat, bez nove pretrage. Izmjena ulaza uklanja
    važenje rezultata; promijenjen kanal/prepreka ili veze odbijaju upis.
 5. U crtanju poslije uspjeha odmah zadati sljedeću tačku. Nastavak je sa sačuvanog
    spoljašnjeg kraja i početne fizičke kote. Cancel/neuspjeh čuva dotadašnji nastavak.
