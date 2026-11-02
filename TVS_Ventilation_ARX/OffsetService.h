@@ -45,7 +45,11 @@ inline bool properties(TVS_Pipe* source,Snapshot& s,std::wostringstream& out){
     // No unknown dictionary payload can be safely interpreted after changing length.
     if(!source->extensionDictionary().isNull()){
         AcDbObjectPointer<AcDbDictionary> d(source->extensionDictionary(),AcDb::kForRead);
-        if(d.openStatus()!=Acad::eOk||d->numEntries()!=0)return reject(L"Nepodrzani extension podaci kanala.");
+        if(d.openStatus()!=Acad::eOk)return reject(L"Nepodrzani extension podaci kanala.");
+        // Only the display-only hidden-edge mark (TVS_HIDDEN_BY_V1) is known and harmless.
+        AcDbDictionaryIterator* it=d->newIterator();if(!it)return reject(L"Nepodrzani extension podaci kanala.");
+        bool known=true;for(;!it->done();it->next())if(wcscmp(it->name(),L"TVS_HIDDEN_BY_V1")!=0)known=false;delete it;
+        if(!known)return reject(L"Nepodrzani extension podaci kanala.");
     }
     resbuf* raw=source->xData(NULL);
     struct Release {resbuf* p;~Release(){if(p)acutRelRb(p);}} release={raw};
@@ -134,6 +138,20 @@ inline bool describe(TVS_Entity* e,tvsMove::Node& n){
     }
     return true;
 }
+// True when an element that cannot be described does not touch the selected duct.
+inline bool unrelated(TVS_Entity* e,const tvsMove::Node& node,TVS_Pipe* source,const AcGePoint3d ends[2],double tol){
+    for(const auto& c:e->connectors)if(c.connectionID==source->objectId())return false;
+    for(const auto& c:source->connectors)if(c.connectionID==e->objectId())return false;
+    std::vector<tvsMoveGeometry::Point> points(node.ports.begin(),node.ports.end());
+    if(TVS_Pipe* p=TVS_Pipe::cast(e)){points.push_back(tvsMove::point(p->FirstPoint));points.push_back(tvsMove::point(p->LastPoint));
+        // the selected duct's ends must not lie on this pipe either
+        for(int k=0;k<2;++k)if(tvsMoveNetwork::interior(tvsMove::point(ends[k]),tvsMove::point(p->FirstPoint),tvsMove::point(p->LastPoint),tol))return false;}
+    if(points.empty())return false; // nothing known about its position: stay conservative
+    for(const auto& q:points){
+        for(int k=0;k<2;++k)if(tvsMoveGeometry::pointsNear(q,tvsMove::point(ends[k]),tol))return false;
+        if(tvsMoveNetwork::interior(q,tvsMove::point(ends[0]),tvsMove::point(ends[1]),tol))return false;}
+    return true;
+}
 inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature,bool bounded=false){
     const double tol=.001/s.physical.factor;
     const int selected=s.physical.end==tvsOffsetOperation::First?0:1,opposite=1-selected;
@@ -160,7 +178,11 @@ inline bool topology(const Snapshot& s,TVS_Pipe* source,std::wstring& signature,
         AcDbObjectPointer<AcDbEntity> object;object.acquire(rawEntity);
         TVS_Entity* e=TVS_Entity::cast(object.object());if(!e||e->objectId()==s.source)continue;
         tvsMove::Node node;if(!describe(e,node)||!node.kind||node.ports.size()!=node.axes.size()
-            ||node.ports.size()!=node.sections.size())return reject(L"Nepodrzana TVS geometrija u Model prostoru.");
+            ||node.ports.size()!=node.sections.size()){
+            // An element TVS cannot describe (flex duct, special fitting) only blocks when it
+            // touches the selected duct: a port at/inside the duct or a connector to it.
+            if(!unrelated(e,node,source,ends,tol))return reject(L"Nepodrzana TVS geometrija (npr. flex ili poseban fiting) dodiruje izabrani kanal.");
+            continue;}
         putId(out,e->objectId());
         if(!connections(e,out))return false;
         for(const auto& c:e->connectors)if(c.connectionID==s.source){
