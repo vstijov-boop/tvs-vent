@@ -20,6 +20,12 @@ DLLIMPEXP void permitClone(const AcDbObjectId& id);
 DLLIMPEXP void clearClonePermits();
 DLLIMPEXP unsigned long revision();
 DLLIMPEXP bool allowTransform(const AcDbObject* object,const AcGeMatrix3d& matrix);
+// Whole-assembly move/rotate: the ARX selection guard permits members of assemblies that are
+// completely in the current command's selection; refusals are counted for one summary line.
+DLLIMPEXP void permitAssemblyTransform(const AcDbObjectId& id);
+DLLIMPEXP void clearAssemblyTransforms();
+DLLIMPEXP void noteTransformRefusal();
+DLLIMPEXP int takeTransformRefusals();
 DLLIMPEXP Acad::ErrorStatus remapClones(AcDbIdMapping& map);
 DLLIMPEXP const ACHAR* statusText(Status status);
 // Internal construction scope is process-local, never serialized.

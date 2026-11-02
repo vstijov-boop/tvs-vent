@@ -51,6 +51,13 @@ njegov slobodni spoljašnji kraj može se koristiti za nastavak. Ako roditelj ve
 čuva eksplicitnu spoljašnju vezu tog ostatka, ili izabrani kraj susjeda predstavlja
 njegovu granicu, novi bypass se odbija umjesto neprimjetnog kvarenja stare reference.
 
+**Pomjeranje sklopa: cijeli sklop ili ništa.** MOVE, ROTATE oko Z i grip pomjeranje
+članova obilaska/offseta dozvoljeni su samo kad su u istom izboru svi članovi sklopa
+(obilazak: 4 koljena, 2 kosa komada i H; samostalni offset: V1 trojka). Djelimičan izbor,
+SCALE, MIRROR i nagib se odbijaju jednom porukom na kraju komande. Ulaz/izlaz i susjedi su
+obični kanali; pomjeraju se samo ako su izabrani. `TVS_BYPASS_DETALJ` računa prepreku po
+trenutnom položaju i javlja kada se razlikuje od upisa.
+
 **Skrivene ivice ukrštanja (GFX-01, varijanta 1 — samo bypass).** Writer na donji
 pravi kanal ukrštanja upisuje `TVS_HIDDEN_BY_V1` (iznad: prepreka ispod H; ispod: H ispod
 prepreke), u istoj transakciji. Pri crtanju se dio ivica donjeg kanala koji je u osnovi

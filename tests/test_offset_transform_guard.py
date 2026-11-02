@@ -8,18 +8,18 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 class OffsetTransformGuard(unittest.TestCase):
     def test_actual_permission_predicate(self):
         text=(ROOT/'TVS_Ventilation_DBX/OffsetAssemblyData.cpp').read_text(encoding='utf-8-sig')
-        body=re.search(r'bool allowTransform\([\s\S]*?\n}\n',text).group()
+        body=re.search(r'static bool rigidPlan\([\s\S]*?\n}\n',text).group()+re.search(r'bool allowTransform\([\s\S]*?\n}\n',text).group()
         source=r'''
 #include <cmath>
 #include <cfloat>
 #include <set>
 #include <cassert>
 #include <iostream>
-struct ID {int value;ID(int v=0):value(v){}bool isNull()const{return value==0;}bool operator<(const ID& b)const{return value<b.value;}};
+struct ID {int value;ID(int v=0):value(v){}bool isNull()const{return value==0;}bool operator<(const ID& b)const{return value<b.value;}};typedef ID AcDbObjectId;
 struct AcDbObject {ID id;bool offset;AcDbObject(int i,bool m):id(i),offset(m){}ID objectId()const{return id;}};
 struct AcGeMatrix3d {double entry[4][4];AcGeMatrix3d(){for(int r=0;r<4;++r)for(int c=0;c<4;++c)entry[r][c]=r==c?1:0;}};
 namespace tvsOffset {bool finite(double x){return x>=-DBL_MAX&&x<=DBL_MAX;}}
-static int writeDepth=0;static std::set<ID> clones;static bool marked(const AcDbObject* o){return o->offset;}
+static int writeDepth=0;static std::set<ID> clones,assemblyPermits;static bool marked(const AcDbObject* o){return o->offset;}
 ''' + body + r'''
 int main(){
  AcDbObject original(1,true),copy(2,true),legacy(3,false),scratch(0,true);
@@ -33,7 +33,17 @@ int main(){
  AcGeMatrix3d mirror;mirror.entry[0][0]=-1;assert(!allowTransform(&copy,mirror));
  clones.clear();assert(!allowTransform(&copy,translation));
  writeDepth=1;assert(allowTransform(&original,translation));writeDepth=0;
- std::cout<<"PASS actual permission predicate: originals blocked, clone/scratch translation allowed, copy SCALE/ROTATE/MIRROR blocked, permit expiry; SDK stubs only\n";
+ // Whole assembly in the selection: original moves/rotates about Z rigidly; never scale/mirror/tilt.
+ assert(!allowTransform(&original,rotation));
+ assemblyPermits.insert(original.id);
+ assert(allowTransform(&original,translation)&&allowTransform(&original,rotation));
+ AcGeMatrix3d turn;const double a=0.6457718232379019;turn.entry[0][0]=std::cos(a);turn.entry[0][1]=-std::sin(a);turn.entry[1][0]=std::sin(a);turn.entry[1][1]=std::cos(a);turn.entry[0][3]=10;
+ assert(allowTransform(&original,turn));
+ assert(!allowTransform(&original,scale)&&!allowTransform(&original,mirror));
+ AcGeMatrix3d tilt;tilt.entry[1][1]=0;tilt.entry[1][2]=-1;tilt.entry[2][1]=1;tilt.entry[2][2]=0;assert(!allowTransform(&original,tilt));
+ assert(allowTransform(&scratch,rotation)&&!allowTransform(&scratch,mirror));
+ assemblyPermits.clear();assert(!allowTransform(&original,translation));
+ std::cout<<"PASS actual permission predicate: originals blocked unless whole assembly selected (rigid plan only), clone/scratch translation allowed, copy SCALE/ROTATE/MIRROR blocked, permit expiry; SDK stubs only\n";
 }
 '''
         with tempfile.TemporaryDirectory() as folder:

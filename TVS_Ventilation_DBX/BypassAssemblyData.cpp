@@ -169,6 +169,12 @@ Status validate(const AcDbObject* object,bool geometry){
     }
     return Valid;
 }
+bool members(const AcDbObject* member,AcDbObjectId out[7]){
+    AcDbObjectId parent;int role=-1;if(link(member,parent,role)!=Valid)return false;
+    Record r;if(read(parent,r)!=Valid)return false;
+    for(int j=0;j<7;++j){if(r.members[j].isNull())return false;out[j]=r.members[j];}
+    return true;
+}
 Status assembly(const AcDbObject* member,Record& record){
     const Status s=validate(member,true);if(s!=Valid)return s;
     AcDbObjectId parent;int role=-1;if(link(member,parent,role)!=Valid)return Corrupt;
