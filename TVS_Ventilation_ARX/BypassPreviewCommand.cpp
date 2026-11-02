@@ -3,6 +3,7 @@
 #include "BypassPreviewCommand.h"
 #include "../geometry/bypass/PreviewPresentation.h"
 #include "TVS_Pipe.h"
+#include "TVS_TAP.h"
 #include "DrawingUnits.h"
 #include "acgiTransient.h"
 #include "dbpl.h"
@@ -16,6 +17,10 @@
 #include "BypassSideDetail.h"
 #include "BypassSideDetailTest.h"
 #include "BypassService.h"
+#include "BypassDialogState.h"
+static_assert(EN_CHANGE==tvsBypassUx::kEnChange&&CBN_SELCHANGE==tvsBypassUx::kCbnSelChange&&BN_CLICKED==tvsBypassUx::kBnClicked,"Win32 notification codes");
+static_assert(RadiusTypeRect_RadiusConstant==tvsBypassUx::RadiusConstant&&RadiusTypeRect_RadiusVariable==tvsBypassUx::RadiusVariable
+ &&RadiusTypeRect_RadiusSpecific==tvsBypassUx::RadiusSpecific,"TVS radius modes");
 namespace {
 using namespace tvsBypassPreview;
 static std::wstring wide(const std::string& s){
@@ -78,7 +83,7 @@ public:
  }
 
 };
-static const int FieldCount=26;
+static const int FieldCount=tvsBypassUx::FieldCount;
 static double Options::* const fields[FieldCount]={&Options::ri,&Options::insulation,&Options::obstacleInsulation,&Options::clearance,&Options::reserve,
  &Options::minSlope,&Options::minBridge,&Options::minProjection,&Options::left,&Options::right,&Options::floor,&Options::ceiling,
  &Options::timeMs,&Options::calls,&Options::cells,&Options::depthStep,&Options::bridgeStep,&Options::maxDepth,&Options::depthLevels,
@@ -89,10 +94,25 @@ static const wchar_t* labels[FieldCount]={L"Unutrašnji radijus koljena Ri (mm)"
 struct Dialog {
  Snapshot snapshot;bool reverse,loading,unitFromRecord,advanced,showDimensions,showAxes,allEdges,canAccept;double scaleX,scaleY;Engine engine;View view;Options options;
  std::wstring values[FieldCount];int units,angle,side;bool confirmed;HWND window;HFONT font;
- Dialog(const Snapshot& s,bool r,double factor,bool known,bool accept=false):snapshot(s),reverse(r),loading(true),unitFromRecord(known),advanced(false),showDimensions(true),showAxes(true),allEdges(false),canAccept(accept),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL){
+ // Per-document design settings (CDocData) and the TVS radius mode. Geometry, units,
+ // window and Z limits always come from the newly selected objects.
+ tvsBypassUx::Memory& memory;tvsBypassUx::RadiusSetting radiusSetting;bool riEdited,insulationProposed;std::wstring riSource;
+ Dialog(const Snapshot& s,bool r,double factor,bool known,tvsBypassUx::Memory& remembered,const tvsBypassUx::RadiusSetting& radius,bool accept=false):snapshot(s),reverse(r),loading(true),unitFromRecord(known),advanced(false),showDimensions(true),showAxes(true),allEdges(false),canAccept(accept),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL),
+  memory(remembered),radiusSetting(radius),riEdited(false),insulationProposed(false){
   for(int j=0;j<FieldCount;++j)values[j]=number(options.*fields[j]);
   values[1]=values[2]=L"";values[10]=values[11]=L"";
+  insulationProposed=tvsBypassUx::apply(memory,values,angle,side);
+  proposeRadius();
   Frame f=engine.frame(s,factor,r);if(known&&f.valid){values[8]=number(f.left);values[9]=number(f.right);}else values[8]=values[9]=L"";
+ }
+ // Ri from the active TVS radius mode (or Rc = 1.0 x B) for the selected duct; a value
+ // the user typed in this dialog is never overwritten. Needs known units.
+ void proposeRadius(){
+  if(riEdited)return;const double f=factor();if(!(f>0))return;
+  const Frame fr=engine.frame(snapshot,f,reverse);if(!fr.valid)return;
+  const tvsBypassUx::RadiusProposal p=tvsBypassUx::radius(radiusSetting,fr.height,f);if(!p.ok)return;
+  values[0]=number(p.ri);riSource=p.source;
+  if(window){const bool was=loading;loading=true;SetDlgItemTextW(window,100,values[0].c_str());loading=was;}
  }
  ~Dialog(){if(font)DeleteObject(font);}
  double factor()const{return units==0?1:units==1?10:units==2?1000:0;}
@@ -107,6 +127,8 @@ struct Dialog {
    t<<L"TRASA "<<f.width<<L" × "<<f.height<<L" mm, osa Z="<<f.z0<<L" mm     |     PREPREKA "<<f.obstacleWidth<<L" × "<<f.obstacleHeight<<L" mm, osa Z="<<f.obstacleZ<<L" mm (iz objekata)\r\n";
    t<<L"Jedinice: "<<(unitFromRecord?L"TVS zapis":L"ručni izbor")<<L" — provjerite i potvrdite. s=0 je presjek osa; +s prati "<<(reverse?L"prvi":L"posljednji")<<L" kraj trase.\r\n";
    t<<L"Sve mjere i fizičke kote ispod su u mm. Presjek nije uvećan po visini; crtačka ravan Z="<<f.origin.z<<L" jedinica.";
+   if(!riSource.empty())t<<L"   Ri: "<<riSource<<(riEdited?L" (ručno izmijenjen)":L"");
+   if(insulationProposed)t<<L"\r\nIzolacije i ostala podešavanja su PRIJEDLOG iz prethodnog unosa u ovom crtežu, ne podatak objekta — provjerite.";
   }else t<<L"Izaberite jedinice crteža i unesite izolacije. Podaci iz objekata ostaju neizmijenjeni.\r\n"<<wide(f.reason);
   SetDlgItemTextW(window,600,t.str().c_str());
  }
@@ -126,7 +148,9 @@ struct Dialog {
     SetDlgItemTextW(window,800,error.c_str());SetFocus(GetDlgItem(window,100+j));return false;}
    options.*fields[j]=x;
   }
-  options.confirmed=true;options.useFloor=!values[10].empty();options.useCeiling=!values[11].empty();options.angle=30+15*angle;options.above=side==1;return true;
+  options.confirmed=true;options.useFloor=!values[10].empty();options.useCeiling=!values[11].empty();options.angle=30+15*angle;options.above=side==1;
+  tvsBypassUx::store(memory,values,angle,side); // confirmed design settings of this document
+  return true;
  }
  void calculate(bool improve){
   if(!parse()){std::wstring error=text(800);invalidate();SetDlgItemTextW(window,800,error.c_str());return;}
@@ -256,10 +280,14 @@ struct Dialog {
   if(m==WM_COMMAND){int id=LOWORD(w),code=HIWORD(w);
    if(id==IDCANCEL){EndDialog(h,IDCANCEL);return TRUE;}
    if(id==IDOK)return TRUE; // No accidental Enter-based insertion or calculation.
-   if(!self->loading&&((id>=100&&id<100+FieldCount&&code==EN_CHANGE)||((id==500||id==501||id==502)&&code==CBN_SELCHANGE)||(id==503&&code==BN_CLICKED))){
+   if(!self->loading&&tvsBypassUx::invalidatesResult(id,code)){
+    if(id==100)self->riEdited=true;
     self->capture();self->invalidate();
     if(id==502){self->unitFromRecord=false;Frame f=self->engine.frame(self->snapshot,self->factor(),self->reverse);self->loading=true;
-     if(f.valid){SetDlgItemTextW(h,108,number(f.left).c_str());SetDlgItemTextW(h,109,number(f.right).c_str());}self->loading=false;self->source();}return TRUE;}
+     if(f.valid){SetDlgItemTextW(h,108,number(f.left).c_str());SetDlgItemTextW(h,109,number(f.right).c_str());}self->loading=false;
+     self->proposeRadius();self->capture();self->source();}
+    else if(id==100)self->source();
+    return TRUE;}
    if(id==504&&code==BN_CLICKED){self->advanced=IsDlgButtonChecked(h,504)==BST_CHECKED;self->fieldLayout();self->refreshResult();return TRUE;}
    if((id==505||id==506)&&code==BN_CLICKED){self->showDimensions=IsDlgButtonChecked(h,505)==BST_CHECKED;self->showAxes=IsDlgButtonChecked(h,506)==BST_CHECKED;InvalidateRect(h,NULL,TRUE);return TRUE;}
    if(id==507&&code==CBN_SELCHANGE){self->allEdges=SendDlgItemMessage(h,507,CB_GETCURSEL,0,0)==1;return TRUE;}
@@ -282,7 +310,7 @@ void tvsBypassDetailCheckCommand(){
   acutPrintf(L"\nBocni detalji: %u lokalnih referenci. %ls",static_cast<unsigned>(used.labels.size()),used.duplicated?L"DUPLIKATI: COPY nije nezavisni detalj; uklonite kopije.":L"Oznake/GUID-i bez otkrivenih duplikata. XREF i ponovljene parent instance nisu globalno provjereni.");
  }catch(...){acutPrintf(L"\nProvjera detalja nije zavrsena; zapis je mozda neispravan ili nedostupan.");}
 }
-static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput* output){
+static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput* output,const TVSBypassRadius& radius){
  try{
   AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
   if(!db||!db->tilemode())return false;
@@ -309,7 +337,8 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
     if(record.openStatus()==Acad::eOk){resbuf* data=NULL;if(record->rbChain(&data)==Acad::eOk){
      for(resbuf* p=data;p;p=p->rbnext)if(p->restype==40&&tvsUnits::validFactor(p->resval.rreal))known=true;
      if(data)acutRelRb(data);}}}dict->close();}
-  Dialog dialog(s,reverse,tvsUnits::factor(db),known,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
+  tvsBypassUx::RadiusSetting radiusSetting;radiusSetting.mode=radius.mode;radiusSetting.k=radius.k;radiusSetting.constantDrawing=radius.constant;
+  Dialog dialog(s,reverse,tvsUnits::factor(db),known,DocVars.docData().bypassMemory,radiusSetting,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
   for(;;){INT_PTR action=dialog.show(owner);
    if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,route,obstacle);
     // Accepting flows (TVS_BYPASS, Obilazak) return to the dialog with the same checked
@@ -334,7 +363,7 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
   }
  }catch(...){acutPrintf(L"\nBYPASS prekinut. Nepotvrdjena transakcija/grafika je uklonjena.");return false;}
 }
-void tvsBypassPreviewCommand(){runBypass(AcDbObjectId::kNull,false,NULL);}
-void tvsBypassCommand(){runBypass(AcDbObjectId::kNull,true,NULL);}
-bool tvsBypassDuringDrawing(const AcDbObjectId& route,TVSBypassOutput& result){return runBypass(route,true,&result);}
+void tvsBypassPreviewCommand(const TVSBypassRadius& radius){runBypass(AcDbObjectId::kNull,false,NULL,radius);}
+void tvsBypassCommand(const TVSBypassRadius& radius){runBypass(AcDbObjectId::kNull,true,NULL,radius);}
+bool tvsBypassDuringDrawing(const AcDbObjectId& route,TVSBypassOutput& result,const TVSBypassRadius& radius){return runBypass(route,true,&result,radius);}
 #endif

@@ -174,7 +174,7 @@ int main(){
             subprocess.run([str(executable(target))],check=True)
     def test_both_drawing_bypass_continuations(self):
         text=(ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
-        needle='if(tvsBypassDuringDrawing(pipi->objectId(),result))'
+        needle='if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings()))'
         callers=[]
         while needle in text:
             body=function(text,needle);callers.append(body);text=text[text.index(needle)+len(body):]
@@ -194,7 +194,9 @@ static int shortOpens=0;
 template<class T> struct AcDbObjectPointer {T* p;AcDbObjectPointer(AcDbObjectId id,AcDb::OpenMode):p(!openFails&&id.value==2?&output:NULL){++shortOpens;}
  Acad::ErrorStatus openStatus()const{return p?Acad::eOk:Acad::eInvalid;}T* operator->(){return p;}};
 static double globalElevMid=-400,globalElev=-400,globalAxis=33;
-static bool tvsBypassDuringDrawing(AcDbObjectId id,TVSBypassOutput& r){assert(id.value==1);r.id=output.objectId();r.pipe=&output;r.elevation=-400;r.angle=45;return accept;}
+struct TVSBypassRadius {int mode;};
+static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r={2};return r;}
+static bool tvsBypassDuringDrawing(AcDbObjectId id,TVSBypassOutput& r,const TVSBypassRadius& radius){assert(radius.mode==2);assert(id.value==1);r.id=output.objectId();r.pipe=&output;r.elevation=-400;r.angle=45;return accept;}
 '''
         for i,body in enumerate(callers):
             code+=f'\nstatic void caller{i}(TVS_Pipe*& pipi,AcGePoint3d& A1,AcGePoint3d& A2,double* pt1){{TVSBypassOutput result;'+body+'}\n'

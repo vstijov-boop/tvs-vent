@@ -89,6 +89,12 @@
 //-----------------------------------------------------------------------------
 //----- ObjectARX EntryPoint
 
+#ifdef TVS_BYPASS_PREVIEW
+// Settings.h globals are per translation unit; the live radius mode is this file's copy.
+static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
+static void tvsBypassCommandEntry(){tvsBypassCommand(tvsBypassRadiusSettings());}
+static void tvsBypassPreviewCommandEntry(){tvsBypassPreviewCommand(tvsBypassRadiusSettings());}
+#endif
 class CTVS_Ventilation_ARXApp : public AcRxArxApp {
 
 public:
@@ -107,9 +113,9 @@ public:
             acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
-        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommand)!=Acad::eOk)
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
-        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommand)!=Acad::eOk)
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
 #endif
 		PropertyAdmin::initialize();
@@ -1771,7 +1777,7 @@ public:
 #ifdef TVS_BYPASS_PREVIEW
             if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
                 TVSBypassOutput result;
-                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings())){
                     // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
                     // loop keeps carrying a pointer, so pipi still takes the committed object.
                     AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
@@ -1997,7 +2003,7 @@ public:
 #ifdef TVS_BYPASS_PREVIEW
             if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
                 TVSBypassOutput result;
-                if(tvsBypassDuringDrawing(pipi->objectId(),result)){
+                if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings())){
                     // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
                     // loop keeps carrying a pointer, so pipi still takes the committed object.
                     AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
