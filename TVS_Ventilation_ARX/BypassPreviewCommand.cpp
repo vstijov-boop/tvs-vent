@@ -92,12 +92,12 @@ static const wchar_t* labels[FieldCount]={L"Unutrašnji radijus koljena Ri (mm)"
  L"Min. dužina kosog komada (mm)",L"Min. dužina srednjeg komada C (mm)",L"Min. projekcija, mm",L"Početak prozora s (mm)",L"Kraj prozora s (mm)",L"Donja granica Z, mm (opciono)",L"Gornja granica Z, mm (opciono)",
  L"Vrijeme, ms (max 10000)",L"Checker pozivi (max 128)",L"Ćelije (max 1000000)",L"Korak D, mm",L"Korak C, mm",L"Max. traženi D, mm",L"Nivoi D (max 128)",L"Prijedlozi C (max 16)",L"Položaji (max 16)",L"Seed solve (max 128)",L"Prijedlozi (max 2048)",L"Inset prozora, mm",L"Prag poboljšanja W, mm",L"Prag poboljšanja D, mm"};
 struct Dialog {
- Snapshot snapshot;bool reverse,loading,unitFromRecord,advanced,showDimensions,showAxes,allEdges,canAccept;double scaleX,scaleY;Engine engine;View view;Options options;
+ Snapshot snapshot;bool reverse,loading,unitFromRecord,unitDefault,advanced,showDimensions,showAxes,allEdges,canAccept;double scaleX,scaleY;Engine engine;View view;Options options;
  std::wstring values[FieldCount];int units,angle,side;bool confirmed;HWND window;HFONT font;
  // Per-document design settings (CDocData) and the TVS radius mode. Geometry, units,
  // window and Z limits always come from the newly selected objects.
  tvsBypassUx::Memory& memory;tvsBypassUx::RadiusSetting radiusSetting;bool riEdited,insulationProposed;std::wstring riSource;
- Dialog(const Snapshot& s,bool r,double factor,bool known,tvsBypassUx::Memory& remembered,const tvsBypassUx::RadiusSetting& radius,bool accept=false):snapshot(s),reverse(r),loading(true),unitFromRecord(known),advanced(false),showDimensions(true),showAxes(true),allEdges(false),canAccept(accept),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL),
+ Dialog(const Snapshot& s,bool r,double factor,bool known,tvsBypassUx::Memory& remembered,const tvsBypassUx::RadiusSetting& radius,bool accept=false):snapshot(s),reverse(r),loading(true),unitFromRecord(known),unitDefault(false),advanced(false),showDimensions(true),showAxes(true),allEdges(false),canAccept(accept),scaleX(1),scaleY(1),units(known?(factor==1?0:factor==10?1:2):-1),angle(1),side(0),confirmed(false),window(NULL),font(NULL),
   memory(remembered),radiusSetting(radius),riEdited(false),insulationProposed(false){
   for(int j=0;j<FieldCount;++j)values[j]=number(options.*fields[j]);
   values[1]=values[2]=L"";values[10]=values[11]=L"";
@@ -125,7 +125,7 @@ struct Dialog {
   Frame f=engine.frame(snapshot,factor(),reverse);std::wostringstream t;
   if(f.valid){
    t<<L"TRASA "<<f.width<<L" × "<<f.height<<L" mm, osa Z="<<f.z0<<L" mm     |     PREPREKA "<<f.obstacleWidth<<L" × "<<f.obstacleHeight<<L" mm, osa Z="<<f.obstacleZ<<L" mm (iz objekata)\r\n";
-   t<<L"Jedinice: "<<(unitFromRecord?L"TVS zapis":L"ručni izbor")<<L" — provjerite i potvrdite. s=0 je presjek osa; +s prati "<<(reverse?L"prvi":L"posljednji")<<L" kraj trase.\r\n";
+   t<<L"Jedinice: "<<(unitFromRecord?L"TVS zapis crteža":unitDefault?L"TVS podrazumijevano mm (crtež nema zapis jedinica)":L"ručni izbor")<<L" — provjerite i potvrdite. s=0 je presjek osa; +s prati "<<(reverse?L"prvi":L"posljednji")<<L" kraj trase.\r\n";
    t<<L"Sve mjere i fizičke kote ispod su u mm. Presjek nije uvećan po visini; crtačka ravan Z="<<f.origin.z<<L" jedinica.";
    if(!riSource.empty())t<<L"   Ri: "<<riSource<<(riEdited?L" (ručno izmijenjen)":L"");
    if(insulationProposed)t<<L"\r\nIzolacije i ostala podešavanja su PRIJEDLOG iz prethodnog unosa u ovom crtežu, ne podatak objekta — provjerite.";
@@ -188,13 +188,20 @@ struct Dialog {
   move(700,12,616,130,30);move(702,156,616,145,30);move(701,315,616,143,30);move(703,12,666,145,30);move(704,165,666,145,30);move(IDCANCEL,318,666,140,30);
   InvalidateRect(window,NULL,TRUE);
  }
- void init(HWND h){window=h;loading=true;
+ // Window size the user last chose (this AutoCAD session; UI geometry only, never drawing data).
+ static SIZE& lastSize(){static SIZE size={0,0};return size;}
+ void init(HWND h){window=h;
   RECT work;SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
   MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);if(GetMonitorInfoW(MonitorFromWindow(GetParent(h),MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;
-  // Layout base is 96 DPI; size grows with the monitor scale so text stays readable at 125-200 %.
-  int dpi=96;if(HDC screen=GetDC(NULL)){dpi=GetDeviceCaps(screen,LOGPIXELSY);ReleaseDC(NULL,screen);}if(dpi<96)dpi=96;
-  const LONG width=MulDiv(1220,dpi,96),height=MulDiv(760,dpi,96);
-  SetWindowPos(h,NULL,work.left+10,work.top+10,(std::min)(width,work.right-work.left-20),(std::min)(height,work.bottom-work.top-20),SWP_NOZORDER);
+  // Compact default (85 % of the 1220x760 base); resizable, and the chosen size is kept.
+  const LONG availableW=work.right-work.left-20,availableH=work.bottom-work.top-20;
+  const LONG width=(std::min)(lastSize().cx>0?lastSize().cx:1040L,availableW),height=(std::min)(lastSize().cy>0?lastSize().cy:650L,availableH);
+  SetWindowPos(h,NULL,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,SWP_NOZORDER);
+  build();
+ }
+ // Rebuild all controls for the current client size (initial show and after a resize).
+ void rebuild(){capture();while(HWND c=GetWindow(window,GW_CHILD))DestroyWindow(c);if(font){DeleteObject(font);font=NULL;}build();InvalidateRect(window,NULL,TRUE);}
+ void build(){HWND h=window;loading=true;
   RECT client;GetClientRect(h,&client);scaleX=client.right/1204.0;scaleY=client.bottom/720.0;
   if(!font)font=CreateFontW(-(int)(13*(std::min)(scaleX,scaleY)),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,0,0,CLEARTYPE_QUALITY,0,L"Segoe UI");
   child(L"STATIC",L"",SS_LEFT,600,12,10,1180,75);source();
@@ -292,13 +299,16 @@ struct Dialog {
   if(!self)return FALSE;
   if(m==WM_PAINT){self->paint();return TRUE;}
   if(m==WM_CLOSE){EndDialog(h,IDCANCEL);return TRUE;}
+  if(m==WM_GETMINMAXINFO){MINMAXINFO* mm=(MINMAXINFO*)l;mm->ptMinTrackSize.x=820;mm->ptMinTrackSize.y=520;return TRUE;}
+  if(m==WM_EXITSIZEMOVE){RECT r;GetWindowRect(h,&r);SIZE now={r.right-r.left,r.bottom-r.top};SIZE& last=lastSize();
+   RECT c;GetClientRect(h,&c);if(std::fabs(c.right/1204.0-self->scaleX)>1e-3||std::fabs(c.bottom/720.0-self->scaleY)>1e-3){last=now;self->rebuild();}return TRUE;}
   if(m==WM_COMMAND){int id=LOWORD(w),code=HIWORD(w);
    if(id==IDCANCEL){EndDialog(h,IDCANCEL);return TRUE;}
    if(id==IDOK)return TRUE; // No accidental Enter-based insertion or calculation.
    if(!self->loading&&tvsBypassUx::invalidatesResult(id,code)){
     if(id==100)self->riEdited=true;
     self->capture();self->invalidate();
-    if(id==502){self->unitFromRecord=false;Frame f=self->engine.frame(self->snapshot,self->factor(),self->reverse);self->loading=true;
+    if(id==502){self->unitFromRecord=false;self->unitDefault=false;Frame f=self->engine.frame(self->snapshot,self->factor(),self->reverse);self->loading=true;
      if(f.valid){SetDlgItemTextW(h,108,number(f.left).c_str());SetDlgItemTextW(h,109,number(f.right).c_str());}self->loading=false;
      self->proposeRadius();self->capture();self->source();}
     else if(id==100)self->source();
@@ -313,7 +323,7 @@ struct Dialog {
  INT_PTR show(HWND owner){
   const wchar_t title[]=L"TVS — Obilazak kanala (DEV)";
   std::vector<WORD> buffer((sizeof(DLGTEMPLATE)+sizeof(title)+8)/2,0);
-  DLGTEMPLATE t={};t.style=WS_POPUP|WS_CAPTION|WS_SYSMENU|DS_MODALFRAME;t.cx=780;t.cy=460;
+  DLGTEMPLATE t={};t.style=WS_POPUP|WS_CAPTION|WS_SYSMENU|WS_THICKFRAME|DS_MODALFRAME;t.cx=780;t.cy=460;
   memcpy(&buffer[0],&t,sizeof(t));BYTE* p=(BYTE*)&buffer[0]+sizeof(t);p+=4;memcpy(p,title,sizeof(title));
   return DialogBoxIndirectParamW(AfxGetInstanceHandle(),(DLGTEMPLATE*)&buffer[0],owner,proc,(LPARAM)this);
  }
@@ -353,7 +363,10 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
      for(resbuf* p=data;p;p=p->rbnext)if(p->restype==40&&tvsUnits::validFactor(p->resval.rreal))known=true;
      if(data)acutRelRb(data);}}}dict->close();}
   tvsBypassUx::RadiusSetting radiusSetting;radiusSetting.mode=radius.mode;radiusSetting.k=radius.k;radiusSetting.constantDrawing=radius.constant;
-  Dialog dialog(s,reverse,tvsUnits::factor(db),known,DocVars.docData().bypassMemory,radiusSetting,permanent);HWND owner=acedGetAcadFrame()->GetSafeHwnd();
+  // Units always preselected from TVS: the drawing record, or TVS's own default (no record = mm,
+  // e.g. TVS_SETTINGS left on mm does not write a record). The user still confirms them.
+  Dialog dialog(s,reverse,tvsUnits::factor(db),true,DocVars.docData().bypassMemory,radiusSetting,permanent);
+  dialog.unitFromRecord=known;dialog.unitDefault=!known;HWND owner=acedGetAcadFrame()->GetSafeHwnd();
   for(;;){INT_PTR action=dialog.show(owner);
    if(action==701){
     // Accepting flows: [Prihvati/Dijalog/Odustani]; TVS_BYPASS_PREVIEW: [Dijalog/Odustani].
