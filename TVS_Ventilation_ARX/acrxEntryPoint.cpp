@@ -1124,6 +1124,7 @@ public:
 		double fl = globalFlow = dg.Flow;
 		globalLengthTr = dg.LengthTr;
 		globalLengthW = dg.LengthW;
+		tvsTeeFit::transitionSetting() = globalLengthTr * tvsUnits::factor();   // T komad: transition at a width step
 
 		globalWipeout = dg.Wipe;
 		globalGrani = dg.Grani;

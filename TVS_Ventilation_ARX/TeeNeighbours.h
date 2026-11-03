@@ -48,7 +48,10 @@ inline std::vector<End> ductsAt(const TVS_WYE* w,const AcGePoint3d& at,double to
 // Other end of a duct whose width changed: the element there (any TVS port within tol)
 // still has the old width. A transition there takes the new width on that side; otherwise a
 // centred transition of transitionMm is inserted by shortening the duct.
-inline double transitionMm(){return 300;}
+// Transition length, mm: TVS_SETTINGS "Prelaz L" (set by the settings dialog; one value for
+// all translation units, unlike the static globals of Settings.h). Default 300 mm.
+inline double& transitionSetting(){static double mm=300;return mm;}
+inline double transitionMm(){return transitionSetting()>0?transitionSetting():300;}
 inline void farEnd(const AcDbObjectId& teeId,const AcDbObjectId& ductId,bool nearIsFirst,double tol,double f){
     AcGePoint3d E,N;double width=0,height=0,elev=0;bool oneD=false;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return;
