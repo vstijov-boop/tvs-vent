@@ -57,6 +57,7 @@
 #include "PropertyAdmin.h"
 #include "TvsLinetypes.h"
 #include "FlexCuffCommand.h"
+#include "MLeaderStyleTools.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -127,6 +128,8 @@ public:
         acedEditor->addReactor(&offsetReactor());
 #endif
         tvsLinetypes::ensureCurrent(); // drawing already open when the ARX is loaded
+        { const MLeaderSettings& ml = Settings::get()->mLeader; // TVS label style available to AutoCAD too
+          tvsMLeaderStyle::ensureCurrentDocument(ml.style, ml.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : ml.styleSource); }
         // TODO: Add your initialization code here
 
 		return (retCode);
@@ -160,6 +163,8 @@ public:
 		TVSController::get()->tvsPropertyController.registerApp();
         PropertyAdmin::initialize();
         tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
+        { const MLeaderSettings& ml = Settings::get()->mLeader; // TVS label style available to AutoCAD too
+          tvsMLeaderStyle::ensureCurrentDocument(ml.style, ml.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : ml.styleSource); }
 
 		return (retCode);
 	}

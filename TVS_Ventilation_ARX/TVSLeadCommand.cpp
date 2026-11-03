@@ -57,9 +57,7 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 	{
 		AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
 		const MLeaderSettings& m = Settings::get()->mLeader;
-		AcDbObjectId styleId = tvsMLeaderStyle::find(db, m.style);
-		if (styleId.isNull() && !m.style.IsEmpty() && !m.styleSource.IsEmpty())
-			tvsMLeaderStyle::import(db, m.styleSource, m.style, styleId);
+		AcDbObjectId styleId = tvsMLeaderStyle::ensure(db, m.style, m.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : m.styleSource);
 		if (styleId.isNull() && db) styleId = db->mleaderstyle();
 		if (!styleId.isNull()) {
 			pEnt->setMLeaderStyle(styleId);

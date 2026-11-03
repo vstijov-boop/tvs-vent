@@ -29,6 +29,7 @@ naziv postojećeg atributa.\r\n\
 		pipeLeader = L"[D]mm\\P[L]m\\U+00B3/h";
 		blockLeader = L"[Тип]-[Размер]";
 		scale = 50;
+		style = L"TVS_MleaderStyle";   // shipped in TVS_Oznake.dwg (text style TVS_TextStyle)
 		load();
 	};
 
@@ -46,7 +47,7 @@ naziv postojećeg atributa.\r\n\
 	CString  pipeLeader;
 	CString  blockLeader;
 	CString  style;        // multileader style name ("" = drawing's current style)
-	CString  styleSource;  // DWG the style was taken from (imported again when missing)
+	CString  styleSource;  // DWG the style was taken from ("" = shipped TVS_Oznake.dwg)
 	double   scale;        // drawing scale 1:scale
 
 	static const wchar_t* key() { return L"Software\\TVS_Vent\\MLeader"; }
