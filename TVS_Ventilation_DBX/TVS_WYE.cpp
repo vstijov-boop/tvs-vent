@@ -1180,6 +1180,27 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 	return tvsTee::valid(tee);
 }
 
+bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
+{
+	tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
+	if (!teeShape(tee, o, ex, ey)) return false;
+	tvsTee::Shape s; if (!tvsTee::shape(tee, s)) return false;   // drawn as a plain T otherwise
+	AcGeVector3d u = Vectpr, v = Vectotv; u.z = v.z = 0; u.normalize(); v.normalize();
+	ports[2] = Basepoint + v * (SizeApr / 2 + LengthPl);
+	if (tee.type == tvsTee::Branch) {
+		const double half = LengthPl + SizeAotv / 2;
+		ports[0] = Basepoint - u * half; ports[1] = Basepoint + u * half;
+		widths[0] = tee.A; widths[1] = tee.C; widths[2] = tee.w1;
+	}
+	else {   // +u = first branch (w1), -u = left branch (w2); fixed collars l
+		const double a = tee.A / 2;
+		ports[1] = Basepoint + u * (a + tee.R1 - tee.w1 + tee.l);
+		ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);
+		widths[0] = tee.w2; widths[1] = tee.w1; widths[2] = tee.A;
+	}
+	return true;
+}
+
 void TVS_WYE::getName(CString &unit)
 {
 	unit = CCommonWueName;

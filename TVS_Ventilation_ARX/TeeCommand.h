@@ -2,10 +2,11 @@
 // TVS_TK_TIP (faza 1): turns an existing TVS T-komad into TK-O "sa ogrankom" or TK-G
 // "gacasti" (or back to the plain T). Defaults: centre-line radius = branch width (outer
 // 1.5 w), collars 25 mm as in the dynamic block "T komad". LengthPl becomes l + R - w so the TVS ports
-// match the drawn fitting; neighbouring ducts are not moved (faza 2/3: insertion/editing).
+// match the drawn fitting; connected TVS ducts follow the ports (TeeNeighbours.h, faza 3).
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
+#include "TeeNeighbours.h"
 namespace tvsTeeCommand {
 inline bool askWidth(const wchar_t* prompt,double defaultMm,double& valueMm){
     valueMm=defaultMm;wchar_t text[200];swprintf_s(text,L"%ls <%.0f>: ",prompt,defaultMm);
@@ -18,11 +19,12 @@ inline void setType(){
     AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return;}
     if(w->ThisRoundpr||w->ThisRoundotv){acutPrintf(L"\nTK-O/TK-G su za pravougaone kanale.");return;}
     tvsTeeData::Record current;tvsTeeData::read(w.object(),current);
+    const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
     acedInitGet(0,L"Ogranak Gacasti Ravni");ACHAR kw[32]=L"";
     const int rc=acedGetKword(L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Ravni] <Ogranak>: ",kw);
     if(rc!=RTNORM&&rc!=RTNONE)return;
     const double f=tvsUnits::factor(w.object());tvsTeeData::Record r;
-    if(_wcsicmp(kw,L"Ravni")==0){if(tvsTeeData::write(w.object(),r)==Acad::eOk)acutPrintf(L"\nT-komad je ponovo obican (TK0).");return;}
+    if(_wcsicmp(kw,L"Ravni")==0){if(tvsTeeData::write(w.object(),r)==Acad::eOk){acutPrintf(L"\nT-komad je ponovo obican (TK0).");w->recordGraphicsModified();tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));}return;}
     const bool pants=_wcsicmp(kw,L"Gacasti")==0;
     r.type=pants?tvsTee::Pants:tvsTee::Branch;r.l=tvsTeeData::collarMm()/f;
     // TK-O: run = TVS run (A in -> C out), branch = TVS branch. TK-G: inlet = TVS branch, outlets = TVS run.
@@ -36,7 +38,8 @@ inline void setType(){
     const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
     if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return;}
     w->recordGraphicsModified();
-    acutPrintf(L"\n%ls: R = %.0f mm, prikljucak %.0f mm. Susjedni kanali nisu pomjereni; po potrebi ih prilagodite.",
+    tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
+    acutPrintf(L"\n%ls: R = %.0f mm, prikljucak %.0f mm.",
         pants?L"Gacasti T komad TK-G":L"T komad sa ogrankom TK-O",tvsTee::defaultRadius(w1)*f,tvsTeeData::collarMm());
     (void)current;
 }

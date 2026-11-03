@@ -26,5 +26,12 @@ class TeeContract(unittest.TestCase):
   g=text('TVS_Ventilation_ARX/dgAllEdit.cpp');self.assertIn('DDX_MillimetreString(pDX, IDC_TeeSecond, TeeSecond);',g);self.assertIn('L"Lijevi ogr."',g)
   a=text('TVS_Ventilation_ARX/TeeEditDialog.h');self.assertIn('if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);',a)
   self.assertIn('tvsTee::pantsLengthPl(r.l,w1,w2)',a)
+  # Faza 3: drawn TK ports feed the move/offset port model; connected ducts follow the ports.
+  self.assertIn('bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const',w)
+  self.assertIn('ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);',w,'TK-G left face with fixed collar')
+  m=text('TVS_Ventilation_ARX/TVSMoveCommand.h');self.assertIn('if(p->teePorts(teePort,teeWidth))',m)
+  n=text('TVS_Ventilation_ARX/TeeNeighbours.h');self.assertIn('es=ends[0].first?p->put_FirstPoint(to):p->put_Lastpoint(to);',n);self.assertIn('es=p->put_SizeA(after.w[k]);',n)
+  self.assertEqual(t.count('tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));'),2)
+  self.assertIn('tvsTeeFit::fit(w,old->second,tvsTeeFit::ports(w));',a)
   self.assertIn('Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
 if __name__=='__main__':unittest.main()

@@ -93,6 +93,9 @@ inline bool describe(AcDbEntity* entity,Node& n){
             n.sections.push_back(tvsMoveNetwork::Section(p->SizeApr,p->SizeBpr,p->ThisRoundpr,p->Elev));
             n.sections.push_back(n.sections[0]);
             n.sections.push_back(tvsMoveNetwork::Section(p->SizeAotv,p->SizeBotv,p->ThisRoundotv,p->Elev));
+            // T komad TK-O / TK-G: drawn ports and widths (prolaz C, left branch, fixed collars).
+            AcGePoint3d teePort[3];double teeWidth[3];
+            if(p->teePorts(teePort,teeWidth))for(int k=0;k<3;++k){n.ports[k]=point(teePort[k]);n.sections[k].a=teeWidth[k];}
             if(std::fabs(p->Vectpr.z)<1e-8&&std::fabs(p->Vectotv.z)<1e-8
                 &&std::fabs(mainAxis.dot(branchAxis))<1e-6)n.kind=4;
         }

@@ -6,12 +6,16 @@
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
 #include "dgAllEdit.h"
+#include "TeeNeighbours.h"
+#include <map>
 #include <cwchar>
 namespace tvsTeeEdit {
 struct Gather {
     bool any,mixedType,mixedSecond;int type;double second;
+    std::map<AcDbObjectId,tvsTeeFit::Ports> before;   // ports before the dialog (faza 3)
     Gather():any(false),mixedType(false),mixedSecond(false),type(0),second(0){}
     void add(const TVS_WYE* w){
+        before[w->objectId()]=tvsTeeFit::ports(w);
         tvsTeeData::Record r;const int t=tvsTeeData::read(w,r)?r.type:0;
         const double s=t==tvsTee::Branch?(r.second>0?r.second:w->SizeApr):t==tvsTee::Pants?(r.second>0?r.second:w->SizeApr):0;
         if(!any){any=true;type=t;second=s;return;}
@@ -44,5 +48,7 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
     if(r.type==tvsTee::Pants&&!tvsTee::pantsFeasible(w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,r.l))
         acutPrintf(L"\nGacasti T komad: ogranci su preuski za ulaz (potrebno priblizno lijevi + desni >= ulaz); prikazan je kao obican T-komad.");
     if(changed||branchWidth)w->recordGraphicsModified();
+    std::map<AcDbObjectId,tvsTeeFit::Ports>::const_iterator old=g.before.find(w->objectId());
+    if(old!=g.before.end())tvsTeeFit::fit(w,old->second,tvsTeeFit::ports(w));
 }
 }
