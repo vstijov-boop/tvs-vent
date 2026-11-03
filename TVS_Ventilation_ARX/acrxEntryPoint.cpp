@@ -61,6 +61,7 @@
 #include "TeeCommand.h"
 #include "TeeInsert.h"
 #include "MatchCommand.h"
+#include "SectionCommand.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -1964,6 +1965,13 @@ public:
         tvsFlexCuffCommand::run();
     }
     // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
+    // TVS_PRESJEK: poprecni presjek of the TVS network (SectionCommand.h).
+    static void Ventilation_ARXTVS_PRESJEK(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsSectionCmd::run();
+    }
     // TVS_MATCH: TVS properties of a source duct onto selected elements (MatchCommand.h).
     static void Ventilation_ARXTVS_MATCH(void)
     {
@@ -4237,6 +4245,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MATCH, TVS_MATCH, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 
 #ifdef TVS_OFFSET_PROOF
