@@ -70,23 +70,19 @@ inline void farEnd(const AcDbObjectId& teeId,const AcDbObjectId& ductId,bool nea
      }
      delete it;}
     if(count==0||std::fabs(otherWidth-width)<=1e-9)return;               // free end or same width
-    if(count>1||round){acutPrintf(L"
-Drugi kraj kanala: vise elemenata ili okrugli prikljucak; prilagodite rucno.");return;}
+    if(count>1||round){acutPrintf(L"\nDrugi kraj kanala: vise elemenata ili okrugli prikljucak; prilagodite rucno.");return;}
     if(trans){
         AcDbObjectPointer<TVS_TRANS> t(found,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)return;
         const Acad::ErrorStatus es=port==0?t->put_SizeAp1(width):t->put_SizeAp2(width);
-        if(es==Acad::eOk){t->recordGraphicsModified();acutPrintf(L"
-Drugi kraj kanala: postojeci prelaz preuzima sirinu %.0f mm.",width*f);}
+        if(es==Acad::eOk){t->recordGraphicsModified();acutPrintf(L"\nDrugi kraj kanala: postojeci prelaz preuzima sirinu %.0f mm.",width*f);}
         return;
     }
     AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length();const double lt=transitionMm()/f;
-    if(length<lt+50.0/f){acutPrintf(L"
-Drugi kraj kanala: kanal je prekratak za prelaz %.0f mm; prilagodite rucno.",transitionMm());return;}
+    if(length<lt+50.0/f){acutPrintf(L"\nDrugi kraj kanala: kanal je prekratak za prelaz %.0f mm; prilagodite rucno.",transitionMm());return;}
     dir.normalize();AcGePoint3d start=E-dir*lt;start.z=E.z;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
      const Acad::ErrorStatus es=nearIsFirst?d->put_Lastpoint(start):d->put_FirstPoint(start);
-     if(es!=Acad::eOk){acutPrintf(L"
-Drugi kraj kanala: kanal nije skracen (%ls).",acadErrorStatusText(es));return;}
+     if(es!=Acad::eOk){acutPrintf(L"\nDrugi kraj kanala: kanal nije skracen (%ls).",acadErrorStatusText(es));return;}
      d->recordGraphicsModified();}
     double a1=width,b1=height,a2=otherWidth,b2=otherHeight>0?otherHeight:height,len=lt;AcGeVector3d v=dir*lt;
     TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,start,false,false,1,oneD);
@@ -95,8 +91,7 @@ Drugi kraj kanala: kanal nije skracen (%ls).",acadErrorStatusText(es));return;}
         if(o.openStatus()==Acad::eOk){
             AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()==Acad::eOk)o->setPropertiesFrom(d.object());
             o->put_Elevation(elev);o->recordGraphicsModified();}
-        acutPrintf(L"
-Drugi kraj kanala: umetnut prelaz %.0f -> %.0f mm, duzine %.0f mm.",width*f,otherWidth*f,transitionMm());
+        acutPrintf(L"\nDrugi kraj kanala: umetnut prelaz %.0f -> %.0f mm, duzine %.0f mm.",width*f,otherWidth*f,transitionMm());
     }
 }
 // `before` = ports before the change, `after` = ports of the changed T komad (open for write).
