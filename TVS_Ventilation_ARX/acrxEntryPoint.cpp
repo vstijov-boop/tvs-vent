@@ -637,6 +637,7 @@ public:
 		AcGePoint3d pointSelect1 = line1.closestPointTo(asPnt3d(pnt1));
 		AcGePoint3d pointSelect2 = line2.closestPointTo(asPnt3d(pnt2));
 		AcDbEntity * pEnt;
+		AcDbObjectId wyeId;
 #pragma region  line intersection
 		if (LineStatus == TVSisPerpendicular || LineStatus == TVSisIntersection)
 		{
@@ -733,6 +734,7 @@ public:
 				pPipe2->This1D);
 			SetGlobalProperty(pWye);
 			SetPropertyLikePipe(pPipe2, pWye);
+			wyeId = pWye->id();
 
 
 			acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
@@ -758,6 +760,7 @@ public:
 
 
 
+			tvsTeeCommand::afterConnect(wyeId);   // faza 2: TK-O / TK-G while drawing
 		} //end if line intersection
 #pragma endregion 
 

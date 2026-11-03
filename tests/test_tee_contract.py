@@ -31,6 +31,10 @@ class TeeContract(unittest.TestCase):
   self.assertIn('ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);',w,'TK-G left face with fixed collar')
   m=text('TVS_Ventilation_ARX/TVSMoveCommand.h');self.assertIn('if(p->teePorts(teePort,teeWidth))',m)
   n=text('TVS_Ventilation_ARX/TeeNeighbours.h');self.assertIn('es=ends[0].first?p->put_FirstPoint(to):p->put_Lastpoint(to);',n);self.assertIn('es=p->put_SizeA(after.w[k]);',n)
+  e2=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp');i=e2.index('static bool ConnectWithWye(');j=e2.index('#pragma region linear',i)
+  self.assertIn('tvsTeeCommand::afterConnect(wyeId);',e2[i:j],'faza 2: Racva / TVS_CONNECTW offer TK-O / TK-G')
+  self.assertIn('wyeId = pWye->id();',e2[i:j])
+  self.assertIn('if(after.ok){std::swap(after.p[0],after.p[1]);std::swap(after.w[0],after.w[1]);}',t,'Okreni: ports matched by place')
   self.assertIn('tvsTeeFit::transitionSetting() = globalLengthTr * tvsUnits::factor();',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'),'transition length from TVS_SETTINGS')
   for f in ('TeeNeighbours.h','TeeEditDialog.h','TeeCommand.h'):
    for line in text('TVS_Ventilation_ARX/'+f).splitlines():self.assertFalse(line.rstrip().endswith('L"'),f+': string literal broken by a newline')
