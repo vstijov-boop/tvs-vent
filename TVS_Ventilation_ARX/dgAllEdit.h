@@ -79,6 +79,11 @@
 #define IDC_TapDown 1030
 #define IDC_Swectangle 1013
 #define IDC_DuctFlex 1041
+#define IDC_TeeSecond 1050
+#define IDC_TeeSecondLabel 10050
+#define IDC_LabelSizeA 10001
+#define IDC_LabelSizeA2 10003
+#define IDC_LabelSizeB2 10004
 
 //-----------------------------------------------------------------------------
 class dgAllEdit : public CAdUiBaseDialog {
@@ -197,6 +202,11 @@ public:
 	BOOL bDuctFlex;
 
 	//////////////////////////////////////////////////////////////////////////
+
+	// T komad TK-O / TK-G (TeeEditDialog.h): 0 = none or mixed, 1 = TK-O, 2 = TK-G
+	int TeeType;
+	CString TeeSecond;
+	CEdit fTeeSecond;
 
 	bool Tpipe;
 	bool Twye;

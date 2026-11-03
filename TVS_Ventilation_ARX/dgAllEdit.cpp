@@ -96,6 +96,8 @@ dgAllEdit::dgAllEdit(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : C
 , ElevUp(FALSE)
 , ElevMid(FALSE)
 , ElevDown(FALSE)
+, TeeType(0)
+, TeeSecond(_T(""))
 {
 }
 
@@ -111,6 +113,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_Control(pDX, IDC_SizeB2, fSizeB2);
 	DDX_Control(pDX, IDC_TransLength, fLengthTr);
 	DDX_Control(pDX, IDC_LengthWye, fLengthW);
+	DDX_Control(pDX, IDC_TeeSecond, fTeeSecond);
 	DDX_Control(pDX, IDCANCEL, F);
 	DDX_Control(pDX, IDC_Wipeout, fWipeout);
 	DDX_Control(pDX, IDC_Grani, fGrani);
@@ -144,6 +147,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_MillimetreString(pDX, IDC_SizeB2, SizeB2);
 	DDX_MillimetreString(pDX, IDC_TransLength, LengthTr);
 	DDX_MillimetreString(pDX, IDC_LengthWye, LengthW);
+	DDX_MillimetreString(pDX, IDC_TeeSecond, TeeSecond);
 	DDX_MillimetreString(pDX, IDC_ElevVal, Elev);
 	DDX_Text(pDX, IDC_Speed, Speed);
 	DDX_Text(pDX, IDC_i, I);
@@ -224,6 +228,19 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 	{
 		fLengthW.ShowWindow(false);
 
+	}
+
+	// T komad: TK-O asks for the run outlet C, TK-G for the left branch (may differ from the right).
+	if (TeeType == 1 || TeeType == 2)
+	{
+		SetDlgItemTextW(IDC_TeeSecondLabel, TeeType == 1 ? L"Prolaz C" : L"Lijevi ogr.");
+		if (TeeType == 1) { SetDlgItemTextW(IDC_LabelSizeA2, L"Ogr. Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ogr. Hotv"); }
+		else { SetDlgItemTextW(IDC_LabelSizeA, L"Desni ogr."); SetDlgItemTextW(IDC_LabelSizeA2, L"Ulaz Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ulaz Hotv"); }
+	}
+	else
+	{
+		fTeeSecond.ShowWindow(false);
+		if (CWnd* label = GetDlgItem(IDC_TeeSecondLabel)) label->ShowWindow(false);
 	}
 
 	if ((Twye == false) && (Ttrans == false))

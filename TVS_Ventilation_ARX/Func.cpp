@@ -2,6 +2,7 @@
 #include "StdAfx.h"
 #include "Func.h"
 #include "ElbowDirection.h"
+#include "TeeEditDialog.h"
 
 
 
@@ -992,6 +993,7 @@ void func::Change(ads_name &sset)
 	TVS_Pipe * Pipi;
 	TVS_TAP * Tapie;
 	TVS_WYE* Wyeie;
+	tvsTeeEdit::Gather teeGather;
 	TVS_TRANS * Transie;
 
 	double NewSiseA;
@@ -1190,6 +1192,7 @@ void func::Change(ads_name &sset)
 						rprov(vSizeA2, fSizeA2, Wyeie->SizeAotv, SizeA2);
 						rprov(vSizeB2, fSizeB2, Wyeie->SizeBotv, SizeB2);
 						rprov(vLengthW, fLengthW, Wyeie->LengthPl, LengthW);
+						teeGather.add(Wyeie);
 
 						rprov(vD1, fD1, Wyeie->This1D, D1);
 						rprov(vWipe, fWipe, Wyeie->Wipeout, Wipe);
@@ -1226,6 +1229,7 @@ void func::Change(ads_name &sset)
 
 
 	dgAllEdit dg;
+	tvsTeeEdit::prepare(dg, teeGather);
 
 
 
@@ -1454,6 +1458,7 @@ void func::Change(ads_name &sset)
 						if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
 						if (cSizeB2 == false) Wyeie->put_SizeBotv(SizeB2);
 						if (cLengthW == false) Wyeie->put_Length(LengthW);
+						tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
 						if (cD1 == false) Wyeie->put_This1D(D1);
@@ -1511,6 +1516,7 @@ void func::Change(AcDbEntity *pEnt)
 	TVS_Pipe * Pipi;
 	TVS_TAP * Tapie;
 	TVS_WYE* Wyeie;
+	tvsTeeEdit::Gather teeGather;
 	TVS_TRANS * Transie;
 
 	double NewSiseA;
@@ -1693,6 +1699,7 @@ void func::Change(AcDbEntity *pEnt)
 		rprov(vSizeA2, fSizeA2, Wyeie->SizeAotv, SizeA2);
 		rprov(vSizeB2, fSizeB2, Wyeie->SizeBotv, SizeB2);
 		rprov(vLengthW, fLengthW, Wyeie->LengthPl, LengthW);
+		teeGather.add(Wyeie);
 
 		rprov(vD1, fD1, Wyeie->This1D, D1);
 		rprov(vWipe, fWipe, Wyeie->Wipeout, Wipe);
@@ -1727,6 +1734,7 @@ void func::Change(AcDbEntity *pEnt)
 
 
 	dgAllEdit dg;
+	tvsTeeEdit::prepare(dg, teeGather);
 
 
 	strfil(SizeA, vSizeA, sSizeA);
@@ -1941,6 +1949,7 @@ void func::Change(AcDbEntity *pEnt)
 			if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
 			if (cSizeB2 == false) Wyeie->put_SizeBotv(SizeB2);
 			if (cLengthW == false) Wyeie->put_Length(LengthW);
+			tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
 			if (cD1 == false) Wyeie->put_This1D(D1);
