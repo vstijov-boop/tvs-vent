@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2012 by Autodesk, Inc. 
+﻿// (C) Copyright 2002-2012 by Autodesk, Inc. 
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -59,6 +59,7 @@
 #include "FlexCuffCommand.h"
 #include "MLeaderStyleTools.h"
 #include "TeeCommand.h"
+#include "TeeInsert.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -641,6 +642,10 @@ public:
 #pragma region  line intersection
 		if (LineStatus == TVSisPerpendicular || LineStatus == TVSisIntersection)
 		{
+			int teeType = tvsTee::Straight; double teeSecond = 0;
+			if (!pPipe1->ThisRound && !pPipe2->ThisRound && pPipe1->SizeB > 0 && pPipe2->SizeB > 0
+				&& !tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor()))
+				return false;
 
 			AcGePoint3d midp, point1, point2, intersectpoint;
 
@@ -760,7 +765,7 @@ public:
 
 
 
-			tvsTeeCommand::afterConnect(wyeId);   // faza 2: TK-O / TK-G while drawing
+			tvsTeeCommand::applyType(wyeId, teeType, teeSecond);   // faza 2: created directly as TK-O / TK-G
 		} //end if line intersection
 #pragma endregion 
 
@@ -1491,6 +1496,94 @@ public:
 		return true;
 	}
 #endif
+	// T komad faza 2 (TVS_DRAW / TVS_PIPE option Tkomad): TK-O / TK-G placed on the duct being
+	// drawn with a preview (TeeInsert.h); the duct is extended or shortened to the inlet face,
+	// the other outlet gets a short duct, drawing continues from the chosen outlet.
+	static bool teeDuringDrawing(AcGePoint3d &A1, AcGePoint3d &A2, TVS_Pipe *&pipi, ads_point &pt1)
+	{
+		if (!pipi) return false;
+		const AcDbObjectId pipeId = pipi->objectId();
+		tvsTeeInsert::Input in;
+		{
+			AcDbObjectPointer<TVS_Pipe> p(pipeId, AcDb::kForRead);
+			if (p.openStatus() != Acad::eOk) return false;
+			if (p->ThisRound || p->SizeB <= 0) { acutPrintf(L"\nTK-O/TK-G su za pravougaone kanale."); return false; }
+			in.start = p->FirstPoint; in.end = p->LastPoint; in.A = p->SizeA; in.B = p->SizeB;
+		}
+		const double f = tvsUnits::factor();
+		in.l = tvsTeeData::collarMm() / f; in.minimum = 50 / f;
+		const int def = tvsTeeCommand::lastType() == tvsTee::Pants ? tvsTee::Pants : tvsTee::Branch;
+		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)] <%ls>: ", tvsTeeCommand::typeKeyword(def));
+		acedInitGet(0, L"Ogranak Gacasti"); ACHAR kw[32] = L"";
+		const int rc = acedGetKword(prompt, kw);
+		if (rc != RTNORM && rc != RTNONE) return false;
+		in.type = rc == RTNONE ? def : (_wcsicmp(kw, L"Gacasti") == 0 ? tvsTee::Pants : tvsTee::Branch);
+		double w1 = 0, second = 0;
+		const bool pants = in.type == tvsTee::Pants;
+		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina desnog ogranka, mm" : L"\nSirina ogranka, mm", in.A * f, w1)) return false;
+		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina lijevog ogranka, mm" : L"\nSirina izlaza prolaza C, mm", (pants ? w1 / f : in.A) * f, second)) return false;
+		in.w1 = w1 / f; in.second = second / f;
+		if (pants && !tvsTee::pantsFeasible(in.A, in.w1, in.second, in.l)) {
+			acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).", in.A * f);
+			return false;
+		}
+		tvsTeeInsert::Plan plan;
+		for (;;) {
+			tvsTeeInsert::Jig jig(in);
+			if (jig.drag() != AcEdJig::kNormal) return false;
+			if (jig.valid()) { plan = jig.result(); break; }
+			acutPrintf(L"\nT komad se ne moze postaviti na tom mjestu.");
+		}
+		// duct up to the inlet face
+		{
+			AcDbObjectPointer<TVS_Pipe> p(pipeId, AcDb::kForWrite);
+			if (p.openStatus() != Acad::eOk || p->put_Lastpoint(plan.face) != Acad::eOk) { acutPrintf(L"\nKanal nije prilagodjen; T komad nije umetnut."); return false; }
+			p->recordGraphicsModified();
+		}
+		double sApr = plan.SizeApr, sBpr = in.B, sAotv = plan.SizeAotv, sBotv = in.B, len = plan.LengthPl;
+		AcGeVector3d vpr = plan.Vectpr, votv = plan.Vectotv; AcGePoint3d base = plan.Basepoint;
+		TVS_WYE* pWye = TVS_WYE::add_new(sApr, sBpr, sAotv, sBotv, len, vpr, votv, base, false, false, pipi->This1D);
+		if (!pWye) return false;
+		const AcDbObjectId wyeId = pWye->id();
+		SetGlobalProperty(pWye);
+		SetPropertyLikePipe(pipi, pWye);
+		{
+			AcDbObjectPointer<TVS_WYE> w(wyeId, AcDb::kForWrite);
+			if (w.openStatus() == Acad::eOk) {
+				tvsTeeData::Record r; r.type = in.type; r.l = in.l; r.second = pants ? plan.tee.w2 : plan.tee.C;
+				r.radius2 = pants ? tvsTee::defaultRadius(r.second) : 0;
+				if (tvsTeeData::write(w.object(), r) == Acad::eOk) w->recordGraphicsModified();
+			}
+		}
+		tvsTeeCommand::lastType() = in.type;
+		// continuation
+		acedInitGet(0, pants ? L"Desni Lijevi" : L"Prolaz Ogranak"); ACHAR nk[32] = L"";
+		const int nrc = acedGetKword(pants ? L"\nNastavak crtanja [Desni/Lijevi] <Desni>: " : L"\nNastavak crtanja [Prolaz/Ogranak] <Prolaz>: ", nk);
+		int cont = 0;
+		if (nrc == RTNORM && (_wcsicmp(nk, L"Lijevi") == 0 || _wcsicmp(nk, L"Ogranak") == 0)) cont = 1;
+		TVS_Pipe pipie;
+		const int other = 1 - cont;
+		{	// short duct on the other outlet, to be continued later
+			AcGePoint3d s0 = plan.port[other], s1 = s0 + plan.portDir[other] * (300 / f);
+			double wa = plan.portWidth[other], wb = in.B;
+			TVS_Pipe* stub = pipie.add_new(s0, s1, wa, wb, false, false);
+			if (stub) { const AcDbObjectId sid = stub->id(); SetPropertyLikePipe(pipi, stub);
+				AcDbObjectPointer<TVS_Pipe> s(sid, AcDb::kForWrite); if (s.openStatus() == Acad::eOk) s->put_SizeA(plan.portWidth[other]); }
+		}
+		AcGePoint3d c0 = plan.port[cont], c1 = c0 + plan.portDir[cont] * (100 / f);
+		double ca = plan.portWidth[cont], cb = in.B;
+		TVS_Pipe* next = pipie.add_new(c0, c1, ca, cb, false, false);
+		if (!next) return true;
+		const AcDbObjectId nid = next->id();
+		SetPropertyLikePipe(pipi, next);
+		{ AcDbObjectPointer<TVS_Pipe> s(nid, AcDb::kForWrite); if (s.openStatus() == Acad::eOk) s->put_SizeA(ca); }
+		globSizeA = ca;   // drawing goes on with the outlet width
+		pipi = next; A1 = c0; A2 = c1;
+		pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
+		acutPrintf(L"\n%ls umetnut; crtanje se nastavlja iz %ls.", pants ? L"Gacasti T komad TK-G" : L"T komad sa ogrankom TK-O",
+			pants ? (cont ? L"lijevog ogranka" : L"desnog ogranka") : (cont ? L"ogranka" : L"prolaza"));
+		return true;
+	}
 	static void addtrans(double &pSizeAp1,
 		double &pSizeBp1,
 		double &pSizeAp2,
@@ -1752,8 +1845,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N Obilazak O"));
-			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje/Obilazak]: "), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Tkomad T Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Tkomad/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1795,6 +1888,10 @@ public:
 				reg = dCONNECTW;
 				connect2(pipi, reg);
 				return false;
+			}
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Tkomad")) == 0 || _wcsicmp(resultss, _T("T")) == 0))
+			{
+				teeDuringDrawing(A1, A2, pipi, pt1);   // faza 2: TK-O / TK-G in the duct being drawn
 			}
 
 #ifdef TVS_BYPASS_PREVIEW
@@ -1995,8 +2092,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Z Gore G Nadolje N Obilazak O"));
-			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Z/Gore/Nadolje/Obilazak]: "), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Tkomad T Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Tkomad/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -2038,6 +2135,10 @@ public:
 				reg = dCONNECTW;
 				connect2(pipi, reg);
 				return;
+			}
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Tkomad")) == 0 || _wcsicmp(resultss, _T("T")) == 0))
+			{
+				teeDuringDrawing(A1, A2, pipi, pt1);   // faza 2: TK-O / TK-G in the duct being drawn
 			}
 
 #ifdef TVS_BYPASS_PREVIEW

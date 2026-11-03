@@ -78,10 +78,40 @@ inline void setType(){
     AcDbObjectId id;if(acdbGetObjectId(id,name)!=Acad::eOk)return;
     chooseType(id);
 }
-// Faza 2: a T komad just made by Racva (TVS_DRAW) or TVS_CONNECTW. Rectangular only.
-inline void afterConnect(const AcDbObjectId& id){
-    if(id.isNull())return;
-    {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk||w->ThisRoundpr||w->ThisRoundotv)return;}
-    chooseType(id);
+// Faza 2, Racva (TVS_DRAW) and TVS_CONNECTW: the type is asked before the T-komad is made, so
+// it is created directly as TK-O / TK-G. main = width of the run duct (TVS SizeApr), branch =
+// width of the branch duct (TVS SizeAotv), drawing units. false = cancel.
+inline bool askType(int& type,double& second,double main,double branch,double f){
+    for(;;){
+        const int def=lastType();
+        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Ravni] <%ls>: ",typeKeyword(def));
+        acedInitGet(0,L"Ogranak Gacasti Ravni");ACHAR kw[32]=L"";
+        const int rc=acedGetKword(prompt,kw);
+        if(rc==RTNONE)wcscpy_s(kw,typeKeyword(def));else if(rc!=RTNORM)return false;
+        type=_wcsicmp(kw,L"Ogranak")==0?tvsTee::Branch:_wcsicmp(kw,L"Gacasti")==0?tvsTee::Pants:tvsTee::Straight;
+        second=0;if(type==tvsTee::Straight){lastType()=type;return true;}
+        double mm=0;
+        if(!askWidth(type==tvsTee::Pants?L"\nSirina lijevog ogranka, mm":L"\nSirina izlaza prolaza C, mm",main*f,mm))return false;
+        second=mm/f;
+        if(type==tvsTee::Pants&&!tvsTee::pantsFeasible(branch,main,second,tvsTeeData::collarMm()/f)){
+            acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).",branch*f);continue;}
+        return true;
+    }
+}
+// Applies a type chosen by askType to the T-komad just made; connected ducts follow (faza 3).
+inline void applyType(const AcDbObjectId& id,int type,double second){
+    if(id.isNull()||type==tvsTee::Straight)return;
+    AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk||w->ThisRoundpr||w->ThisRoundotv)return;
+    const double f=tvsUnits::factor(w.object());
+    const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
+    tvsTeeData::Record r;r.type=type;r.l=tvsTeeData::collarMm()/f;r.second=second;
+    const bool pants=type==tvsTee::Pants;r.radius2=pants?tvsTee::defaultRadius(second):0;
+    const double w1=pants?w->SizeApr:w->SizeAotv;
+    w->LengthPl=pants?tvsTee::pantsLengthPl(r.l,w1,second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
+    if(tvsTeeData::write(w.object(),r)!=Acad::eOk)return;
+    w->recordGraphicsModified();lastType()=type;
+    tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
+    acedInitGet(0,L"oKreni");ACHAR k2[32]=L"";
+    if(acedGetKword(L"\n[oKreni] <Gotovo>: ",k2)==RTNORM){flip(w.object());acutPrintf(L"\nT komad je okrenut.");}
 }
 }
