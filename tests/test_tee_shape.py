@@ -10,27 +10,31 @@ using namespace tvsTee;
 static bool near(double a,double b,double e=1e-9){return std::fabs(a-b)<=e;}
 static P at(const Arc& c,double ang){return P(c.c.x+c.r*std::cos(ang),c.c.y+c.r*std::sin(ang));}
 int main(int argc,char**){
- // Block defaults: A = C = w = 100, R = 1.75 w = 175, collars 25, flange 25.
+ // Defaults: A = C = w = 100, outer R = 1.5 w = 150 (centre line R = w), collars 25, flange 25.
  Tee o;o.type=Branch;o.A=100;o.C=100;o.w1=100;o.R1=defaultRadius(100);o.l=25;o.flange=25;
  Shape s;assert(shape(o,s));
- assert(near(runLength(o),300)&&near(lengthPl(25,175,100),100));        // as in the block (L = 300)
+ assert(near(defaultRadius(100)-50,100)&&near(runLength(o),250)&&near(lengthPl(25,150,100),75));
  const Arc& in=s.arcs[0];const Arc& outA=s.arcs[1];
- assert(near(in.c.x,125)&&near(in.c.y,25)&&near(in.r,75)&&near(outA.r,175));   // centre (125,25), Ri 75
- P p=at(in,in.a0);assert(near(p.x,125)&&near(p.y,100));p=at(in,in.a1);assert(near(p.x,50)&&near(p.y,25));
- p=at(outA,outA.a0);assert(near(p.x,125)&&near(p.y,200));p=at(outA,outA.a1);assert(near(p.x,-50,1e-6));  // reaches the far wall
+ assert(near(in.c.x,100)&&near(in.c.y,25)&&near(in.r,50)&&near(outA.r,150));   // centre (100,25), Ri 50
+ P p=at(in,in.a0);assert(near(p.x,100)&&near(p.y,75));p=at(in,in.a1);assert(near(p.x,50)&&near(p.y,25));
+ const double qy=25+std::sqrt(150.0*150-50*50);
+ p=at(outA,outA.a0);assert(near(p.x,100)&&near(p.y,175));p=at(outA,outA.a1);assert(near(p.x,50,1e-6)&&near(p.y,qy,1e-6));  // stops at the near run wall
+ // Near run wall is open between the inner arc and the outer arc; no line crosses the opening.
+ bool wall=false;for(const Seg& g:s.lines){if(near(g.a.x,50)&&near(g.b.x,50)){if(std::max(g.a.y,g.b.y)>25+1e-9)assert(!(std::min(g.a.y,g.b.y)<qy-1e-6));if(near(g.a.y,qy,1e-6)&&near(g.b.y,225))wall=true;}}assert(wall);
  // Ports equal the TVS_WYE model: run half = LengthPl + w/2 around the branch centre line,
  // branch face at A/2 + LengthPl. Branch centre line y = l + Ri + w/2 = L/2.
  const double Lp=lengthPl(o.l,o.R1,o.w1);assert(near(o.l+(o.R1-o.w1)+o.w1/2,runLength(o)/2));
- bool face=false;for(const Seg& g:s.lines)if(near(g.a.x,o.A/2+Lp)&&near(g.b.x,o.A/2+Lp)&&near(g.a.y,100-25)&&near(g.b.y,200+25))face=true;assert(face);
+ bool face=false;for(const Seg& g:s.lines)if(near(g.a.x,o.A/2+Lp)&&near(g.b.x,o.A/2+Lp)&&near(g.a.y,75-25)&&near(g.b.y,175+25))face=true;assert(face);
  // TK-G: both branches, outer arcs meet on the axis.
- Tee g=o;g.type=Pants;g.w2=100;g.R2=175;Shape t;assert(shape(g,t));assert(t.arcs.size()==4);
+ Tee g=o;g.type=Pants;g.w2=100;g.R2=150;Shape t;assert(shape(g,t));assert(t.arcs.size()==4);
  p=at(t.arcs[1],t.arcs[1].a1);assert(near(p.x,0,1e-9));p=at(t.arcs[3],t.arcs[3].a0);assert(near(p.x,0,1e-9));
- // Different widths and a narrow branch (outer arc cannot reach the far wall: stops at 180 deg).
- Tee n=o;n.w1=60;n.R1=defaultRadius(60);Shape u;assert(shape(n,u));p=at(u.arcs[1],u.arcs[1].a1);assert(p.x>-50&&near(u.arcs[1].a1,pi()));
+ // Narrow branch and a tapered run (C < A): the outer arc still ends on the near wall.
+ Tee n=o;n.w1=60;n.R1=defaultRadius(60);n.C=80;Shape u;assert(shape(n,u));p=at(u.arcs[1],u.arcs[1].a1);
+ {const double L=runLength(n),tt=(p.y-25)/(L-50);assert(tt>0&&tt<1&&near(p.x,50+tt*(40-50),1e-6));}
  // Area: branch quarter elbow + collar, run by mean perimeter minus opening.
- const double b=200,bb=200;const double ref=(2*(100+200)*300-100*200+2*(100+200)*(175-50)*pi()/2+2*(100+200)*25)/1e6;
+ const double b=200,bb=200;const double ref=(2*(100+200)*250-100*200+2*(100+200)*(150-50)*pi()/2+2*(100+200)*25)/1e6;
  assert(near(area(o,b,bb),ref,1e-12));
- const double pants=(2*(100+200)*25+2*(2*(100+200)*(175-50)*pi()/2+2*(100+200)*25))/1e6;assert(near(area(g,b,bb),pants,1e-12));
+ const double pants=(2*(100+200)*25+2*(2*(100+200)*(150-50)*pi()/2+2*(100+200)*25))/1e6;assert(near(area(g,b,bb),pants,1e-12));
  // Invalid input draws nothing.
  Shape z;Tee bad=o;bad.R1=90;assert(!shape(bad,z));bad=o;bad.type=Straight;assert(!shape(bad,z));
  if(argc>1){

@@ -1,7 +1,7 @@
 #pragma once
 // TVS_TK_TIP (faza 1): turns an existing TVS T-komad into TK-O "sa ogrankom" or TK-G
-// "gacasti" (or back to the plain T). Defaults as in the dynamic block "T komad": outer
-// radius 1.75 x branch width, collars 25 mm. LengthPl becomes l + R - w so the TVS ports
+// "gacasti" (or back to the plain T). Defaults: centre-line radius = branch width (outer
+// 1.5 w), collars 25 mm as in the dynamic block "T komad". LengthPl becomes l + R - w so the TVS ports
 // match the drawn fitting; neighbouring ducts are not moved (faza 2/3: insertion/editing).
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"

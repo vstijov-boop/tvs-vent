@@ -248,8 +248,7 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 					const double s0 = ang(c.a0), s1 = ang(c.a1);
 					setMainProperty(new AcDbArc(world(c.c), AcGeVector3d(0, 0, 1), c.r, ccw ? s0 : s1, ccw ? s1 : s0));
 				}
-				for (size_t j = 0; j < shape.axis.size(); ++j)
-					setCenterProperty(new AcDbLine(world(shape.axis[j].a), world(shape.axis[j].b)));
+				// no centre lines on TK-O / TK-G (as in the block)
 				for each (AcDbEntity * var in ListOfEntity) mode->geometry().draw(var);
 				return Adesk::kTrue;
 			}
