@@ -88,19 +88,18 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 		AcDbObjectPointer<AcDbMLeader>pEnt1(pEnt->id(), AcDb::kForWrite);
 		if (pEnt1.openStatus() == Acad::eOk)
 		{
-			// The MText was placed with its top-left corner at ptEnd, but the leader attaches to
-			// the style's connection point (e.g. underline of the first line). Move the text so
-			// that connection point lands on ptEnd, as AutoCAD does after a manual move. The
-			// connection on the side facing the leader is the one nearer the leader's start.
-			AcGePoint3d c1, c2, location;
-			if (pEnt1->connectionPoint(AcGeVector3d(1, 0, 0), c1) == Acad::eOk
-				&& pEnt1->connectionPoint(AcGeVector3d(-1, 0, 0), c2) == Acad::eOk
-				&& pEnt1->getTextLocation(location) == Acad::eOk) {
-				const bool textRight = ptEnd.x >= ptStart.x;
-				const AcGePoint3d c = textRight ? (c1.x <= c2.x ? c1 : c2) : (c1.x >= c2.x ? c1 : c2);
-				pEnt1->setTextLocation(location + (ptEnd - c));
+			// The MText sits with its top-left corner at ptEnd, while the style attaches the
+			// leader elsewhere (e.g. underline of the first line). First let AutoCAD re-attach
+			// the leader end to the content (tiny move of content + dogleg, as a manual text
+			// move does), read where it attached, then move content and leader end together
+			// so the attachment lands on the picked point ptEnd. The arrow stays on the duct.
+			// a tiny real move (a zero vector could be ignored); the second move corrects it
+			pEnt1->moveMLeader(AcGeVector3d(1e-4, 0, 0), AcDbMLeader::kMoveContentAndDoglegPoints);
+			AcGePoint3d attached;
+			if (pEnt1->getLastVertex(i, attached) == Acad::eOk) {
+				const AcGeVector3d shift = ptEnd - attached;
+				if (shift.length() > 1e-9) pEnt1->moveMLeader(shift, AcDbMLeader::kMoveContentAndDoglegPoints);
 			}
-			pEnt1->setLastVertex(i, ptEnd);
 			//pEnt1->mtext()->setColorIndex(-1);
 		}
 
