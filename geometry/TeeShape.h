@@ -44,8 +44,9 @@ inline void branchAt(Shape& out,double a,double l,double d,double w,double R,dou
     out.axis.push_back(Seg(P(0,y0+w/2),P(x1,y0+w/2)));
 }
 // TK-G: both branch centre lines on one axis Y = l + max(Rc1, Rc2) (Rc = R - w/2); the
-// branch with the smaller Rc starts after a straight inlet wall d. Faces at x = +-(a + Y - w1/2)
-// (TVS run ends), so the collar of each branch is X - a - Ri (l_b / l_c1 in the block).
+// branch with the smaller Rc starts after a straight inlet wall d. Collars are fixed (l) on
+// both branches, so each face is at x = +-(a + Ri + l); X = a + Y - w1/2 is the TVS run end
+// (a narrower branch ends short of it; the neighbour duct is adjusted later, faza 3).
 struct PantsFrame {double Y,X,d1,d2;};
 inline PantsFrame pantsFrame(const Tee& t){
     PantsFrame p;const double a=t.A/2,rc1=t.R1-t.w1/2,rc2=t.R2-t.w2/2;
@@ -79,7 +80,6 @@ inline bool shape(const Tee& t,Shape& out){
     }else{
         const PantsFrame pf=pantsFrame(t);
         const double ri1=t.R1-t.w1,ri2=t.R2-t.w2;
-        if(!(pf.X>a+ri1+1e-9)||!(pf.X>a+ri2+1e-9))return false;
         // Cusp = upper intersection of the two outer circles; it must lie on both quarter arcs,
         // otherwise the branches are too narrow for the inlet (not used in practice).
         const P c1(a+ri1,l+pf.d1),c2(-(a+ri2),l+pf.d2);
@@ -94,8 +94,8 @@ inline bool shape(const Tee& t,Shape& out){
         }
         if(!cusp)return false;   // branches too narrow for the inlet: not a real TK-G
         out.axis.push_back(Seg(P(0,0),P(0,pf.Y)));
-        branchAt(out,a,l,pf.d1,t.w1,t.R1,pf.X,f,+1,e1);
-        branchAt(out,a,l,pf.d2,t.w2,t.R2,pf.X,f,-1,e2);
+        branchAt(out,a,l,pf.d1,t.w1,t.R1,a+ri1+l,f,+1,e1);
+        branchAt(out,a,l,pf.d2,t.w2,t.R2,a+ri2+l,f,-1,e2);
     }
     return true;
 }
@@ -109,8 +109,8 @@ inline double area(const Tee& t,double b,double bb){
     double s=0;
     if(t.type==Branch){const double L=runLength(t);
         s=(perimeter(t.A,b)+perimeter(t.C,b))/2*L-t.w1*bb+arm(t.w1,t.R1,bb,t.l);}
-    else{const PantsFrame p=pantsFrame(t);const double a=t.A/2;
-        s=perimeter(t.A,b)*t.l+arm(t.w1,t.R1,bb,p.X-a-(t.R1-t.w1))+arm(t.w2,t.R2,bb,p.X-a-(t.R2-t.w2))
+    else{const PantsFrame p=pantsFrame(t);
+        s=perimeter(t.A,b)*t.l+arm(t.w1,t.R1,bb,t.l)+arm(t.w2,t.R2,bb,t.l)
          +perimeter(t.w1,bb)*p.d1+perimeter(t.w2,bb)*p.d2;}
     return s/1e6;
 }
