@@ -1166,7 +1166,14 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 	}
 	else {
 		tee.A = SizeAotv; tee.w1 = SizeApr; tee.w2 = r.second > 0 ? r.second : SizeApr;
-		tee.R1 = LengthPl - r.l + tee.w1; tee.R2 = r.radius2 > tee.w2 ? r.radius2 : tvsTee::defaultRadius(tee.w2);
+		// Branch axes on one line Y = LengthPl + w1/2 from the inlet face: the branch with the
+		// larger default centre-line radius follows L, the other keeps its own (Rc = w).
+		const double avail = LengthPl + tee.w1 / 2 - r.l;
+		const double rc1d = tvsTee::defaultRadius(tee.w1) - tee.w1 / 2;
+		const double rc2d = (r.radius2 > tee.w2 ? r.radius2 : tvsTee::defaultRadius(tee.w2)) - tee.w2 / 2;
+		double rc1 = rc1d < avail ? rc1d : avail, rc2 = rc2d < avail ? rc2d : avail;
+		if ((rc1 > rc2 ? rc1 : rc2) < avail) { if (rc1d >= rc2d) rc1 = avail; else rc2 = avail; }
+		tee.R1 = rc1 + tee.w1 / 2; tee.R2 = rc2 + tee.w2 / 2;
 		origin = Basepoint + v * (SizeApr / 2 + LengthPl); ey = -v; ex = u;
 	}
 	origin.z = Basepoint.z;

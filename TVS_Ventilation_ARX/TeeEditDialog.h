@@ -33,11 +33,13 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
         if(end!=(LPCTSTR)dg.TeeSecond&&end&&*end==0&&v>0){
             r.second=v;if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);changed=true;}
     }
-    const bool branchWidth=r.type==tvsTee::Branch?widthA2Changed:widthAChanged;
+    // TK-G: both branch widths set L (axes on one line); TK-O: the branch width.
+    const bool branchWidth=r.type==tvsTee::Branch?widthA2Changed:(widthAChanged||changed);
     if(changed){w->assertWriteEnabled();if(tvsTeeData::write(w,r)!=Acad::eOk)return;}
     if(branchWidth&&!lengthChanged){
         const double w1=r.type==tvsTee::Branch?w->SizeAotv:w->SizeApr;
-        w->put_Length(tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1));
+        const double w2=r.second>0?r.second:w->SizeApr;
+        w->put_Length(r.type==tvsTee::Branch?tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1):tvsTee::pantsLengthPl(r.l,w1,w2));
     }
     if(changed||branchWidth)w->recordGraphicsModified();
 }
