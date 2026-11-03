@@ -59,12 +59,15 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 		const MLeaderSettings& m = Settings::get()->mLeader;
 		AcDbObjectId styleId = tvsMLeaderStyle::ensure(db, m.style, m.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : m.styleSource);
 		if (styleId.isNull() && db) styleId = db->mleaderstyle();
+		const double scale = m.scale > 0 ? m.scale / tvsUnits::factor(db) : 1;
 		if (!styleId.isNull()) {
 			pEnt->setMLeaderStyle(styleId);
 			AcDbObjectPointer<AcDbMLeaderStyle> style(styleId, AcDb::kForRead);
-			if (style.openStatus() == Acad::eOk) { mText->setTextStyle(style->textStyleId()); mText->setTextHeight(style->textHeight()); }
+			// MText content keeps an absolute height; AutoCAD shows it as Height = absolute /
+			// Overall scale. So the absolute height is style height x scale (Height 2.5,
+			// Overall scale 50 -> 125), consistent with a plain AutoCAD multileader.
+			if (style.openStatus() == Acad::eOk) { mText->setTextStyle(style->textStyleId()); mText->setTextHeight(style->textHeight() * scale); }
 		}
-		const double scale = m.scale > 0 ? m.scale / tvsUnits::factor(db) : 1;
 		pEnt->setScale(scale);
 	}
 

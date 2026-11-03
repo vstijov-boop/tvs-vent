@@ -16,6 +16,8 @@ class MLeaderSettings(unittest.TestCase):
   l=text('TVS_Ventilation_ARX/TVSLeadCommand.cpp')
   self.assertIn('pEnt->setMLeaderStyle(styleId);',l)
   self.assertIn('const double scale = m.scale > 0 ? m.scale / tvsUnits::factor(db) : 1;',l,'paper mm x scale / units')
+  self.assertIn('mText->setTextHeight(style->textHeight() * scale);',l,'absolute MText height = style height x overall scale')
+  self.assertLess(l.index('const double scale ='),l.index('mText->setTextHeight(style->textHeight() * scale);'))
   self.assertLess(l.index('pEnt->setMLeaderStyle(styleId);'),l.index('pEnt->addLeader(i);'))
   d=text('TVS_Ventilation_ARX/dgMLeadProperty.cpp')
   self.assertIn('tvsMLeaderStyle::import(',d);self.assertIn('m.save();',d)
