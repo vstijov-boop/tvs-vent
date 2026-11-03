@@ -29,17 +29,14 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 {
 
 	AcDbMText *mText = new AcDbMText();
-	AcGeVector3d vec;
-	if (ptStart.x < ptEnd.x)
-	{
-		vec = AcGeVector3d(0, 1, 0);
-	}
-	else
-	{
-		vec = AcGeVector3d(0, -1, 0);
-	}
+	// Side of the text: to the left of the landing point when it was picked left of the
+	// duct point, otherwise to the right (also for a vertical leader). AutoCAD takes the
+	// side from the dogleg direction of each label; the style cannot decide it.
+	const bool textLeft = ptEnd.x < ptStart.x;
+	const AcGeVector3d side = textLeft ? AcGeVector3d(-1, 0, 0) : AcGeVector3d(1, 0, 0);
 
 	mText->setLocation(ptEnd);
+	mText->setAttachment(textLeft ? AcDbMText::kTopRight : AcDbMText::kTopLeft);
 
 	mText->setColorIndex(AcDb::kByLayer);
 	mText->setContents(message.GetString());
@@ -74,11 +71,10 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 	int i;
 	pEnt->setContentType(AcDbMLeaderStyle::kMTextContent);
 	pEnt->addLeader(i);
+	const int leader = i; // cluster index (i becomes the leader line index below)
 	pEnt->addLeaderLine(ptStart, i);
 	pEnt->addLastVertex(i, ptEnd);
-	//pEnt->setEnableDogleg(false);
-	//pEnt->setDoglegLength(10);
-	//pEnt->setDoglegDirection(i,vec);
+	pEnt->setDoglegDirection(leader, side);
 
 	pEnt->setMText(mText);
 
