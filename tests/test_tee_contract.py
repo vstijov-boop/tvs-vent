@@ -31,6 +31,8 @@ class TeeContract(unittest.TestCase):
   self.assertIn('ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);',w,'TK-G left face with fixed collar')
   m=text('TVS_Ventilation_ARX/TVSMoveCommand.h');self.assertIn('if(p->teePorts(teePort,teeWidth))',m)
   n=text('TVS_Ventilation_ARX/TeeNeighbours.h');self.assertIn('es=ends[0].first?p->put_FirstPoint(to):p->put_Lastpoint(to);',n);self.assertIn('es=p->put_SizeA(after.w[k]);',n)
+  self.assertIn('TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,start,false,false,1,oneD);',n,'other end: transition after a width step')
+  self.assertIn('const Acad::ErrorStatus es=port==0?t->put_SizeAp1(width):t->put_SizeAp2(width);',n,'existing transition takes the new width')
   self.assertEqual(t.count('tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));'),2)
   self.assertIn('tvsTeeFit::fit(w,old->second,tvsTeeFit::ports(w));',a)
   self.assertIn('Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))

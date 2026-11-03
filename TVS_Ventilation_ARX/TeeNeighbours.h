@@ -2,10 +2,14 @@
 // T komad faza 3: after TVS_TK_TIP or the Svojstva dialog changed a TK-O / TK-G, the TVS duct
 // (TVS_Pipe) connected to each port follows it: its end moves to the drawn face (TK-G narrower
 // branch with a fixed collar) and its width becomes the port width (TK-O prolaz C, TK-G left
-// branch, back to Dpr for a plain T). Other neighbours (elbow, transition) are only reported.
+// branch, back to Dpr for a plain T). At the duct's other end a width step to the next element
+// gets a TVS transition (or an existing transition there takes the new width). Neighbours
+// other than a duct directly on the T komad port are only reported.
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
+#include "../TVS_Ventilation_DBX/TVS_TRANS.h"
+#include "TVSMoveCommand.h"
 #include "dbsymtb.h"
 #include "dbobjptr.h"
 #include <cmath>
@@ -41,6 +45,60 @@ inline std::vector<End> ductsAt(const TVS_WYE* w,const AcGePoint3d& at,double to
     }
     delete it;return out;
 }
+// Other end of a duct whose width changed: the element there (any TVS port within tol)
+// still has the old width. A transition there takes the new width on that side; otherwise a
+// centred transition of transitionMm is inserted by shortening the duct.
+inline double transitionMm(){return 300;}
+inline void farEnd(const AcDbObjectId& teeId,const AcDbObjectId& ductId,bool nearIsFirst,double tol,double f){
+    AcGePoint3d E,N;double width=0,height=0,elev=0;bool oneD=false;
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return;
+     E=nearIsFirst?d->LastPoint:d->FirstPoint;N=nearIsFirst?d->FirstPoint:d->LastPoint;
+     width=d->SizeA;height=d->SizeB;elev=d->Elev;oneD=d->This1D;}
+    AcDbObjectId found;int count=0,port=-1;double otherWidth=0,otherHeight=0;bool trans=false,round=false;
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return;
+     AcDbObjectPointer<AcDbBlockTableRecord> space(d->ownerId(),AcDb::kForRead);d.close();if(space.openStatus()!=Acad::eOk)return;
+     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
+     for(;!it->done();it->step()){
+        AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk||id==ductId||id==teeId)continue;
+        AcDbEntity* e=NULL;if(acdbOpenAcDbEntity(e,id,AcDb::kForRead)!=Acad::eOk)continue;
+        tvsMove::Node n;
+        if(tvsMove::describe(e,n))for(size_t j=0;j<n.ports.size()&&j<n.sections.size();++j)
+            if(planDistance(tvsMove::acad(n.ports[j]),E)<=tol){
+                ++count;found=id;port=static_cast<int>(j);otherWidth=n.sections[j].a;otherHeight=n.sections[j].b;
+                round=n.sections[j].round;trans=TVS_TRANS::cast(e)!=NULL;break;}
+        e->close();
+     }
+     delete it;}
+    if(count==0||std::fabs(otherWidth-width)<=1e-9)return;               // free end or same width
+    if(count>1||round){acutPrintf(L"
+Drugi kraj kanala: vise elemenata ili okrugli prikljucak; prilagodite rucno.");return;}
+    if(trans){
+        AcDbObjectPointer<TVS_TRANS> t(found,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)return;
+        const Acad::ErrorStatus es=port==0?t->put_SizeAp1(width):t->put_SizeAp2(width);
+        if(es==Acad::eOk){t->recordGraphicsModified();acutPrintf(L"
+Drugi kraj kanala: postojeci prelaz preuzima sirinu %.0f mm.",width*f);}
+        return;
+    }
+    AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length();const double lt=transitionMm()/f;
+    if(length<lt+50.0/f){acutPrintf(L"
+Drugi kraj kanala: kanal je prekratak za prelaz %.0f mm; prilagodite rucno.",transitionMm());return;}
+    dir.normalize();AcGePoint3d start=E-dir*lt;start.z=E.z;
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
+     const Acad::ErrorStatus es=nearIsFirst?d->put_Lastpoint(start):d->put_FirstPoint(start);
+     if(es!=Acad::eOk){acutPrintf(L"
+Drugi kraj kanala: kanal nije skracen (%ls).",acadErrorStatusText(es));return;}
+     d->recordGraphicsModified();}
+    double a1=width,b1=height,a2=otherWidth,b2=otherHeight>0?otherHeight:height,len=lt;AcGeVector3d v=dir*lt;
+    TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,start,false,false,1,oneD);
+    if(t&&!t->objectId().isNull()){
+        AcDbObjectPointer<TVS_TRANS> o(t->objectId(),AcDb::kForWrite);
+        if(o.openStatus()==Acad::eOk){
+            AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()==Acad::eOk)o->setPropertiesFrom(d.object());
+            o->put_Elevation(elev);o->recordGraphicsModified();}
+        acutPrintf(L"
+Drugi kraj kanala: umetnut prelaz %.0f -> %.0f mm, duzine %.0f mm.",width*f,otherWidth*f,transitionMm());
+    }
+}
 // `before` = ports before the change, `after` = ports of the changed T komad (open for write).
 inline void fit(TVS_WYE* w,const Ports& before,const Ports& after){
     if(!w||!before.ok||!after.ok)return;
@@ -63,7 +121,8 @@ inline void fit(TVS_WYE* w,const Ports& before,const Ports& after){
         if(es==Acad::eOk&&resize)es=p->put_SizeA(after.w[k]);
         if(es!=Acad::eOk){acutPrintf(L"\nT komad, %ls: kanal nije prilagodjen (%ls).",names[k],acadErrorStatusText(es));continue;}
         p->recordGraphicsModified();++moved;
-        if(resize)acutPrintf(L"\nT komad, %ls: kanal je sada sirine %.0f mm; provjerite njegov drugi kraj.",names[k],after.w[k]*f);
+        if(resize){acutPrintf(L"\nT komad, %ls: kanal je sada sirine %.0f mm.",names[k],after.w[k]*f);
+            p.close();farEnd(w->objectId(),ends[0].id,ends[0].first,tol,f);}
     }
     if(moved)acutPrintf(L"\nPrilagodjeno kanala uz T komad: %d.",moved);
 }
