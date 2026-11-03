@@ -88,6 +88,18 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 		AcDbObjectPointer<AcDbMLeader>pEnt1(pEnt->id(), AcDb::kForWrite);
 		if (pEnt1.openStatus() == Acad::eOk)
 		{
+			// The MText was placed with its top-left corner at ptEnd, but the leader attaches to
+			// the style's connection point (e.g. underline of the first line). Move the text so
+			// that connection point lands on ptEnd, as AutoCAD does after a manual move. The
+			// connection on the side facing the leader is the one nearer the leader's start.
+			AcGePoint3d c1, c2, location;
+			if (pEnt1->connectionPoint(AcGeVector3d(1, 0, 0), c1) == Acad::eOk
+				&& pEnt1->connectionPoint(AcGeVector3d(-1, 0, 0), c2) == Acad::eOk
+				&& pEnt1->getTextLocation(location) == Acad::eOk) {
+				const bool textRight = ptEnd.x >= ptStart.x;
+				const AcGePoint3d c = textRight ? (c1.x <= c2.x ? c1 : c2) : (c1.x >= c2.x ? c1 : c2);
+				pEnt1->setTextLocation(location + (ptEnd - c));
+			}
 			pEnt1->setLastVertex(i, ptEnd);
 			//pEnt1->mtext()->setColorIndex(-1);
 		}

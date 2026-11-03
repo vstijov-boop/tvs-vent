@@ -19,6 +19,8 @@ class MLeaderSettings(unittest.TestCase):
   self.assertIn('mText->setTextHeight(style->textHeight() * scale);',l,'absolute MText height = style height x overall scale')
   self.assertLess(l.index('const double scale ='),l.index('mText->setTextHeight(style->textHeight() * scale);'))
   self.assertLess(l.index('pEnt->setMLeaderStyle(styleId);'),l.index('pEnt->addLeader(i);'))
+  self.assertIn('pEnt1->setTextLocation(location + (ptEnd - c));',l,'text moved so its connection point is the picked landing point')
+  self.assertLess(l.index('pEnt1->setTextLocation('),l.index('pEnt1->setLastVertex(i, ptEnd);'))
   d=text('TVS_Ventilation_ARX/dgMLeadProperty.cpp')
   self.assertIn('tvsMLeaderStyle::import(',d);self.assertIn('m.save();',d)
   r=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc')
