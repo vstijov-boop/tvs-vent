@@ -41,6 +41,8 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
         const double w2=r.second>0?r.second:w->SizeApr;
         w->put_Length(r.type==tvsTee::Branch?tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1):tvsTee::pantsLengthPl(r.l,w1,w2));
     }
+    if(r.type==tvsTee::Pants&&!tvsTee::pantsFeasible(w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,r.l))
+        acutPrintf(L"\nGacasti T komad: ogranci su preuski za ulaz (potrebno priblizno lijevi + desni >= ulaz); prikazan je kao obican T-komad.");
     if(changed||branchWidth)w->recordGraphicsModified();
 }
 }

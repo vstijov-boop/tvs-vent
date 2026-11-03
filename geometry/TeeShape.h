@@ -52,6 +52,12 @@ inline PantsFrame pantsFrame(const Tee& t){
     p.Y=t.l+(rc1>rc2?rc1:rc2);p.d1=p.Y-t.l-rc1;p.d2=p.Y-t.l-rc2;p.X=a+p.Y-t.w1/2;return p;
 }
 inline double pantsLengthPl(double l,double w1,double w2){return l+(w1>w2?w1:w2)-w1/2;} // defaults Rc = w
+inline bool shape(const Tee& t,Shape& out);
+// TK-G with default radii (Rc = w) is drawable: the outer arcs meet (about w1 + w2 >= A).
+inline bool pantsFeasible(double A,double w1,double w2,double l){
+    Tee t;t.type=Pants;t.A=A;t.w1=w1;t.w2=w2;t.R1=defaultRadius(w1);t.R2=defaultRadius(w2);t.l=l;
+    Shape s;return shape(t,s);
+}
 inline bool shape(const Tee& t,Shape& out){
     out=Shape();if(!valid(t))return false;
     const double a=t.A/2,l=t.l,f=t.flange;
@@ -74,9 +80,8 @@ inline bool shape(const Tee& t,Shape& out){
         const PantsFrame pf=pantsFrame(t);
         const double ri1=t.R1-t.w1,ri2=t.R2-t.w2;
         if(!(pf.X>a+ri1+1e-9)||!(pf.X>a+ri2+1e-9))return false;
-        // Cusp = upper intersection of the two outer circles, if it lies on both quarter arcs;
-        // otherwise (branches much narrower than the inlet) both arcs run to 180 deg, then
-        // straight down to the inlet face, which closes the outline.
+        // Cusp = upper intersection of the two outer circles; it must lie on both quarter arcs,
+        // otherwise the branches are too narrow for the inlet (not used in practice).
         const P c1(a+ri1,l+pf.d1),c2(-(a+ri2),l+pf.d2);
         const double ddx=c2.x-c1.x,ddy=c2.y-c1.y,D=std::sqrt(ddx*ddx+ddy*ddy);
         double e1=pi(),e2=0;bool cusp=false;
@@ -87,12 +92,7 @@ inline bool shape(const Tee& t,Shape& out){
             const double a1=std::atan2(k.y-c1.y,k.x-c1.x),a2=std::atan2(k.y-c2.y,k.x-c2.x);
             if(a1>=pi()/2-1e-9&&a1<=pi()+1e-9&&a2>=-1e-9&&a2<=pi()/2+1e-9){e1=a1;e2=a2;cusp=true;}
         }
-        if(!cusp){   // arcs end tangent-vertical; drop to the inlet face and close along it
-            const double x1=c1.x-t.R1,x2=c2.x+t.R2;
-            if(pf.d1>1e-12)out.lines.push_back(Seg(P(x1,c1.y),P(x1,l)));
-            if(pf.d2>1e-12)out.lines.push_back(Seg(P(x2,c2.y),P(x2,l)));
-            if(x1-x2>1e-12)out.lines.push_back(Seg(P(x1,l),P(x2,l)));
-        }
+        if(!cusp)return false;   // branches too narrow for the inlet: not a real TK-G
         out.axis.push_back(Seg(P(0,0),P(0,pf.Y)));
         branchAt(out,a,l,pf.d1,t.w1,t.R1,pf.X,f,+1,e1);
         branchAt(out,a,l,pf.d2,t.w2,t.R2,pf.X,f,-1,e2);

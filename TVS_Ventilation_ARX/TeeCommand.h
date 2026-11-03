@@ -30,6 +30,8 @@ inline void setType(){
     double secondMm=0;
     if(!askWidth(pants?L"\nSirina lijevog ogranka, mm":L"\nSirina izlaza prolaza C, mm",(pants?w->SizeApr:w->SizeApr)*f,secondMm))return;
     r.second=secondMm/f;r.radius2=pants?tvsTee::defaultRadius(r.second):0;
+    if(pants&&!tvsTee::pantsFeasible(w->SizeAotv,w1,r.second,r.l)){
+        acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).",w->SizeAotv*f);return;}
     w->assertWriteEnabled();w->LengthPl=pants?tvsTee::pantsLengthPl(r.l,w1,r.second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
     const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
     if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return;}

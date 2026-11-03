@@ -29,26 +29,22 @@ int main(int argc,char**){
  Tee g=o;g.type=Pants;g.w2=100;g.R2=150;Shape t;assert(shape(g,t));assert(t.arcs.size()==4);
  p=at(t.arcs[1],t.arcs[1].a1);assert(near(p.x,0,1e-9));p=at(t.arcs[3],t.arcs[3].a0);assert(near(p.x,0,1e-9));
  // TK-G with different branch widths: both branch axes on one line (TVS run), faces at +-X,
- // the narrower branch starts after a straight inlet wall; outline closes (cusp or back wall).
- const double cases[][3]={{100,100,60},{200,100,60},{200,60,100},{300,60,60},{100,60,100}};
+ // the narrower branch starts after a straight inlet wall; outer arcs meet in a cusp.
+ const double cases[][3]={{100,100,60},{100,60,100},{100,60,60},{150,100,60}};
  for(const auto& cs:cases){
   Tee k=o;k.type=Pants;k.A=cs[0];k.w1=cs[1];k.w2=cs[2];k.R1=defaultRadius(k.w1);k.R2=defaultRadius(k.w2);
-  Shape h;assert(shape(k,h));const PantsFrame pf=pantsFrame(k);
+  Shape h;assert(shape(k,h)&&pantsFeasible(k.A,k.w1,k.w2,25));const PantsFrame pf=pantsFrame(k);
   assert(near(pf.Y,25+(std::max)(k.w1,k.w2))&&near(pf.Y-k.w1/2,pantsLengthPl(25,k.w1,k.w2)));
   double mid[2]={0,0};int faces=0;
   for(const Seg& g:h.lines)if(near(std::fabs(g.a.x),pf.X)&&near(g.a.x,g.b.x)&&std::fabs(g.b.y-g.a.y)>1){
     ++faces;mid[g.a.x>0?0:1]=(g.a.y+g.b.y)/2;}
   assert(faces==2&&near(mid[0],pf.Y)&&near(mid[1],pf.Y));
-  // outer arc ends meet (cusp), or each reaches the inlet face (y = l) itself or by a vertical line
-  P e1=at(h.arcs[1],h.arcs[1].a1),e2=at(h.arcs[3],h.arcs[3].a0);
-  if(!(near(e1.x,e2.x,1e-6)&&near(e1.y,e2.y,1e-6))){
-   for(int j=0;j<2;++j){const P e=j?e2:e1;bool ok=near(e.y,25,1e-6);
-    for(const Seg& g:h.lines)if(near(g.a.x,e.x,1e-6)&&near(g.a.y,e.y,1e-6)&&near(g.b.x,e.x,1e-6)&&near(g.b.y,25,1e-6))ok=true;
-    assert(ok);}
-   assert(near(e1.x-e2.x,k.A-k.w1-k.w2,1e-6));}
+  P e1=at(h.arcs[1],h.arcs[1].a1),e2=at(h.arcs[3],h.arcs[3].a0);assert(near(e1.x,e2.x,1e-6)&&near(e1.y,e2.y,1e-6));
   if(argc>2)for(const Seg& q:h.lines)std::printf("G%%d %%f %%f %%f %%f\n",(int)(&cs-cases),q.a.x,q.a.y,q.b.x,q.b.y);
   if(argc>2)for(const Arc& c:h.arcs)std::printf("H%%d %%f %%f %%f %%f %%f\n",(int)(&cs-cases),c.c.x,c.c.y,c.r,c.a0,c.a1);
  }
+ // Branches too narrow for the inlet (not used in practice): no TK-G drawing.
+ assert(!pantsFeasible(200,60,100,25)&&!pantsFeasible(200,100,60,25)&&!pantsFeasible(300,60,60,25));
  // Narrow branch and a tapered run (C < A): the outer arc still ends on the near wall.
  Tee n=o;n.w1=60;n.R1=defaultRadius(60);n.C=80;Shape u;assert(shape(n,u));p=at(u.arcs[1],u.arcs[1].a1);
  {const double L=runLength(n),tt=(p.y-25)/(L-50);assert(tt>0&&tt<1&&near(p.x,50+tt*(40-50),1e-6));}
