@@ -7,6 +7,8 @@
 #include "dgMLeadProperty.h"
 #include "MleaderController.h"
 #include "TVSController.h"
+#include "MLeaderStyleTools.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
 using namespace func;
 
 TVSCommandLead::TVSCommandLead(void)
@@ -48,6 +50,25 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 
 	//pEnt->setLineWeight(AcDb::kLnWt025);
 	//pEnt->setColor(pEnt1->color());
+
+	// Style and scale from the label settings: style heights are paper mm, the overall
+	// scale is drawing scale / drawing units. A style missing in this drawing is copied
+	// again from the DWG it was chosen from.
+	{
+		AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
+		const MLeaderSettings& m = Settings::get()->mLeader;
+		AcDbObjectId styleId = tvsMLeaderStyle::find(db, m.style);
+		if (styleId.isNull() && !m.style.IsEmpty() && !m.styleSource.IsEmpty())
+			tvsMLeaderStyle::import(db, m.styleSource, m.style, styleId);
+		if (styleId.isNull() && db) styleId = db->mleaderstyle();
+		if (!styleId.isNull()) {
+			pEnt->setMLeaderStyle(styleId);
+			AcDbObjectPointer<AcDbMLeaderStyle> style(styleId, AcDb::kForRead);
+			if (style.openStatus() == Acad::eOk) { mText->setTextStyle(style->textStyleId()); mText->setTextHeight(style->textHeight()); }
+		}
+		const double scale = m.scale > 0 ? m.scale / tvsUnits::factor(db) : 1;
+		pEnt->setScale(scale);
+	}
 
 	int i;
 	pEnt->setContentType(AcDbMLeaderStyle::kMTextContent);
