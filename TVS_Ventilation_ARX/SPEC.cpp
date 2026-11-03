@@ -19,6 +19,8 @@ using namespace std;
 #define Trans 5
 #define Wye 6
 #define FlexCuff 7
+#define TeeBranch 8
+#define TeePants 9
 #define TypeInt 0
 #define TypeDouble1 1
 #define TypeDouble2 2
@@ -40,7 +42,7 @@ void SPEC::setAcharType(int val)
 	}
 }
 
-SPEC::SPEC(void) : sheetMass(0.0), sheetThickness(0.0), sheetUnitMass(0.0)
+SPEC::SPEC(void) : Extra(0.0), sheetMass(0.0), sheetThickness(0.0), sheetUnitMass(0.0)
 {
 	wcscpy_s(d,_T("%%c"));
 	wcscpy_s(grad,_T("%%d"));
@@ -66,7 +68,7 @@ void SPEC::setParam2(double param,int type)
 void SPEC::addCuffs(AcDbEntity * pEnt, double diameterMm, int count)
 {
 	status = FlexCuff;
-	SizeA = diameterMm; SizeB = 0; SizeA2 = SizeA3 = 0; Swectangle = 0; Length = 0; Area = 0;
+	SizeA = diameterMm; SizeB = 0; SizeA2 = SizeA3 = 0; Swectangle = 0; Extra = 0; Length = 0; Area = 0;
 	sheetMass = sheetThickness = sheetUnitMass = 0.0;
 	setName(L"Manžetna (obujmica) fleksibilnog kanala");
 	setLable(d);
@@ -92,6 +94,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 	SizeA2=0;
 	SizeA3=0;
 	Swectangle=0;
+	Extra=0;
 	Length=0;
 	Area=0;
 	sheetMass = sheetThickness = sheetUnitMass = 0.0;
@@ -284,6 +287,31 @@ bool SPEC::add(AcDbEntity * pEnt)
 				appendLable(_T(" (L="));
 				appendLable(tvsUnits::mm(pWye->LengthPl, pWye));
 				appendLable(_T(" mm)"));
+				// T komad TK-O / TK-G (TVS_TEE_V1): own name, sizes, radius and sheet area.
+				{
+					tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
+					if (SizeB > 0 && SizeA3 > 0 && pWye->teeShape(tee, o, ex, ey)) {
+						const double f = tvsUnits::factor(pWye);
+						tvsTee::Tee mm = tee; mm.A *= f; mm.C *= f; mm.w1 *= f; mm.w2 *= f; mm.R1 *= f; mm.R2 *= f; mm.l *= f;
+						const bool branchTee = tee.type == tvsTee::Branch;
+						status = branchTee ? TeeBranch : TeePants;
+						Extra = branchTee ? mm.C : mm.w2;
+						setName(branchTee ? L"T komad sa ogrankom TK-O" : L"Gaćasti T komad TK-G");
+						if (branchTee) {   // A x B - C x B / w x b, R
+							setLable(SizeA); appendLable(_T("x")); appendLable(SizeB); appendLable(_T("-"));
+							appendLable(mm.C); appendLable(_T("x")); appendLable(SizeB); appendLable(_T(" / "));
+							appendLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3);
+						} else {           // inlet A x B / w1 x b, w2 x b, R
+							setLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3); appendLable(_T(" / "));
+							appendLable(SizeA); appendLable(_T("x")); appendLable(SizeB); appendLable(_T(", "));
+							appendLable(mm.w2); appendLable(_T("x")); appendLable(SizeB);
+						}
+						appendLable(_T(" (R=")); appendLable(mm.R1);
+						if (!branchTee && std::fabs(mm.R2 - mm.R1) > 0.05) { appendLable(_T("/")); appendLable(mm.R2); }
+						appendLable(_T(" mm)"));
+						Area = branchTee ? tvsTee::area(mm, SizeB, SizeA3) : tvsTee::area(mm, SizeA3, SizeB);
+					}
+				}
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);
 			}
@@ -766,7 +794,9 @@ void SPEClist::append(SPEC line)
 
 int SPEClist::checkRelevations(SPEC param1, SPEC param2)
 {
-	double parameters1[6],parameters2[6];;
+	double parameters1[7],parameters2[7];;
+	parameters1[6]=param1.Extra;
+	parameters2[6]=param2.Extra;
 	parameters1[0]=param1.status;
 	parameters2[0]=param2.status;
 
@@ -786,7 +816,7 @@ int SPEClist::checkRelevations(SPEC param1, SPEC param2)
 	parameters2[5]=param2.Swectangle;
 	int i=0;
 
-	while (i<6)
+	while (i<7)
 	{
 		if (parameters1[i]<parameters2[i])
 		{

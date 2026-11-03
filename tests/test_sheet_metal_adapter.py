@@ -19,6 +19,7 @@ class SheetMetalAdapter(unittest.TestCase):
                               if line.startswith('#define RadiusType') or line.startswith('#define Form_'))
         stub = r'''
 #include "SheetMetal.h"
+#include "TEE_SHAPE"
 #include <cassert>
 #include <cmath>
 #define DuctTypeFlex 1
@@ -49,9 +50,14 @@ struct TVS_TRANS:TVS_Entity {
     bool ThisRoundp1,ThisRoundp2;
     CAST(TVS_TRANS)
 };
+struct AcGePoint3d {double x,y,z;};
+struct AcGeVector3d {double x,y,z;};
 struct TVS_WYE:TVS_Entity {
     double SizeApr,SizeBpr,SizeAotv,SizeBotv,LengthPl;
     bool ThisRoundpr,ThisRoundotv;
+    bool tk; tvsTee::Tee shapeValue;   // stub of TVS_WYE::teeShape (record read)
+    TVS_WYE():tk(false){}
+    bool teeShape(tvsTee::Tee& t,AcGePoint3d&,AcGeVector3d&,AcGeVector3d&) const {t=shapeValue;return tk;}
     CAST(TVS_WYE)
 };
 namespace tvsUnits { double factor(const TVS_Entity *p) { return p->units; }
@@ -101,6 +107,10 @@ int main() {
         assert(w.getSheetMetal(area,t,m)); near(area,.645);
         w.SizeAotv=1200/f;
         assert(w.getSheetMetal(area,t,m)); near(t,1.0); // Largest side includes branch.
+        {TVS_WYE k=w; k.SizeAotv=300/f; k.LengthPl=100/f; k.tk=true; k.shapeValue.type=tvsTee::Branch;
+         k.shapeValue.A=400/f;k.shapeValue.C=400/f;k.shapeValue.w1=300/f;k.shapeValue.R1=525/f;k.shapeValue.l=25/f;
+         assert(k.getSheetMetal(area,t,m)); tvsTee::Tee mmT=k.shapeValue;mmT.A*=f;mmT.C*=f;mmT.w1*=f;mmT.R1*=f;mmT.l*=f;
+         near(area,tvsTee::area(mmT,200,150));}  // TK-O: TeeShape area (run b, branch b2)
         w.LengthPl=-1; assert(!w.getSheetMetal(area,t,m));
     }
     TVS_Entity unknown;
@@ -109,7 +119,7 @@ int main() {
 '''
         with tempfile.TemporaryDirectory() as tmp:
             cpp = Path(tmp)/'adapter.cpp'
-            cpp.write_text(constants+"\n"+stub+radius_method+method+checks)
+            cpp.write_text((constants+"\n"+stub+radius_method+method+checks).replace('TEE_SHAPE',(root/'geometry/TeeShape.h').as_posix()))
             executable = str(Path(tmp)/'adapter')
             subprocess.run(['g++','-std=c++98','-Wall','-Wextra','-Werror','-pedantic',
                 '-I',str(root/'TVS_Ventilation_DBX'),str(cpp),'-o',executable],check=True)

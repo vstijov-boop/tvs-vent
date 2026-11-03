@@ -157,7 +157,13 @@ STDMETHODIMP CComWye::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 	
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("T-komad"));
+		{
+			// T komad type (TVS_TEE_V1): TK-O sa ogrankom, TK-G gacasti, otherwise the plain T.
+			AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+			tvsTeeData::Record r;
+			const bool tee = pSq.openStatus() == Acad::eOk && tvsTeeData::read(pSq.operator->(), r);
+			*propName = ::SysAllocString(!tee ? L"T-komad" : r.type == tvsTee::Branch ? L"T komad sa ogrankom (TK-O)" : L"Gaćasti T komad (TK-G)");
+		}
 		break; 
 		
 	//////////////////////////////////////////////////////////////////////////

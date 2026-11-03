@@ -58,6 +58,7 @@
 #include "TvsLinetypes.h"
 #include "FlexCuffCommand.h"
 #include "MLeaderStyleTools.h"
+#include "TeeCommand.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -1859,6 +1860,12 @@ public:
     {
         if (ActivationErrorMessage() != pError_Ok) return;
         tvsFlexCuffCommand::run();
+    }
+    // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
+    static void Ventilation_ARXTVS_TK_TIP(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsTeeCommand::setType();
     }
     static void Ventilation_ARXTVS_FLEX_MANZETNA(void)
     {
@@ -4116,6 +4123,7 @@ ACED_ADSSYMBOL_ENTRY_AUTO(CTVS_Ventilation_ARXApp, MyLispFunction, false)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH, TVS_STRETCH, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
 
 #ifdef TVS_OFFSET_PROOF
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET, TVS_TEST_OFFSET, ACRX_CMD_MODAL, NULL)

@@ -54,6 +54,7 @@ int status;
 double Length;
 double Length2;
 double Swectangle;
+double Extra; // T komad TK-O/TK-G: second width (outlet C / left branch), grouping key
 double Area;
 double sheetMass;
 double sheetThickness;

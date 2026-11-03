@@ -232,6 +232,29 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 
 
 	Gimme7Points();
+	// T komad TK-O / TK-G: drawn from geometry/TeeShape.h (as the dynamic block "T komad").
+	{
+		tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
+		if (!This1D && teeShape(tee, o, ex, ey)) {
+			tvsTee::Shape shape;
+			if (tvsTee::shape(tee, shape)) {
+				auto world = [&](const tvsTee::P& q) { return o + ex * q.x + ey * q.y; };
+				const bool ccw = ex.crossProduct(ey).z > 0;
+				for (size_t j = 0; j < shape.lines.size(); ++j)
+					setMainProperty(new AcDbLine(world(shape.lines[j].a), world(shape.lines[j].b)));
+				for (size_t j = 0; j < shape.arcs.size(); ++j) {
+					const tvsTee::Arc& c = shape.arcs[j];
+					auto ang = [&](double t) { const AcGeVector3d d = ex * std::cos(t) + ey * std::sin(t); return std::atan2(d.y, d.x); };
+					const double s0 = ang(c.a0), s1 = ang(c.a1);
+					setMainProperty(new AcDbArc(world(c.c), AcGeVector3d(0, 0, 1), c.r, ccw ? s0 : s1, ccw ? s1 : s0));
+				}
+				for (size_t j = 0; j < shape.axis.size(); ++j)
+					setCenterProperty(new AcDbLine(world(shape.axis[j].a), world(shape.axis[j].b)));
+				for each (AcDbEntity * var in ListOfEntity) mode->geometry().draw(var);
+				return Adesk::kTrue;
+			}
+		}
+	}
 	if (Wipeout==true) //wipe
 	{
 	
@@ -1128,6 +1151,28 @@ void TVS_WYE::Gimme7Points()
 		);
 }
 
+
+bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, AcGeVector3d &ey) const
+{
+	tvsTeeData::Record r;
+	if (!tvsTeeData::read(this, r)) return false;
+	AcGeVector3d u = Vectpr, v = Vectotv; u.z = v.z = 0;
+	if (u.length() < 1e-12 || v.length() < 1e-12) return false;
+	u.normalize(); v.normalize();
+	tee = tvsTee::Tee(); tee.type = r.type; tee.l = r.l; tee.flange = tvsTeeData::flangeMm() / tvsUnits::factor(this);
+	if (r.type == tvsTee::Branch) {
+		tee.A = SizeApr; tee.w1 = SizeAotv; tee.C = r.second > 0 ? r.second : SizeApr;
+		tee.R1 = LengthPl - r.l + tee.w1;
+		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
+	}
+	else {
+		tee.A = SizeAotv; tee.w1 = SizeApr; tee.w2 = r.second > 0 ? r.second : SizeApr;
+		tee.R1 = LengthPl - r.l + tee.w1; tee.R2 = r.radius2 > tee.w2 ? r.radius2 : tvsTee::defaultRadius(tee.w2);
+		origin = Basepoint + v * (SizeApr / 2 + LengthPl); ey = -v; ex = u;
+	}
+	origin.z = Basepoint.z;
+	return tvsTee::valid(tee);
+}
 
 void TVS_WYE::getName(CString &unit)
 {

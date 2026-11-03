@@ -229,12 +229,21 @@
            len (vlax-get-property obj 'Length)
            lm  (if (= *tvs-wye-mode* "dpr")
                  (* *tvs-wye-k* a)
-                 (+ a2 (* 2.0 len))))
+                 (+ a2 (* 2.0 len)))
+           native nil)
+     ;; TVS sheet area first: exact also for T komad TK-O / TK-G (radius branches).
+     (if (vlax-property-available-p obj 'SheetArea)
+       (progn
+         (setq native (vl-catch-all-apply 'vlax-get-property (list obj 'SheetArea)))
+         (if (vl-catch-all-error-p native) (setq native nil))
+         (if (= (type native) 'VARIANT) (setq native (vlax-variant-value native)))
+         (if (not (and (numberp native) (> native 0.0))) (setq native nil))))
      (list "T-komad" 4
            (strcat (tvs-fmt a) "x" (tvs-fmt b) " / " (tvs-fmt a2) "x" (tvs-fmt b2))
-           (/ (- (+ (* 2.0 (+ a b) lm) (* 2.0 (+ a2 b2) len))
-                 (if *tvs-wye-hole* (* a2 b2) 0.0))      ; otvor odvojka u glavnom dijelu
-              1.0e6)
+           (if native native
+             (/ (- (+ (* 2.0 (+ a b) lm) (* 2.0 (+ a2 b2) len))
+                   (if *tvs-wye-hole* (* a2 b2) 0.0))      ; otvor odvojka u glavnom dijelu
+                1.0e6))
            (max a b a2 b2)
            nil))
     (T nil)))
