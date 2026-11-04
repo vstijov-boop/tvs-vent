@@ -11,6 +11,7 @@
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "TeeNeighbours.h"
 #include "TVSMoveCommand.h"
+#include "ElevationShift.h"
 #include <set>
 #include <vector>
 namespace tvsMatch {
@@ -123,20 +124,7 @@ inline void run(){
         {AcDbObjectPointer<AcDbEntity> e(targets[0],AcDb::kForRead);TVS_Entity* t=e.openStatus()==Acad::eOk?TVS_Entity::cast(e.object()):NULL;
          if(t)delta=targetAxis(src,t->SizeA,t->SizeB,o.reference)-t->Elev;}
         if(std::fabs(delta)>1e-9){
-#ifdef TVS_OFFSET_INTEGRATION
-            tvsOffsetData::WriteScope scope;   // whole assemblies move together, nothing is split
-#endif
-            AcGeMatrix3d up;up.setToTranslation(AcGeVector3d(0,0,delta));int shifted=0;
-            for(size_t i=0;i<targets.size();++i){
-                if(targets[i]==src.id)continue;
-                AcDbObjectPointer<AcDbEntity> e(targets[i],AcDb::kForWrite);if(e.openStatus()!=Acad::eOk)continue;
-                TVS_Entity* t=TVS_Entity::cast(e.object());if(!t)continue;
-                tvsMove::Node n;bool spatial=false;   // offset/bypass members carry real Z in their points
-                if(tvsMove::describe(e.object(),n))for(size_t j=0;j<n.ports.size();++j)if(std::fabs(n.ports[j].z)>1e-9)spatial=true;
-                if(t->put_Elevation(t->Elev+delta)!=Acad::eOk)continue;
-                if(spatial)e->transformBy(up);
-                e->recordGraphicsModified();++shifted;
-            }
+            const int shifted=tvsElevationShift::shift(targets,delta,src.id);
             acutPrintf(L"\nMreza pomjerena za %.0f mm (%d elemenata); postojece promjene kote su sacuvane.",delta*f,shifted);
         }
     }

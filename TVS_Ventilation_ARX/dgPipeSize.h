@@ -84,6 +84,7 @@
 
 #define IDC_DuctFlex 1041
 #define IDC_LevelTooltip 1043
+#define IDC_TransVert 1044
 //-----------------------------------------------------------------------------
 class dgPipeSize : public CAdUiBaseDialog {
 	DECLARE_DYNAMIC(dgPipeSize)
@@ -215,6 +216,7 @@ public:
 	CButton fDuctFlex;
 	BOOL DuctFlex;
 	BOOL LevelTooltip;   // TVS_SETTINGS: oblacic sa kotama (LevelTooltip.h)
+	int TransVert;       // TVS_SETTINGS: poravnanje novih prelaza po visini (TransAlignData.h)
 	BOOL bDuctFlex;
 	//	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
 

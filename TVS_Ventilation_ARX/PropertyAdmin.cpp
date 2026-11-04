@@ -4,6 +4,7 @@
 #include "../TVS_Ventilation_DBX/TVS_TAP.h"
 #include "../TVS_Ventilation_DBX/TVS_TRANS.h"
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
+#include "TVSPropertyTransAlignDyn.h"
 
 bool PropertyAdmin::m_bInitialized=false;
 AcRxClass *PropertyAdmin::m_pClass=AcDbEntity::desc();
@@ -15,7 +16,8 @@ struct Registration {
     CComObject<CTVSNativeSheetDyn<0> > *area;
     CComObject<CTVSNativeSheetDyn<1> > *thickness;
     CComObject<CTVSNativeSheetDyn<2> > *mass;
-    Registration():selection(NULL),area(NULL),thickness(NULL),mass(NULL) {}
+    CComObject<CTVSTransAlignDyn> *align;   // TVS_TRANS only: poravnanje po visini
+    Registration():selection(NULL),area(NULL),thickness(NULL),mass(NULL),align(NULL) {}
 };
 std::vector<Registration*> registrations;
 CComPtr<IPropertyManager2> managerFor(AcRxClass *type)
@@ -55,6 +57,7 @@ void PropertyAdmin::initialize()
         if (ok && i>0) ok=add(item->manager,item->area) && add(item->manager,item->thickness)
             && add(item->manager,item->mass);
         if (ok) ok=add(item->manager,item->selection);
+        if (ok && types[i]==TVS_TRANS::desc()) ok=add(item->manager,item->align);
         if (!ok) {
             uninitialize();
             acutPrintf(L"\nTVS: registracija prikaza mase nije uspjela.");
@@ -68,6 +71,7 @@ void PropertyAdmin::uninitialize()
 {
     for (size_t i=0;i<registrations.size();++i) {
         Registration *item=registrations[i];
+        remove(item->manager,item->align);
         remove(item->manager,item->selection); remove(item->manager,item->mass);
         remove(item->manager,item->thickness); remove(item->manager,item->area);
         delete item;

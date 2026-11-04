@@ -63,6 +63,7 @@
 #include "MatchCommand.h"
 #include "SectionCommand.h"
 #include "LevelTooltip.h"
+#include "TransAlignCommand.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -1122,6 +1123,7 @@ public:
 		dg.WipeoutLength = globalWipeoutLength;
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
 		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
+		dg.TransVert = tvsTransAlignCmd::defaultAlign();
 
 		//AcApDocument *pDoc=acDocManager->curDocument();
 		//acDocManager->lockDocument(pDoc,AcAp::kWrite);
@@ -1153,6 +1155,7 @@ public:
 		globalWipeoutLength = dg.WipeoutLength;
 
 		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
+		tvsTransAlignCmd::setDefault(dg.TransVert);              // poravnanje novih prelaza
 		if (dg.DuctFlex == TRUE) { globalDuctType = DuctTypeFlex; globSizeB = 0; }
 		else globalDuctType = DuctTypeStill;
 		if (globSizeB == 0) globRound = true;
@@ -1635,6 +1638,17 @@ public:
 			pTransType,
 			pThis1D);
 		SetGlobalProperty(transie);
+		{	// poravnanje po visini (TVS_SETTINGS): the duct after the transition continues at the shifted axis
+			const int align = tvsTransAlignCmd::defaultAlign();
+			if (align != tvsTransAlign::Axis) {
+				AcDbObjectPointer<TVS_TRANS> t(transie->objectId(), AcDb::kForWrite);
+				if (t.openStatus() == Acad::eOk && tvsTransAlign::write(t.object(), align) == Acad::eOk) {
+					globalElevMid += tvsTransAlign::endOffset(align, pSizeAp1, pSizeBp1, pSizeAp2, pSizeBp2);
+					globalElev = globalElevMid;
+					t->recordGraphicsModified();
+				}
+			}
+		}
 		pFirstPoint = AcGePoint3d(pFirstPoint.x + pLengthTr*Vect.x,
 			pFirstPoint.y + pLengthTr*Vect.y,
 			pFirstPoint.z + pLengthTr*Vect.z
@@ -1970,6 +1984,13 @@ public:
         tvsFlexCuffCommand::run();
     }
     // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
+    // TVS_PRELAZ_KOTA: transition alignment by height; asks which side of the network stays.
+    static void Ventilation_ARXTVS_PRELAZ_KOTA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsTransAlignCmd::run();
+    }
     // TVS_KOTE: on-screen elevation labels on/off (LevelLabels.h, not plotted).
     static void Ventilation_ARXTVS_KOTE(void)
     {
@@ -4256,6 +4277,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRELAZ_KOTA, TVS_PRELAZ_KOTA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOTE, TVS_KOTE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MATCH, TVS_MATCH, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)

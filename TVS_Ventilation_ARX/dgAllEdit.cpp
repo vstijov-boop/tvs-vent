@@ -97,6 +97,7 @@ dgAllEdit::dgAllEdit(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : C
 , ElevMid(FALSE)
 , ElevDown(FALSE)
 , TeeType(0)
+, TransVert(-1)
 , TeeSecond(_T(""))
 {
 }
@@ -148,6 +149,9 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_MillimetreString(pDX, IDC_TransLength, LengthTr);
 	DDX_MillimetreString(pDX, IDC_LengthWye, LengthW);
 	DDX_MillimetreString(pDX, IDC_TeeSecond, TeeSecond);
+	if (pDX->m_bSaveAndValidate) {   // prelaz po visini (combo filled in OnShowWindow)
+		if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit))) if (vert->GetCount() == 3) TransVert = vert->GetCurSel();
+	}
 	DDX_MillimetreString(pDX, IDC_ElevVal, Elev);
 	DDX_Text(pDX, IDC_Speed, Speed);
 	DDX_Text(pDX, IDC_i, I);
@@ -222,6 +226,16 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 	{
 		fLengthTr.ShowWindow(false);
 
+	}
+	if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit)))
+	{
+		if (Ttrans) {
+			if (vert->GetCount() == 0) { vert->AddString(L"Osa"); vert->AddString(L"Ravno uz gornju ivicu"); vert->AddString(L"Ravno uz donju ivicu"); }
+			vert->SetCurSel(TransVert);   // -1: razno
+		} else {
+			vert->ShowWindow(false);
+			if (CWnd* label = GetDlgItem(IDC_TransVertLabel)) label->ShowWindow(false);
+		}
 	}
 
 	if (Twye == false)

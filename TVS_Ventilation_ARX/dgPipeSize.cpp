@@ -72,7 +72,7 @@ END_MESSAGE_MAP()
 
 //-----------------------------------------------------------------------------
 dgPipeSize::dgPipeSize(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : CAdUiBaseDialog(dgPipeSize::IDD, pParent, hInstance), SizeA(0)
-, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE)
+, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), TransVert(0)
 {
 }
 
@@ -185,12 +185,19 @@ BOOL dgPipeSize::OnInitDialog() {
     drawingUnits.AddString(L"m — metri");
     drawingUnits.SetCurSel(unitsFactor == 10.0 ? 1 : unitsFactor == 1000.0 ? 2 : 0);
     drawingUnits.EnableWindow(allowDrawingUnitsChange ? TRUE : FALSE);
+    if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVert))) {
+        vert->AddString(L"Osa");
+        vert->AddString(L"Ravno uz gornju ivicu");
+        vert->AddString(L"Ravno uz donju ivicu");
+        vert->SetCurSel(TransVert >= 0 && TransVert <= 2 ? TransVert : 0);
+    }
     return result;
 }
 
 void dgPipeSize::OnBnClickedOk()
 {
     if (!UpdateData(TRUE)) return;
+    if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVert))) { const int v = vert->GetCurSel(); if (v >= 0) TransVert = v; }
     const int selection = drawingUnits.GetCurSel();
     const double selected = selection == 1 ? 10.0 : selection == 2 ? 1000.0 : 1.0;
     if (allowDrawingUnitsChange && selected != unitsFactor) {

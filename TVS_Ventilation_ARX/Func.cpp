@@ -3,6 +3,7 @@
 #include "Func.h"
 #include "ElbowDirection.h"
 #include "TeeEditDialog.h"
+#include "TransAlignCommand.h"
 
 
 
@@ -994,6 +995,7 @@ void func::Change(ads_name &sset)
 	TVS_TAP * Tapie;
 	TVS_WYE* Wyeie;
 	tvsTeeEdit::Gather teeGather;
+	tvsTransAlignCmd::Gather transGather;
 	TVS_TRANS * Transie;
 
 	double NewSiseA;
@@ -1209,6 +1211,7 @@ void func::Change(ads_name &sset)
 						rprov(vSizeA2, fSizeA2, Transie->SizeAp2, SizeA2);
 						rprov(vSizeB2, fSizeB2, Transie->SizeBp2, SizeB2);
 						rprov(vLengthTr, fLengthTr, Transie->LengthTr, LengthTr);
+						transGather.add(Transie);
 
 						rprov(vD1, fD1, Transie->This1D, D1);
 						rprov(vWipe, fWipe, Transie->Wipeout, Wipe);
@@ -1230,6 +1233,7 @@ void func::Change(ads_name &sset)
 
 	dgAllEdit dg;
 	tvsTeeEdit::prepare(dg, teeGather);
+	dg.TransVert = transGather.common();
 
 
 
@@ -1472,11 +1476,13 @@ void func::Change(ads_name &sset)
 					if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 					{
 						///
+						const double transBefore = tvsTransAlignCmd::endOffset(Transie);
 						if (cSizeA == false) Transie->put_SizeAp1(SizeA);
 						if (cSizeB == false) Transie->put_SizeBp1(SizeB);
 						if (cSizeA2 == false) Transie->put_SizeAp2(SizeA2);
 						if (cSizeB2 == false) Transie->put_SizeBp2(SizeB2);
 						if (cLengthTr == false) Transie->put_Length(LengthTr);
+						tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert);   // poravnanje po visini
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
 						if (cD1 == false) Transie->put_This1D(D1);
@@ -1517,6 +1523,7 @@ void func::Change(AcDbEntity *pEnt)
 	TVS_TAP * Tapie;
 	TVS_WYE* Wyeie;
 	tvsTeeEdit::Gather teeGather;
+	tvsTransAlignCmd::Gather transGather;
 	TVS_TRANS * Transie;
 
 	double NewSiseA;
@@ -1716,6 +1723,7 @@ void func::Change(AcDbEntity *pEnt)
 		rprov(vSizeA2, fSizeA2, Transie->SizeAp2, SizeA2);
 		rprov(vSizeB2, fSizeB2, Transie->SizeBp2, SizeB2);
 		rprov(vLengthTr, fLengthTr, Transie->LengthTr, LengthTr);
+		transGather.add(Transie);
 
 		rprov(vD1, fD1, Transie->This1D, D1);
 		rprov(vWipe, fWipe, Transie->Wipeout, Wipe);
@@ -1735,6 +1743,7 @@ void func::Change(AcDbEntity *pEnt)
 
 	dgAllEdit dg;
 	tvsTeeEdit::prepare(dg, teeGather);
+	dg.TransVert = transGather.common();
 
 
 	strfil(SizeA, vSizeA, sSizeA);
@@ -1963,11 +1972,13 @@ void func::Change(AcDbEntity *pEnt)
 		if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 		{
 			///
+			const double transBefore = tvsTransAlignCmd::endOffset(Transie);
 			if (cSizeA == false) Transie->put_SizeAp1(SizeA);
 			if (cSizeB == false) Transie->put_SizeBp1(SizeB);
 			if (cSizeA2 == false) Transie->put_SizeAp2(SizeA2);
 			if (cSizeB2 == false) Transie->put_SizeBp2(SizeB2);
 			if (cLengthTr == false) Transie->put_Length(LengthTr);
+			tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert);   // poravnanje po visini
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
 			if (cD1 == false) Transie->put_This1D(D1);
