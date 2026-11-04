@@ -28,7 +28,8 @@ class TransAlign(unittest.TestCase):
   self.assertIn('if (ok && types[i]==TVS_TRANS::desc()) ok=add(item->manager,item->align);',text('TVS_Ventilation_ARX/PropertyAdmin.cpp'))
   self.assertIn('COM_INTERFACE_ENTRY(IDynamicEnumProperty)',text('TVS_Ventilation_ARX/TVSPropertyTransAlignDyn.h'))
   f=text('TVS_Ventilation_ARX/Func.cpp');self.assertEqual(f.count('tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert);'),2)
-  r=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc');self.assertIn('COMBOBOX        1044,300,104',r);self.assertIn('COMBOBOX        1045,300,160',r)
+  r=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc');self.assertIn('COMBOBOX        1044,300,122',r);self.assertIn('COMBOBOX        1046,300,104',r)
+  self.assertIn('ftTransType = dg.TransPlan; tvsTransAlignCmd::storePlan(ftTransType);',e);self.assertIn('ftTransType = tvsTransAlignCmd::loadPlan();',e);self.assertIn('COMBOBOX        1045,300,160',r)
   for fn in ('TVS_Ventilation_ARX/TransAlignCommand.h','TVS_Ventilation_ARX/ElevationShift.h','TVS_Ventilation_ARX/TVSPropertyTransAlignDyn.h','TVS_Ventilation_DBX/TransAlignData.h'):
    for line in text(fn).splitlines():self.assertFalse(line.rstrip().endswith('L"'),fn)
 if __name__=='__main__':unittest.main()

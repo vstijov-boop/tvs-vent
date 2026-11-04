@@ -118,6 +118,7 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		tvsLevelTooltip::start();
+		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)
 #ifdef TVS_BYPASS_PREVIEW
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
@@ -1124,6 +1125,7 @@ public:
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
 		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
 		dg.TransVert = tvsTransAlignCmd::defaultAlign();
+		dg.TransPlan = ftTransType;
 
 		//AcApDocument *pDoc=acDocManager->curDocument();
 		//acDocManager->lockDocument(pDoc,AcAp::kWrite);
@@ -1156,6 +1158,7 @@ public:
 
 		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
 		tvsTransAlignCmd::setDefault(dg.TransVert);              // poravnanje novih prelaza
+		if (dg.TransPlan >= 1 && dg.TransPlan <= 3) { ftTransType = dg.TransPlan; tvsTransAlignCmd::storePlan(ftTransType); }   // tip u tlocrtu
 		if (dg.DuctFlex == TRUE) { globalDuctType = DuctTypeFlex; globSizeB = 0; }
 		else globalDuctType = DuctTypeStill;
 		if (globSizeB == 0) globRound = true;

@@ -72,7 +72,7 @@ END_MESSAGE_MAP()
 
 //-----------------------------------------------------------------------------
 dgPipeSize::dgPipeSize(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : CAdUiBaseDialog(dgPipeSize::IDD, pParent, hInstance), SizeA(0)
-, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), TransVert(0)
+, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), TransVert(0), TransPlan(1)
 {
 }
 
@@ -191,6 +191,12 @@ BOOL dgPipeSize::OnInitDialog() {
         vert->AddString(L"Ravno uz donju ivicu");
         vert->SetCurSel(TransVert >= 0 && TransVert <= 2 ? TransVert : 0);
     }
+    if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlan))) {   // order = TransType 1, 2, 3
+        plan->AddString(L"Simetrično");
+        plan->AddString(L"Ravno uz desnu ivicu");
+        plan->AddString(L"Ravno uz lijevu ivicu");
+        plan->SetCurSel(TransPlan >= 1 && TransPlan <= 3 ? TransPlan - 1 : 0);
+    }
     return result;
 }
 
@@ -198,6 +204,7 @@ void dgPipeSize::OnBnClickedOk()
 {
     if (!UpdateData(TRUE)) return;
     if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVert))) { const int v = vert->GetCurSel(); if (v >= 0) TransVert = v; }
+    if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlan))) { const int v = plan->GetCurSel(); if (v >= 0) TransPlan = v + 1; }
     const int selection = drawingUnits.GetCurSel();
     const double selected = selection == 1 ? 10.0 : selection == 2 ? 1000.0 : 1.0;
     if (allowDrawingUnitsChange && selected != unitsFactor) {

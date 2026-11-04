@@ -24,6 +24,17 @@ inline void setDefault(int a){
     HKEY k=NULL;if(RegCreateKeyExW(HKEY_CURRENT_USER,regKey(),0,NULL,0,KEY_WRITE,NULL,&k,NULL)!=ERROR_SUCCESS)return;
     const DWORD v=static_cast<DWORD>(a);RegSetValueExW(k,L"TransVert",0,REG_DWORD,reinterpret_cast<const BYTE*>(&v),sizeof(v));RegCloseKey(k);
 }
+// Plan type of new transitions (TransType): 1 simetricno, 2 ravno uz desnu, 3 ravno uz lijevu
+// ivicu (u smjeru crtanja). Per user, as the height alignment.
+inline int loadPlan(){
+    HKEY k=NULL;if(RegOpenKeyExW(HKEY_CURRENT_USER,regKey(),0,KEY_READ,&k)!=ERROR_SUCCESS)return 1;
+    DWORD v=0,size=sizeof(v),type=0;const bool ok=RegQueryValueExW(k,L"TransPlan",NULL,&type,reinterpret_cast<LPBYTE>(&v),&size)==ERROR_SUCCESS&&type==REG_DWORD;
+    RegCloseKey(k);return ok&&v>=1&&v<=3?static_cast<int>(v):1;
+}
+inline void storePlan(int t){
+    if(t<1||t>3)return;HKEY k=NULL;if(RegCreateKeyExW(HKEY_CURRENT_USER,regKey(),0,NULL,0,KEY_WRITE,NULL,&k,NULL)!=ERROR_SUCCESS)return;
+    const DWORD v=static_cast<DWORD>(t);RegSetValueExW(k,L"TransPlan",0,REG_DWORD,reinterpret_cast<const BYTE*>(&v),sizeof(v));RegCloseKey(k);
+}
 inline double endOffset(const TVS_TRANS* t,int align){return tvsTransAlign::endOffset(align,t->SizeAp1,t->SizeBp1,t->SizeAp2,t->SizeBp2);}
 inline double endOffset(const TVS_TRANS* t){return endOffset(t,tvsTransAlign::read(t));}
 // State before a change: the end offset it had.
