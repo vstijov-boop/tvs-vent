@@ -112,6 +112,18 @@ inline void text(AcDbBlockTableRecord* btr,const AcGePoint3d& at,const wchar_t* 
 inline void line(AcDbBlockTableRecord* btr,double x1,double y1,double x2,double y2,const AcDbObjectId& layerId){
     append(btr,new AcDbLine(AcGePoint3d(x1,y1,0),AcGePoint3d(x2,y2,0)),layerId);
 }
+// Visinska kota on a duct edge at (x, edge): half triangle with its tip on the edge (above the
+// top edge, below the bottom edge), vertical leader, shelf line, value above the shelf.
+inline void levelMark(AcDbBlockTableRecord* btr,double x,double edge,bool top,const std::wstring& value,double th,const AcDbObjectId& style,const AcDbObjectId& layerId){
+    const double t=1.2*th,s=top?1:-1,shelf=edge+s*t,w=0.6*t,len=0.65*th*value.size()+0.6*th;
+    line(btr,x,edge,x-w,shelf,layerId);line(btr,x-w,shelf,x,shelf,layerId);           // triangle
+    line(btr,x,edge,x,edge+s*2*t,layerId);                                             // leader
+    line(btr,x-w,shelf,x+len,shelf,layerId);                                           // shelf
+    AcDbText* tx=new AcDbText(AcGePoint3d(x+0.2*th,shelf+0.25*th,0),value.c_str(),style,th,0);
+    tx->setDatabaseDefaults(btr->database());tx->setTextStyle(style);tx->setHeight(th);
+    tx->setHorizontalMode(AcDb::kTextLeft);tx->setVerticalMode(AcDb::kTextBase);
+    append(btr,tx,layerId);
+}
 inline std::wstring level(double drawing,double f){wchar_t s[40];swprintf_s(s,L"%+.3f",drawing*f/1000);return s;}
 // Dimension style of the sections at this text height: values in mm (dimlfac = units factor).
 inline AcDbObjectId dimStyle(AcDbDatabase* db,double th,double f,const AcDbObjectId& textStyle){
@@ -140,7 +152,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
         if(btr->newIterator(it)==Acad::eOk){for(;!it->done();it->step()){AcDbEntity* e=NULL;if(it->getEntity(e,AcDb::kForWrite)==Acad::eOk){e->erase();e->close();}}delete it;}
     }
     const AcDbObjectId layerId=layer(db),style=textStyle(db);
-    const double th=0.8*p.scale/f,gap=0.5*th;   // section labels: 0.8 mm x scale (1:50 -> 40 mm)
+    const double th=0.7*p.scale/f,gap=0.5*th;   // section labels: 0.7 mm x scale (1:50 -> 35 mm)
     std::vector<tvsSection::Member> net;members(db,net);
     const tvsSection::P a(p.p1.x,p.p1.y),b(p.p2.x,p.p2.y);
     const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(a,b,net,p.flip,2.0/f);
@@ -164,10 +176,9 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
         }
         wchar_t size[64];
         if(c.round)swprintf_s(size,L"%%%%c%.0f",c.A*f);else swprintf_s(size,L"%.0fx%.0f",c.A*f,c.B*f);
-        text(btr,AcGePoint3d(x,y+hh+gap+1.9*th,0),size,th,style,layerId);
-        const std::wstring top=L"gi "+level(c.z+hh,f),bottom=L"di "+level(c.z-hh,f);
-        text(btr,AcGePoint3d(x,y+hh+gap+th/2,0),top.c_str(),th,style,layerId);
-        text(btr,AcGePoint3d(x,y-hh-gap-th/2,0),bottom.c_str(),th,style,layerId);
+        text(btr,AcGePoint3d(x,y+hh+3.2*th,0),size,th,style,layerId);
+        levelMark(btr,x,y+hh,true,level(c.z+hh,f),th,style,layerId);
+        levelMark(btr,x,y-hh,false,level(c.z-hh,f),th,style,layerId);
         for(size_t j=0;j<i;++j)if(tvsSection::overlap(cuts[j],c)){
             acutPrintf(L"\nPresjek %ls: kanali se preklapaju kod %.0f mm od pocetka linije.",p.letter.c_str(),c.s*f);break;}
     }
@@ -198,8 +209,8 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
     for(size_t i=0;i<views.size();++i){const tvsSection::View& v=views[i];
         if(!v.level()||v.x1-v.x0<8*th)continue;
         const double x=(v.x0+v.x1)/2,zt=v.zc0+v.h/2,zb=v.zc0-v.h/2;
-        if(!tvsSection::covered(cover,v.tag,v.closest,x,zt-1e-6)){const std::wstring t=L"gi "+level(zt,f);text(btr,AcGePoint3d(x,zt-p.floor+gap+th/2,0),t.c_str(),th,style,layerId);}
-        if(!tvsSection::covered(cover,v.tag,v.closest,x,zb+1e-6)){const std::wstring t=L"di "+level(zb,f);text(btr,AcGePoint3d(x,zb-p.floor-gap-th/2,0),t.c_str(),th,style,layerId);}
+        if(!tvsSection::covered(cover,v.tag,v.closest,x,zt-1e-6))levelMark(btr,x,zt-p.floor,true,level(zt,f),th,style,layerId);
+        if(!tvsSection::covered(cover,v.tag,v.closest,x,zb+1e-6))levelMark(btr,x,zb-p.floor,false,level(zb,f),th,style,layerId);
     }
     // clear distances: between stacked ducts (razmak) and below the lower one (svijetla visina)
     {

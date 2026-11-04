@@ -106,6 +106,8 @@ class Section(unittest.TestCase):
   s=(ROOT/'TVS_Ventilation_ARX/SectionCommand.h').read_text(encoding='utf-8-sig')
   self.assertIn('const int n=build(btr.object(),p);refreshReferences(btr.object());',s,'Osvjezi rebuilds the block from stored parameters')
   self.assertIn('const short types[]={1,1,10,10,70,40,40,40};',s)
+  self.assertIn('const double th=0.7*p.scale/f',s,'1:50 in mm -> 35')
+  self.assertIn('levelMark(btr,x,y+hh,true,level(c.z+hh,f),th,style,layerId);',s,'visinske kote as level marks')
   for line in s.splitlines():self.assertFalse(line.rstrip().endswith('L"'))
   import re
   g=(ROOT/'geometry/Section.h').read_text()
