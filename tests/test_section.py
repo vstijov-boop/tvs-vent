@@ -46,9 +46,9 @@ int main(){
    assert(par&&!outside);
    std::vector<Edge> ee=edges(cc,vv);
    // the parallel duct's top edge (z=1100) is hidden between x=400 and x=600 by the cut 200x300 at z=1000
-   bool hidden=false,left=false;for(size_t i=0;i<ee.size();++i){const Edge& g=ee[i];
-     if(near(g.y0,1100)&&near(g.y1,1100)&&g.hidden&&near(g.x0,400,1e-6)&&near(g.x1,600,1e-6))hidden=true;   // change points refined
-     if(near(g.y0,1100)&&!g.hidden&&near(g.x0,0)&&near(g.x1,400,1e-6))left=true;}
+   bool hidden=false,left=false;for(size_t i=0;i<ee.size();++i){const Prim& g=ee[i].g;const bool gh=ee[i].hidden;
+     if(near(g.y0,1100)&&near(g.y1,1100)&&gh&&near((std::min)(g.x0,g.x1),400,1e-4)&&near((std::max)(g.x0,g.x1),600,1e-4))hidden=true;   // change points refined
+     if(near(g.y0,1100)&&!gh&&near((std::min)(g.x0,g.x1),0)&&near((std::max)(g.x0,g.x1),400,1e-4))left=true;}
    assert(hidden&&left);
    // flipped: looking -y, nothing behind (members at +y are in front of the plane)
    assert(views(s1,s2,m2,true,1000,1).size()==1);   // only the crossing duct's part at y<0
@@ -66,10 +66,30 @@ int main(){
    assert(slope&&vert);
    // sloped top edge drawn as one straight (not stepped) visible line
    std::vector<Edge> e=edges(std::vector<Cut>(),v);bool top=false;
-   for(size_t i=0;i<e.size();++i)if(!e[i].hidden&&near(e[i].x0,1000)&&near(e[i].y0,2100)&&near(e[i].x1,1600)&&near(e[i].y1,2700))top=true;
+   for(size_t i=0;i<e.size();++i)if(!e[i].hidden&&near(e[i].g.x0,1000)&&near(e[i].g.y0,1900)&&near(e[i].g.x1,1600)&&near(e[i].g.y1,2500))top=true;   // bottom edge
    assert(top);
    // cut through the sloped piece: elevation interpolated
    Cut c;assert(cut(P(1300,0),P(1300,1000),sl,c)&&near(c.z,2300));
+ }
+ // vertical elbow seen from the side: true arc band, level end tangent horizontal
+ { Member bnd;bnd.a=P(1000,300);bnd.b=P(1200,300);bnd.A1=bnd.A2=400;bnd.B1=bnd.B2=200;bnd.sloped=true;bnd.bend=true;bnd.levelA=true;bnd.za=2000;bnd.zb=2200;bnd.tag=7;
+   std::vector<Member> one(1,bnd);std::vector<View> v=views(P(0,0),P(3000,0),one,false,1000,1);
+   assert(v.size()==1&&v[0].bend&&v[0].outline.size()==4&&v[0].outline[0].arc&&v[0].outline[2].arc);
+   const Prim& o=v[0].outline[0];assert(near(o.r,200+100)&&near(o.cx,1000)&&near(o.cy,2200));   // axis radius 200 (quarter), outer 300
+   const P s0=o.at(0),s1=o.at(1);assert(near(s0.x,1000,1e-9)&&near(s0.y,1900,1e-9)&&near(s1.x,1300,1e-9)&&near(s1.y,2200,1e-9));
+   std::vector<Edge> e=edges(std::vector<Cut>(),v);bool arc=false;for(size_t i=0;i<e.size();++i)if(e[i].g.arc&&!e[i].hidden)arc=true;assert(arc);
+ }
+ // horizontal elbow chords at one level merge into one box (no inner vertical lines)
+ { Member c1;c1.a=P(500,300);c1.b=P(800,300);c1.A1=c1.A2=200;c1.B1=c1.B2=200;c1.z=1000;c1.tag=9;
+   Member c2=c1;c2.a=P(800,300);c2.b=P(800,600);
+   std::vector<Member> two;two.push_back(c1);two.push_back(c2);
+   std::vector<View> v=views(P(0,0),P(3000,0),two,false,1000,1);assert(v.size()==1&&near(v[0].x0,500)&&near(v[0].x1,900));
+ }
+ // gap: duct passing under a cut duct
+ { std::vector<Cut> cc(1);cc[0].s=1000;cc[0].w=400;cc[0].h=200;cc[0].z=2500;cc[0].tag=1;
+   View low;low.x0=0;low.x1=3000;low.zc0=low.zc1=2000;low.h=200;low.tag=2;low.closest=100;low.quad();
+   std::vector<View> vv(1,low);std::vector<Gap> g=gaps(cc,vv,10);
+   assert(g.size()==1&&near(g[0].low,2100)&&near(g[0].high,2400)&&near(g[0].lowBottom,1900)&&near(g[0].x,1000));
  }
  std::puts("PASS SECTION cuts");
 }

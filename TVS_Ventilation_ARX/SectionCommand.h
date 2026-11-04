@@ -71,7 +71,7 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
 #endif
             }
             else if(tap&&tap->get_Form()!=Form_Direct){   // vertical elbow
-                add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);out.back().sloped=true;
+                add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);out.back().sloped=true;out.back().bend=true;
                 bends.push_back(out.size()-1);bendElev.push_back(n.elevation);
             }
             else for(size_t j=0;j<n.ports.size();++j)add(n.middle,n.ports[j],n.sections[j],n.sections[j]);
@@ -91,7 +91,8 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
                     const double z=o.zAt(oe?1.0:0.0),g=std::fabs(z-bendElev[k]);if(gap<0||g<gap){gap=g;best=z;}}}
             if(end)m.zb=best;else m.za=best;
         }
-        if(std::fabs(m.zb-m.za)<=1e-9)m.sloped=false;
+        m.levelA=std::fabs(m.za-bendElev[k])<=std::fabs(m.zb-bendElev[k]);   // the end at the elbow's own level
+        if(std::fabs(m.zb-m.za)<=1e-9){m.sloped=false;m.bend=false;}
     }
 }
 inline AcDbObjectId append(AcDbBlockTableRecord* btr,AcDbEntity* e,const AcDbObjectId& layerId){
@@ -109,6 +110,25 @@ inline void line(AcDbBlockTableRecord* btr,double x1,double y1,double x2,double 
     append(btr,new AcDbLine(AcGePoint3d(x1,y1,0),AcGePoint3d(x2,y2,0)),layerId);
 }
 inline std::wstring level(double drawing,double f){wchar_t s[40];swprintf_s(s,L"%+.3f",drawing*f/1000);return s;}
+// Dimension style of the sections at this text height: values in mm (dimlfac = units factor).
+inline AcDbObjectId dimStyle(AcDbDatabase* db,double th,double f,const AcDbObjectId& textStyle){
+    wchar_t name[64];swprintf_s(name,L"TVS_PRESJEK_%.0f",th*f*100);
+    AcDbDimStyleTable* raw=NULL;if(db->getDimStyleTable(raw,AcDb::kForWrite)!=Acad::eOk)return db->dimstyle();
+    AcDbObjectPointer<AcDbDimStyleTable> table;table.acquire(raw);AcDbObjectId id;
+    if(table->getAt(name,id)==Acad::eOk)return id;
+    AcDbDimStyleTableRecord* st=new AcDbDimStyleTableRecord();st->setName(name);
+    st->setDimtxsty(textStyle);st->setDimtxt(th);st->setDimasz(0.8*th);st->setDimscale(1);st->setDimlfac(f);
+    st->setDimdec(0);st->setDimgap(0.4*th);st->setDimexo(0.4*th);st->setDimexe(0.6*th);st->setDimtad(0);
+    if(table->add(id,st)!=Acad::eOk){delete st;return db->dimstyle();}
+    st->close();return id;
+}
+inline void dimension(AcDbBlockTableRecord* btr,double x,double y0,double y1,double xline,const wchar_t* text,const AcDbObjectId& style,const AcDbObjectId& layerId){
+    if(!(y1-y0>1e-9))return;
+    AcDbRotatedDimension* d=new AcDbRotatedDimension(3.14159265358979323846/2,AcGePoint3d(x,y0,0),AcGePoint3d(x,y1,0),AcGePoint3d(xline,(y0+y1)/2,0),text,style);
+    d->setDatabaseDefaults(btr->database());d->setDimensionStyle(style);
+    const AcDbObjectId id=append(btr,d,layerId);
+    AcDbObjectPointer<AcDbRotatedDimension> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk)o->recomputeDimBlock(true);
+}
 // Rebuilds the block contents from the stored parameters. Returns the number of ducts cut.
 inline int build(AcDbBlockTableRecord* btr,const Params& p){
     AcDbDatabase* db=btr->database();const double f=tvsUnits::factor(db);
@@ -141,8 +161,9 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
         }
         wchar_t size[64];
         if(c.round)swprintf_s(size,L"%%%%c%.0f",c.A*f);else swprintf_s(size,L"%.0fx%.0f",c.A*f,c.B*f);
-        text(btr,AcGePoint3d(x,y+hh+gap+th/2,0),size,th,style,layerId);
-        const std::wstring bottom=L"dno "+level(c.z-hh,f);
+        text(btr,AcGePoint3d(x,y+hh+gap+1.9*th,0),size,th,style,layerId);
+        const std::wstring top=L"gi "+level(c.z+hh,f),bottom=L"di "+level(c.z-hh,f);
+        text(btr,AcGePoint3d(x,y+hh+gap+th/2,0),top.c_str(),th,style,layerId);
         text(btr,AcGePoint3d(x,y-hh-gap-th/2,0),bottom.c_str(),th,style,layerId);
         for(size_t j=0;j<i;++j)if(tvsSection::overlap(cuts[j],c)){
             acutPrintf(L"\nPresjek %ls: kanali se preklapaju kod %.0f mm od pocetka linije.",p.letter.c_str(),c.s*f);break;}
@@ -153,11 +174,39 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
     AcDbObjectId dashed;
     if(p.hidden){tvsLinetypes::ensure(db);AcDbLinetypeTable* lt=NULL;
         if(db->getLinetypeTable(lt,AcDb::kForRead)==Acad::eOk){lt->getAt(L"tvs_hidden",dashed);lt->close();}}
-    for(size_t i=0;i<edges.size();++i){const tvsSection::Edge& g=edges[i];
-        if(g.hidden&&!p.hidden)continue;
-        AcDbLine* l=new AcDbLine(AcGePoint3d(g.x0,g.y0-p.floor,0),AcGePoint3d(g.x1,g.y1-p.floor,0));
-        const AcDbObjectId id=append(btr,l,layerId);
-        if(g.hidden&&!dashed.isNull()){AcDbObjectPointer<AcDbLine> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk){o->setLinetype(dashed);o->setLinetypeScale(1/f);}}
+    for(size_t i=0;i<edges.size();++i){const tvsSection::Edge& e=edges[i];const tvsSection::Prim& g=e.g;
+        if(e.hidden&&!p.hidden)continue;
+        AcDbEntity* ent=NULL;
+        if(!g.arc)ent=new AcDbLine(AcGePoint3d(g.x0,g.y0-p.floor,0),AcGePoint3d(g.x1,g.y1-p.floor,0));
+        else if(std::fabs(std::fabs(g.k)-1)<1e-3){   // true arc (elbow plane parallel to the section)
+            double b0=g.k>0?g.a0:3.14159265358979323846-g.a0,b1=g.k>0?g.a1:3.14159265358979323846-g.a1;if(b1<b0)std::swap(b0,b1);
+            if(b1-b0<1e-9||g.r<1e-9)continue;
+            ent=new AcDbArc(AcGePoint3d(g.cx,g.cy-p.floor,0),g.r,b0,b1);
+        }else{   // oblique: projected arc as a fine polyline
+            AcDbPolyline* pl=new AcDbPolyline(33);
+            for(int k=0;k<=32;++k){const tvsSection::P q=g.at(k/32.0);pl->addVertexAt(k,AcGePoint2d(q.x,q.y-p.floor));}
+            ent=pl;
+        }
+        const AcDbObjectId id=append(btr,ent,layerId);
+        if(e.hidden&&!dashed.isNull()){AcDbObjectPointer<AcDbEntity> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk){o->setLinetype(dashed);o->setLinetypeScale(1/f);}}
+    }
+    // edge elevations of the straight level pieces seen in depth (where visible)
+    const std::vector<tvsSection::View> cover=tvsSection::cover(cuts,views);
+    for(size_t i=0;i<views.size();++i){const tvsSection::View& v=views[i];
+        if(!v.level()||v.x1-v.x0<8*th)continue;
+        const double x=(v.x0+v.x1)/2,zt=v.zc0+v.h/2,zb=v.zc0-v.h/2;
+        if(!tvsSection::covered(cover,v.tag,v.closest,x,zt-1e-6)){const std::wstring t=L"gi "+level(zt,f);text(btr,AcGePoint3d(x,zt-p.floor+gap+th/2,0),t.c_str(),th,style,layerId);}
+        if(!tvsSection::covered(cover,v.tag,v.closest,x,zb+1e-6)){const std::wstring t=L"di "+level(zb,f);text(btr,AcGePoint3d(x,zb-p.floor-gap-th/2,0),t.c_str(),th,style,layerId);}
+    }
+    // clear distances: between stacked ducts (razmak) and below the lower one (svijetla visina)
+    {
+        const std::vector<tvsSection::Gap> g=tvsSection::gaps(cuts,views,2*th);
+        const AcDbObjectId dim=dimStyle(db,th,f,style);
+        for(size_t i=0;i<g.size();++i){
+            const double x=g[i].x;
+            dimension(btr,x,g[i].low-p.floor,g[i].high-p.floor,x,L"razmak <>",dim,layerId);
+            if(g[i].lowBottom>p.floor)dimension(btr,x+3*th,0,g[i].lowBottom-p.floor,x+3*th,L"h=<>",dim,layerId);
+        }
     }
     const std::wstring title=L"PRESJEK "+p.letter+L"-"+p.letter;
     text(btr,AcGePoint3d(L/2,-4*th,0),title.c_str(),1.4*th,style,layerId);
