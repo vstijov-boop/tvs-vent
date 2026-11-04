@@ -119,6 +119,7 @@ jobs:
           Copy-Item "$output/*.arx", "$output/*.dbx" dist-bypass-preview
           Copy-Item development/BYPASS_DEV_GUIDE.md, development/OFFSET_INT00_GUIDE.md, development/OFFSET_PROOF_GUIDE.md, development/OFFSET_INTEGRATION_GUIDE.md, development/bypass-preview/GUIDE.md, development/bypass-preview/UI_READABILITY.md, development/bypass-preview/SIDE_DETAIL.md dist-bypass-preview
           Copy-Item Installer/TVS_TOOLS/KGTEZ.lsp dist-bypass-preview
+          Copy-Item Installer/TVS_VENT/TVS_VENT.cuix, Installer/TVS_TOOLS/TVS_TOOLS.cuix, development/TESTIRANJE.md dist-bypass-preview
           Copy-Item Installer/Resources/TVS_Oznake.dwg dist-bypass-preview
           "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nDEVELOPMENT ONLY: TVS_BYPASS and Obilazak during TVS_PIPE/TVS_DRAW. Parent over two unchanged V1 triples plus H. No exact hidden-line visibility. TVSBypassPreview=true; TVS_BYPASS_PREVIEW. Standard static side-detail block insertion remains available and unlinked. TVSOffsetProof=true / TVSOffsetIntegration=true / TVS_OFFSET_INTEGRATION`nNo AutoCAD runtime tests executed by CI. Development integration: runtime verification still required." | Out-File dist-bypass-preview/BUILD.txt -Encoding utf8
       - uses: actions/upload-artifact@v4
