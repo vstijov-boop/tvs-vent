@@ -10,5 +10,7 @@ class MatchContract(unittest.TestCase):
   self.assertIn('tvsTeeFit::farEnd(AcDbObjectId::kNull,widened[i],true,tol,f);tvsTeeFit::farEnd(AcDbObjectId::kNull,widened[i],false,tol,f);',m,'width step at both ends gets a transition')
   self.assertIn('const double axis=targetAxis(src,t->SizeA,t->SizeB,o.reference);',m)
   self.assertIn('if(pipe->ThisRound!=src.round)++skippedShape;',m,'no round/rectangular conversion')
+  self.assertIn('acedInitGet(0,L"Dimenzije Kota Referenca Tip Prikaz prOtok Sloj");',m,'keyword letters unique (R = Referenca, O = prOtok)')
+  self.assertIn('if(rc==RTNORM&&!_wcsicmp(kw,L"Mreza")){if(!network(db,tol,targets))return;}',m)
   for line in m.splitlines():self.assertFalse(line.rstrip().endswith('L"'))
 if __name__=='__main__':unittest.main()
