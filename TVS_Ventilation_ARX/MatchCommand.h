@@ -1,6 +1,6 @@
 #pragma once
 // TVS_MATCH: TVS properties of one source duct onto selected TVS elements (MATCHPROP does not
-// know them). Groups (Podesavanja): Dimenzije (ducts only), Kota (axis / top / bottom of the
+// know them). Groups (settings dialog IDD_MATCHSET): Dimenzije (ducts only), Kota (axis / top / bottom of the
 // source), Tip (kruti / flex, ducts only), Prikaz (maskiranje, ivice, 1D), Protok, Sloj (layer,
 // colour, linetype). After a width change, each end of a changed duct that meets an element of
 // another width gets a transition (TeeNeighbours.h); elevation steps to elements outside the
@@ -15,30 +15,56 @@
 #include "ElevationShift.h"
 #include "TransAlignCommand.h"
 #include <utility>
+#include "resource.h"
+#include "adui.h"
 #include <set>
 #include <vector>
 namespace tvsMatch {
 struct Options {bool size,elevation,type,display,flow,layer;int reference; // 0 osa, 1 vrh, 2 dno
     Options():size(true),elevation(true),type(true),display(true),flow(false),layer(true),reference(0){}};
 inline Options& options(){static Options o;return o;}
-inline const wchar_t* yes(bool v){return v?L"Da":L"Ne";}
-inline const wchar_t* refName(int r){return r==1?L"Vrh":r==2?L"Dno":L"Osa";}
-inline void settings(){
-    for(;;){
-        Options& o=options();
-        acutPrintf(L"\nPrenosi: Dimenzije=%ls Kota=%ls (%ls) Tip=%ls Prikaz=%ls Protok=%ls Sloj=%ls",
-            yes(o.size),yes(o.elevation),refName(o.reference),yes(o.type),yes(o.display),yes(o.flow),yes(o.layer));
-        acedInitGet(0,L"Dimenzije Kota Referenca Tip Prikaz prOtok Sloj");ACHAR kw[32]=L"";
-        const int rc=acedGetKword(L"\nPromijeni [Dimenzije/Kota/Referenca/Tip/Prikaz/prOtok/Sloj] <Gotovo>: ",kw);
-        if(rc!=RTNORM)return;
-        if(!_wcsicmp(kw,L"Dimenzije"))o.size=!o.size;
-        else if(!_wcsicmp(kw,L"Kota"))o.elevation=!o.elevation;
-        else if(!_wcsicmp(kw,L"Referenca"))o.reference=(o.reference+1)%3;
-        else if(!_wcsicmp(kw,L"Tip"))o.type=!o.type;
-        else if(!_wcsicmp(kw,L"Prikaz"))o.display=!o.display;
-        else if(!_wcsicmp(kw,L"prOtok"))o.flow=!o.flow;   // O: R belongs to Referenca
-        else if(!_wcsicmp(kw,L"Sloj"))o.layer=!o.layer;
+// Kept per user (HKCU\Software\TVS_Vent\MatchOptions): bits D K T P O S, reference, Mreza.
+inline const wchar_t* regKey(){return L"Software\\TVS_Vent";}
+inline void load(Options& o,bool& network){
+    HKEY k=NULL;if(RegOpenKeyExW(HKEY_CURRENT_USER,regKey(),0,KEY_READ,&k)!=ERROR_SUCCESS)return;
+    DWORD v=0,size=sizeof(v),type=0;
+    if(RegQueryValueExW(k,L"MatchOptions",NULL,&type,reinterpret_cast<LPBYTE>(&v),&size)==ERROR_SUCCESS&&type==REG_DWORD&&(v&0x80000000u)){
+        o.size=(v&1)!=0;o.elevation=(v&2)!=0;o.type=(v&4)!=0;o.display=(v&8)!=0;o.flow=(v&16)!=0;o.layer=(v&32)!=0;
+        o.reference=static_cast<int>((v>>8)&3);if(o.reference>2)o.reference=0;network=(v&(1u<<12))!=0;}
+    RegCloseKey(k);
+}
+inline void save(const Options& o,bool network){
+    const DWORD v=0x80000000u|(o.size?1:0)|(o.elevation?2:0)|(o.type?4:0)|(o.display?8:0)|(o.flow?16:0)|(o.layer?32:0)|(static_cast<DWORD>(o.reference)<<8)|(network?1u<<12:0);
+    HKEY k=NULL;if(RegCreateKeyExW(HKEY_CURRENT_USER,regKey(),0,NULL,0,KEY_WRITE,NULL,&k,NULL)!=ERROR_SUCCESS)return;
+    RegSetValueExW(k,L"MatchOptions",0,REG_DWORD,reinterpret_cast<const BYTE*>(&v),sizeof(v));RegCloseKey(k);
+}
+// Settings dialog shown on every TVS_MATCH (after the source is picked).
+class Dialog : public CAdUiBaseDialog {
+public:
+    Options o;bool network;
+    Dialog():CAdUiBaseDialog(IDD_MATCHSET,NULL,NULL),network(false){}
+    virtual BOOL OnInitDialog(){
+        CAdUiBaseDialog::OnInitDialog();
+        CheckDlgButton(1101,o.size);CheckDlgButton(1102,o.elevation);CheckDlgButton(1104,o.type);
+        CheckDlgButton(1105,o.display);CheckDlgButton(1106,o.flow);CheckDlgButton(1107,o.layer);
+        if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(1103))){c->AddString(L"Osa");c->AddString(L"Vrh (gornja ivica)");c->AddString(L"Dno (donja ivica)");c->SetCurSel(o.reference);}
+        CheckRadioButton(1108,1109,network?1109:1108);
+        return TRUE;
     }
+    virtual void OnOK(){
+        o.size=IsDlgButtonChecked(1101)==BST_CHECKED;o.elevation=IsDlgButtonChecked(1102)==BST_CHECKED;o.type=IsDlgButtonChecked(1104)==BST_CHECKED;
+        o.display=IsDlgButtonChecked(1105)==BST_CHECKED;o.flow=IsDlgButtonChecked(1106)==BST_CHECKED;o.layer=IsDlgButtonChecked(1107)==BST_CHECKED;
+        if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(1103))){const int r=c->GetCurSel();if(r>=0&&r<=2)o.reference=r;}
+        network=IsDlgButtonChecked(1109)==BST_CHECKED;
+        CAdUiBaseDialog::OnOK();
+    }
+};
+inline bool ask(bool& network){
+    static bool loaded=false;static bool lastNetwork=false;
+    if(!loaded){load(options(),lastNetwork);loaded=true;}
+    Dialog dg;dg.o=options();dg.network=lastNetwork;
+    {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return false;}
+    options()=dg.o;lastNetwork=network=dg.network;save(dg.o,dg.network);return true;
 }
 struct Source {double A,B,elev,flow,wipeLength;bool round,wipe,grani,oneD;int ductType;AcDbObjectId id;};
 inline double height(double A,double B){return B>0?B:A;}   // round: diameter
@@ -70,9 +96,8 @@ inline void run(){
     const double f=tvsUnits::factor(db),tol=2.0/f;
     Source src;
     for(;;){
-        ads_name name;ads_point pick;acedInitGet(0,L"Podesavanja");
-        const int rc=acedEntSel(L"\nIzaberite izvorni TVS kanal ili [Podesavanja]: ",name,pick);
-        if(rc==RTKWORD){settings();continue;}
+        ads_name name;ads_point pick;
+        const int rc=acedEntSel(L"\nIzaberite izvorni TVS kanal: ",name,pick);
         if(rc!=RTNORM)return;
         AcDbObjectId id;if(acdbGetObjectId(id,name)!=Acad::eOk)return;
         AcDbObjectPointer<TVS_Pipe> p(id,AcDb::kForRead);
@@ -82,18 +107,14 @@ inline void run(){
         break;
     }
     std::vector<AcDbObjectId> targets;bool whole=false;
-    {
-        acedInitGet(0,L"Izbor Mreza");ACHAR kw[32]=L"";
-        const int rc=acedGetKword(L"\nCiljevi [Izbor/Mreza (povezani elementi)] <Izbor>: ",kw);
-        if(rc!=RTNORM&&rc!=RTNONE)return;
-        if(rc==RTNORM&&!_wcsicmp(kw,L"Mreza")){if(!network(db,tol,targets))return;whole=true;}
-        else{
-            ads_name ss;acutPrintf(L"\nIzaberite ciljne TVS elemente: ");
-            if(acedSSGet(NULL,NULL,NULL,NULL,ss)!=RTNORM)return;
-            Adesk::Int32 count=0;acedSSLength(ss,&count);
-            for(Adesk::Int32 i=0;i<count;++i){ads_name en;AcDbObjectId id;if(acedSSName(ss,i,en)==RTNORM&&acdbGetObjectId(id,en)==Acad::eOk)targets.push_back(id);}
-            acedSSFree(ss);
-        }
+    if(!ask(whole))return;   // settings dialog: what is transferred, Izbor / Mreza
+    if(whole){if(!network(db,tol,targets))return;}
+    else{
+        ads_name ss;acutPrintf(L"\nIzaberite ciljne TVS elemente: ");
+        if(acedSSGet(NULL,NULL,NULL,NULL,ss)!=RTNORM)return;
+        Adesk::Int32 count=0;acedSSLength(ss,&count);
+        for(Adesk::Int32 i=0;i<count;++i){ads_name en;AcDbObjectId id;if(acedSSName(ss,i,en)==RTNORM&&acdbGetObjectId(id,en)==Acad::eOk)targets.push_back(id);}
+        acedSSFree(ss);
     }
     const Options o=options();
     std::set<AcDbObjectId> selected;std::vector<AcDbObjectId> widened,raised;

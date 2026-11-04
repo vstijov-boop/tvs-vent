@@ -321,6 +321,27 @@ BEGIN
     LTEXT           "* ne važi za centar",-1,381,113,90,12
 END
 
+IDD_MATCHSET DIALOGEX 0, 0, 232, 186
+STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTERMOUSE | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "TVS_MATCH — prenos svojstava"
+FONT 8, "Tahoma", 0, 0, 0x0
+BEGIN
+    GROUPBOX        "Šta se prenosi sa izvornog kanala",-1,7,5,218,104
+    CONTROL         "Dimenzije (kanali i prelazi)",1101,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,18,120,10
+    CONTROL         "Visinska kota",1102,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,32,70,10
+    LTEXT           "Referenca:",-1,95,33,40,10
+    COMBOBOX        1103,140,31,78,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Tip kanala (kruti / fleksibilni)",1104,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,46,140,10
+    CONTROL         "Prikaz (maskiranje, ivice, 1D)",1105,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,60,140,10
+    CONTROL         "Protok",1106,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,74,70,10
+    CONTROL         "Sloj, boja i tip linije",1107,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,88,120,10
+    GROUPBOX        "Ciljni elementi",-1,7,112,218,46
+    CONTROL         "Izbor: samo izabrani elementi",1108,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,15,124,200,10
+    CONTROL         "Mreža: svi povezani elementi (kota: cijela mreža se pomjera)",1109,"Button",BS_AUTORADIOBUTTON,15,138,205,10
+    DEFPUSHBUTTON   "U redu",IDOK,110,165,55,15
+    PUSHBUTTON      "Otkaži",IDCANCEL,170,165,55,15
+END
+
 IDD_HANGEZDG DIALOGEX 0, 0, 160, 82
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Promjena kote Z"

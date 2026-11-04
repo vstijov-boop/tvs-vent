@@ -34,6 +34,7 @@
 #define IDR_TVSPROPERTYNoteDYN          114
 #define IDR_TVSPROPERTYZDYN             115
 #define IDR_TVSPROPERTYAADYN            116
+#define IDD_MATCHSET                    117
 
 // Next default values for new objects
 // 
