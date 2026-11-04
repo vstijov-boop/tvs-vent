@@ -7,6 +7,7 @@
 #include "../geometry/Section.h"
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 #include "../TVS_Ventilation_DBX/TVS_TRANS.h"
+#include "../TVS_Ventilation_DBX/TVS_TAP.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "TVSMoveCommand.h"
 #include "TvsLinetypes.h"
@@ -44,10 +45,14 @@ inline AcDbObjectId textStyle(AcDbDatabase* db){
     return table->getAt(L"TVS_TextStyle",id)==Acad::eOk?id:db->textstyle();
 }
 // TVS network as plan members (see geometry/Section.h).
+// TVS network as plan members (see geometry/Section.h). Sloped piece of a Z prelaz / obilazak:
+// axis z at its ends from the assembly record (rise). Vertical elbows (Gore / Nadolje): one
+// member between their ports, end elevations taken from the elements they join.
 inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
     AcDbObjectPointer<AcDbBlockTableRecord> space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
-    int tag=0;
+    const double f=tvsUnits::factor(db),tol=2.0/f;
+    int tag=0;std::vector<size_t> bends;std::vector<double> bendElev;
     for(;!it->done();it->step()){
         AcDbEntity* e=NULL;if(it->getEntity(e,AcDb::kForRead)!=Acad::eOk)continue;
         tvsMove::Node n;
@@ -55,13 +60,39 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
             ++tag;
             auto add=[&](const tvsMove::Point& a,const tvsMove::Point& b,const tvsMoveNetwork::Section& sa,const tvsMoveNetwork::Section& sb){
                 tvsSection::Member m;m.a=tvsSection::P(a.x,a.y);m.b=tvsSection::P(b.x,b.y);
-                m.A1=sa.a;m.B1=sa.b;m.A2=sb.a;m.B2=sb.b;m.round=sa.round;m.z=n.elevation;m.tag=tag;out.push_back(m);};
-            if(TVS_Pipe::cast(e)||TVS_TRANS::cast(e))add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);
+                m.A1=sa.a;m.B1=sa.b;m.A2=sb.a;m.B2=sb.b;m.round=sa.round;m.z=m.za=m.zb=n.elevation;m.tag=tag;out.push_back(m);};
+            TVS_TAP* tap=TVS_TAP::cast(e);
+            if(TVS_Pipe::cast(e)||TVS_TRANS::cast(e)){
+                add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);
+#ifdef TVS_OFFSET_INTEGRATION
+                tvsOffsetData::Record r;
+                if(TVS_Pipe::cast(e)&&tvsOffsetData::read(e,r)==tvsOffsetData::Valid&&r.role==tvsOffsetData::SlopedStraight&&std::fabs(r.rise)>1e-9){
+                    tvsSection::Member& m=out.back();m.sloped=true;m.za=n.elevation-r.rise/2/f;m.zb=n.elevation+r.rise/2/f;}
+#endif
+            }
+            else if(tap&&tap->get_Form()!=Form_Direct){   // vertical elbow
+                add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);out.back().sloped=true;
+                bends.push_back(out.size()-1);bendElev.push_back(n.elevation);
+            }
             else for(size_t j=0;j<n.ports.size();++j)add(n.middle,n.ports[j],n.sections[j],n.sections[j]);
         }
         e->close();
     }
     delete it;
+    // vertical elbows: each end at the elevation of the member it joins (nearest to the elbow's own)
+    for(size_t k=0;k<bends.size();++k){
+        tvsSection::Member& m=out[bends[k]];
+        for(int end=0;end<2;++end){
+            const tvsSection::P q=end?m.b:m.a;double best=bendElev[k],gap=-1;
+            for(size_t i=0;i<out.size();++i){if(out[i].tag==m.tag)continue;
+                bool isBend=false;for(size_t j=0;j<bends.size();++j)if(bends[j]==i)isBend=true;if(isBend)continue;
+                const tvsSection::Member& o=out[i];
+                for(int oe=0;oe<2;++oe){const tvsSection::P r=oe?o.b:o.a;if(std::hypot(r.x-q.x,r.y-q.y)>tol)continue;
+                    const double z=o.zAt(oe?1.0:0.0),g=std::fabs(z-bendElev[k]);if(gap<0||g<gap){gap=g;best=z;}}}
+            if(end)m.zb=best;else m.za=best;
+        }
+        if(std::fabs(m.zb-m.za)<=1e-9)m.sloped=false;
+    }
 }
 inline AcDbObjectId append(AcDbBlockTableRecord* btr,AcDbEntity* e,const AcDbObjectId& layerId){
     e->setDatabaseDefaults(btr->database());e->setLayer(layerId);AcDbObjectId id;
@@ -117,7 +148,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
             acutPrintf(L"\nPresjek %ls: kanali se preklapaju kod %.0f mm od pocetka linije.",p.letter.c_str(),c.s*f);break;}
     }
     // elements behind the section plane (dubina), thin outline; covered parts left out or dashed
-    const std::vector<tvsSection::View> views=tvsSection::views(a,b,net,p.flip,p.depth);
+    const std::vector<tvsSection::View> views=tvsSection::views(a,b,net,p.flip,p.depth,2.0/f);
     const std::vector<tvsSection::Edge> edges=tvsSection::edges(cuts,views);
     AcDbObjectId dashed;
     if(p.hidden){tvsLinetypes::ensure(db);AcDbLinetypeTable* lt=NULL;

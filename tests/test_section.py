@@ -41,17 +41,35 @@ int main(){
    Member out3=q;out3.a=P(0,3000);out3.b=P(2000,3000);out3.tag=12;m2.push_back(out3);                           // outside the depth
    const P s1(0,0),s2(2000,0);   // looking +y (left of +x)
    std::vector<Cut> cc=cuts(s1,s2,m2,false,1);assert(cc.size()==1&&near(cc[0].s,500));
-   std::vector<View> vv=views(s1,s2,m2,false,1000);
-   bool par=false,outside=false;for(size_t i=0;i<vv.size();++i){if(vv[i].tag==11){par=near(vv[i].x0,0)&&near(vv[i].x1,2000)&&near(vv[i].z0,900)&&near(vv[i].z1,1100)&&near(vv[i].closest,500);}if(vv[i].tag==12)outside=true;}
+   std::vector<View> vv=views(s1,s2,m2,false,1000,1);
+   bool par=false,outside=false;for(size_t i=0;i<vv.size();++i){if(vv[i].tag==11){par=near(vv[i].x0,0)&&near(vv[i].x1,2000)&&near(vv[i].zc0,1000)&&near(vv[i].zc1,1000)&&near(vv[i].h,200)&&near(vv[i].closest,500);}if(vv[i].tag==12)outside=true;}
    assert(par&&!outside);
    std::vector<Edge> ee=edges(cc,vv);
    // the parallel duct's top edge (z=1100) is hidden between x=400 and x=600 by the cut 200x300 at z=1000
    bool hidden=false,left=false;for(size_t i=0;i<ee.size();++i){const Edge& g=ee[i];
-     if(near(g.y0,1100)&&near(g.y1,1100)&&g.hidden&&near(g.x0,400)&&near(g.x1,600))hidden=true;
-     if(near(g.y0,1100)&&!g.hidden&&near(g.x0,0)&&near(g.x1,400))left=true;}
+     if(near(g.y0,1100)&&near(g.y1,1100)&&g.hidden&&near(g.x0,400,1e-6)&&near(g.x1,600,1e-6))hidden=true;   // change points refined
+     if(near(g.y0,1100)&&!g.hidden&&near(g.x0,0)&&near(g.x1,400,1e-6))left=true;}
    assert(hidden&&left);
    // flipped: looking -y, nothing behind (members at +y are in front of the plane)
-   assert(views(s1,s2,m2,true,1000).size()==1);   // only the crossing duct's part at y<0
+   assert(views(s1,s2,m2,true,1000,1).size()==1);   // only the crossing duct's part at y<0
+ }
+ // Z prelaz seen from the side: level 2000 -> sloped -> level 2600, parallel to the section 300 behind
+ { std::vector<Member> z3;const P s1(0,0),s2(3000,0);
+   Member l1;l1.a=P(0,300);l1.b=P(1000,300);l1.A1=l1.A2=400;l1.B1=l1.B2=200;l1.z=2000;l1.tag=1;z3.push_back(l1);
+   Member sl=l1;sl.a=P(1000,300);sl.b=P(1600,300);sl.sloped=true;sl.za=2000;sl.zb=2600;sl.tag=2;z3.push_back(sl);
+   Member l2=l1;l2.a=P(1600,300);l2.b=P(3000,300);l2.z=2600;l2.tag=3;z3.push_back(l2);
+   Member riser=l1;riser.a=riser.b=P(2500,100);riser.sloped=true;riser.za=2600;riser.zb=3200;riser.tag=4;z3.push_back(riser);
+   std::vector<View> v=views(s1,s2,z3,false,1000,1);assert(v.size()==4);
+   bool slope=false,vert=false;for(size_t i=0;i<v.size();++i){
+     if(v[i].tag==2)slope=near(v[i].x0,1000)&&near(v[i].x1,1600)&&near(v[i].zc0,2000)&&near(v[i].zc1,2600);
+     if(v[i].tag==4)vert=v[i].vertical&&near(v[i].x0,2300)&&near(v[i].x1,2700)&&near(v[i].zc0,2900)&&near(v[i].h,600);}
+   assert(slope&&vert);
+   // sloped top edge drawn as one straight (not stepped) visible line
+   std::vector<Edge> e=edges(std::vector<Cut>(),v);bool top=false;
+   for(size_t i=0;i<e.size();++i)if(!e[i].hidden&&near(e[i].x0,1000)&&near(e[i].y0,2100)&&near(e[i].x1,1600)&&near(e[i].y1,2700))top=true;
+   assert(top);
+   // cut through the sloped piece: elevation interpolated
+   Cut c;assert(cut(P(1300,0),P(1300,1000),sl,c)&&near(c.z,2300));
  }
  std::puts("PASS SECTION cuts");
 }
