@@ -156,58 +156,58 @@ STDMETHODIMP CComTrans::GetDisplayName (DISPID dispId, BSTR *propName)
 	{
 		// стандартное 
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Переход")); 
+		*propName  = ::SysAllocString(_T("Prelaz"));
 		break; 
 
 	case (DISPID_A): 
-		*propName  = ::SysAllocString(L"Dпр"); 
+		*propName  = ::SysAllocString(L"Dpr");
 		break; 
 
 	case (DISPID_SizeB): 
-		*propName  = ::SysAllocString(L"Hпр"); 
+		*propName  = ::SysAllocString(L"Hpr");
 		break; 
 	case (DISPID_A2): 
-		*propName  = ::SysAllocString(L"Dпр2"); 
+		*propName  = ::SysAllocString(L"Dpr2");
 		break; 
 
 	case (DISPID_SizeB2): 
-		*propName  = ::SysAllocString(L"Hпр2"); 
+		*propName  = ::SysAllocString(L"Hpr2");
 		break; 
 
 		//case (DISPID_Flow): 
-		//	*propName  = ::SysAllocString(L"L="); 
+		//	*propName  = ::SysAllocString(L"Protok, m³/h");
 		//	break; 
 		//case (DISPID_Speed): 
-		//	*propName  = ::SysAllocString(L"v="); 
+		//	*propName  = ::SysAllocString(L"Brzina, m/s");
 		//	break; 
 
 
 
 
 	case (DISPID_Length): 
-		*propName  = ::SysAllocString(L"Длина"); 
+		*propName  = ::SysAllocString(L"Dužina");
 		break; 
 	case (DISPID_1D2D): 
-		*propName  = ::SysAllocString(L"1D"); 
+		*propName  = ::SysAllocString(L"Prikaz 1D");
 		break; 
 	case (DISPID_Rotation): 
-		*propName  = ::SysAllocString(L"Угол"); 
+		*propName  = ::SysAllocString(L"Ugao rotacije");
 		break; 
 
 	case (DISPID_Wipeout): 
-		*propName  = ::SysAllocString(L"Маскировка"); 
+		*propName  = ::SysAllocString(L"Maskiranje");
 		break; 
 	case (DISPID_TransType): 
-		*propName  = ::SysAllocString(L"Тип"); 
+		*propName  = ::SysAllocString(L"Tip");
 		break; 
 	case (DISPID_Elev): 
-		*propName  = ::SysAllocString(L"Отм. Центр"); 
+		*propName  = ::SysAllocString(L"Kota ose");
 		break; 
 	case (DISPID_Tag1): 
-		*propName  = ::SysAllocString(L"Тэг 1"); 
+		*propName  = ::SysAllocString(L"Oznaka 1");
 		break;
 	case (DISPID_Tag2): 
-		*propName  = ::SysAllocString(L"Тэг 2"); 
+		*propName  = ::SysAllocString(L"Oznaka 2");
 		break;
 	} 
 	return S_OK; 
@@ -224,6 +224,7 @@ STDMETHODIMP CComTrans::get_Dpr(double *pVal)
 	size = pSq->SizeAp1;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -236,6 +237,8 @@ STDMETHODIMP CComTrans::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeAp1(newVal);
 	Fire_Notification(DISPID_A);
@@ -254,6 +257,7 @@ STDMETHODIMP CComTrans::get_SizeB(double *pVal)
 	size = pSq->SizeBp1;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -266,6 +270,8 @@ STDMETHODIMP CComTrans::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBp1(newVal);
@@ -287,6 +293,7 @@ STDMETHODIMP CComTrans::get_Dpr2(double *pVal)
 	size = pSq->SizeAp2;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -299,6 +306,8 @@ STDMETHODIMP CComTrans::put_Dpr2(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeAp2(newVal);
 	Fire_Notification(DISPID_A2);
@@ -317,6 +326,7 @@ STDMETHODIMP CComTrans::get_SizeB2(double *pVal)
 	size = pSq->SizeBp2;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -329,6 +339,8 @@ STDMETHODIMP CComTrans::put_SizeB2(double newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBp2(newVal);
@@ -353,6 +365,7 @@ STDMETHODIMP CComTrans::get_Length(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -365,6 +378,8 @@ STDMETHODIMP CComTrans::put_Length(double  newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Length(newVal);
@@ -558,6 +573,7 @@ STDMETHODIMP CComTrans::get_Elev(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -570,6 +586,8 @@ STDMETHODIMP CComTrans::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);
@@ -652,3 +670,39 @@ STDMETHODIMP CComTrans::put_Elev(double  newVal)
 // 
 // 	return S_OK;
 // }
+
+STDMETHODIMP CComTrans::get_SheetArea(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 0, pVal);
+}
+
+STDMETHODIMP CComTrans::get_SheetThickness(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 1, pVal);
+}
+
+STDMETHODIMP CComTrans::get_SheetMass(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TRANS> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 2, pVal);
+}
+
+STDMETHODIMP CComTrans::ShowProperty(DISPID dispId, BOOL *show)
+{
+    if (!show) return E_POINTER;
+    if (dispId >= DISPID_SheetArea && dispId <= DISPID_SheetMass) {
+        // Automation keeps the original VARIANT accessors. OPM gets the typed
+        // dynamic properties registered by the ARX, without duplicate rows.
+        *show=FALSE;
+        return S_OK;
+    }
+    return IOPMPropertyExtensionImpl<CComTrans>::ShowProperty(dispId,show);
+}

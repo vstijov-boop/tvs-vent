@@ -1,6 +1,9 @@
 ﻿#pragma once;
 #include "StdAfx.h"
 #include "Func.h"
+#include "ElbowDirection.h"
+#include "TeeEditDialog.h"
+#include "TransAlignCommand.h"
 
 
 
@@ -252,9 +255,9 @@ bool func::correctpipes(AcGePoint3d &A,
 	AcGePoint3d pB1, pB2;
 	double plength1, plength2, negatvel;
 	double flanez = 0;
-	if ((pThisRound == true) && (pSizeA < 630))
+	if ((pThisRound == true) && (pSizeA * tvsUnits::factor() < 630))
 	{
-		flanez = 45;
+		flanez = 45 / tvsUnits::factor();
 	}
 	plength1 = length2p(A, B);
 	plength2 = length2p(B, C);
@@ -329,17 +332,17 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	const ACHAR*t5)
 {
 	AcGePoint3d pos1, pos2, pos3, pos4, pos5;
-	pos1 = AcGePoint3d(cent.x + 300, cent.y + 50, cent.z);
-	pos2 = AcGePoint3d(cent.x + 300 + 5500, cent.y + 50, cent.z);
-	pos3 = AcGePoint3d(cent.x + 300 + 6400, cent.y + 50, cent.z);
-	pos4 = AcGePoint3d(cent.x + 300 + 7500, cent.y + 50, cent.z);
-	pos5 = AcGePoint3d(cent.x + 300 + 8400, cent.y + 50, cent.z);
+	pos1 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos2 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (5500.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos3 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (6400.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos4 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (7500.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
+	pos5 = AcGePoint3d(cent.x + (300.0 / tvsUnits::factor()) + (8400.0 / tvsUnits::factor()), cent.y + (50.0 / tvsUnits::factor()), cent.z);
 
 	AcDbDatabase *db = acdbHostApplicationServices()->workingDatabase();
 
 	AcDbObjectId tId = db->textstyle();
 	///
-	AcDbText *text1 = new AcDbText(pos1, t1, tId, 250, 0);
+	AcDbText *text1 = new AcDbText(pos1, t1, tId, (250.0 / tvsUnits::factor()), 0);
 
 	AcDbBlockTable *pBlockTable;
 	acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -357,7 +360,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	if ((wcscmp(t2, _T("")) != 0))
 	{
 
-		AcDbText *text2 = new AcDbText(pos2, t2, tId, 250, 0);
+		AcDbText *text2 = new AcDbText(pos2, t2, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -376,7 +379,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	//
 	if ((wcscmp(t3, _T("")) != 0))
 	{
-		AcDbText *text3 = new AcDbText(pos3, t3, tId, 250, 0);
+		AcDbText *text3 = new AcDbText(pos3, t3, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -396,7 +399,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 	//
 	if ((wcscmp(t4, _T("")) != 0))
 	{
-		AcDbText *text4 = new AcDbText(pos4, t4, tId, 250, 0);
+		AcDbText *text4 = new AcDbText(pos4, t4, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -414,7 +417,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 
 	if ((wcscmp(t5, _T("")) != 0))
 	{
-		AcDbText *text5 = new AcDbText(pos5, t5, tId, 250, 0);
+		AcDbText *text5 = new AcDbText(pos5, t5, tId, (250.0 / tvsUnits::factor()), 0);
 
 
 		acdbHostApplicationServices()->workingDatabase()->getSymbolTable(pBlockTable,
@@ -430,7 +433,7 @@ AcGePoint3d func::AddSpecLine(AcGePoint3d cent,
 		text5->close();
 	}
 	//
-	return (AcGePoint3d(cent.x, cent.y - 800, cent.z));
+	return (AcGePoint3d(cent.x, cent.y - (800.0 / tvsUnits::factor()), cent.z));
 
 }
 
@@ -991,6 +994,8 @@ void func::Change(ads_name &sset)
 	TVS_Pipe * Pipi;
 	TVS_TAP * Tapie;
 	TVS_WYE* Wyeie;
+	tvsTeeEdit::Gather teeGather;
+	tvsTransAlignCmd::Gather transGather;
 	TVS_TRANS * Transie;
 
 	double NewSiseA;
@@ -1189,6 +1194,7 @@ void func::Change(ads_name &sset)
 						rprov(vSizeA2, fSizeA2, Wyeie->SizeAotv, SizeA2);
 						rprov(vSizeB2, fSizeB2, Wyeie->SizeBotv, SizeB2);
 						rprov(vLengthW, fLengthW, Wyeie->LengthPl, LengthW);
+						teeGather.add(Wyeie);
 
 						rprov(vD1, fD1, Wyeie->This1D, D1);
 						rprov(vWipe, fWipe, Wyeie->Wipeout, Wipe);
@@ -1205,6 +1211,7 @@ void func::Change(ads_name &sset)
 						rprov(vSizeA2, fSizeA2, Transie->SizeAp2, SizeA2);
 						rprov(vSizeB2, fSizeB2, Transie->SizeBp2, SizeB2);
 						rprov(vLengthTr, fLengthTr, Transie->LengthTr, LengthTr);
+						transGather.add(Transie);
 
 						rprov(vD1, fD1, Transie->This1D, D1);
 						rprov(vWipe, fWipe, Transie->Wipeout, Wipe);
@@ -1225,6 +1232,9 @@ void func::Change(ads_name &sset)
 
 
 	dgAllEdit dg;
+	tvsTeeEdit::prepare(dg, teeGather);
+	dg.TransVert = transGather.common();
+	dg.TransPlan = transGather.commonPlan();
 
 
 
@@ -1297,7 +1307,7 @@ void func::Change(ads_name &sset)
 		&& firstTrans == false
 		&& firstWye == false)
 	{
-		acutPrintf(_T("\nНичего не выбрано"));
+		acutPrintf(_T("\nNišta nije izabrano"));
 		return;
 	}
 	{
@@ -1453,6 +1463,7 @@ void func::Change(ads_name &sset)
 						if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
 						if (cSizeB2 == false) Wyeie->put_SizeBotv(SizeB2);
 						if (cLengthW == false) Wyeie->put_Length(LengthW);
+						tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
 						if (cD1 == false) Wyeie->put_This1D(D1);
@@ -1466,11 +1477,13 @@ void func::Change(ads_name &sset)
 					if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 					{
 						///
+						const tvsTransAlignCmd::Before transBefore = tvsTransAlignCmd::before(Transie);
 						if (cSizeA == false) Transie->put_SizeAp1(SizeA);
 						if (cSizeB == false) Transie->put_SizeBp1(SizeB);
 						if (cSizeA2 == false) Transie->put_SizeAp2(SizeA2);
 						if (cSizeB2 == false) Transie->put_SizeBp2(SizeB2);
 						if (cLengthTr == false) Transie->put_Length(LengthTr);
+						tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert, dg.TransPlan);   // poravnanje po visini
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
 						if (cD1 == false) Transie->put_This1D(D1);
@@ -1510,6 +1523,8 @@ void func::Change(AcDbEntity *pEnt)
 	TVS_Pipe * Pipi;
 	TVS_TAP * Tapie;
 	TVS_WYE* Wyeie;
+	tvsTeeEdit::Gather teeGather;
+	tvsTransAlignCmd::Gather transGather;
 	TVS_TRANS * Transie;
 
 	double NewSiseA;
@@ -1692,6 +1707,7 @@ void func::Change(AcDbEntity *pEnt)
 		rprov(vSizeA2, fSizeA2, Wyeie->SizeAotv, SizeA2);
 		rprov(vSizeB2, fSizeB2, Wyeie->SizeBotv, SizeB2);
 		rprov(vLengthW, fLengthW, Wyeie->LengthPl, LengthW);
+		teeGather.add(Wyeie);
 
 		rprov(vD1, fD1, Wyeie->This1D, D1);
 		rprov(vWipe, fWipe, Wyeie->Wipeout, Wipe);
@@ -1708,6 +1724,7 @@ void func::Change(AcDbEntity *pEnt)
 		rprov(vSizeA2, fSizeA2, Transie->SizeAp2, SizeA2);
 		rprov(vSizeB2, fSizeB2, Transie->SizeBp2, SizeB2);
 		rprov(vLengthTr, fLengthTr, Transie->LengthTr, LengthTr);
+		transGather.add(Transie);
 
 		rprov(vD1, fD1, Transie->This1D, D1);
 		rprov(vWipe, fWipe, Transie->Wipeout, Wipe);
@@ -1726,6 +1743,9 @@ void func::Change(AcDbEntity *pEnt)
 
 
 	dgAllEdit dg;
+	tvsTeeEdit::prepare(dg, teeGather);
+	dg.TransVert = transGather.common();
+	dg.TransPlan = transGather.commonPlan();
 
 
 	strfil(SizeA, vSizeA, sSizeA);
@@ -1796,7 +1816,7 @@ void func::Change(AcDbEntity *pEnt)
 		&& firstTrans == false
 		&& firstWye == false)
 	{
-		acutPrintf(_T("\nНичего не выбрано"));
+		acutPrintf(_T("\nNišta nije izabrano"));
 		return;
 	}
 	{
@@ -1940,6 +1960,7 @@ void func::Change(AcDbEntity *pEnt)
 			if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
 			if (cSizeB2 == false) Wyeie->put_SizeBotv(SizeB2);
 			if (cLengthW == false) Wyeie->put_Length(LengthW);
+			tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
 			if (cD1 == false) Wyeie->put_This1D(D1);
@@ -1953,11 +1974,13 @@ void func::Change(AcDbEntity *pEnt)
 		if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 		{
 			///
+			const tvsTransAlignCmd::Before transBefore = tvsTransAlignCmd::before(Transie);
 			if (cSizeA == false) Transie->put_SizeAp1(SizeA);
 			if (cSizeB == false) Transie->put_SizeBp1(SizeB);
 			if (cSizeA2 == false) Transie->put_SizeAp2(SizeA2);
 			if (cSizeB2 == false) Transie->put_SizeBp2(SizeB2);
 			if (cLengthTr == false) Transie->put_Length(LengthTr);
+			tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert, dg.TransPlan);   // poravnanje po visini
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
 			if (cD1 == false) Transie->put_This1D(D1);
@@ -2779,6 +2802,7 @@ double func::getElev(double &Elev,
 
 TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 {
+	syncTVSGlobalUnits();
 
 
 
@@ -2792,7 +2816,7 @@ TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 	bool pThisRound = globRound;
 
 	pMidPoint = t2;
-	GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect);
+	if (!GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect)) return NULL;
 	pStartVect.normalize();
 	pNormVect = AcGeVector3d(0, 0, 1);
 	TVS_TAP* pEnt = TVS_TAP::add_new(pSizeA, pSizeB, pRadius, pNormVect, pStartVect, pMidPoint, pSwectangle, false, pThisRound);
@@ -2823,75 +2847,15 @@ TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 
 
 
-void func::GiveStartvectorAndAngle(AcGePoint3d &n1,
-	AcGePoint3d &n2,
-	AcGePoint3d &n3,
-	double &pAngle,
-	AcGeVector3d &pStartvector)
+bool func::GiveStartvectorAndAngle(AcGePoint3d &n1,
+    AcGePoint3d &n2, AcGePoint3d &n3,
+    double &pAngle, AcGeVector3d &pStartvector)
 {
-
-
-	AcGePoint3d R1, R2, R3, R4,
-		B1, B2, B3, B4,
-		S1, S2, F1, F2, midp,
-		Norm1, Norm2;
-	double pRadius = 10;
-
-	AcGeVector3d finishvector;
-	fourpoints(n1, n2, R1, R2, B2, B1, pRadius);
-	fourpoints(n2, n3, R3, R4, B4, B3, pRadius);
-
-	if (intersection(R1, R2, R3, R4, midp) == true)
-	{
-		//acutPrintf(_T("\n1"));
-		S1 = R2; F1 = B2;
-		S2 = R3; F2 = B3;
-	}
-
-	if (intersection(B1, B2, B3, B4, midp) == true)
-	{
-		//acutPrintf(_T("\n4"));
-		S1 = B2; F1 = R2;
-		S2 = B3; F2 = R3;
-	}
-
-
-	Norm1 = AcGePoint3d(F1.x - S1.x,
-		F1.y - S1.y,
-		0);
-	Norm2 = AcGePoint3d(F2.x - S2.x,
-		F2.y - S2.y,
-		0);
-	//consoleprint(Norm1,_T("\nПервая точка"));
-	//consoleprint(Norm2,_T("\nВторая точка"));
-	pStartvector = AcGeVector3d(Norm1.x, Norm1.y, 0);
-	finishvector = AcGeVector3d(Norm2.x, Norm2.y, 0);
-
-	pAngle = angle(Norm1, Norm2);
-
-	//consoleprint(pAngle,_T("\nУгол"));
-	Givestartvector(pStartvector, finishvector, pAngle);
-	//pStartvector.normalize();
-	midp = n2;
-	//consoleprint(pAngle,_T("\nУгол"));
-
-
-
-
-
-
-
-	// 	AcGeVector3d pfinishvector;
-	// 	pfinishvector=AcGeVector3d(n3.x-n2.x,n3.y-n2.y,n3.z-n2.z);
-	// 	pStartvector=AcGeVector3d(n2.x-n1.x,n2.y-n1.y,n2.z-n1.z);
-	// 	midp=n2;
-	// 	
-	// 	pfinishvector.normalize();
-	// 	pStartvector.normalize();
-	// 	pAngle=pStartvector.angleTo(pfinishvector);
-
-
-
+    double x = 0.0, y = 0.0;
+    if (!tvsGeometry::elbowDirection(n1.x, n1.y, n2.x, n2.y,
+                                    n3.x, n3.y, pAngle, x, y)) return false;
+    pStartvector = AcGeVector3d(x, y, 0.0);
+    return true;
 }
 
 
@@ -2955,7 +2919,7 @@ int func::TVSClassCheck(AcDbEntity* pEnt)
 	else
 	{
 
-		acutPrintf(_T("Объект блокирован"));
+		acutPrintf(_T("Objekat je zaključan"));
 		return isBlocked;
 	}
 }

@@ -23,8 +23,27 @@
 //----- dgAllEdit.cpp : Implementation of dgAllEdit
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "ElevRefSwitch.h"
+#include "TransPreview.h"
 #include "resource.h"
 #include "dgAllEdit.h"
+
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
+static void DDX_MillimetreString(CDataExchange* dx, int id, CString& value) {
+    const double factor = tvsUnits::factor();
+    CString display = value;
+    wchar_t* end = NULL;
+    double number = wcstod(value, &end);
+    if (!dx->m_bSaveAndValidate && end != (LPCTSTR)value && end && *end == 0)
+        display.Format(L"%.15g", number * factor);
+    DDX_Text(dx, id, display);
+    if (dx->m_bSaveAndValidate) {
+        number = wcstod(display, &end);
+        if (end != (LPCTSTR)display && end && *end == 0) value.Format(L"%.15g", number / factor);
+        else value = display;
+    }
+}
+
 #include "Calculate.h"
 
 //-----------------------------------------------------------------------------
@@ -34,6 +53,11 @@ BEGIN_MESSAGE_MAP(dgAllEdit, CAdUiBaseDialog)
 	ON_MESSAGE(WM_ACAD_KEEPFOCUS, OnAcadKeepFocus)
 
 	ON_WM_SHOWWINDOW()
+	ON_WM_DRAWITEM()
+	ON_CBN_SELCHANGE(IDC_TransVertEdit, &dgAllEdit::RefreshPreview)
+	ON_CBN_SELCHANGE(IDC_TransPlanEdit, &dgAllEdit::RefreshPreview)
+	ON_EN_CHANGE(IDC_SizeA2, &dgAllEdit::RefreshPreview)
+	ON_EN_CHANGE(IDC_SizeB2, &dgAllEdit::RefreshPreview)
 	ON_EN_CHANGE(IDC_SizeA, &dgAllEdit::ChangeSizeA)
 	ON_EN_CHANGE(IDC_SizeB, &dgAllEdit::ChangeSizeA)
 	//ON_EN_CHANGE(IDC_SizeA2, &dgAllEdit::ChangeSizeA2)
@@ -79,6 +103,10 @@ dgAllEdit::dgAllEdit(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : C
 , ElevUp(FALSE)
 , ElevMid(FALSE)
 , ElevDown(FALSE)
+, TeeType(0)
+, TransVert(-1)
+, TransPlan(-1)
+, TeeSecond(_T(""))
 {
 }
 
@@ -94,6 +122,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_Control(pDX, IDC_SizeB2, fSizeB2);
 	DDX_Control(pDX, IDC_TransLength, fLengthTr);
 	DDX_Control(pDX, IDC_LengthWye, fLengthW);
+	DDX_Control(pDX, IDC_TeeSecond, fTeeSecond);
 	DDX_Control(pDX, IDCANCEL, F);
 	DDX_Control(pDX, IDC_Wipeout, fWipeout);
 	DDX_Control(pDX, IDC_Grani, fGrani);
@@ -120,21 +149,26 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 
 
 
-	DDX_Text(pDX, IDC_SizeA, SizeA);
-	DDX_Text(pDX, IDC_SizeB, SizeB);
+	DDX_MillimetreString(pDX, IDC_SizeA, SizeA);
+	DDX_MillimetreString(pDX, IDC_SizeB, SizeB);
 	DDX_Text(pDX, IDC_Flow, Flow);
-	DDX_Text(pDX, IDC_SizeA2, SizeA2);
-	DDX_Text(pDX, IDC_SizeB2, SizeB2);
-	DDX_Text(pDX, IDC_TransLength, LengthTr);
-	DDX_Text(pDX, IDC_LengthWye, LengthW);
-	DDX_Text(pDX, IDC_ElevVal, Elev);
+	DDX_MillimetreString(pDX, IDC_SizeA2, SizeA2);
+	DDX_MillimetreString(pDX, IDC_SizeB2, SizeB2);
+	DDX_MillimetreString(pDX, IDC_TransLength, LengthTr);
+	DDX_MillimetreString(pDX, IDC_LengthWye, LengthW);
+	DDX_MillimetreString(pDX, IDC_TeeSecond, TeeSecond);
+	if (pDX->m_bSaveAndValidate) {   // prelaz po visini (combo filled in OnShowWindow)
+		if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit))) if (vert->GetCount() == 3) TransVert = vert->GetCurSel();
+		if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit))) if (plan->GetCount() == 3) { const int v = plan->GetCurSel(); TransPlan = v >= 0 ? v + 1 : -1; }
+	}
+	DDX_MillimetreString(pDX, IDC_ElevVal, Elev);
 	DDX_Text(pDX, IDC_Speed, Speed);
 	DDX_Text(pDX, IDC_i, I);
 	DDX_Text(pDX, IDC_dP, Dp);
 
 	DDX_Text(pDX, IDC_Swectangle, Swectangle);
 	DDX_Text(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
-	DDX_Text(pDX, IDC_TapRadiusConst, TapRadiusConst);
+	DDX_MillimetreString(pDX, IDC_TapRadiusConst, TapRadiusConst);
 
 
 
@@ -166,7 +200,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 
 
 	DDX_Control(pDX, IDC_WipeoutLength, fWipeoutLength);
-	DDX_Text(pDX, IDC_WipeoutLength, WipeoutLength);
+	DDX_MillimetreString(pDX, IDC_WipeoutLength, WipeoutLength);
 
 	DDX_Control(pDX, IDC_DuctFlex, fDuctFlex);
 	DDX_Check(pDX, IDC_DuctFlex, DuctFlex);
@@ -202,11 +236,45 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 		fLengthTr.ShowWindow(false);
 
 	}
+	if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit)))
+	{
+		if (Ttrans) {
+			if (vert->GetCount() == 0) { vert->AddString(L"Osa"); vert->AddString(L"Ravno uz gornju ivicu"); vert->AddString(L"Ravno uz donju ivicu"); }
+			vert->SetCurSel(TransVert);   // -1: razno
+		} else {
+			vert->ShowWindow(false);
+			if (CWnd* label = GetDlgItem(IDC_TransVertLabel)) label->ShowWindow(false);
+		}
+	}
+	if (CWnd* preview = GetDlgItem(IDC_TransPreview)) preview->ShowWindow(Ttrans && !Ttap ? SW_SHOW : SW_HIDE);   // sketch only for prelazi
+	if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit)))
+	{
+		if (Ttrans) {
+			if (plan->GetCount() == 0) { plan->AddString(L"Simetrično"); plan->AddString(L"Ravno uz desnu ivicu"); plan->AddString(L"Ravno uz lijevu ivicu"); }
+			plan->SetCurSel(TransPlan >= 1 && TransPlan <= 3 ? TransPlan - 1 : -1);
+		} else {
+			plan->ShowWindow(false);
+			if (CWnd* label = GetDlgItem(IDC_TransPlanLabel)) label->ShowWindow(false);
+		}
+	}
 
 	if (Twye == false)
 	{
 		fLengthW.ShowWindow(false);
 
+	}
+
+	// T komad: TK-O asks for the run outlet C, TK-G for the left branch (may differ from the right).
+	if (TeeType == 1 || TeeType == 2)
+	{
+		SetDlgItemTextW(IDC_TeeSecondLabel, TeeType == 1 ? L"Prolaz C" : L"Lijevi ogr.");
+		if (TeeType == 1) { SetDlgItemTextW(IDC_LabelSizeA2, L"Ogr. Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ogr. Hotv"); }
+		else { SetDlgItemTextW(IDC_LabelSizeA, L"Desni ogr."); SetDlgItemTextW(IDC_LabelSizeA2, L"Ulaz Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ulaz Hotv"); }
+	}
+	else
+	{
+		fTeeSecond.ShowWindow(false);
+		if (CWnd* label = GetDlgItem(IDC_TeeSecondLabel)) label->ShowWindow(false);
 	}
 
 	if ((Twye == false) && (Ttrans == false))
@@ -224,6 +292,18 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 	}
 
 	this->ChangeSizeA();
+
+	// Koljeno (radius, smjer) only for elbows, T-komad only for tees: not shown for a prelaz or kanal.
+	if (Ttap == false)
+	{
+		static const int elbow[] = {10061,10062,10063,10064,1018,1019,1036,1037,1038,1039,1040,1013,10013,1030,1034,1035};
+		for (size_t k = 0; k < sizeof(elbow) / sizeof(elbow[0]); ++k) if (CWnd* c = GetDlgItem(elbow[k])) c->ShowWindow(false);
+	}
+	if (Twye == false)
+	{
+		static const int tee[] = {10065,123};
+		for (size_t k = 0; k < sizeof(tee) / sizeof(tee[0]); ++k) if (CWnd* c = GetDlgItem(tee[k])) c->ShowWindow(false);
+	}
 
 	if (Ttap == true)
 	{
@@ -304,8 +384,27 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 
 
 
+void dgAllEdit::RefreshPreview()
+{
+	if (CWnd* w = GetDlgItem(IDC_TransPreview)) w->Invalidate(FALSE);
+}
+
+void dgAllEdit::OnDrawItem(int id, LPDRAWITEMSTRUCT item)
+{
+	if (id != IDC_TransPreview || !item) { CAdUiBaseDialog::OnDrawItem(id, item); return; }
+	CDC* dc = CDC::FromHandle(item->hDC);
+	double v[4] = {0, 0, 0, 0};
+	const int ids[4] = {IDC_SizeA, IDC_SizeB, IDC_SizeA2, IDC_SizeB2};
+	for (int k = 0; k < 4; ++k) tvsElevRef::number(this, ids[k], v[k]);
+	int plan = -1, vert = -1;
+	if (CComboBox* c = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit))) { const int s = c->GetCurSel(); plan = s >= 0 ? s + 1 : -1; }
+	if (CComboBox* c = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit))) vert = c->GetCurSel();
+	tvsTransPreview::sketch(dc, CRect(item->rcItem), plan, vert, v[0], v[1], v[2], v[3]);
+}
+
 void dgAllEdit::ChangeSizeA()
 {
+	RefreshPreview();
 
 	double pSpeed, pFlow, pI, pDp, pSizeA, pSizeB;
 	CString zSizeA, zSizeB, zFlow, zSpeed, zI;
@@ -359,6 +458,7 @@ void dgAllEdit::ChangeSpeed()
 
 void dgAllEdit::SetElevUp()
 {
+	tvsElevRef::convert(this, fElevDown.GetCheck() ? 2 : fElevMid.GetCheck() ? 0 : 1, 1);   // the other box still shows the previous reference
 
 	fElevUp.SetCheck(1);
 	fElevMid.SetCheck(0);
@@ -372,6 +472,7 @@ void dgAllEdit::SetElevUp()
 
 void dgAllEdit::SetElevMid()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevDown.GetCheck() ? 2 : 0, 0);   // the other box still shows the previous reference
 
 
 	fElevUp.SetCheck(0);
@@ -382,6 +483,7 @@ void dgAllEdit::SetElevMid()
 
 void dgAllEdit::SetElevDown()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevMid.GetCheck() ? 0 : 2, 2);   // the other box still shows the previous reference
 	fElevUp.SetCheck(0);
 	fElevMid.SetCheck(0);
 	fElevDown.SetCheck(1);

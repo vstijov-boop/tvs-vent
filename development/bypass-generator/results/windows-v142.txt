@@ -1,0 +1,86 @@
+Executed GitHub Actions output (timestamps / ANSI colour removed only)
+Source: 05252ad0bbb347b6866f4b6fbb6daf2393b54a9a
+Run: https://github.com/vstijov-boop/tvs-vent/actions/runs/41253216430
+Job: https://github.com/vstijov-boop/tvs-vent/actions/runs/41253216430/job/124690859827
+
+TOOLSET v142 vcvars C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvars64.bat -vcvars_ver=14.29
+VCToolsInstallDir C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Tools\MSVC\14.29.30133\
+VCToolsVersion 14.29.30133
+WindowsSDKVersion 10.0.26100.0\
+WindowsSdkDir C:\Program Files (x86)\Windows Kits\10\
+usage: cl [ option... ] filename... [ /link linkoption... ]
+Microsoft (R) C/C++ Optimizing Compiler Version 19.29.30159 for x64
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+COMPILE: cl /nologo /EHsc /std:c++14 /O2 /fp:strict /W4 /WX /FeC:\Users\RUNNER~1\AppData\Local\Temp\tmp85_wpjs_\bounds.exe /FoC:\Users\RUNNER~1\AppData\Local\Temp\tmp85_wpjs_\bounds.obj C:\Users\RUNNER~1\AppData\Local\Temp\tmp85_wpjs_\bounds.cpp
+bounds.cpp
+
+COMPILE: cl /nologo /EHsc /std:c++14 /O2 /fp:fast /W4 /WX /Zs C:\Users\RUNNER~1\AppData\Local\Temp\tmp85_wpjs_\bounds.cpp
+bounds.cpp
+D:/a/tvs-vent/tvs-vent/geometry/bypass/OutwardInterval.h(12): fatal error C1189: #error:  Bypass bounds require strict IEEE binary64 evaluation without fast-math.
+
+test_outward_arithmetic_and_trig (test_bypass_bounds.BypassBounds.test_outward_arithmetic_and_trig) ... ok
+PASS 452 independent exact-Fraction enclosure cases; fast-math rejected
+COMPILE: cl /nologo /EHsc /std:c++14 /O2 /fp:strict /W4 /WX /FeC:\Users\RUNNER~1\AppData\Local\Temp\tmp39hy21io\bypass.exe /FoC:\Users\RUNNER~1\AppData\Local\Temp\tmp39hy21io\bypass.obj D:\a\tvs-vent\tvs-vent\tests\test_bypass_candidate.cpp
+test_bypass_candidate.cpp
+
+reference below with explicit .1 margin status=0 constraints proven for bounded model; minimum reach NOT confirmed distance=[49.9990018646668,50.0000000000002] guard=3.5242919693701e-12 cells=3442
+mirrored above status=0 constraints proven for bounded model; minimum reach NOT confirmed distance=[49.9990018646669,50.0000000000001] guard=2.67164068645798e-12 cells=3442
+exact requested 50 boundary status=2 boundary, work limit or assembly guard unresolved distance=[49.9990018646668,50.0000000000002] guard=3.5242919693701e-12 cells=3442
+insulated status=0 constraints proven for bounded model; minimum reach NOT confirmed distance=[49.9990052439557,50] guard=3.70903308066772e-12 cells=3834
+nonoptimal wide candidate status=0 constraints proven for bounded model; minimum reach NOT confirmed distance=[175,175] guard=3.97903932025656e-12 cells=17
+slope too close to corner status=1 clearance violated distance=[42.9279365573022,42.9289321969146] guard=3.5242919693701e-12 cells=1262
+interior arc oracle [49.9990057228653,50.0000000007342] u=0.614501953125 v=0
+candidate zero-gap boundary status=2 boundary, work limit or assembly guard unresolved distance=[0,0] guard=3.23918669664636e-12 cells=8
+fixed 30 status=0 constraints proven for bounded model; minimum reach NOT confirmed distance=[49.9990049308865,50.0000000000001] guard=3.46744855050929e-12 cells=3006
+fixed 60 status=0 constraints proven for bounded model; minimum reach NOT confirmed distance=[49.9990004890367,50.0000000000001] guard=3.01270119962282e-12 cells=3048
+ALL PASSED 70 checks. Candidate validation only, no optimizer/CAD.
+test_candidate_and_solid_distance (test_bypass_candidate.BypassCandidate.test_candidate_and_solid_distance) ... ok
+COMPILE: cl /nologo /EHsc /std:c++14 /O2 /fp:strict /W4 /WX /FeC:\Users\RUNNER~1\AppData\Local\Temp\tmpnl9dmwdg\fp.exe /FoC:\Users\RUNNER~1\AppData\Local\Temp\tmpnl9dmwdg\fp.obj D:\a\tvs-vent\tvs-vent\tests\test_bypass_fp_environment.cpp
+test_bypass_fp_environment.cpp
+
+FP default supported=1 rounding=0 FLT_EVAL_METHOD=0
+FP unsupported CSR=9fa4 after=9fa4 supported=0
+FP unsupported CSR=1fe4 after=1fe4 supported=0
+FP unsupported CSR=9fe4 after=9fe4 supported=0
+PASS FP 30 environment checks
+test_floating_environment (test_bypass_fp_environment.BypassEnvironment.test_floating_environment) ... ok
+COMPILE: cl /nologo /EHsc /std:c++14 /O2 /fp:strict /W4 /WX /FeC:\Users\RUNNER~1\AppData\Local\Temp\tmpe4uvagnj\generator.exe /FoC:\Users\RUNNER~1\AppData\Local\Temp\tmpe4uvagnj\generator.obj D:\a\tvs-vent\tvs-vent\tests\test_bypass_generator.cpp
+test_bypass_generator.cpp
+
+REFERENCE {"case":"below45","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999999999996589,"gapHi":65.000000000003411,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":47.607900000000001,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"above45","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-110,"passHi":-110,"gapLo":64.999999999997158,"gapHi":65.000000000002842,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.945799999999998,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"angle30","found":true,"status":0,"D":290,"C":360,"s0":-789.47441116742357,"Wlo":1578.9488223348471,"Whi":1578.9488223348471,"passLo":-690,"passHi":-690,"gapLo":64.999999999996419,"gapHi":65.000000000003581,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":47.257599999999996,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"above30","found":true,"status":0,"D":290,"C":360,"s0":-789.47441116742357,"Wlo":1578.9488223348471,"Whi":1578.9488223348471,"passLo":-110,"passHi":-110,"gapLo":64.99999999999693,"gapHi":65.00000000000307,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.9191,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"angle45","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999999999996589,"gapHi":65.000000000003411,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.899999999999999,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"above45-wide","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-110,"passHi":-110,"gapLo":64.999999999997158,"gapHi":65.000000000002842,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.931899999999999,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"angle60","found":true,"status":0,"D":290,"C":360,"s0":-578.37168574084183,"Wlo":1156.7433714816837,"Whi":1156.7433714816837,"passLo":-690,"passHi":-690,"gapLo":64.99999999999693,"gapHi":65.00000000000307,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":64.242000000000004,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"above60","found":true,"status":0,"D":290,"C":360,"s0":-578.37168574084183,"Wlo":1156.7433714816837,"Whi":1156.7433714816837,"passLo":-110,"passHi":-110,"gapLo":64.999999999997783,"gapHi":65.000000000002217,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":66.107600000000005,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"insulated","found":true,"status":0,"D":340,"C":460,"s0":-735.68542494923804,"Wlo":1471.3708498984761,"Whi":1471.3708498984761,"passLo":-740,"passHi":-740,"gapLo":64.999999999996049,"gapHi":65.000000000003951,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.854599999999998,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"narrow-feasible","found":true,"status":0,"D":290,"C":250,"s0":-580.68542494923804,"Wlo":1161.3708498984761,"Whi":1161.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999287388145845,"gapHi":65.000000000003354,"calls":1,"cells":130,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":69.236199999999997,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"asymmetric","found":true,"status":0,"D":290,"C":360,"s0":-579,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.95850989558437,"gapHi":64.959442683684372,"calls":1,"cells":286,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":105.66330000000001,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"active-floor","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999999999996589,"gapHi":65.000000000003411,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.822400000000002,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"active-ceiling","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-110,"passHi":-110,"gapLo":64.999999999997158,"gapHi":65.000000000002842,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":47.075499999999998,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"floor-proven-impossible","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":1,"proposals":0,"improvements":0,"elapsedMs":0.0018,"reason":"seed solve budget or depth bound","minimumConfirmed":false}
+REFERENCE {"case":"ceiling-proven-impossible","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":1,"proposals":0,"improvements":0,"elapsedMs":0.0012999999999999999,"reason":"seed solve budget or depth bound","minimumConfirmed":false}
+REFERENCE {"case":"window-proven-impossible","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":8,"proposals":0,"improvements":0,"elapsedMs":0.0137,"reason":"finite proposal set exhausted","minimumConfirmed":false}
+REFERENCE {"case":"active-minima","found":true,"status":0,"D":435,"C":420,"s0":-810.68542494923804,"Wlo":1621.3708498984761,"Whi":1621.3708498984761,"passLo":-835,"passHi":-835,"gapLo":209.99999999999585,"gapHi":210.00000000000415,"calls":1,"cells":16,"seedSolves":2,"proposals":1,"improvements":0,"elapsedMs":47.056399999999996,"reason":"first verified feasible candidate","minimumConfirmed":false}
+REFERENCE {"case":"numerical-boundary","found":false,"status":2,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":15,"cells":8978,"seedSolves":1,"proposals":15,"improvements":0,"elapsedMs":2399.6945999999998,"reason":"finite proposal set exhausted","minimumConfirmed":false}
+REFERENCE {"case":"zero-calls","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":1,"proposals":0,"improvements":0,"elapsedMs":0.0054000000000000003,"reason":"checker-call budget","minimumConfirmed":false}
+REFERENCE {"case":"zero-cells","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":1,"proposals":0,"improvements":0,"elapsedMs":0.0025999999999999999,"reason":"cell budget","minimumConfirmed":false}
+REFERENCE {"case":"zero-time","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":0,"proposals":0,"improvements":0,"elapsedMs":0.00080000000000000004,"reason":"time budget","minimumConfirmed":false}
+REFERENCE {"case":"zero-proposals","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":1,"proposals":0,"improvements":0,"elapsedMs":0.0025999999999999999,"reason":"proposal budget","minimumConfirmed":false}
+REFERENCE {"case":"zero-seeds","found":false,"status":1,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":0,"cells":0,"seedSolves":0,"proposals":0,"improvements":0,"elapsedMs":0.00080000000000000004,"reason":"seed solve budget or depth bound","minimumConfirmed":false}
+REFERENCE {"case":"one-cell","found":false,"status":2,"D":0,"C":0,"s0":0,"Wlo":0,"Whi":0,"passLo":0,"passHi":0,"calls":1,"cells":1,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":46.758800000000001,"reason":"cell budget","minimumConfirmed":false}
+REFERENCE {"case":"retained-at-call-limit","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999999999996589,"gapHi":65.000000000003411,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":47.130699999999997,"reason":"checker-call budget","minimumConfirmed":false}
+REFERENCE {"case":"bounded-improvement","found":true,"status":0,"D":290,"C":250,"s0":-580.68542494923804,"Wlo":1161.3708498984761,"Whi":1161.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999287388145845,"gapHi":65.000000000003354,"calls":12,"cells":7144,"seedSolves":1,"proposals":12,"improvements":1,"elapsedMs":1342.3646000000001,"reason":"checker-call budget","minimumConfirmed":false}
+REFERENCE {"case":"ignored-candidate-and-inactive-bounds","found":true,"status":0,"D":290,"C":360,"s0":-635.68542494923804,"Wlo":1271.3708498984761,"Whi":1271.3708498984761,"passLo":-690,"passHi":-690,"gapLo":64.999999999996589,"gapHi":65.000000000003411,"calls":1,"cells":10,"seedSolves":1,"proposals":1,"improvements":0,"elapsedMs":59.091099999999997,"reason":"first verified feasible candidate","minimumConfirmed":false}
+PASS GENERATOR 274 checks, 17 independently rechecked solutions
+
+test_verified_candidate_generation (test_bypass_generator.BypassGenerator.test_verified_candidate_generation) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 24.406s
+
+OK

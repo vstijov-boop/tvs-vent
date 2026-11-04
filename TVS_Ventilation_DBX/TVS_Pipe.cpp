@@ -1,4 +1,4 @@
-﻿// (C) Copyright 2002-2007 by Autodesk, Inc. 
+﻿// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -23,7 +23,18 @@
 //----- TVS_Pipe.cpp : Implementation of TVS_Pipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "LevelLabels.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include "../geometry/SlopeProjection.h"
+#include <limits>
+#endif
 #include "TVS_Pipe.h"
+#include "HiddenSpanData.h"
+#include "FlexCuffData.h"
+#include "../geometry/HiddenSpan.h"
+#include <algorithm>
+#include <vector>
 #include "TVS_Ventilation_DBX_i.h"
 #include<vector>
 //-----------------------------------------------------------------------------
@@ -189,7 +200,7 @@ Acad::ErrorStatus TVS_Pipe::dwgInFields (AcDbDwgFiler *pFiler) {
 
 //- SubXXX() methods (self notification)
 Acad::ErrorStatus TVS_Pipe::subOpen (AcDb::OpenMode mode) {
-	return (AcDbCurve::subOpen (mode)) ;
+	return (TVS_Entity::subOpen (mode)) ;
 }
 
 Acad::ErrorStatus TVS_Pipe::subErase (Adesk::Boolean erasing) {
@@ -197,11 +208,11 @@ Acad::ErrorStatus TVS_Pipe::subErase (Adesk::Boolean erasing) {
 }
 
 Acad::ErrorStatus TVS_Pipe::subCancel () {
-	return (AcDbCurve::subCancel ()) ;
+	return (TVS_Entity::subCancel ()) ;
 }
 
 Acad::ErrorStatus TVS_Pipe::subClose () {
-	return (AcDbCurve::subClose ()) ;
+	return (TVS_Entity::subClose ()) ;
 }
 
 //- Persistent reactor callbacks
@@ -283,6 +294,7 @@ Acad::ErrorStatus TVS_Pipe::subGetClassID (CLSID *pClsid) const {
 //----- AcDbEntity protocols
 Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
+	tvsLevelLabels::draw(mode, database(), FirstPoint + (LastPoint - FirstPoint) / 2, LastPoint - FirstPoint, Elev, SizeA, SizeB);   // TVS_KOTE
 	ClearEntitylist();
 	Length=(sqrt((FirstPoint.x-LastPoint.x)*(FirstPoint.x-LastPoint.x)+
 		(FirstPoint.y-LastPoint.y)*
@@ -290,6 +302,50 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
 	if (SizeB==0) ThisRound=true;
 	else ThisRound=false;
 
+#ifdef TVS_OFFSET_INTEGRATION
+    tvsOffsetData::Record offset;
+    tvsOffsetData::Status offsetStatus=tvsOffsetData::read(this,offset);
+    if(offsetStatus!=tvsOffsetData::Legacy){
+        if(offsetStatus!=tvsOffsetData::Valid||offset.role!=tvsOffsetData::SlopedStraight){
+            AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);
+        }else if(ThisRound){
+            // Round bypass slope: SizeB = 0, so the rectangular joint projection does not apply.
+            tvsOffset::WorldPoint sides[2][2];
+            if(tvsSlopeProjection::roundSides(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
+                tvsOffset::WorldPoint(LastPoint.x,LastPoint.y,LastPoint.z),SizeA,sides)){
+                if(Wipeout){AcDbPolyline* mask=new AcDbPolyline();
+                    mask->addVertexAt(0,AcGePoint2d(FirstPoint.x,FirstPoint.y));mask->addVertexAt(1,AcGePoint2d(LastPoint.x,LastPoint.y));
+                    mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
+                if(!This1D)for(int k=0;k<2;++k)setMainProperty(new AcDbLine(AcGePoint3d(sides[k][0].x,sides[k][0].y,sides[k][0].z),AcGePoint3d(sides[k][1].x,sides[k][1].y,sides[k][1].z)));
+                setCenterProperty(new AcDbLine(FirstPoint,LastPoint));
+            }else{AcDbLine* invalid=new AcDbLine(FirstPoint,LastPoint);setMainProperty(invalid);invalid->setColorIndex(1);}
+        }else {
+            tvsOffset::WorldPoint corners[2][4];
+            if(tvsSlopeProjection::joints(tvsOffset::WorldPoint(FirstPoint.x,FirstPoint.y,FirstPoint.z),
+                tvsOffset::WorldPoint(LastPoint.x,LastPoint.y,LastPoint.z),SizeA,SizeB,offset.rise/tvsUnits::factor(this),corners)){
+                AcGePoint3d p[2][4];for(int j=0;j<2;++j)for(int k=0;k<4;++k)p[j][k]=AcGePoint3d(corners[j][k].x,corners[j][k].y,corners[j][k].z);
+                const int firstEdge=offset.rise>0?2:0,lastEdge=offset.rise>0?0:2;
+                if(Wipeout){AcDbPolyline* mask=new AcDbPolyline();
+                    // Existing mask helper strokes an open centreline with channel width.
+                    // A closed outline would be stroked twice outside the physical footprint.
+                    mask->addVertexAt(0,AcGePoint2d((p[0][firstEdge].x+p[0][firstEdge+1].x)/2,
+                                                   (p[0][firstEdge].y+p[0][firstEdge+1].y)/2));
+                    mask->addVertexAt(1,AcGePoint2d((p[1][lastEdge].x+p[1][lastEdge+1].x)/2,
+                                                   (p[1][lastEdge].y+p[1][lastEdge+1].y)/2));
+                    mask->setElevation(FirstPoint.z);setWipeoutProperty(mode,mask);}
+                if(!This1D){
+                    setMainProperty(new AcDbLine(p[0][firstEdge],p[1][lastEdge]));
+                    setMainProperty(new AcDbLine(p[0][firstEdge+1],p[1][lastEdge+1]));
+                    for(int j=0;j<2;++j){setMainProperty(new AcDbLine(p[j][2],p[j][3]));setHideProperty(new AcDbLine(p[j][0],p[j][1]));}
+                }
+                setCenterProperty(new AcDbLine(FirstPoint,LastPoint));
+            }
+        }
+        for each(AcDbEntity* entity in ListOfWipeout)mode->geometry().draw(entity);
+        for each(AcDbEntity* entity in ListOfEntity)mode->geometry().draw(entity);
+        return Adesk::kTrue;
+    }
+#endif
 	if (Wipeout==true)
 	{
 
@@ -323,8 +379,58 @@ setWipeoutProperty(mode,wPline);
 		
 		AcDbLine	*Line1 = new AcDbLine(A,B);
 		AcDbLine	*Line2 = new AcDbLine(D,C);
-		if (DuctType==DuctTypeStill) {setMainProperty(Line1); setMainProperty(Line2);}
-		if (DuctType==DuctTypeFlex) {setZigzagProperty(Line1); setZigzagProperty(Line2);}
+		if (DuctType==DuctTypeStill) {
+			// Bypass crossing (GFX-01 variant 1): edge parts under an upper duct are dashed.
+			std::vector<tvsHiddenSpan::Entry> uppers;
+			std::vector<std::pair<double,double> > hidden[2];
+			if (tvsHiddenSpan::read(this, uppers)) {
+				for (size_t k = 0; k < uppers.size(); ++k) {
+					tvsHiddenSpan::Entry e = uppers[k];
+					if (e.upper.isNull() || e.upper.isErased()) continue;
+					TVS_Pipe* live = NULL;
+					if (acdbOpenObject(live, e.upper, AcDb::kForRead) == Acad::eOk) {
+						e.first = live->FirstPoint; e.last = live->LastPoint; e.width = live->SizeA; e.elevation = live->Elev; live->close();
+					}
+					if (!(Elev < e.elevation)) continue;
+					tvsHidden::P q[4];
+					if (!tvsHidden::footprint(tvsHidden::P(e.first.x, e.first.y), tvsHidden::P(e.last.x, e.last.y), e.width, q)) continue;
+					const AcDbLine* edges[2] = { Line1, Line2 };
+					for (int j = 0; j < 2; ++j) {
+						double t0, t1;
+						if (tvsHidden::clip(tvsHidden::P(edges[j]->startPoint().x, edges[j]->startPoint().y), tvsHidden::P(edges[j]->endPoint().x, edges[j]->endPoint().y), q, t0, t1))
+							hidden[j].push_back(std::make_pair(t0, t1));
+					}
+				}
+			}
+			AcDbLine* edges[2] = { Line1, Line2 };
+			for (int j = 0; j < 2; ++j) {
+				if (hidden[j].empty()) { setMainProperty(edges[j]); continue; }
+				std::sort(hidden[j].begin(), hidden[j].end());
+				const AcGePoint3d a = edges[j]->startPoint(), b = edges[j]->endPoint();
+				double at = 0;
+				for (size_t k = 0; k < hidden[j].size(); ++k) {
+					const double t0 = (std::max)(at, hidden[j][k].first), t1 = (std::max)(t0, hidden[j][k].second);
+					if (t0 > at) setMainProperty(new AcDbLine(a + (b - a) * at, a + (b - a) * t0));
+					if (t1 > t0) setHideProperty(new AcDbLine(a + (b - a) * t0, a + (b - a) * t1));
+					at = (std::max)(at, t1);
+				}
+				if (at < 1) setMainProperty(new AcDbLine(a + (b - a) * at, b));
+				delete edges[j];
+			}
+		}
+		if (DuctType==DuctTypeFlex) {
+			// Air hose: convex beads of pitch k*D (geometry/FlexHose.h); zigzag only as fallback.
+			AcGeVector3d axis(LastPoint.x - FirstPoint.x, LastPoint.y - FirstPoint.y, 0);
+			const double length = axis.length();
+			tvsFlex::Drawing hose;
+			bool cuffStart = false, cuffEnd = false; tvsFlexCuff::read(this, cuffStart, cuffEnd);
+			const double unit = tvsUnits::factor(this), cuff = tvsFlexCuff::lengthMm() / unit;
+			const tvsFlex::Cuffs cuffs(cuffStart ? cuff : 0, cuffEnd ? cuff : 0, tvsFlexCuff::extraMm() / unit);
+			if (length > 0 && tvsFlex::straight(FirstPoint.x, FirstPoint.y, axis.x / length, axis.y / length, length, SizeA, tvsFlex::defaultPitch(), hose, cuffs)) {
+				setFlexDrawing(hose, FirstPoint.z); delete Line1; delete Line2;
+			}
+			else { setZigzagProperty(Line1); setZigzagProperty(Line2); }
+		}
 		
 
 		
@@ -532,6 +638,9 @@ Acad::ErrorStatus TVS_Pipe::subGetOsnapPoints (
 Acad::ErrorStatus TVS_Pipe::subGetGripPoints (
 	AcGePoint3dArray &gripPoints, AcDbIntArray &osnapModes, AcDbIntArray &geomIds
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled () ;
 
 	gripPoints.append(FirstPoint);
@@ -560,6 +669,9 @@ void TVS_Pipe::SetParamsForDraw( AcDbObjectId pEntId, int pGripNumber )
 }
 
 Acad::ErrorStatus TVS_Pipe::subMoveGripPointsAt (const AcDbIntArray &indices, const AcGeVector3d &offset) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new moveGripPointsAt() method below (which is the default implementation)
@@ -605,6 +717,9 @@ Acad::ErrorStatus TVS_Pipe::subGetGripPoints (
 	AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize, 
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	//assertReadEnabled () ;
 
 	//appDataType::iterator appIter = putAppData();
@@ -683,6 +798,9 @@ Acad::ErrorStatus TVS_Pipe::subMoveGripPointsAt (
 	const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset,
 	const int bitflags
 ) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -881,6 +999,9 @@ AcGePoint3d TVS_Pipe::get_FirstPoint(void) const
 
 Acad::ErrorStatus TVS_Pipe::put_FirstPoint(AcGePoint3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	FirstPoint =newVal ;
 	return (Acad::eOk) ;
@@ -891,22 +1012,27 @@ Acad::ErrorStatus TVS_Pipe::put_FirstPoint(AcGePoint3d newVal)
 void TVS_Pipe::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 {
  
-	if (SizeB==0)
+	if (tvsUnits::mm(SizeB, this)==0)
 	{
-		sizeStr.Format(L"%%%%c%g", SizeA);
+		sizeStr.Format(L"%%%%c%g", tvsUnits::mm(SizeA, this));
 		return;
 	}
 	if (sortSize){
-		sizeStr.Format(L"%gx%g", min(SizeA,SizeB),max(SizeA,SizeB));
+		sizeStr.Format(L"%gx%g", min(tvsUnits::mm(SizeA, this),tvsUnits::mm(SizeB, this)),max(tvsUnits::mm(SizeA, this),tvsUnits::mm(SizeB, this)));
 		return;
 	}else{
-		sizeStr.Format(L"%gx%g", SizeA,SizeB);
+		sizeStr.Format(L"%gx%g", tvsUnits::mm(SizeA, this),tvsUnits::mm(SizeB, this));
 	}
 }
 
 void TVS_Pipe::getCount(double &count)
 {
-	count = get_Length() / 1000;
+	#ifdef TVS_OFFSET_INTEGRATION
+    double physical=0;
+    count=getPhysicalLength(physical)?tvsUnits::metres(physical,this):std::numeric_limits<double>::quiet_NaN();
+#else
+    count = tvsUnits::metres(get_Length(), this);
+#endif
 }
 
 void TVS_Pipe::getCountUnit(CString &unit)
@@ -981,8 +1107,8 @@ void TVS_Pipe::Gimme4PipePointsWipe ()
 	X1=LastPoint.x-FirstPoint.x;
 	Y1=LastPoint.y-FirstPoint.y;
 
-	X2=Y1*(SizeA+200)/Length/2;
-	Y2=X1*(SizeA+200)/Length/2;
+	X2=Y1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
+	Y2=X1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
 	//AW=AcGePoint3d(FirstPoint.x-X2,FirstPoint.y+Y2,FirstPoint.z);
 	//BW=AcGePoint3d(LastPoint.x-X2,LastPoint.y+Y2,FirstPoint.z);
 	//CW=AcGePoint3d(LastPoint.x+X2,LastPoint.y-Y2,FirstPoint.z);
@@ -1060,6 +1186,9 @@ TVS_Pipe* TVS_Pipe::add_new(AcGePoint3d &pFirstPoint,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS: clan obilaska/offseta se moze samo pomjeriti ili rotirati oko Z (SCALE/MIRROR nisu dozvoljeni).");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 
 	FirstPoint.transformBy(xform);
@@ -1068,6 +1197,9 @@ Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 }
 void TVS_Pipe::setLastpoint (AcGePoint3d pLastpoint)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	LastPoint=pLastpoint;
 }
 
@@ -1075,12 +1207,18 @@ void TVS_Pipe::setLastpoint (AcGePoint3d pLastpoint)
 
 void TVS_Pipe::setDuctType(int pDuctType)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType=pDuctType;
 }
 
 Acad::ErrorStatus TVS_Pipe::put_SizeB(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 
 
@@ -1163,6 +1301,9 @@ AcGePoint3dArray TVS_Pipe::getPointsForSpline( const int &quantity, AcDbSpline *
 
 void TVS_Pipe::setFlex( const bool &isFlex )
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	if (isFlex)
 	{
@@ -1196,10 +1337,15 @@ Acad::ErrorStatus TVS_Pipe::subExplode(AcDbVoidPtrArray & entitySet) const
 
 }
 
+#ifdef TVS_OFFSET_INTEGRATION
+bool TVS_Pipe::getPhysicalLength(double& value) const {
+    assertReadEnabled();return tvsOffsetData::physicalLength(this,get_Length(),value);
+}
+#endif
 double TVS_Pipe::get_Length(void) const
 {
 	assertReadEnabled () ;
-	return (Length) ;
+	return (FirstPoint.distanceTo(AcGePoint3d(LastPoint.x, LastPoint.y, FirstPoint.z))) ;
 }
 
 AcGePoint3d TVS_Pipe::get_Lastpoint(void) const
@@ -1210,6 +1356,9 @@ AcGePoint3d TVS_Pipe::get_Lastpoint(void) const
 
 Acad::ErrorStatus TVS_Pipe::put_Lastpoint(AcGePoint3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	LastPoint =newVal ;
 	return (Acad::eOk) ;

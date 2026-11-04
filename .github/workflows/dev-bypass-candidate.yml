@@ -1,0 +1,31 @@
+name: DEV SDK-free bypass candidate
+on:
+  pull_request:
+    branches: [razvoj-offset-arx]
+    paths:
+      - 'geometry/bypass/**'
+      - 'geometry/OffsetOperation.h'
+      - 'tests/*offset*'
+      - 'tests/*bypass*'
+      - '.github/workflows/dev-bypass-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  candidate-regressions:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Candidate and existing SDK-free regressions
+        run: |
+          set -o pipefail
+          mkdir -p bypass-test-results
+          python3 --version | tee bypass-test-results/environment.txt
+          g++ --version | head -n 1 | tee -a bypass-test-results/environment.txt
+          TVS_BYPASS_REFERENCE_OUT=bypass-test-results/references.json python3 -m unittest discover -s tests -p 'test_*.py' -v 2>&1 | tee bypass-test-results/tests.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: SDK-free-bypass-candidate-test-results
+          path: bypass-test-results/

@@ -23,6 +23,8 @@
 //----- TVS_TRANS.cpp : Implementation of TVS_TRANS
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "LevelLabels.h"
+#include "TransAlignData.h"
 #include "TVS_TRANS.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
@@ -49,21 +51,21 @@ TVS_TRANS::~TVS_TRANS () {
 void TVS_TRANS::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 {
 
-	if (SizeBp1==0)
+	if (tvsUnits::mm(SizeBp1, this)==0)
 	{
-		sizeStr.Format(L"%%%%c%g", SizeAp1);
+		sizeStr.Format(L"%%%%c%g", tvsUnits::mm(SizeAp1, this));
 	
 	}else{
-		sizeStr.Format(L"%gx%g", SizeAp1,SizeBp1);
+		sizeStr.Format(L"%gx%g", tvsUnits::mm(SizeAp1, this),tvsUnits::mm(SizeBp1, this));
 	}
 	CString strSize2;
-	if (SizeBp2==0)
+	if (tvsUnits::mm(SizeBp2, this)==0)
 	{
-		strSize2.Format(L"-%%%%c%g", SizeAp2);
+		strSize2.Format(L"-%%%%c%g", tvsUnits::mm(SizeAp2, this));
 		sizeStr += strSize2;
 
 	}else{
-		strSize2.Format(L"-%gx%g", SizeAp2,SizeBp2);
+		strSize2.Format(L"-%gx%g", tvsUnits::mm(SizeAp2, this),tvsUnits::mm(SizeBp2, this));
 		sizeStr += strSize2;
 	}
 }
@@ -250,6 +252,9 @@ void TVS_TRANS::unappended (const AcDbObject *pDbObj) {
 //----- AcDbEntity protocols
 Adesk::Boolean TVS_TRANS::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
+	// TVS_KOTE: both ends (the end axis follows the alignment by height, TransAlignData.h)
+	tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.2, VectTr, Elev, SizeAp1, SizeBp1);
+	tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.8, VectTr, Elev + tvsTransAlign::endOffset(tvsTransAlign::read(this), SizeAp1, SizeBp1, SizeAp2, SizeBp2), SizeAp2, SizeBp2);
 	ClearEntitylist();
 	bool tt=false;
 	AcGeVector3d vec=AcGeVector3d(VectTr.y,-VectTr.x,VectTr.z);
@@ -808,15 +813,9 @@ Acad::ErrorStatus TVS_TRANS::subExplode(AcDbVoidPtrArray & entitySet) const
 			AcDbLine* pLine2 = new AcDbLine;
 			pLine2->setStartPoint(FirstPoint);
 			pLine2->setEndPoint(LastPoint);
-			AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-			AcDbLinetypeTable *pLtTable;
-			AcDbObjectId ltId;
-			pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-			pLtTable->getAt(_T("tvs_centerline"), ltId);
-			pLtTable->close();
 			pLine2->setLineWeight(AcDb::LineWeight(15));
-			pLine2->setLayer(this->layerId());
-			pLine2->setLinetype(ltId);
+				pLine2->setLayer(this->layerId());
+				setAuxLinetype(pLine2, _T("tvs_centerline"));
 			pLine2->setColor(this->color());
 			entitySet.append(pLine2);
 

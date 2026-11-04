@@ -47,6 +47,7 @@
 //-----------------------------------------------------------------------------
 
 #include "TVS_Entity.h"
+#include "TeeData.h"
 //-----------------------------------------------------------------------------
 class DLLIMPEXP TVS_WYE : public TVS_Entity {
 
@@ -189,6 +190,12 @@ public:
 		bool pThis1D=false
 		);
 	void Gimme7Points();
+	// T komad TK-O / TK-G (TVS_TEE_V1): local shape and frame (origin = inlet face centre,
+	// ey into the fitting, ex = first branch side). False for the plain T (TK0).
+	bool teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, AcGeVector3d &ey) const;
+	// TK-O / TK-G drawn ports in the TVS order (run start, run end, branch) and their widths;
+	// false for a plain T (nominal TVS ports apply).
+	bool teePorts(AcGePoint3d ports[3], double widths[3]) const;
 
 	////////////////////////////////////
 	virtual void getName(CString &unit);

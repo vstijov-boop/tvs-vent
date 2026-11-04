@@ -23,8 +23,17 @@
 //----- dgPipeSize.cpp : Implementation of dgPipeSize
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "ElevRefSwitch.h"
 #include "Resource.h"
 #include "dgPipeSize.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
+
+static void DDX_Millimetres(CDataExchange* dx, int id, double& value, double factor) {
+    double mm = value * factor;
+    DDX_Text(dx, id, mm);
+    if (dx->m_bSaveAndValidate) value = mm / factor;
+}
+
 
 //-----------------------------------------------------------------------------
 IMPLEMENT_DYNAMIC(dgPipeSize, CAdUiBaseDialog)
@@ -64,7 +73,7 @@ END_MESSAGE_MAP()
 
 //-----------------------------------------------------------------------------
 dgPipeSize::dgPipeSize(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : CAdUiBaseDialog(dgPipeSize::IDD, pParent, hInstance), SizeA(0)
-, SizeB(0)
+, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), TransVert(0), TransPlan(1)
 {
 }
 
@@ -72,6 +81,7 @@ dgPipeSize::dgPipeSize(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) :
 void dgPipeSize::DoDataExchange(CDataExchange *pDX) {
 	CAdUiBaseDialog::DoDataExchange(pDX);
 	DDX_Control(pDX, IDC_SizeA, fSizeA);
+	DDX_Control(pDX, 1042, drawingUnits);
 	DDX_Control(pDX, IDC_SizeB, fSizeB);
 	DDX_Control(pDX, IDC_Flow, fFlow);
 	//DDX_Control(pDX, IDC_SizeA2, fSizeA2);
@@ -104,21 +114,21 @@ void dgPipeSize::DoDataExchange(CDataExchange *pDX) {
 
 
 
-	DDX_Text(pDX, IDC_SizeA, SizeA);
-	DDX_Text(pDX, IDC_SizeB, SizeB);
+	DDX_Millimetres(pDX, IDC_SizeA, SizeA, unitsFactor);
+	DDX_Millimetres(pDX, IDC_SizeB, SizeB, unitsFactor);
 	DDX_Text(pDX, IDC_Flow, Flow);
 	//DDX_Text(pDX, IDC_SizeA2, SizeA2);
 	//DDX_Text(pDX, IDC_SizeB2, SizeB2);
-	DDX_Text(pDX, IDC_TransLength, LengthTr);
-	DDX_Text(pDX, IDC_LengthWye, LengthW);
-	DDX_Text(pDX, IDC_ElevVal, Elev);
+	DDX_Millimetres(pDX, IDC_TransLength, LengthTr, unitsFactor);
+	DDX_Millimetres(pDX, IDC_LengthWye, LengthW, unitsFactor);
+	DDX_Millimetres(pDX, IDC_ElevVal, Elev, unitsFactor);
 	DDX_Text(pDX, IDC_Speed, Speed);
 	DDX_Text(pDX, IDC_i, I);
 	//DDX_Text(pDX, IDC_dP, Dp);
 
 	//DDX_Text(pDX, IDC_Swectangle, Swectangle);
 	DDX_Text(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
-	DDX_Text(pDX, IDC_TapRadiusConst, TapRadiusConst);
+	DDX_Millimetres(pDX, IDC_TapRadiusConst, TapRadiusConst, unitsFactor);
 
 
 
@@ -146,11 +156,12 @@ void dgPipeSize::DoDataExchange(CDataExchange *pDX) {
 
 
 	DDX_Control(pDX, IDC_WipeoutLength, fWipeoutLength);
-	DDX_Text(pDX, IDC_WipeoutLength, WipeoutLength);
+	DDX_Millimetres(pDX, IDC_WipeoutLength, WipeoutLength, unitsFactor);
 
 
 	DDX_Control(pDX, IDC_DuctFlex, fDuctFlex);
 	DDX_Check(pDX, IDC_DuctFlex, DuctFlex);
+	DDX_Check(pDX, IDC_LevelTooltip, LevelTooltip);
 	//DDX_Check(pDX, IDC_TapUp, TapUp);
 	//DDX_Check(pDX, IDC_TapMid, TapMid);
 	//DDX_Check(pDX, IDC_TapDown, TapDown);
@@ -168,8 +179,47 @@ LRESULT dgPipeSize::OnAcadKeepFocus(WPARAM, LPARAM) {
 
 
 
+BOOL dgPipeSize::OnInitDialog() {
+    BOOL result = CAdUiBaseDialog::OnInitDialog();
+    drawingUnits.AddString(L"mm — milimetri");
+    drawingUnits.AddString(L"cm — centimetri");
+    drawingUnits.AddString(L"m — metri");
+    drawingUnits.SetCurSel(unitsFactor == 10.0 ? 1 : unitsFactor == 1000.0 ? 2 : 0);
+    drawingUnits.EnableWindow(allowDrawingUnitsChange ? TRUE : FALSE);
+    if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVert))) {
+        vert->AddString(L"Osa");
+        vert->AddString(L"Ravno uz gornju ivicu");
+        vert->AddString(L"Ravno uz donju ivicu");
+        vert->SetCurSel(TransVert >= 0 && TransVert <= 2 ? TransVert : 0);
+    }
+    if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlan))) {   // order = TransType 1, 2, 3
+        plan->AddString(L"Simetrično");
+        plan->AddString(L"Ravno uz desnu ivicu");
+        plan->AddString(L"Ravno uz lijevu ivicu");
+        plan->SetCurSel(TransPlan >= 1 && TransPlan <= 3 ? TransPlan - 1 : 0);
+    }
+    return result;
+}
+
 void dgPipeSize::OnBnClickedOk()
 {
+    if (!UpdateData(TRUE)) return;
+    if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVert))) { const int v = vert->GetCurSel(); if (v >= 0) TransVert = v; }
+    if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlan))) { const int v = plan->GetCurSel(); if (v >= 0) TransPlan = v + 1; }
+    const int selection = drawingUnits.GetCurSel();
+    const double selected = selection == 1 ? 10.0 : selection == 2 ? 1000.0 : 1.0;
+    if (allowDrawingUnitsChange && selected != unitsFactor) {
+        if (tvsUnits::hasElements()) {
+            AfxMessageBox(L"Jedinice izaberite prije crtanja TVS elemenata. Postojeći elementi nisu izmijenjeni.");
+            return;
+        }
+        if (tvsUnits::store(selected) != Acad::eOk) {
+            AfxMessageBox(L"Nije moguće sačuvati jedinice u ovom crtežu.");
+            return;
+        }
+        unitsFactor = selected;
+    }
+
 
 
 	if (TapRadiusRoundConst == TRUE)
@@ -268,6 +318,7 @@ void dgPipeSize::ChangeSpeed()
 
 void dgPipeSize::SetElevUp()
 {
+	tvsElevRef::convert(this, fElevDown.GetCheck() ? 2 : fElevMid.GetCheck() ? 0 : 1, 1);   // the other box still shows the previous reference
 
 	fElevUp.SetCheck(1);
 	fElevMid.SetCheck(0);
@@ -281,6 +332,7 @@ void dgPipeSize::SetElevUp()
 
 void dgPipeSize::SetElevMid()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevDown.GetCheck() ? 2 : 0, 0);   // the other box still shows the previous reference
 
 
 	fElevUp.SetCheck(0);
@@ -291,6 +343,7 @@ void dgPipeSize::SetElevMid()
 
 void dgPipeSize::SetElevDown()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevMid.GetCheck() ? 0 : 2, 2);   // the other box still shows the previous reference
 	fElevUp.SetCheck(0);
 	fElevMid.SetCheck(0);
 	fElevDown.SetCheck(1);

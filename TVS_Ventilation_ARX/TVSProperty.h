@@ -53,7 +53,11 @@ public:
 	CString manufacturer;
 	CString units;
 	double count;
-	double mass;
+	double mass; // kg per specification unit (kg/m for straight ducts).
+	bool hasSheetMetal;
+	double sheetArea;
+	double sheetThickness;
+	double totalMass;
 	CString note;
 	bool isTvsEnt;
 	virtual ~TVSProperty();

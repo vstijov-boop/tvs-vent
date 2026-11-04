@@ -1,4 +1,4 @@
-#include "StdAfx.h"
+﻿#include "StdAfx.h"
 #include "TVSPropertyManufacturerDyn.h"
 #include "TVSController.h"
 
@@ -30,7 +30,7 @@ STDMETHODIMP CTVSPropertyManufacturerDyn::GetDisplayName(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(CTVSProperty_manufacturer);
+	*pBstrName = ::SysAllocString(L"Proizvođač");
 
 	return (S_OK);
 }
@@ -59,7 +59,7 @@ STDMETHODIMP CTVSPropertyManufacturerDyn::GetDescription(BSTR *pBstrName) {
 	if (pBstrName == NULL)
 		return (E_POINTER);
 	// TODO: add your code here (and comment the line below)
-	*pBstrName = ::SysAllocString(L"Description for My Property (CTVSPropertyManufacturerDyn)");
+	*pBstrName = ::SysAllocString(L"Proizvođač elementa.");
 
 	return (S_OK);
 }
@@ -160,7 +160,7 @@ STDMETHODIMP CTVSPropertyManufacturerDyn::GetCategoryName(PROPCAT propcat, LCID 
 	// TODO: add your code here (and comment the 3 lines below)
 	if (propcat != 0)
 		return (E_INVALIDARG);
-	*pBstrName = ::SysAllocString(CTVSPropertyCategoryName);
+	*pBstrName = ::SysAllocString(L"TVS svojstva");
 
 	return (S_OK);
 }

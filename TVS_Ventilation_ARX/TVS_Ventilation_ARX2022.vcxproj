@@ -149,6 +149,27 @@
       <AdditionalDependencies Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)TVS_Ventilation_DBX\$(IntDir)TVSTVS_Ventilation_DBX.lib;AcPal.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(TVSBypassPreview)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_BYPASS_PREVIEW;TVS_BYPASS_FAULT_INJECTION;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(TVSBypassPreview)'=='true'">
+    <ClCompile Include="BypassPreviewCommand.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="BypassNumericBridge.cpp">
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <FloatingPointModel>Strict</FloatingPointModel>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+    </ClCompile>
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(TVSOffsetProof)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="OffsetIntegrationCommand.h" /><ClInclude Include="OffsetService.h" /><ClInclude Include="BypassService.h" /><ClInclude Include="..\geometry\OffsetOperation.h" /><ClInclude Include="OffsetIntegrationReactor.h" /><ClInclude Include="OffsetIntegrationDiagnostics.h" /><ClInclude Include="OffsetSessionState.h" /><ClInclude Include="OffsetSelectionCheck.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
+  <ItemDefinitionGroup Condition="'$(TVSOffsetIntegration)'=='true'">
+    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\GridCtrl_src\GridCell.cpp" />
     <ClCompile Include="..\GridCtrl_src\GridCellBase.cpp" />

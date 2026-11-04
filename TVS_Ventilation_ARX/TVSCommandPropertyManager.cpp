@@ -1,4 +1,4 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TVSCommandPropertyManager.h"
 #include "MleaderController.h"
 #include "TVSPropertySpec.h"
@@ -20,7 +20,11 @@ void TVSCommandPropertyManager::execute(void)
 	if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 		return;
 	TVSPropertySpec spec;
-	spec.processSetOfObjects(sset);
+	#ifdef TVS_OFFSET_INTEGRATION
+    if(!spec.processSetOfObjects(sset)){acedSSFree(sset);return;}
+#else
+    spec.processSetOfObjects(sset);
+#endif
 	spec.sort();
 	if (spec.rows.size() > 0) {
 		dgTVSPropertyManager dg;

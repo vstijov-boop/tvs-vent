@@ -1,5 +1,10 @@
-#include "stdafx.h"
+﻿#include "stdafx.h"
 #include "TVSPropertyController.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#endif
+#include "../TVS_Ventilation_DBX/SheetMetal.h"
+#include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 
 
 TVSPropertyController::TVSPropertyController()
@@ -172,6 +177,8 @@ bool TVSPropertyController::getProperty(const AcDbObjectId &objectId, TVSPropert
 			if ((ent = TVS_Entity::cast(pObj)) != NULL) {
 				{
 					tvsProperty.isTvsEnt = true;
+                    tvsProperty.hasSheetMetal = ent->getSheetMetal(tvsProperty.sheetArea,
+                        tvsProperty.sheetThickness, tvsProperty.totalMass);
 				}
 			}
 		}
@@ -183,7 +190,11 @@ bool TVSPropertyController::getProperty(const AcDbObjectId &objectId, TVSPropert
 		getManufaturer(objectId, tvsProperty.manufacturer);
 		getMass(objectId, tvsProperty.mass);
 		getUnits(objectId, tvsProperty.units);
-		getCount(objectId, tvsProperty.count);
+		#ifdef TVS_OFFSET_INTEGRATION
+        if(!getCount(objectId,tvsProperty.count))return false;
+#else
+        getCount(objectId, tvsProperty.count);
+#endif
 		getNote(objectId, tvsProperty.note);
 		return true;
 	}
@@ -262,7 +273,11 @@ bool TVSPropertyController::setSize(const AcDbObjectId &objectId, const CString 
 
 bool TVSPropertyController::getSize(const AcDbObjectId &objectId, CString &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForRead);
+#else
 	AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForWrite);
+#endif
 	if (pObj.openStatus() != Acad::eOk) return false;
 	TVS_Entity * ent;
 	if ((ent = TVS_Entity::cast(pObj)) != NULL) {
@@ -311,7 +326,11 @@ bool TVSPropertyController::setUnits(const AcDbObjectId &objectId, const CString
 
 bool TVSPropertyController::getUnits(const AcDbObjectId &objectId, CString &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForRead);
+#else
 	AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForWrite);
+#endif
 	if (pObj.openStatus() != Acad::eOk) return false;
 
 	TVS_Entity * ent;
@@ -344,13 +363,20 @@ bool TVSPropertyController::setCount(const AcDbObjectId &objectId, const double 
 
 bool TVSPropertyController::getCount(const AcDbObjectId &objectId, double &val)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForRead);
+#else
 	AcDbObjectPointer<AcDbObject> pObj(objectId, AcDb::kForWrite);
+#endif
 	if (pObj.openStatus() != Acad::eOk) return false;
 
 	TVS_Entity * ent;
 	if ((ent = TVS_Entity::cast(pObj)) != NULL) {
 		ent->getCount(val);
-		return true;
+#ifdef TVS_OFFSET_INTEGRATION
+        if(!(val>=0&&val<=DBL_MAX)){acutPrintf(L"\nTVS OFFSET: nevažeća količina; provjerite podatke sklopa.");return false;}
+#endif
+        return true;
 	}
 	else {
 		return getSubXReal(pObj, CTVSProperty, CTVSProperty_Number_count, val);
@@ -359,13 +385,46 @@ bool TVSPropertyController::getCount(const AcDbObjectId &objectId, double &val)
 
 bool TVSPropertyController::setMass(const AcDbObjectId &objectId, const double &val)
 {
-	return setSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
+    // Native sheet mass is derived; preserve manual masses of other objects.
+    {
+        AcDbObjectPointer<TVS_Entity> ent(objectId, AcDb::kForRead);
+        double area, thickness, mass;
+        if (ent.openStatus() == Acad::eOk && ent->getSheetMetal(area,thickness,mass)) return false;
+    }
+    return setSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
 }
 
 bool TVSPropertyController::getMass(const AcDbObjectId &objectId, double &val)
 {
-	return getSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
-
+#ifdef TVS_OFFSET_INTEGRATION
+    {
+        AcDbObjectPointer<AcDbObject> object(objectId,AcDb::kForRead);
+        if(object.openStatus()!=Acad::eOk)return false;
+        tvsOffsetData::Status status=tvsOffsetData::quantityStatus(object.object());
+        if(status!=tvsOffsetData::Legacy&&status!=tvsOffsetData::Valid&&status!=tvsOffsetData::Incomplete){
+            acutPrintf(L"\nTVS OFFSET: masa nije dostupna — %s.",tvsOffsetData::statusText(status));return false;}
+    }
+#endif
+    {
+        AcDbObjectPointer<TVS_Entity> ent(objectId, AcDb::kForRead);
+        double area, thickness, mass;
+        if (ent.openStatus() == Acad::eOk && ent->getSheetMetal(area,thickness,mass)) {
+            // Standard specification columns contain mass per unit of quantity.
+            double quantity;
+            ent->getCount(quantity);
+            if (quantity > 0.0) val = mass / quantity;
+            else if (TVS_Pipe::cast(ent.operator->())) {
+                const TVS_Pipe *pipe = TVS_Pipe::cast(ent.operator->());
+                const double f = tvsUnits::factor(pipe);
+                const double a = pipe->SizeA*f, b = pipe->ThisRound ? 0.0 : pipe->SizeB*f;
+                val = tvsSheetMetal::mass(tvsSheetMetal::perimeter(a,b)/1000.0,thickness);
+            }
+            else val = mass;
+            return true;
+        }
+    }
+    val = 0.0;
+    return getSubXReal(objectId, CTVSProperty, CTVSProperty_Number_mass, val);
 }
 
 bool TVSPropertyController::setNote(const AcDbObjectId &objectId, const CString &val)

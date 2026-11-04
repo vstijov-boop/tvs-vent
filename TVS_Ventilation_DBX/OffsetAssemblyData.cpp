@@ -1,0 +1,202 @@
+﻿#include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "TVS_Entity.h"
+#include "TVS_Pipe.h"
+#include "TVS_TAP.h"
+#include "OffsetAssemblyData.h"
+#include "BypassAssemblyData.h"
+#include "dbdict.h"
+#include "dbxrecrd.h"
+#include "dbobjptr.h"
+#include "dbtrans.h"
+#include "../geometry/RoundElbow.h"
+#include "../geometry/OffsetAdapter.h"
+#include <set>
+#include <map>
+#include <limits>
+#include "../geometry/OffsetRecordRules.h"
+namespace tvsOffsetData {
+static unsigned long dataRevision=1;
+unsigned long revision(){return dataRevision;}
+static int writeDepth=0;static std::set<AcDbObjectId> clones;
+WriteScope::WriteScope(){++writeDepth;}WriteScope::~WriteScope(){--writeDepth;}
+void permitClone(const AcDbObjectId& id){clones.insert(id);}void clearClonePermits(){clones.clear();++dataRevision;}
+const ACHAR* statusText(Status s){switch(s){case Legacy:return L"Legacy";case Valid:return L"Valid";case Incomplete:return L"Incomplete";case UnsupportedVersion:return L"UnsupportedVersion";case GeometryMismatch:return L"GeometryMismatch";default:return L"Corrupt";}}
+CString newGuid(){GUID id;OLECHAR value[40]={0};if(FAILED(CoCreateGuid(&id)))return CString();StringFromGUID2(id,value,40);return CString(value);}
+Status read(const AcDbObject* object,Record& out){
+    if(!object)return Corrupt;
+    AcDbObjectId dictId=object->extensionDictionary();if(dictId.isNull())return Legacy;
+    AcDbObjectPointer<AcDbDictionary> dict(dictId,AcDb::kForRead);if(dict.openStatus()!=Acad::eOk)return Corrupt;
+    AcDbObjectId id;Acad::ErrorStatus lookup=dict->getAt(L"TVS_OFFSET_MEMBER",id);
+    if(lookup==Acad::eKeyNotFound)return Legacy;if(lookup!=Acad::eOk)return Corrupt;
+    AcDbObjectPointer<AcDbXrecord> record(id,AcDb::kForRead);if(record.openStatus()!=Acad::eOk)return Corrupt;
+    resbuf* data=NULL;if(record->rbChain(&data)!=Acad::eOk||!data)return Corrupt;
+    Record r;resbuf* p=data;bool ok=true;
+    const int types[]={90,1,70,330,330,330,40};
+    for(int j=0;j<7;++j){if(!p||p->restype!=types[j]){ok=false;break;}
+        if(j==0)r.version=p->resval.rlong;
+        if(j==1){if(!p->resval.rstring){ok=false;break;}r.guid=p->resval.rstring;}
+        if(j==2)r.role=p->resval.rint;
+        if(j>=3&&j<=5){if(p->resval.rlname[0]||p->resval.rlname[1])
+            if(acdbGetObjectId(r.members[j-3],p->resval.rlname)!=Acad::eOk){ok=false;break;}}
+        if(j==6)r.rise=p->resval.rreal;p=p->rbnext;
+    }
+    if(p)ok=false;acutRelRb(data);
+    if(!ok)return Corrupt;out=r;
+    GUID parsedGuid;
+    bool guidShape=r.guid.GetLength()==38&&r.guid[0]==L'{'&&r.guid[37]==L'}'
+        &&SUCCEEDED(CLSIDFromString(const_cast<ACHAR*>(r.guid.GetString()),&parsedGuid));
+    tvsOffsetRecordRules::ScalarStatus scalar=tvsOffsetRecordRules::validate(r.version,r.role,guidShape,r.rise);
+    if(scalar==tvsOffsetRecordRules::ScalarUnsupported)return UnsupportedVersion;
+    if(scalar!=tvsOffsetRecordRules::ScalarValid)return Corrupt;
+    if(r.members[r.role]!=object->objectId())return Corrupt;
+    return Valid;
+}
+Acad::ErrorStatus write(AcDbObject* object,const Record& r){
+    if(!object||!object->isWriteEnabled()||r.guid.IsEmpty())return Acad::eInvalidInput;
+    Acad::ErrorStatus es=object->createExtensionDictionary();if(es!=Acad::eOk)return es;
+    AcDbTransactionManager* manager=object->database()->transactionManager();
+    bool managed=manager&&manager->numActiveTransactions()>0;AcDbObject* raw=NULL;
+    AcDbDictionary* dict=NULL;
+    if(managed){es=manager->getObject(raw,object->extensionDictionary(),AcDb::kForWrite);dict=AcDbDictionary::cast(raw);}
+    else es=acdbOpenObject(dict,object->extensionDictionary(),AcDb::kForWrite);
+    if(es!=Acad::eOk||!dict)return es;
+    AcDbObjectId id;AcDbXrecord* record=NULL;
+    if(dict->getAt(L"TVS_OFFSET_MEMBER",id)==Acad::eOk){
+        if(managed){raw=NULL;es=manager->getObject(raw,id,AcDb::kForWrite);record=AcDbXrecord::cast(raw);}
+        else es=acdbOpenObject(record,id,AcDb::kForWrite);
+    }else {record=new AcDbXrecord();es=dict->setAt(L"TVS_OFFSET_MEMBER",record,id);
+        if(es!=Acad::eOk){delete record;record=NULL;}
+        else if(managed)es=manager->addNewlyCreatedDBRObject(record,true);}
+    if(es==Acad::eOk&&record){
+        resbuf nodes[7]={};const int types[]={90,1,70,330,330,330,40};
+        for(int j=0;j<7;++j){nodes[j].restype=static_cast<short>(types[j]);nodes[j].rbnext=j<6?&nodes[j+1]:NULL;}
+        nodes[0].resval.rlong=r.version;nodes[1].resval.rstring=const_cast<ACHAR*>(r.guid.GetString());nodes[2].resval.rint=static_cast<short>(r.role);
+        for(int j=0;j<3;++j)if(!r.members[j].isNull())acdbGetAdsName(nodes[j+3].resval.rlname,r.members[j]);
+        nodes[6].resval.rreal=r.rise;record->setXlateReferences(true);es=record->setFromRbChain(nodes[0]);if(es==Acad::eOk)++dataRevision;
+    }
+    if(!managed){if(record)record->close();dict->close();}return es;
+}
+
+bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy||tvsBypassData::marked(o);}
+bool editable(const AcDbObject* o){return writeDepth>0||!marked(o)||clones.find(o->objectId())!=clones.end();}
+// Rigid in plan: translation (any) plus rotation about Z; no scale, mirror or tilt.
+static bool rigidPlan(const AcGeMatrix3d& m){
+    for(int r=0;r<4;++r)for(int c=0;c<4;++c)if(!tvsOffset::finite(m.entry[r][c]))return false;
+    const double a=m.entry[0][0],b=m.entry[0][1],c=m.entry[1][0],d=m.entry[1][1];
+    if(std::fabs(a-d)>1e-10||std::fabs(b+c)>1e-10||std::fabs(a*a+c*c-1)>1e-10)return false;
+    if(std::fabs(m.entry[0][2])>1e-10||std::fabs(m.entry[1][2])>1e-10||std::fabs(m.entry[2][0])>1e-10||std::fabs(m.entry[2][1])>1e-10||std::fabs(m.entry[2][2]-1)>1e-10)return false;
+    return std::fabs(m.entry[3][0])<=1e-10&&std::fabs(m.entry[3][1])<=1e-10&&std::fabs(m.entry[3][2])<=1e-10&&std::fabs(m.entry[3][3]-1)<=1e-10;
+}
+// Members move/rotate like ordinary ducts (user decision: a broken bypass is redrawn by the
+// user). Assembly geometry may then no longer match: TVS_BYPASS_DETALJ refuses such a
+// bypass, quantities stay per member (quantityStatus). Scale/mirror/tilt stay refused.
+bool allowTransform(const AcDbObject* o,const AcGeMatrix3d& m){
+    if(!marked(o)||writeDepth>0)return true;
+    return rigidPlan(m);
+}
+static bool nearPoint(const AcGePoint3d& a,const AcGePoint3d& b,double f){return a.distanceTo(b)*f<=.001;}
+Status validateCore(const AcDbObject* o,bool geometry){
+    Record r;Status s=read(o,r);if(s!=Valid)return s;
+    for(int j=0;j<3;++j){if(r.members[j].isNull()||r.members[j].isErased())return Incomplete;
+        if(r.members[j].database()!=o->database())return Corrupt;
+        for(int k=0;k<j;++k)if(r.members[k]==r.members[j])return Corrupt;}
+    AcDbObjectPointer<TVS_TAP> a(r.members[0],AcDb::kForRead),b(r.members[2],AcDb::kForRead);
+    AcDbObjectPointer<TVS_Pipe> p(r.members[1],AcDb::kForRead);
+    // Null/erased members were classified above. Other failures (wrong class,
+    // unavailable object) cannot certify a safe standalone quantity.
+    if(a.openStatus()!=Acad::eOk||b.openStatus()!=Acad::eOk||p.openStatus()!=Acad::eOk)return Corrupt;
+    const AcDbObject* objects[]={a.object(),p.object(),b.object()};Record members[3];
+    for(int j=0;j<3;++j){Status q=read(objects[j],members[j]);
+        // A missing member record is not a legacy assembly: the selected member
+        // explicitly claims reciprocal membership and that claim is broken.
+        if(q==Legacy)return Corrupt;if(q!=Valid)return q;
+        if(members[j].role!=j||members[j].guid!=r.guid)return Corrupt;
+        for(int k=0;k<3;++k)if(members[j].members[k]!=r.members[k])return Corrupt;}
+    if(!geometry)return Valid;
+    // Detect failed clone finalization / duplicate identities without rewriting DWG.
+    AcDbObjectPointer<AcDbBlockTableRecord> owner(o->ownerId(),AcDb::kForRead);
+    if(owner.openStatus()!=Acad::eOk)return Corrupt;
+    AcDbBlockTableRecordIterator* iterator=NULL;if(owner->newIterator(iterator)!=Acad::eOk)return Corrupt;
+    bool conflict=false;
+    for(;!iterator->done();iterator->step()){
+        AcDbEntity* other=NULL;if(iterator->getEntity(other,AcDb::kForRead)!=Acad::eOk){conflict=true;break;}
+        Record record;Status os=read(other,record);other->close();
+        if(os!=Legacy&&record.guid==r.guid){for(int j=0;j<3;++j)if(record.members[j]!=r.members[j])conflict=true;}
+    }
+    delete iterator;if(conflict)return Corrupt;
+    double f=tvsUnits::factor(o);double delta=(b->get_Elevation()-a->get_Elevation())*f;
+    // Whole triple rectangular, or whole triple round (bypass of a round duct: smooth
+    // constant-radius TVS elbows, bend dimension = diameter, SizeB = 0).
+    const bool round=p->ThisRound;
+    if(a->ThisRound!=round||b->ThisRound!=round||a->DuctType!=DuctTypeStill||b->DuctType!=DuctTypeStill||p->DuctType!=DuctTypeStill)return GeometryMismatch;
+    if(round&&(p->SizeB!=0||a->SizeB!=0||b->SizeB!=0||a->RadiusTypeRound!=RadiusTypeRound_RadiusConstant||b->RadiusTypeRound!=RadiusTypeRound_RadiusConstant))return GeometryMismatch;
+    if(std::fabs(a->SizeA-p->SizeA)*f>.001||std::fabs(a->SizeB-p->SizeB)*f>.001||std::fabs(b->SizeA-p->SizeA)*f>.001||std::fabs(b->SizeB-p->SizeB)*f>.001
+        ||std::fabs(a->get_radius()-b->get_radius())*f>.001||std::fabs(a->Swectangle-b->Swectangle)>1e-8)return GeometryMismatch;
+    AcGeVector3d axis=p->LastPoint-p->FirstPoint;if(axis.length()<=0)return GeometryMismatch;
+    double heading=std::atan2(axis.y,axis.x);
+    const double bend=round?p->SizeA:p->SizeB;
+    tvsOffset::Input in(delta,p->SizeA*f,bend*f,a->get_radius()*f,a->Swectangle,0);
+    tvsOffset::Result result=tvsOffset::solve(in);if(!result.hasGeometry())return GeometryMismatch;
+    // The adapter works in the rectangular parameterisation (MiddlePoint = MC port).
+    auto rectMiddle=[&](const TVS_TAP* tap){if(!round)return tap->MiddlePoint;tvsRoundElbow::P ma,mc;
+        tvsRoundElbow::ports(tvsRoundElbow::P(tap->MiddlePoint.x,tap->MiddlePoint.y),tap->Startvector.x,tap->Startvector.y,tap->Swectangle,tap->get_radius()+tap->SizeA/2,ma,mc);
+        return AcGePoint3d(mc.x,mc.y,tap->MiddlePoint.z);};
+    const AcGePoint3d aMiddle=rectMiddle(a.object()),bMiddle=rectMiddle(b.object());
+    tvsOffsetAdapter::Placement place(tvsOffset::WorldPoint(aMiddle.x,aMiddle.y,aMiddle.z),heading,f,a->get_Elevation()*f);
+    tvsOffsetAdapter::Result d=tvsOffsetAdapter::adapt(in,result,place);if(!d.ready())return GeometryMismatch;
+    for(int j=0;j<2;++j){TVS_TAP* tap=j==0?a.object():b.object();const tvsOffsetAdapter::Elbow& expected=d.elbows[j];
+        if((tap->Startvector-AcGeVector3d(expected.startVector.x,expected.startVector.y,0)).length()>1e-8
+            ||(tap->Normvector-AcGeVector3d(0,0,1)).length()>1e-8)return GeometryMismatch;}
+    if(!nearPoint(p->FirstPoint,AcGePoint3d(d.middle.first.x,d.middle.first.y,d.middle.first.z),f)
+        ||!nearPoint(p->LastPoint,AcGePoint3d(d.middle.last.x,d.middle.last.y,d.middle.last.z),f)
+        ||!nearPoint(bMiddle,AcGePoint3d(d.elbows[1].middle.x,d.elbows[1].middle.y,d.elbows[1].middle.z),f)
+        ||std::fabs(members[1].rise-(result.axis[2].z-result.axis[1].z))>.001
+        ||a->get_Form()!=(delta>0?Form_Up:Form_Down)||b->get_Form()!=(delta>0?Form_Down:Form_Up))return GeometryMismatch;
+    return Valid;
+}
+Status validate(const AcDbObject* o,bool geometry){
+    Status s=validateCore(o,geometry);
+    if(s!=Legacy&&s!=Valid)return s;
+    return tvsBypassData::marked(o)?tvsBypassData::validate(o,geometry):s;
+}
+Status quantityStatus(const AcDbObject* o){
+    Status s=validateCore(o,true);
+    if(s==Corrupt||s==UnsupportedVersion)return s;
+    if(tvsBypassData::marked(o)){const Status b=tvsBypassData::validate(o,true);if(b==Corrupt||b==UnsupportedVersion)return b;}
+    return s==Legacy?Legacy:Valid;
+}
+bool physicalLength(const AcDbObject* o,double projected,double& physical){
+    Record r;Status s=read(o,r);physical=projected;if(s==Legacy){
+        if(!tvsBypassData::marked(o))return true;
+        const Status parent=quantityStatus(o);return parent!=Corrupt&&parent!=UnsupportedVersion;
+    }
+    if(s!=Valid||r.role!=SlopedStraight){acutPrintf(L"\nTVS OFFSET: neispravni podaci fizičke dužine (%s).",statusText(s));return false;}
+    // Incomplete membership still permits the standalone member's own valid quantity.
+    Status integrity=quantityStatus(o);if(integrity==Corrupt||integrity==UnsupportedVersion){acutPrintf(L"\nTVS OFFSET: neispravno članstvo (%s).",statusText(integrity));return false;}
+    double h=r.rise/tvsUnits::factor(o);return tvsOffsetRecordRules::physical(projected,h,physical);
+}
+Acad::ErrorStatus remapClones(AcDbIdMapping& map){
+    std::map<CString,CString> guids;AcDbIdMappingIter iter(map);AcDbIdPair pair;
+    WriteScope scope;
+    for(iter.start();!iter.done();iter.next()){
+        if(!iter.getMap(pair)||!pair.isCloned()||pair.key()==pair.value())continue;
+        AcDbObjectPointer<AcDbObject> source(pair.key(),AcDb::kForRead);
+        if(source.openStatus()!=Acad::eOk)continue;Record original;Status status=read(source.object(),original);
+        if(status==Legacy)continue;if(status!=Valid)return Acad::eInvalidInput;
+        AcDbObjectPointer<AcDbObject> dest(pair.value(),AcDb::kForWrite);if(dest.openStatus()!=Acad::eOk)return dest.openStatus();
+        Record copy=original;
+        if(std::fabs(tvsUnits::factor(source.object())-tvsUnits::factor(dest.object()))>1e-10){
+            // Explicitly unsupported import, never silently reuse rise in mismatched units.
+            copy.version=-1;
+            acutPrintf(L"\nTVS OFFSET: COPY između različitih jedinica nije podržan; obračun kopije je blokiran (verzija -1).");
+        }
+        if(guids.find(original.guid)==guids.end())guids[original.guid]=newGuid();copy.guid=guids[original.guid];
+        for(int j=0;j<3;++j){AcDbIdPair member;member.setKey(original.members[j]);
+            copy.members[j]=(map.compute(member)&&member.isCloned())?member.value():AcDbObjectId::kNull;}
+        copy.members[copy.role]=pair.value();Acad::ErrorStatus es=write(dest.object(),copy);if(es!=Acad::eOk)return es;permitClone(pair.value());
+    }
+    return Acad::eOk;
+}
+}
+#endif

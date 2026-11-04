@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="sr-Latn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TVS — Obilazak kanala · prijedlog dijaloga</title>
+<style>
+:root{color-scheme:light}*{box-sizing:border-box}body{margin:0;background:#e6e9ec;color:#20282e;font:14px 'Segoe UI',Arial,sans-serif}button,input,select{font:inherit}button{cursor:pointer}.page{max-width:1180px;margin:24px auto;padding:0 16px}.context{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:13px}.context h1{font-size:20px;font-weight:600;margin:0 0 4px}.context p{margin:0;color:#58636d;font-size:13px}.examples{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}.examples button{border:1px solid #aab2b9;background:#f7f8f9;padding:8px 16px;border-radius:3px;color:#28323a}.examples button[aria-pressed=true]{background:#2d5978;color:#fff;border-color:#2d5978}.examples span{padding:9px 8px 9px 0;color:#59656e;font-size:13px}.window{background:#f3f3f3;border:1px solid #9ea6ad;box-shadow:0 10px 28px #182b3c20;border-radius:5px;overflow:hidden}.titlebar{background:#fafafa;border-bottom:1px solid #c8cdd1;padding:13px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px}.titlebar h2{font-size:16px;font-weight:600;margin:0}.symbol{display:inline-grid;place-items:center;background:#346a8a;color:#fff;width:25px;height:25px;margin-right:8px;border-radius:2px}.tag{font-size:12px;color:#586773;background:#e9edf0;padding:4px 8px;border-radius:3px}.body{padding:15px 18px 0}.top{display:grid;grid-template-columns:1fr 1fr 1.08fr;gap:14px}fieldset{margin:0;padding:11px 12px 12px;border:1px solid #c4c9cd;min-width:0}legend{padding:0 5px;color:#354652;font-weight:600}.rows{display:grid;grid-template-columns:1fr auto;gap:7px 10px;align-items:center}.rows label,.rows .label{color:#414e59}.datum{font-variant-numeric:tabular-nums;white-space:nowrap}.value{display:flex;align-items:center;gap:5px}.value input{width:85px}.value.wide input{width:129px}input[readonly],select:disabled{color:#1c2d37;background:#fff;border:1px solid #aab1b7;border-radius:1px;padding:4px 7px;opacity:1;text-align:right;height:29px;font-variant-numeric:tabular-nums}select:disabled{width:85px;text-align:left}.unit{color:#66747e;min-width:20px;font-size:12px}.source{font-size:11px;color:#6a7780;margin:9px 0 0}.choice{display:flex;gap:12px;margin-bottom:10px}.choice label{display:flex;align-items:center;gap:5px}.choice input{accent-color:#2d5978}.spacer{height:7px}.minima{display:flex;gap:14px;align-items:center;flex-wrap:wrap;border:1px solid #c4c9cd;border-top:0;padding:9px 12px;font-size:13px}.minima label{display:flex;gap:7px;align-items:center}.minima input{width:62px;height:26px}.manual{color:#8b5d1c;font-size:12px}.plothead{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:15px 0 7px}.plothead strong{font-weight:600}.plothead label{font-size:12px;color:#55636d;white-space:nowrap}.plot{background:#fff;border:1px solid #bbc3c9;position:relative}.plot svg{display:block;width:100%;height:auto}.plot text{font-family:'Segoe UI',Arial,sans-serif;font-size:14px;fill:#30404b}.plot .small{font-size:12px}.plot .dimlabel{paint-order:stroke;stroke:#fff;stroke-width:6px;stroke-linejoin:round}.plot .zlabel{font-size:12px;fill:#526573}.legend{display:flex;gap:17px;flex-wrap:wrap;padding:8px 12px;border-top:1px solid #e0e4e7;font-size:12px;color:#52616b}.key{display:inline-block;width:18px;height:8px;margin-right:6px;vertical-align:1px}.note{font-size:12px;color:#687680;margin:6px 0 10px}.status{margin:12px 0 10px;background:#e6f1eb;border-left:4px solid #397657;padding:10px 12px;color:#265e41;font-size:13px}.status.fail{background:#f8e8e5;color:#8b3426;border-left-color:#b84e3d}.status strong{font-weight:600}.results{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:0 0 13px}.metrics{display:grid;grid-template-columns:1fr auto;gap:6px 12px;align-content:start;font-size:13px}.metrics dd,.metrics dt{margin:0}.metrics dd{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}.metrics dt{color:#43535e}.metrics .muted{color:#6f7c86;font-weight:400}.pieces{border-collapse:collapse;width:100%;font-size:12px}.pieces th{font-weight:600;background:#e6e9eb;color:#3d4b55;text-align:left}.pieces td,.pieces th{padding:5px 8px;border-bottom:1px solid #d8dde1}.pieces td:last-child,.pieces th:last-child{text-align:right;font-variant-numeric:tabular-nums}.pieces td:nth-child(2),.pieces th:nth-child(2){text-align:right;font-variant-numeric:tabular-nums}.footer{display:flex;align-items:center;justify-content:space-between;gap:16px;border-top:1px solid #c8ced3;padding:12px 18px;background:#f0f0f0}.footer span{font-size:12px;color:#63717c}.actions{display:flex;gap:9px}.actions button{padding:6px 15px;min-width:86px;border:1px solid #adb6bc;background:#e7eaed;color:#7b858d;border-radius:2px;cursor:not-allowed}.actions .primary{border-color:#92a8b8;background:#dce6ec}.subfoot{font-size:12px;color:#66747d;margin:13px 2px;line-height:1.5}.caption{font-size:13px;color:#40515d;margin:9px 0 0;line-height:1.45}.precision{font-size:11px;color:#65737d}.nowrap{white-space:nowrap}@media(max-width:800px){.top{grid-template-columns:1fr 1fr}.top fieldset:last-child{grid-column:1/-1}.top fieldset:last-child .rows{grid-template-columns:1fr auto 1fr auto}.results{grid-template-columns:1fr}.context{display:block}.footer{align-items:flex-start;flex-direction:column}.plothead{flex-wrap:wrap}.plot{overflow-x:auto}.plot svg{min-width:770px}.page{margin:12px auto}.minima{gap:10px}.tag{display:none}}@media(max-width:500px){.top{grid-template-columns:1fr}.top fieldset:last-child .rows{grid-template-columns:1fr auto}.actions{flex-wrap:wrap}.examples button{padding:7px 10px}.window .body{padding:12px 10px 0}}@media print{body{background:white}.page{max-width:none;margin:0;padding:0}.context,.examples,.footer,.subfoot{display:none}.window{box-shadow:none}.plot svg{min-width:0}.top{grid-template-columns:1fr 1fr 1fr}.results{grid-template-columns:1fr 1fr}.status{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<main class="page">
+ <div class="context"><div><h1>Predlog dijaloga · Obilazak kanala</h1><p>Fiksni referentni primjeri za pregled izgleda i pravila. Bez solvera i CAD veze.</p></div><span class="tag">TVS · plan MVP-a · 31.10.2026.</span></div>
+ <nav class="examples" aria-label="Referentna stanja"><span>Prikaži stanje:</span><button type="button" data-case="below" aria-pressed="true">Prolaz ispod</button><button type="button" data-case="above" aria-pressed="false">Prolaz iznad</button><button type="button" data-case="fail" aria-pressed="false">Nema dovoljno prostora</button><button type="button" data-case="insulation" aria-pressed="false">Sa izolacijom 25 mm</button></nav>
+ <section class="window" aria-label="Mockup dijaloga Obilazak kanala">
+  <header class="titlebar"><h2><span class="symbol" aria-hidden="true">↗</span>Obilazak kanala</h2><span class="tag">Fizičke mjere: mm · postojeća kotna referenca</span></header>
+  <div class="body">
+   <div class="top">
+    <fieldset><legend>Novi kanal</legend><div class="rows">
+      <span class="label">A × B</span><div class="value wide"><input readonly aria-label="Presjek novog kanala" value="400 × 200"><span class="unit">mm</span></div>
+      <label for="znew">Kota ose</label><div class="value"><input id="znew" readonly value="−400"><span class="unit">mm</span></div>
+      <label for="inew">Izolacija</label><div class="value"><input id="inew" readonly value="0"><span class="unit">mm</span></div>
+      <span class="label">Ulaz / izlaz</span><span class="datum">Ista kota, isti presjek</span>
+    </div><p class="source">Zadati primjer · u CAD toku preuzeti sa aktivnog kanala.</p></fieldset>
+    <fieldset><legend>Prepreka</legend><div class="rows">
+      <label for="obswidth">Širina duž nove trase</label><div class="value"><input id="obswidth" readonly value="250"><span class="unit">mm</span></div>
+      <label for="obsheight">Visina</label><div class="value"><input id="obsheight" readonly value="250"><span class="unit">mm</span></div>
+      <label for="zobs">Kota ose</label><div class="value"><input id="zobs" readonly value="−400"><span class="unit">mm</span></div>
+      <label for="iobs">Izolacija</label><div class="value"><input id="iobs" readonly value="0"><span class="unit">mm</span></div>
+    </div><p class="source">Upravno ukrštanje · pun poprečni preklop pretpostavljen u primjeru.</p></fieldset>
+    <fieldset><legend>Geometrija prolaza</legend><div class="choice"><label><input id="over" type="radio" name="side" disabled> Iznad</label><label><input id="under" type="radio" name="side" checked disabled> Ispod</label></div><div class="rows">
+      <label for="angle">Ugao koljena</label><select id="angle" disabled><option>45°</option></select>
+      <label for="ri">Unutrašnji Ri</label><div class="value"><input id="ri" readonly value="100"><span class="unit">mm</span></div>
+      <label for="gap">Čisti razmak</label><div class="value"><input id="gap" readonly value="50"><span class="unit">mm</span></div>
+    </div><p class="source">Razmak = najkraće rastojanje između spoljnih površina.</p></fieldset>
+   </div>
+   <div class="minima"><label>Kosi komadi ≥ <input readonly aria-label="Minimalna fizička dužina kosog komada" value="100"> mm</label><label>Srednji pravi ≥ <input readonly aria-label="Minimalna srednja dužina" value="100"> mm</label><span class="manual">Ručni projektni ulazi · nisu normativni minimumi</span></div>
+   <div class="plothead"><strong>Uzdužni vertikalni presjek <span class="precision">s–z · jednaka skala osa</span></strong><label><input id="dimensions" type="checkbox" checked> Prikaži kote i dužine</label></div>
+   <div class="plot"><svg id="section" viewBox="0 0 1120 470" role="img" aria-labelledby="section-title section-desc"></svg><div class="legend"><span><i class="key" style="background:#d3e6ed;border:1px solid #387388"></i>Novi kanal</span><span><i class="key" style="background:#d2d7dc;border:1px solid #606c76"></i>Prepreka</span><span><i class="key" style="background:#f2dfb7;border:1px solid #9c7944"></i>Izolacija <b id="iso-legend" style="font-weight:400">0 mm</b></span><span><i class="key" style="border-top:2px dashed #ba8237;height:2px"></i>Granica razmaka 50 mm</span></div></div>
+   <p class="note">U ovom presjeku vidi se visina B = 200 mm. Širina A = 400 mm je upravna na ekran. Mjere su fizičke, ne crtački Z.</p>
+   <div id="status" class="status" role="status" aria-live="polite"></div>
+   <div class="results">
+    <dl class="metrics">
+      <dt>Kota ose prolaza</dt><dd id="passz"></dd>
+      <dt>Ukupni horizontalni zahvat</dt><dd id="run"></dd>
+      <dt>Najmanji ostvareni razmak</dt><dd id="achieved"></dd>
+      <dt>Vertikalni zazor srednjeg dijela</dt><dd id="verticalgap"></dd>
+      <dt>Prostor prije / poslije prepreke</dt><dd id="available"></dd>
+      <dt>Minimum ulaz / izlaz</dt><dd class="muted">100 / 100 mm, izvan zahvata</dd>
+    </dl>
+    <div><table class="pieces"><thead><tr><th>Komad</th><th>Fizička dužina</th><th>XY projekcija</th></tr></thead><tbody id="pieces"></tbody></table><p class="precision">L ose koljena je informativna mjera luka. Obračun lima ostaje po TVS fitingu, bez dupliranja.</p></div>
+   </div>
+  </div>
+  <footer class="footer"><span>Mockup: polja i upis nisu aktivni. Primjeri nisu praktična CAD provjera.</span><div class="actions"><button disabled title="Nije povezano sa crtežom">Pregled u crtežu</button><button class="primary" disabled title="CAD upis nije implementiran">U redu</button><button disabled>Otkaži</button></div></footer>
+ </section>
+ <p class="caption" id="explanation"></p>
+ <p class="subfoot">Prikazan je unaprijed zadat analitički primjer za kriterijum najkraćeg rastojanja. Izbor stanja mijenja samo fiksne podatke i grafiku; ne postoji optimizer, očitavanje DWG-a ni upis. Dostupni prostor je ručni ulaz nakon rezervacije ulaznog i izlaznog nastavka. Presjek se automatski uklapa bez različitog uvećanja po osama.</p>
+</main>
+<script>
+// Fixed review fixtures only. No bypass solver, collision engine or CAD calls.
+const fixtures = {"below":{"points":[[-544.9747468305833,-400],[-403.5533905932738,-458.5786437626905],[-231.06601717798213,-631.0660171779821],[-89.64466094067262,-689.6446609406726],[89.64466094067262,-689.6446609406726],[231.06601717798213,-631.0660171779821],[403.5533905932738,-458.5786437626905],[544.9747468305833,-400]],"passz":-689.6446609406726,"run":1089.9494936611666,"bridge":179.28932188134524,"slope":243.93398282201787,"projected":172.48737341529164,"vertical":64.64466094067262,"insulation":0,"available":700,"up":false,"fail":false,"contact":[-160.35533905932738,-560.3553390593273]},"above":{"points":[[-544.9747468305833,-400],[-403.5533905932738,-341.4213562373095],[-231.06601717798213,-168.93398282201792],[-89.64466094067262,-110.35533905932743],[89.64466094067262,-110.35533905932743],[231.06601717798213,-168.93398282201792],[403.5533905932738,-341.4213562373095],[544.9747468305833,-400]],"passz":-110.35533905932743,"run":1089.9494936611666,"bridge":179.28932188134524,"slope":243.93398282201787,"projected":172.48737341529164,"vertical":64.64466094067262,"insulation":0,"available":700,"up":true,"fail":false,"contact":[-160.35533905932738,-239.64466094067268]},"fail":{"points":[[-544.9747468305833,-400],[-403.5533905932738,-458.5786437626905],[-231.06601717798213,-631.0660171779821],[-89.64466094067262,-689.6446609406726],[89.64466094067262,-689.6446609406726],[231.06601717798213,-631.0660171779821],[403.5533905932738,-458.5786437626905],[544.9747468305833,-400]],"passz":-689.6446609406726,"run":1089.9494936611666,"bridge":179.28932188134524,"slope":243.93398282201787,"projected":172.48737341529164,"vertical":64.64466094067262,"insulation":0,"available":500,"up":false,"fail":true,"contact":[-160.35533905932738,-560.3553390593273]},"insulation":{"points":[[-630.3300858899107,-400],[-488.9087296526012,-458.5786437626905],[-273.74368670764585,-673.7436867076458],[-132.3223304703363,-732.3223304703363],[132.3223304703363,-732.3223304703363],[273.74368670764585,-673.7436867076458],[488.9087296526012,-458.5786437626905],[630.3300858899107,-400]],"passz":-732.3223304703363,"run":1260.6601717798214,"bridge":264.6446609406726,"slope":304.28932188134524,"projected":215.16504294495536,"vertical":57.32233047033628,"insulation":25,"available":700,"up":false,"fail":false,"contact":[-185.35533905932738,-585.3553390593273]}};
+const root = document.querySelector('main');
+let selected='below';
+const f=(v,d=2)=>new Intl.NumberFormat('sr-Latn-ME',{minimumFractionDigits:d,maximumFractionDigits:d}).format(v);
+const set=(id,text)=>document.getElementById(id).textContent=text;
+function svgEl(tag,attrs,parent){const e=document.createElementNS('http://www.w3.org/2000/svg',tag);for(const [k,v]of Object.entries(attrs))e.setAttribute(k,v);(parent||document.getElementById('section')).appendChild(e);return e;}
+function draw(d){
+ const svg=document.getElementById('section');svg.replaceChildren();
+ svgEl('title',{id:'section-title'},svg).textContent=d.fail?'Neizvodljiv prolaz u raspoloživom prostoru':d.up?'Prolaz iznad prepreke':'Prolaz ispod prepreke';
+ svgEl('desc',{id:'section-desc'},svg).textContent='Uzdužni vertikalni presjek četiri glatka koljena i tri prava komada. Najkraći razmak 50 milimetara. '+(d.fail?'Za geometrijski kandidat nedostaje 89,95 milimetara ukupne dužine.':'Ukupni zahvat '+f(d.run)+' milimetara.');
+ const zMin=d.up?-635:-1000,zMax=d.up?200:-155;
+ const k=Math.min(1000/1560,345/(zMax-zMin)),cx=570,cy=220;
+ const zMid=(zMin+zMax)/2;
+ const x=s=>cx+k*s,y=z=>cy-k*(z-zMid);
+ const line=(a,b,attrs={},par)=>svgEl('line',{x1:x(a[0]),y1:y(a[1]),x2:x(b[0]),y2:y(b[1]),stroke:'#a3b0b8','stroke-width':1,...attrs},par);
+ const text=(s,z,value,attrs={},par)=>{const e=svgEl('text',{x:x(s),y:y(z),...attrs},par);e.textContent=value;return e;};
+ const defs=svgEl('defs',{},svg);
+ const pattern=svgEl('pattern',{id:'hatch',width:7,height:7,patternUnits:'userSpaceOnUse'},defs);svgEl('path',{d:'M-2 2 L2 -2 M0 7 L7 0 M5 9 L9 5',stroke:'#ae8d52','stroke-width':1},pattern);
+ for(const z of [-800,-600,-400,-200,0])if(z>zMin&&z<zMax){line([-760,z],[760,z],{stroke:'#edf0f2'});text(-780,z,'z '+z,{'text-anchor':'end',dy:4,class:'zlabel'});}
+ const av=d.available;
+ for(const s of [-av,av]){line([s,zMin+30],[s,zMax-25],{stroke:d.fail?'#c55845':'#a1adb7','stroke-dasharray':'5 5'});text(s,zMax-10,(s<0?'−':'+')+av,{'text-anchor':'middle',class:'small',fill:d.fail?'#a83b2d':'#586a75'});}
+ text(0,zMax-10,'Ručno raspoloživ prostor',{'text-anchor':'middle',class:'small'});
+ const oh=125+d.insulation,ow=125+d.insulation;
+ svgEl('rect',{x:x(-ow-50),y:y(-400+oh+50),width:(2*ow+100)*k,height:(2*oh+100)*k,rx:50*k,fill:'#d9a351','fill-opacity':.09,stroke:'#ba8237','stroke-width':1.2,'stroke-dasharray':'5 4'});
+ if(d.insulation){svgEl('rect',{x:x(-ow),y:y(-400+oh),width:ow*2*k,height:oh*2*k,fill:'#f4e5c6',stroke:'#a08558','stroke-width':1});svgEl('rect',{x:x(-ow),y:y(-400+oh),width:ow*2*k,height:oh*2*k,fill:'url(#hatch)'});}
+ svgEl('rect',{x:x(-125),y:y(-275),width:250*k,height:250*k,fill:'#d9dfe3',stroke:'#64737c','stroke-width':1.5});
+ text(0,-400,'Prepreka',{'text-anchor':'middle',dy:-7,'font-weight':'600'});text(0,-400,'250 × 250',{'text-anchor':'middle',dy:13,class:'small'});
+ const p=d.points,sw=d.up?[0,1,1,0]:[1,0,0,1];
+ let path=`M ${x(-740)} ${y(-400)} L ${x(p[0][0])} ${y(p[0][1])}`;
+ path+=` A ${200*k} ${200*k} 0 0 ${sw[0]} ${x(p[1][0])} ${y(p[1][1])}`;
+ path+=` L ${x(p[2][0])} ${y(p[2][1])} A ${200*k} ${200*k} 0 0 ${sw[1]} ${x(p[3][0])} ${y(p[3][1])}`;
+ path+=` L ${x(p[4][0])} ${y(p[4][1])} A ${200*k} ${200*k} 0 0 ${sw[2]} ${x(p[5][0])} ${y(p[5][1])}`;
+ path+=` L ${x(p[6][0])} ${y(p[6][1])} A ${200*k} ${200*k} 0 0 ${sw[3]} ${x(p[7][0])} ${y(p[7][1])} L ${x(740)} ${y(-400)}`;
+ const route=svgEl('g',{opacity:d.fail?.53:1});
+ const stroke=(width,color)=>svgEl('path',{d:path,fill:'none',stroke:color,'stroke-width':width*k,'stroke-linecap':'butt','stroke-linejoin':'round'},route);
+ if(d.insulation){stroke(252,'#9c845b');stroke(249,'#f2dfb7');}
+ stroke(202,d.fail?'#aa5347':'#387388');stroke(198,d.fail?'#f2d8d3':'#d3e6ed');
+ svgEl('path',{d:path,fill:'none',stroke:d.fail?'#aa5347':'#5b7d8b','stroke-width':.9,'stroke-dasharray':'6 5'},route);
+ const phi=d.up?[0,45,45,0,0,-45,-45,0]:[0,-45,-45,0,0,45,45,0];
+ for(let j=0;j<8;j++){const a=phi[j]*Math.PI/180,ns=-Math.sin(a),nz=Math.cos(a);line([p[j][0]-100*ns,p[j][1]-100*nz],[p[j][0]+100*ns,p[j][1]+100*nz],{stroke:d.fail?'#aa5347':'#5e8595','stroke-width':1},route);}
+ if(document.getElementById('dimensions').checked){
+  const g=svgEl('g',{'data-dimensions':'true'}),sg=d.up?1:-1;
+  const dimension=(a,b,label,offset)=>{line(a,b,{stroke:'#526b7b','stroke-width':1},g);const dx=b[0]-a[0],dz=b[1]-a[1],len=Math.hypot(dx,dz);const n=[-dz/len*7,dx/len*7];for(const v of[a,b])line([v[0]-n[0],v[1]-n[1]],[v[0]+n[0],v[1]+n[1]],{stroke:'#526b7b','stroke-width':1.2},g);text((a[0]+b[0])/2,(a[1]+b[1])/2,label,{'text-anchor':'middle',dy:offset||-7,class:'dimlabel'},g);};
+  const dimZ=d.passz+sg*(100+d.insulation+145);
+  for(const q of[p[0],p[7]])line(q,[q[0],dimZ],{stroke:'#9baab4','stroke-dasharray':'3 4'},g);
+  dimension([p[0][0],dimZ],[p[7][0],dimZ],'Ukupni zahvat '+f(d.run)+' mm',d.up?-9:20);
+  const hz=d.passz+sg*(100+d.insulation+35);
+  dimension([p[3][0],hz],[p[4][0],hz],'H '+f(d.bridge)+' mm',d.up?-9:20);
+  line([-740,d.passz],[p[3][0],d.passz],{stroke:'#8d9da9','stroke-dasharray':'3 4'},g);
+  text(-750,d.passz,'Kota ose '+f(d.passz),{'text-anchor':'end',dy:4,class:'dimlabel small'},g);
+  const cp=d.contact,op=[-ow,-400+sg*oh];
+  line(cp,op,{stroke:'#ac7028','stroke-width':2},g);
+  for(const point of[cp,op])svgEl('circle',{cx:x(point[0]),cy:y(point[1]),r:3,fill:'#ac7028'},g);
+  const lz=(cp[1]+op[1])/2;
+  line([cp[0]-70,lz],[(cp[0]+op[0])/2,lz],{stroke:'#ac7028','stroke-width':1},g);
+  text(cp[0]-80,lz,'min 50 mm',{'text-anchor':'end',dy:4,class:'dimlabel small'},g);
+  for(const [index,label]of[[1,'S1'],[5,'S2']]){const q=[(p[index][0]+p[index+1][0])/2,(p[index][1]+p[index+1][1])/2];text(q[0]+(index===1?-130:130),q[1]+sg*60,label+'  '+f(d.slope),{'text-anchor':'middle',class:'dimlabel small'},g);}
+  if(d.fail)text(0,dimZ-50/k,'Nedostaje '+f(d.run-2*d.available)+' mm ukupno',{'text-anchor':'middle',class:'dimlabel','font-weight':'600',fill:'#a63e2f'},g);
+ }
+}
+function render(){
+ const d=fixtures[selected];document.getElementById('over').checked=d.up;document.getElementById('under').checked=!d.up;
+ document.getElementById('inew').value=d.insulation;document.getElementById('iobs').value=d.insulation;set('iso-legend',d.insulation+' mm');
+ for(const b of root.querySelectorAll('[data-case]'))b.setAttribute('aria-pressed',String(b.dataset.case===selected));
+ set('passz',f(d.passz)+' mm'+(d.fail?' · kandidat':''));set('run',f(d.run)+' mm');set('achieved','50,00 mm'+(d.fail?' · samo geometrija':''));set('verticalgap',f(d.vertical)+' mm');set('available',d.available+' / '+d.available+' mm');
+ const status=document.getElementById('status');status.className='status'+(d.fail?' fail':'');
+ status.textContent=d.fail?'Neizvodljivo u zadatom prostoru: potrebno '+f(d.run)+' mm, raspoloživo '+(2*d.available)+' mm. Nedostaje '+f(d.run-2*d.available)+' mm. Kandidat je prikazan kao duh; upis nije dozvoljen.':'Referentno izvodljivo za izabranu prepreku · najkraći razmak 50,00 mm. Analitički primjer najmanjeg zahvata, zatim najmanjeg visinskog otklona. Nije CAD potvrda.';
+ const rows=[['Koljeno K1–K4 · svako','157,08*','—'],['Kosi komad S1',f(d.slope),f(d.projected)],['Srednji pravi H',f(d.bridge),f(d.bridge)],['Kosi komad S2',f(d.slope),f(d.projected)]];
+ document.getElementById('pieces').replaceChildren(...rows.map(row=>{const tr=document.createElement('tr');for(const item of row){const td=document.createElement('td');td.textContent=item;tr.appendChild(td);}return tr;}));
+ set('explanation',d.fail?'Neizvodljivost ovog primjera potiče od raspoložive dužine, iako geometrijski kandidat zadovoljava razmak.':'Najkraći razmak nastaje ukoso uz rub prepreke. Vertikalni zazor srednjeg dijela je '+f(d.vertical)+' mm. Kota prolaza samo iz uslova vertikalnog zazora ne bi dala najmanji ukupni zahvat.');draw(d);
+}
+for(const b of root.querySelectorAll('[data-case]'))b.addEventListener('click',()=>{selected=b.dataset.case;render();});
+document.getElementById('dimensions').addEventListener('change',render);render();
+</script>
+</body></html>

@@ -91,17 +91,17 @@ void dgBlockManager::OnShowWindow(BOOL bShow, UINT nStatus)
 	mGrid.SetColumnWidth(9, wide);
 	mGrid.SetColumnWidth(10, wide * 2);
 
-	mGrid.SetItemText(0, 0, _T("№"));
-	mGrid.SetItemText(0, 1, _T("Поз"));
-	mGrid.SetItemText(0, 2, _T("Наименование"));
-	mGrid.SetItemText(0, 3, _T("Тип"));
-	mGrid.SetItemText(0, 4, _T("Размер"));
-	mGrid.SetItemText(0, 5, _T("Артикул"));
-	mGrid.SetItemText(0, 6, _T("Производитель"));
-	mGrid.SetItemText(0, 7, _T("Единица"));
-	mGrid.SetItemText(0, 8, _T("Кол-во"));
-	mGrid.SetItemText(0, 9, _T("Масса"));
-	mGrid.SetItemText(0, 10, _T("Примечание"));
+	mGrid.SetItemText(0, 0, _T("Br."));
+	mGrid.SetItemText(0, 1, _T("Poz."));
+	mGrid.SetItemText(0, 2, _T("Naziv"));
+	mGrid.SetItemText(0, 3, _T("Tip"));
+	mGrid.SetItemText(0, 4, _T("Dimenzije"));
+	mGrid.SetItemText(0, 5, _T("Šifra"));
+	mGrid.SetItemText(0, 6, _T("Proizvođač"));
+	mGrid.SetItemText(0, 7, _T("Jed. mj."));
+	mGrid.SetItemText(0, 8, _T("Kol."));
+	mGrid.SetItemText(0, 9, _T("Masa"));
+	mGrid.SetItemText(0, 10, _T("Napomena"));
 
 	for (int i = 0; i < blckList.specList.length(); i++)
 	{

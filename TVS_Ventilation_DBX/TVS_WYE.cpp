@@ -23,6 +23,7 @@
 //----- TVS_WYE.cpp : Implementation of TVS_WYE
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "LevelLabels.h"
 #include "TVS_WYE.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
@@ -49,21 +50,21 @@ TVS_WYE::~TVS_WYE () {
 void TVS_WYE::getSizeString(CString &sizeStr,const bool &sortSize/*=false*/)
 {
 
-	if (SizeBpr==0)
+	if (tvsUnits::mm(SizeBpr, this)==0)
 	{
-		sizeStr.Format(L"%%%%c%g", SizeApr);
+		sizeStr.Format(L"%%%%c%g", tvsUnits::mm(SizeApr, this));
 
 	}else{
-		sizeStr.Format(L"%gx%g", SizeApr,SizeBpr);
+		sizeStr.Format(L"%gx%g", tvsUnits::mm(SizeApr, this),tvsUnits::mm(SizeBpr, this));
 	}
 	CString strSize2;
-	if (SizeBotv==0)
+	if (tvsUnits::mm(SizeBotv, this)==0)
 	{
-		strSize2.Format(L"-%%%%c%g", SizeAotv);
+		strSize2.Format(L"-%%%%c%g", tvsUnits::mm(SizeAotv, this));
 		sizeStr += strSize2;
 
 	}else{
-		strSize2.Format(L"-%gx%g", SizeAotv,SizeBotv);
+		strSize2.Format(L"-%gx%g", tvsUnits::mm(SizeAotv, this),tvsUnits::mm(SizeBotv, this));
 		sizeStr += strSize2;
 	}
 }
@@ -224,6 +225,7 @@ void TVS_WYE::unappended (const AcDbObject *pDbObj) {
 //----- AcDbEntity protocols
 Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
+	tvsLevelLabels::draw(mode, database(), Basepoint, Vectpr, Elev, SizeApr, SizeBpr);   // TVS_KOTE
 		ListOfEntity.removeAll();
 		ListOfWipeout.removeAll();
 	AcGePoint3d massforarray[2];
@@ -232,6 +234,28 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 
 
 	Gimme7Points();
+	// T komad TK-O / TK-G: drawn from geometry/TeeShape.h (as the dynamic block "T komad").
+	{
+		tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
+		if (!This1D && teeShape(tee, o, ex, ey)) {
+			tvsTee::Shape shape;
+			if (tvsTee::shape(tee, shape)) {
+				auto world = [&](const tvsTee::P& q) { return o + ex * q.x + ey * q.y; };
+				const bool ccw = ex.crossProduct(ey).z > 0;
+				for (size_t j = 0; j < shape.lines.size(); ++j)
+					setMainProperty(new AcDbLine(world(shape.lines[j].a), world(shape.lines[j].b)));
+				for (size_t j = 0; j < shape.arcs.size(); ++j) {
+					const tvsTee::Arc& c = shape.arcs[j];
+					auto ang = [&](double t) { const AcGeVector3d d = ex * std::cos(t) + ey * std::sin(t); return std::atan2(d.y, d.x); };
+					const double s0 = ang(c.a0), s1 = ang(c.a1);
+					setMainProperty(new AcDbArc(world(c.c), AcGeVector3d(0, 0, 1), c.r, ccw ? s0 : s1, ccw ? s1 : s0));
+				}
+				// no centre lines on TK-O / TK-G (as in the block)
+				for each (AcDbEntity * var in ListOfEntity) mode->geometry().draw(var);
+				return Adesk::kTrue;
+			}
+		}
+	}
 	if (Wipeout==true) //wipe
 	{
 	
@@ -876,15 +900,9 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				AcDbLine* pLine22 = new AcDbLine;
 				pLine22->setStartPoint(pA1);
 				pLine22->setEndPoint(pA3);
-				AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-				AcDbLinetypeTable *pLtTable;
-				AcDbObjectId ltId;
-				pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-				pLtTable->getAt(_T("tvs_centerline"), ltId);
-				pLtTable->close();
 				pLine22->setLineWeight(AcDb::LineWeight(15));
 				pLine22->setLayer(this->layerId());
-				pLine22->setLinetype(ltId);
+				setAuxLinetype(pLine22, _T("tvs_centerline"));
 				pLine22->setColor(this->color());
 				entitySet.append(pLine22);
 
@@ -895,7 +913,7 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				pLine3->setEndPoint(pA5);
 				pLine3->setLineWeight(AcDb::LineWeight(15));
 				pLine3->setLayer(this->layerId());
-				pLine3->setLinetype(ltId);
+				setAuxLinetype(pLine3, _T("tvs_centerline"));
 				pLine3->setColor(this->color());
 				entitySet.append(pLine3);
 
@@ -926,15 +944,9 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				AcDbLine* pLine5 = new AcDbLine;
 				pLine5->setStartPoint(pA3);
 				pLine5->setEndPoint(pA1);
-				AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-				AcDbLinetypeTable *pLtTable;
-				AcDbObjectId ltId;
-				pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-				pLtTable->getAt(_T("tvs_centerline"), ltId);
-				pLtTable->close();
 				pLine5->setLineWeight(AcDb::LineWeight(15));
 				pLine5->setLayer(this->layerId());
-				pLine5->setLinetype(ltId);
+				setAuxLinetype(pLine5, _T("tvs_centerline"));
 				pLine5->setColor(this->color());
 				entitySet.append(pLine5);
 
@@ -971,15 +983,9 @@ Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 				AcDbLine* pLine7 = new AcDbLine;
 				pLine7->setStartPoint(pMa);
 				pLine7->setEndPoint(pA5);
-				AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-				AcDbLinetypeTable *pLtTable;
-				AcDbObjectId ltId;
-				pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-				pLtTable->getAt(_T("tvs_centerline"), ltId);
-				pLtTable->close();
 				pLine7->setLineWeight(AcDb::LineWeight(15));
 				pLine7->setLayer(this->layerId());
-				pLine7->setLinetype(ltId);
+				setAuxLinetype(pLine7, _T("tvs_centerline"));
 				pLine7->setColor(this->color());
 				entitySet.append(pLine7);
 
@@ -1146,6 +1152,56 @@ void TVS_WYE::Gimme7Points()
 		);
 }
 
+
+bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, AcGeVector3d &ey) const
+{
+	tvsTeeData::Record r;
+	if (!tvsTeeData::read(this, r)) return false;
+	AcGeVector3d u = Vectpr, v = Vectotv; u.z = v.z = 0;
+	if (u.length() < 1e-12 || v.length() < 1e-12) return false;
+	u.normalize(); v.normalize();
+	tee = tvsTee::Tee(); tee.type = r.type; tee.l = r.l; tee.flange = tvsTeeData::flangeMm() / tvsUnits::factor(this);
+	if (r.type == tvsTee::Branch) {
+		tee.A = SizeApr; tee.w1 = SizeAotv; tee.C = r.second > 0 ? r.second : SizeApr;
+		tee.R1 = LengthPl - r.l + tee.w1;
+		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
+	}
+	else {
+		tee.A = SizeAotv; tee.w1 = SizeApr; tee.w2 = r.second > 0 ? r.second : SizeApr;
+		// Branch axes on one line Y = LengthPl + w1/2 from the inlet face: the branch with the
+		// larger default centre-line radius follows L, the other keeps its own (Rc = w).
+		const double avail = LengthPl + tee.w1 / 2 - r.l;
+		const double rc1d = tvsTee::defaultRadius(tee.w1) - tee.w1 / 2;
+		const double rc2d = (r.radius2 > tee.w2 ? r.radius2 : tvsTee::defaultRadius(tee.w2)) - tee.w2 / 2;
+		double rc1 = rc1d < avail ? rc1d : avail, rc2 = rc2d < avail ? rc2d : avail;
+		if ((rc1 > rc2 ? rc1 : rc2) < avail) { if (rc1d >= rc2d) rc1 = avail; else rc2 = avail; }
+		tee.R1 = rc1 + tee.w1 / 2; tee.R2 = rc2 + tee.w2 / 2;
+		origin = Basepoint + v * (SizeApr / 2 + LengthPl); ey = -v; ex = u;
+	}
+	origin.z = Basepoint.z;
+	return tvsTee::valid(tee);
+}
+
+bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
+{
+	tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
+	if (!teeShape(tee, o, ex, ey)) return false;
+	tvsTee::Shape s; if (!tvsTee::shape(tee, s)) return false;   // drawn as a plain T otherwise
+	AcGeVector3d u = Vectpr, v = Vectotv; u.z = v.z = 0; u.normalize(); v.normalize();
+	ports[2] = Basepoint + v * (SizeApr / 2 + LengthPl);
+	if (tee.type == tvsTee::Branch) {
+		const double half = LengthPl + SizeAotv / 2;
+		ports[0] = Basepoint - u * half; ports[1] = Basepoint + u * half;
+		widths[0] = tee.A; widths[1] = tee.C; widths[2] = tee.w1;
+	}
+	else {   // +u = first branch (w1), -u = left branch (w2); fixed collars l
+		const double a = tee.A / 2;
+		ports[1] = Basepoint + u * (a + tee.R1 - tee.w1 + tee.l);
+		ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);
+		widths[0] = tee.w2; widths[1] = tee.w1; widths[2] = tee.A;
+	}
+	return true;
+}
 
 void TVS_WYE::getName(CString &unit)
 {

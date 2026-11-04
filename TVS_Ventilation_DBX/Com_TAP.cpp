@@ -156,40 +156,45 @@ STDMETHODIMP CCom_TAP::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 		// стандартное 
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Отвод")); 
+		{
+			// Flexible hose: say so in the Properties palette (same object type, DuctType flex).
+			AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+			const bool flex = pSq.openStatus() == Acad::eOk && pSq->DuctType == DuctTypeFlex;
+			*propName = ::SysAllocString(flex ? L"Fleksibilno koljeno" : _T("Koljeno"));
+		}
 		break; 
 
 	case (DISPID_A): 
-		*propName  = ::SysAllocString(L"Dпр"); 
+		*propName  = ::SysAllocString(L"Dpr");
 		break; 
 
 	case (DISPID_SizeB): 
-		*propName  = ::SysAllocString(L"Hпр"); 
+		*propName  = ::SysAllocString(L"Hpr");
 		break; 
 	case (DISPID_Flow): 
-		*propName  = ::SysAllocString(L"L="); 
+		*propName  = ::SysAllocString(L"Protok, m³/h");
 		break; 
 	case (DISPID_Speed): 
-		*propName  = ::SysAllocString(L"v="); 
+		*propName  = ::SysAllocString(L"Brzina, m/s");
 		break; 
 
 	case (DISPID_1D2D): 
-		*propName  = ::SysAllocString(L"1D"); 
+		*propName  = ::SysAllocString(L"Prikaz 1D");
 		break; 
 	case (DISPID_Rotation): 
-		*propName  = ::SysAllocString(L"Угол"); 
+		*propName  = ::SysAllocString(L"Ugao rotacije");
 		break; 
 	case (DISPID_Angle): 
-		*propName  = ::SysAllocString(L"Угол отвода"); 
+		*propName  = ::SysAllocString(L"Ugao koljena");
 		break; 
 	case (DISPID_Wipeout): 
-		*propName  = ::SysAllocString(L"Маскировка"); 
+		*propName  = ::SysAllocString(L"Maskiranje");
 		break; 
 	case (DISPID_Elev): 
-		*propName  = ::SysAllocString(L"Отм. Центр"); 
+		*propName  = ::SysAllocString(L"Kota ose");
 		break; 
 	case (DISPID_Form):
-		*propName = ::SysAllocString(L"Форма отв");
+		*propName = ::SysAllocString(L"Oblik koljena");
 		break;
 
 	} 
@@ -207,6 +212,7 @@ STDMETHODIMP CCom_TAP::get_Dpr(double *pVal)
 
 	*pVal = pSq->get_SizeA();
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -219,6 +225,8 @@ STDMETHODIMP CCom_TAP::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->TVS_TAP::put_SizeA(newVal);
 	Fire_Notification(DISPID_A);
@@ -237,6 +245,7 @@ STDMETHODIMP CCom_TAP::get_SizeB(double *pVal)
 	size = pSq->get_SizeB();
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -249,6 +258,8 @@ STDMETHODIMP CCom_TAP::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->TVS_TAP::put_SizeB(newVal);
 	Fire_Notification(DISPID_SizeB);
@@ -268,12 +279,12 @@ STDMETHODIMP CCom_TAP::get_Speed(double *pVal)
 	{
 		if (pSq->get_ThisRound()==true)
 		{
-			speed=pflow/(3600*3.14*(pSq->SizeA/1000)*(pSq->SizeA/1000)/4);
+			speed=pflow/(3600*3.14*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)/4);
 
 		}
 		else
 		{
-			speed=pflow/(3600*(pSq->SizeA/1000)*(pSq->SizeB/1000));
+			speed=pflow/(3600*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000));
 		}
 	}
 	else speed=0;
@@ -300,12 +311,12 @@ STDMETHODIMP CCom_TAP::put_Speed(double newVal)
 
 	if ((pSq->get_ThisRound())==true)
 	{
-		pflow=speed*(3600*3.14*((pSq->SizeA)/1000)*((pSq->SizeA)/1000)/4);
+		pflow=speed*(3600*3.14*((tvsUnits::mm(pSq->SizeA, pSq.operator->()))/1000)*((tvsUnits::mm(pSq->SizeA, pSq.operator->()))/1000)/4);
 
 	}
 	else
 	{
-		pflow=speed*(3600*(pSq->SizeA/1000)*(pSq->SizeB/1000));
+		pflow=speed*(3600*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000));
 
 	}
 
@@ -532,6 +543,7 @@ STDMETHODIMP CCom_TAP::get_Elev(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -544,6 +556,8 @@ STDMETHODIMP CCom_TAP::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);
@@ -579,4 +593,40 @@ STDMETHODIMP CCom_TAP::put_Form(int  newVal)
 	else pSq->put_Form(newVal);
 	Fire_Notification(DISPID_Form);
 	return S_OK;
+}
+
+STDMETHODIMP CCom_TAP::get_SheetArea(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 0, pVal);
+}
+
+STDMETHODIMP CCom_TAP::get_SheetThickness(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 1, pVal);
+}
+
+STDMETHODIMP CCom_TAP::get_SheetMass(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_TAP> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 2, pVal);
+}
+
+STDMETHODIMP CCom_TAP::ShowProperty(DISPID dispId, BOOL *show)
+{
+    if (!show) return E_POINTER;
+    if (dispId >= DISPID_SheetArea && dispId <= DISPID_SheetMass) {
+        // Automation keeps the original VARIANT accessors. OPM gets the typed
+        // dynamic properties registered by the ARX, without duplicate rows.
+        *show=FALSE;
+        return S_OK;
+    }
+    return IOPMPropertyExtensionImpl<CCom_TAP>::ShowProperty(dispId,show);
 }

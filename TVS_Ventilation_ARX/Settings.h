@@ -48,17 +48,18 @@ static double ftSizeroundA = 160;
 static double ftLengthp = 150;
 static int ftTransType = 1;
 static int globalMlead = 1;
-static int globalRadiusTypeRound = RadiusTypeRound_RadiusSpecific;
-static int globalRadiusTypeRect = RadiusTypeRect_RadiusConstant;
+static int globalRadiusTypeRound = RadiusTypeRound_RadiusVariable;
+static int globalRadiusTypeRect = RadiusTypeRect_RadiusVariable;
 static int globalTypeRoundTap = 1;
 static int globalTapForm = Form_Direct;
 static int globalTransType = 0;
-static double globalTapRadiusVariableParameter = 1;
+static double globalTapRadiusVariableParameter = 0.5;
 static double globalTapRadiusConst = 150;
 static double globalFlow = 0;
 static double globalLengthTr = 300;
 static double globalLengthW = 50;
 static double globalElevMid = 0;
+static int globalElevRef = 0; // TVS_SETTINGS level reference: 0 axis (Centar), 1 top (Vrh), 2 bottom (Dno); globalElevMid stays the axis
 static double globalElev = globalElevdown;
 static double globalAxis = 90;
 static int globalDuctType = DuctTypeStill;
@@ -75,3 +76,16 @@ public:
 };
 
 
+
+// Geometry defaults follow the active DWG; dialog and COM values remain in mm.
+static double tvsGlobalUnitsFactor = 1.0;
+static void syncTVSGlobalUnits() {
+    const double next = tvsUnits::factor();
+    if (next == tvsGlobalUnitsFactor) return;
+    double* values[] = { &globSizeA, &globSizeB, &ftSizeB, &ftSizeroundA, &ftLengthp,
+        &globalTapRadiusConst, &globalLengthTr, &globalLengthW, &globalElevMid,
+        &globalWipeoutLength };
+    for (size_t i = 0; i < sizeof(values)/sizeof(values[0]); ++i)
+        *values[i] *= tvsGlobalUnitsFactor / next;
+    tvsGlobalUnitsFactor = next;
+}

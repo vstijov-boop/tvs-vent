@@ -54,7 +54,11 @@ int status;
 double Length;
 double Length2;
 double Swectangle;
+double Extra; // T komad TK-O/TK-G: second width (outlet C / left branch), grouping key
 double Area;
+double sheetMass;
+double sheetThickness;
+double sheetUnitMass;
 void add(double pSizeA,
 double pSizeB,
 bool pThisRect,
@@ -74,6 +78,8 @@ double pSizeA3=0
 
 
 bool add (AcDbEntity * pEnt);
+// Flex hose cuffs (manzetne/obujmice) of one element: `count` pieces of diameter D (mm).
+void addCuffs(AcDbEntity * pEnt, double diameterMm, int count);
 void setName (const ACHAR * pName);
 void setLable (const ACHAR * pAchar);
 void setLable (double val);
