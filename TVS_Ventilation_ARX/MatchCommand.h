@@ -4,7 +4,9 @@
 // source), Tip (kruti / flex, ducts only), Prikaz (maskiranje, ivice, 1D), Protok, Sloj (layer,
 // colour, linetype). After a width change, each end of a changed duct that meets an element of
 // another width gets a transition (TeeNeighbours.h); elevation steps to elements outside the
-// selection are listed. Targets: a selection, or Mreza = every TVS element connected to one pick.
+// selection are listed. Targets: a selection, or Mreza = every TVS element connected to one pick;
+// with Mreza the elevation is not equalised: the whole network moves by the difference between
+// the source and the picked element, so existing level changes (Z prelazi, obilasci) stay.
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "TeeNeighbours.h"
@@ -75,12 +77,12 @@ inline void run(){
         src.round=p->ThisRound;src.wipe=p->Wipeout;src.grani=p->Grani;src.oneD=p->This1D;src.ductType=p->DuctType;src.id=id;
         break;
     }
-    std::vector<AcDbObjectId> targets;
+    std::vector<AcDbObjectId> targets;bool whole=false;
     {
         acedInitGet(0,L"Izbor Mreza");ACHAR kw[32]=L"";
         const int rc=acedGetKword(L"\nCiljevi [Izbor/Mreza (povezani elementi)] <Izbor>: ",kw);
         if(rc!=RTNORM&&rc!=RTNONE)return;
-        if(rc==RTNORM&&!_wcsicmp(kw,L"Mreza")){if(!network(db,tol,targets))return;}
+        if(rc==RTNORM&&!_wcsicmp(kw,L"Mreza")){if(!network(db,tol,targets))return;whole=true;}
         else{
             ads_name ss;acutPrintf(L"\nIzaberite ciljne TVS elemente: ");
             if(acedSSGet(NULL,NULL,NULL,NULL,ss)!=RTNORM)return;
@@ -109,11 +111,34 @@ inline void run(){
         if(o.display){t->put_Wipeout(src.wipe);t->put_WipeoutLength(src.wipeLength);t->put_Grani(src.grani);t->put_This1D(src.oneD);any=true;}
         if(o.flow){t->put_Flow(src.flow);any=true;}
         if(o.layer){AcDbObjectPointer<TVS_Pipe> s(src.id,AcDb::kForRead);if(s.openStatus()==Acad::eOk){e->setPropertiesFrom(s.object());any=true;}}
-        if(o.elevation){
+        if(o.elevation&&!whole){
             const double axis=targetAxis(src,t->SizeA,t->SizeB,o.reference);
             if(std::fabs(axis-t->Elev)>1e-9&&t->put_Elevation(axis)==Acad::eOk){raised.push_back(id);any=true;}
         }
         if(any){e->recordGraphicsModified();++changed;}
+    }
+    // Mreza: shift the whole network by the difference picked element -> source reference
+    if(o.elevation&&whole&&!targets.empty()&&targets[0]!=src.id){
+        double delta=0;
+        {AcDbObjectPointer<AcDbEntity> e(targets[0],AcDb::kForRead);TVS_Entity* t=e.openStatus()==Acad::eOk?TVS_Entity::cast(e.object()):NULL;
+         if(t)delta=targetAxis(src,t->SizeA,t->SizeB,o.reference)-t->Elev;}
+        if(std::fabs(delta)>1e-9){
+#ifdef TVS_OFFSET_INTEGRATION
+            tvsOffsetData::WriteScope scope;   // whole assemblies move together, nothing is split
+#endif
+            AcGeMatrix3d up;up.setToTranslation(AcGeVector3d(0,0,delta));int shifted=0;
+            for(size_t i=0;i<targets.size();++i){
+                if(targets[i]==src.id)continue;
+                AcDbObjectPointer<AcDbEntity> e(targets[i],AcDb::kForWrite);if(e.openStatus()!=Acad::eOk)continue;
+                TVS_Entity* t=TVS_Entity::cast(e.object());if(!t)continue;
+                tvsMove::Node n;bool spatial=false;   // offset/bypass members carry real Z in their points
+                if(tvsMove::describe(e.object(),n))for(size_t j=0;j<n.ports.size();++j)if(std::fabs(n.ports[j].z)>1e-9)spatial=true;
+                if(t->put_Elevation(t->Elev+delta)!=Acad::eOk)continue;
+                if(spatial)e->transformBy(up);
+                e->recordGraphicsModified();++shifted;
+            }
+            acutPrintf(L"\nMreza pomjerena za %.0f mm (%d elemenata); postojece promjene kote su sacuvane.",delta*f,shifted);
+        }
     }
     // width steps at the ends of changed ducts
     for(size_t i=0;i<widened.size();++i){tvsTeeFit::farEnd(AcDbObjectId::kNull,widened[i],true,tol,f);tvsTeeFit::farEnd(AcDbObjectId::kNull,widened[i],false,tol,f);}
