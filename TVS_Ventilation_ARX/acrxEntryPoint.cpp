@@ -62,6 +62,7 @@
 #include "TeeInsert.h"
 #include "MatchCommand.h"
 #include "SectionCommand.h"
+#include "LevelTooltip.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -115,6 +116,7 @@ public:
 		delete pdbl;
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
+		tvsLevelTooltip::start();
 #ifdef TVS_BYPASS_PREVIEW
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
@@ -144,6 +146,7 @@ public:
         acedRegCmds->removeGroup(L"TVS_BYPASS_DEV");
 #endif
         PropertyAdmin::uninitialize();
+        tvsLevelTooltip::stop();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
 #endif
@@ -1118,6 +1121,7 @@ public:
 
 		dg.WipeoutLength = globalWipeoutLength;
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
+		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
 
 		//AcApDocument *pDoc=acDocManager->curDocument();
 		//acDocManager->lockDocument(pDoc,AcAp::kWrite);
@@ -1148,6 +1152,7 @@ public:
 
 		globalWipeoutLength = dg.WipeoutLength;
 
+		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
 		if (dg.DuctFlex == TRUE) { globalDuctType = DuctTypeFlex; globSizeB = 0; }
 		else globalDuctType = DuctTypeStill;
 		if (globSizeB == 0) globRound = true;
@@ -1965,6 +1970,12 @@ public:
         tvsFlexCuffCommand::run();
     }
     // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
+    // TVS_KOTE: on-screen elevation labels on/off (LevelLabels.h, not plotted).
+    static void Ventilation_ARXTVS_KOTE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsLevelTooltip::toggleLabels();
+    }
     // TVS_PRESJEK: poprecni presjek of the TVS network (SectionCommand.h).
     static void Ventilation_ARXTVS_PRESJEK(void)
     {
@@ -4245,6 +4256,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOTE, TVS_KOTE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MATCH, TVS_MATCH, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 

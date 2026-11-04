@@ -9,6 +9,9 @@
 #include "../TVS_Ventilation_DBX/TVS_TRANS.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "TVSMoveCommand.h"
+#include "TvsLinetypes.h"
+#include <dbjig.h>
+#include <acgi.h>
 #include "dbxrecrd.h"
 #include "dbdict.h"
 #include "dbsymtb.h"
@@ -17,9 +20,11 @@
 #include <string>
 #include <cwchar>
 namespace tvsSectionCmd {
-struct Params {AcGePoint3d p1,p2;bool flip;double floor,ceiling,scale;std::wstring letter;   // floor/ceiling: drawing units
-    Params():flip(false),floor(0),ceiling(0),scale(50){}};
-struct Remembered {double floorM,ceilingM,scale;Remembered():floorM(0),ceilingM(3),scale(50){}};
+// depth: zone behind the section plane (drawing units, 0 = cut elements only);
+// hidden: 0 = parts covered by nearer elements are left out, 1 = drawn dashed.
+struct Params {AcGePoint3d p1,p2;bool flip;double floor,ceiling,scale,depth;int hidden;std::wstring letter;   // floor/ceiling: drawing units
+    Params():flip(false),floor(0),ceiling(0),scale(50),depth(0),hidden(0){}};
+struct Remembered {double floorM,ceilingM,scale;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),hidden(0){}};
 inline Remembered& remembered(){static Remembered r;return r;}
 inline const ACHAR* key(){return L"TVS_PRESJEK_V1";}
 inline const ACHAR* layerName(){return L"TVS_PRESJEK";}
@@ -111,15 +116,28 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
         for(size_t j=0;j<i;++j)if(tvsSection::overlap(cuts[j],c)){
             acutPrintf(L"\nPresjek %ls: kanali se preklapaju kod %.0f mm od pocetka linije.",p.letter.c_str(),c.s*f);break;}
     }
+    // elements behind the section plane (dubina), thin outline; covered parts left out or dashed
+    const std::vector<tvsSection::View> views=tvsSection::views(a,b,net,p.flip,p.depth);
+    const std::vector<tvsSection::Edge> edges=tvsSection::edges(cuts,views);
+    AcDbObjectId dashed;
+    if(p.hidden){tvsLinetypes::ensure(db);AcDbLinetypeTable* lt=NULL;
+        if(db->getLinetypeTable(lt,AcDb::kForRead)==Acad::eOk){lt->getAt(L"tvs_hidden",dashed);lt->close();}}
+    for(size_t i=0;i<edges.size();++i){const tvsSection::Edge& g=edges[i];
+        if(g.hidden&&!p.hidden)continue;
+        AcDbLine* l=new AcDbLine(AcGePoint3d(g.x0,g.y0-p.floor,0),AcGePoint3d(g.x1,g.y1-p.floor,0));
+        const AcDbObjectId id=append(btr,l,layerId);
+        if(g.hidden&&!dashed.isNull()){AcDbObjectPointer<AcDbLine> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk){o->setLinetype(dashed);o->setLinetypeScale(1/f);}}
+    }
     const std::wstring title=L"PRESJEK "+p.letter+L"-"+p.letter;
     text(btr,AcGePoint3d(L/2,-4*th,0),title.c_str(),1.4*th,style,layerId);
+    if(!views.empty())acutPrintf(L"\nPresjek %ls: vidljivih elemenata u dubini %d.",p.letter.c_str(),static_cast<int>(views.size()));
     return static_cast<int>(cuts.size());
 }
 inline void store(AcDbBlockTableRecord* btr,const Params& p){
     if(btr->createExtensionDictionary()!=Acad::eOk&&btr->extensionDictionary().isNull())return;
     AcDbObjectPointer<AcDbDictionary> dict(btr->extensionDictionary(),AcDb::kForWrite);if(dict.openStatus()!=Acad::eOk)return;
     resbuf* data=acutBuildList(1,L"TVS_PRESJEK/1",1,p.letter.c_str(),10,asDblArray(p.p1),10,asDblArray(p.p2),70,p.flip?1:0,
-        40,p.floor,40,p.ceiling,40,p.scale,RTNONE);
+        40,p.floor,40,p.ceiling,40,p.scale,40,p.depth,70,p.hidden,RTNONE);
     AcDbObjectId id;AcDbXrecord* rec=NULL;
     if(dict->getAt(key(),id)==Acad::eOk){if(acdbOpenObject(rec,id,AcDb::kForWrite)!=Acad::eOk)rec=NULL;}
     else{rec=new AcDbXrecord();if(dict->setAt(key(),rec,id)!=Acad::eOk){delete rec;rec=NULL;}}
@@ -137,6 +155,7 @@ inline bool load(const AcDbBlockTableRecord* btr,Params& p){
         switch(j){case 1:p.letter=q->resval.rstring;break;case 2:p.p1=asPnt3d(q->resval.rpoint);break;case 3:p.p2=asPnt3d(q->resval.rpoint);break;
             case 4:p.flip=q->resval.rint!=0;break;case 5:p.floor=q->resval.rreal;break;case 6:p.ceiling=q->resval.rreal;break;case 7:p.scale=q->resval.rreal;break;}
         q=q->rbnext;}
+    if(ok&&q&&q->restype==40){p.depth=q->resval.rreal;q=q->rbnext;if(q&&q->restype==70)p.hidden=q->resval.rint;}   // P1b; older sections: no depth
     acutRelRb(data);return ok;
 }
 // Section line in plan: line, view arrows and letters (plain entities).
@@ -146,6 +165,13 @@ inline void planMarks(AcDbDatabase* db,const Params& p){
     AcGeVector3d d=p.p2-p.p1;d.z=0;if(d.length()<1e-12)return;d.normalize();
     AcGeVector3d n(-d.y,d.x,0);if(p.flip)n=-n;   // looking direction
     AcDbLine* l=new AcDbLine(p.p1,p.p2);append(space.object(),l,layerId);
+    if(p.depth>0){   // zone of the section depth: thin dashed, colour 9
+        tvsLinetypes::ensure(db);AcDbObjectId dashed;AcDbLinetypeTable* lt=NULL;
+        if(db->getLinetypeTable(lt,AcDb::kForRead)==Acad::eOk){lt->getAt(L"tvs_hidden",dashed);lt->close();}
+        const AcGePoint3d c[4]={p.p1,p.p2,p.p2+n*p.depth,p.p1+n*p.depth};
+        for(int k=1;k<4;++k){const AcDbObjectId id=append(space.object(),new AcDbLine(c[k],c[(k+1)%4]),layerId);
+            AcDbObjectPointer<AcDbLine> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk){o->setColorIndex(9);if(!dashed.isNull()){o->setLinetype(dashed);o->setLinetypeScale(1/f);}}}
+    }
     const AcGePoint3d ends[2]={p.p1,p.p2};
     for(int k=0;k<2;++k){
         append(space.object(),new AcDbLine(ends[k],ends[k]+n*(4*th)),layerId);
@@ -179,6 +205,31 @@ inline void refresh(){
     const int n=build(btr.object(),p);refreshReferences(btr.object());
     acutPrintf(L"\nPresjek %ls-%ls osvjezen: presjecenih elemenata %d.",p.letter.c_str(),p.letter.c_str(),n);
 }
+// Third point of the section: side (looking direction) and depth, zone drawn while dragging.
+class ZonePreview : public AcDbEntity {
+public:
+    AcGePoint3d p1,p2;bool flip;double depth;ZonePreview():flip(false),depth(0){}
+    virtual Adesk::Boolean subWorldDraw(AcGiWorldDraw* w){
+        AcGeVector3d d=p2-p1;d.z=0;d.normalize();AcGeVector3d n(-d.y,d.x,0);if(flip)n=-n;
+        AcGePoint3d c[5]={p1,p2,p2+n*depth,p1+n*depth,p1};w->subEntityTraits().setColor(9);w->geometry().polyline(5,c);
+        AcGePoint3d m=p1+(p2-p1)/2,arrow[2]={m,m+n*(p1.distanceTo(p2)*0.08)};w->subEntityTraits().setColor(3);w->geometry().polyline(2,arrow);
+        return Adesk::kTrue;}
+};
+class DepthJig : public AcEdJig {
+    ZonePreview z;AcGePoint3d last;
+public:
+    bool flip;double depth;
+    DepthJig(const AcGePoint3d& a,const AcGePoint3d& b):flip(false),depth(0){z.p1=a;z.p2=b;last=b;
+        setDispPrompt(L"\nStrana gledanja i dubina presjeka (povucite misem): ");
+        setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode));}
+    virtual AcDbEntity* entity()const{return const_cast<ZonePreview*>(&z);}
+    virtual DragStatus sampler(){AcGePoint3d q;const DragStatus s=acquirePoint(q);if(s!=kNormal)return s;
+        if(q.distanceTo(last)<1e-9)return kNoChange;last=q;return kNormal;}
+    virtual Adesk::Boolean update(){
+        AcGeVector3d d=z.p2-z.p1;d.z=0;d.normalize();const AcGeVector3d left(-d.y,d.x,0);
+        AcGeVector3d s=last-z.p1;s.z=0;const double v=s.dotProduct(left);
+        z.flip=flip=v<0;z.depth=depth=std::fabs(v);return Adesk::kTrue;}
+};
 inline bool askLevel(const wchar_t* prompt,double& valueM){
     wchar_t text[160];swprintf_s(text,L"%ls <%.2f>: ",prompt,valueM);acedInitGet(0,NULL);double v=0;
     const int rc=acedGetReal(text,&v);if(rc==RTNONE)return true;if(rc!=RTNORM)return false;valueM=v;return true;
@@ -186,20 +237,28 @@ inline bool askLevel(const wchar_t* prompt,double& valueM){
 inline void run(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db);
-    ads_point a,b,c;
+    ads_point a,b;
     acedInitGet(0,L"Osvjezi");
     int rc=acedGetPoint(NULL,L"\nPrva tacka linije presjeka ili [Osvjezi]: ",a);
     if(rc==RTKWORD){refresh();return;}if(rc!=RTNORM)return;
     if(acedGetPoint(a,L"\nDruga tacka linije presjeka: ",b)!=RTNORM)return;
-    if(acedGetPoint(b,L"\nStrana gledanja (tacka): ",c)!=RTNORM)return;
     Params p;
     {   // UCS -> WCS
         resbuf from={};from.restype=RTSHORT;from.resval.rint=1;resbuf to={};to.restype=RTSHORT;to.resval.rint=0;
-        ads_point wa,wb,wc;acedTrans(a,&from,&to,0,wa);acedTrans(b,&from,&to,0,wb);acedTrans(c,&from,&to,0,wc);
+        ads_point wa,wb;acedTrans(a,&from,&to,0,wa);acedTrans(b,&from,&to,0,wb);
         p.p1=asPnt3d(wa);p.p2=asPnt3d(wb);p.p1.z=p.p2.z=0;
-        const AcGeVector3d d=p.p2-p.p1,s=asPnt3d(wc)-p.p1;
-        if(AcGeVector3d(d.x,d.y,0).length()<1e-9){acutPrintf(L"\nLinija presjeka je prekratka.");return;}
-        p.flip=(d.x*s.y-d.y*s.x)<0;   // looking to the left of p1->p2 = not flipped
+        if(AcGeVector3d(p.p2.x-p.p1.x,p.p2.y-p.p1.y,0).length()<1e-9){acutPrintf(L"\nLinija presjeka je prekratka.");return;}
+    }
+    {   // side and depth by dragging (as in Revit): the zone follows the cursor
+        DepthJig jig(p.p1,p.p2);if(jig.drag()!=AcEdJig::kNormal)return;
+        p.flip=jig.flip;p.depth=jig.depth<1.0/f?0:jig.depth;   // < 1 mm: cut elements only
+    }
+    {   Remembered& m0=remembered();
+        if(p.depth>0){acedInitGet(0,L"Izostavi Isprekidano");ACHAR hk[32]=L"";
+            wchar_t hp[120];swprintf_s(hp,L"\nZaklonjeni dijelovi [Izostavi/Isprekidano] <%ls>: ",m0.hidden?L"Isprekidano":L"Izostavi");
+            const int hr=acedGetKword(hp,hk);if(hr!=RTNORM&&hr!=RTNONE)return;
+            if(hr==RTNORM)m0.hidden=_wcsicmp(hk,L"Isprekidano")==0?1:0;}
+        p.hidden=m0.hidden;
     }
     const std::wstring def=nextLetter(db);
     wchar_t prompt[120];swprintf_s(prompt,L"\nOznaka presjeka <%ls>: ",def.c_str());ACHAR input[64]=L"";

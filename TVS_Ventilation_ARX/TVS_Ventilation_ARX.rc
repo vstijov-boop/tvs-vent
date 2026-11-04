@@ -145,6 +145,7 @@ BEGIN
     LTEXT           "L =",123,146,73,25,8,NOT WS_GROUP
     GROUPBOX        "Tip",-1,138,115,103,45
     CONTROL         "Fleksibilni",1041,"Button",BS_AUTO3STATE | WS_GROUP | WS_TABSTOP,144,128,40,10
+    CONTROL         "Oblačić sa kotama",1043,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,144,143,90,10
     LTEXT "Jedinice crteža:",-1,14,183,80,12
     COMBOBOX 1042,98,181,135,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
     LTEXT "Dimenzije i kote unose se u mm. Jedinice se čuvaju u DWG-u.",-1,14,199,420,11

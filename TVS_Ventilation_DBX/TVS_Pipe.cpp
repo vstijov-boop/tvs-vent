@@ -23,6 +23,7 @@
 //----- TVS_Pipe.cpp : Implementation of TVS_Pipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "LevelLabels.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
 #include "../geometry/SlopeProjection.h"
@@ -293,6 +294,7 @@ Acad::ErrorStatus TVS_Pipe::subGetClassID (CLSID *pClsid) const {
 //----- AcDbEntity protocols
 Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
+	tvsLevelLabels::draw(mode, database(), FirstPoint + (LastPoint - FirstPoint) / 2, LastPoint - FirstPoint, Elev, SizeA, SizeB);   // TVS_KOTE
 	ClearEntitylist();
 	Length=(sqrt((FirstPoint.x-LastPoint.x)*(FirstPoint.x-LastPoint.x)+
 		(FirstPoint.y-LastPoint.y)*

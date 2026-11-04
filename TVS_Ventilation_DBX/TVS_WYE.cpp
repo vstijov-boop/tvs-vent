@@ -23,6 +23,7 @@
 //----- TVS_WYE.cpp : Implementation of TVS_WYE
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "LevelLabels.h"
 #include "TVS_WYE.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
@@ -224,6 +225,7 @@ void TVS_WYE::unappended (const AcDbObject *pDbObj) {
 //----- AcDbEntity protocols
 Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
+	tvsLevelLabels::draw(mode, database(), Basepoint, Vectpr, Elev, SizeApr, SizeBpr);   // TVS_KOTE
 		ListOfEntity.removeAll();
 		ListOfWipeout.removeAll();
 	AcGePoint3d massforarray[2];
