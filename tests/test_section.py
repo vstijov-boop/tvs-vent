@@ -100,6 +100,11 @@ int main(){
    const Prim& bot=v[0].outline[0];assert(near(bot.y0,1850)&&near(bot.y1,1950));      // rising bottom
    Cut c;assert(cut(P(1150,0),P(1150,1000),tr,c)&&near(c.z,2025)&&near(c.h,250)&&near(c.z+c.h/2,2150));
  }
+ // prelaz uz jednu ivicu: skewed axis, faces square to the duct -> no widening along a parallel section
+ { Member tr;tr.a=P(1000,300);tr.b=P(1300,325);tr.dir=P(1,0);tr.A1=400;tr.A2=350;tr.B1=tr.B2=200;tr.taper=true;tr.z=2000;tr.tag=31;
+   std::vector<Member> one(1,tr);std::vector<View> v=views(P(0,0),P(3000,0),one,false,1000,1);
+   assert(v.size()==1&&near(v[0].x0,1000,1e-9)&&near(v[0].x1,1300,1e-9));
+ }
  std::puts("PASS SECTION cuts");
 }
 """

@@ -14,7 +14,9 @@ struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 inline double cross(const P& a,const P& b){return a.x*b.y-a.y*b.x;}
 // bend: vertical elbow (Gore / Nadolje) between a and b; levelA = its level end is a.
 // taper: prelaz (height and axis change along it, end faces vertical).
-struct Member {P a,b;double A1,B1,A2,B2;bool round;double z,za,zb;bool sloped,bend,levelA,taper;int tag;
+// dir: plan direction of the duct when it differs from a->b (prelaz uz jednu ivicu: its axis is
+// skewed, its faces are square to the duct direction); (0,0) = a->b.
+struct Member {P a,b,dir;double A1,B1,A2,B2;bool round;double z,za,zb;bool sloped,bend,levelA,taper;int tag;
     Member():A1(0),B1(0),A2(0),B2(0),round(false),z(0),za(0),zb(0),sloped(false),bend(false),levelA(true),taper(false),tag(0){}
     double zAt(double u)const{return sloped?za+(zb-za)*u:z;}
     double planLength()const{return std::sqrt((b.x-a.x)*(b.x-a.x)+(b.y-a.y)*(b.y-a.y));}
@@ -135,7 +137,7 @@ inline std::vector<View> views(const P& p1,const P& p2,const std::vector<Member>
         const double u0=ua+(ub-ua)*t0,u1=ua+(ub-ua)*t1,v0=va+dv*t0,v1=va+dv*t1;
         const double z0=m.zAt(t0),z1=m.zAt(t1);
         // footprint: axis ends +- half width across the member (|sin| member / section)
-        const P e=unit(P(m.b.x-m.a.x,m.b.y-m.a.y));const double across=std::fabs(e.x*d.y-e.y*d.x);
+        const P e=unit(m.dir.x!=0||m.dir.y!=0?m.dir:P(m.b.x-m.a.x,m.b.y-m.a.y));const double across=std::fabs(e.x*d.y-e.y*d.x);
         const bool rising=u1>=u0;const double ulo=rising?u0:u1,uhi=rising?u1:u0,zlo=rising?z0:z1,zhi=rising?z1:z0;
         double lo=ulo-A/2*across,hi=uhi+A/2*across;
         if(hi<0||lo>L)continue;

@@ -15,5 +15,7 @@ class MatchContract(unittest.TestCase):
   self.assertIn('const int shifted=tvsElevationShift::shift(targets,delta,src.id);',m,'Mreza: whole network shifted, level changes kept')
   self.assertIn('if(t->put_Elevation(t->Elev+delta)!=Acad::eOk)continue;',text('TVS_Ventilation_ARX/ElevationShift.h'))
   self.assertIn('if(o.elevation&&!whole){',m)
+  self.assertIn('trans->put_SizeAp1(src.A);trans->put_SizeBp1(src.B);trans->put_SizeAp2(src.A);trans->put_SizeBp2(src.B);',m,'Dimenzije on a prelaz: both ends')
+  self.assertIn('if(tvsElevationShift::side(db,offsetBefore[i].first,1,tol,ids,loop)&&!loop)tvsElevationShift::shift(ids,d,src.id);',m,'Mreza continuous across a prelaz')
   for line in m.splitlines():self.assertFalse(line.rstrip().endswith('L"'))
 if __name__=='__main__':unittest.main()

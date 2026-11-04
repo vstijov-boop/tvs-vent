@@ -13,6 +13,8 @@
 #include "TeeNeighbours.h"
 #include "TVSMoveCommand.h"
 #include "ElevationShift.h"
+#include "TransAlignCommand.h"
+#include <utility>
 #include <set>
 #include <vector>
 namespace tvsMatch {
@@ -95,6 +97,7 @@ inline void run(){
     }
     const Options o=options();
     std::set<AcDbObjectId> selected;std::vector<AcDbObjectId> widened,raised;
+    std::vector<std::pair<AcDbObjectId,double> > offsetBefore;   // end axis offset of target transitions
     int changed=0,skippedShape=0;
     for(size_t i=0;i<targets.size();++i){
         const AcDbObjectId id=targets[i];if(id==src.id)continue;
@@ -103,6 +106,14 @@ inline void run(){
         selected.insert(id);
         TVS_Pipe* pipe=TVS_Pipe::cast(e.object());
         bool any=false;
+        TVS_TRANS* trans=TVS_TRANS::cast(e.object());
+        if(trans){offsetBefore.push_back(std::make_pair(id,tvsTransAlignCmd::endOffset(trans)));
+            // Dimenzije on a prelaz: both ends take the source section (it joins ducts of that size now)
+            if(o.size&&trans->ThisRoundp1==src.round&&trans->ThisRoundp2==src.round
+               &&(std::fabs(trans->SizeAp1-src.A)>1e-9||std::fabs(trans->SizeBp1-src.B)>1e-9||std::fabs(trans->SizeAp2-src.A)>1e-9||std::fabs(trans->SizeBp2-src.B)>1e-9)){
+                trans->put_SizeAp1(src.A);trans->put_SizeBp1(src.B);trans->put_SizeAp2(src.A);trans->put_SizeBp2(src.B);any=true;}
+            else if(o.size&&(trans->ThisRoundp1!=src.round||trans->ThisRoundp2!=src.round))++skippedShape;
+        }
         if(o.size&&pipe){
             if(pipe->ThisRound!=src.round)++skippedShape;
             else if(std::fabs(pipe->SizeA-src.A)>1e-9||std::fabs(pipe->SizeB-src.B)>1e-9){
@@ -130,6 +141,15 @@ inline void run(){
             acutPrintf(L"\nMreza pomjerena za %.0f mm (%d elemenata); postojece promjene kote su sacuvane.",delta*f,shifted);
         }
     }
+    // Mreza: a prelaz whose end offset changed (other heights now) moves the network beyond it,
+    // so the uniform shift above stays continuous across it
+    if(o.elevation&&whole)
+        for(size_t i=0;i<offsetBefore.size();++i){
+            double now=0;{AcDbObjectPointer<TVS_TRANS> t(offsetBefore[i].first,AcDb::kForRead);if(t.openStatus()!=Acad::eOk)continue;now=tvsTransAlignCmd::endOffset(t.object());}
+            const double d=now-offsetBefore[i].second;if(std::fabs(d)<=1e-9)continue;
+            std::vector<AcDbObjectId> ids;bool loop=false;
+            if(tvsElevationShift::side(db,offsetBefore[i].first,1,tol,ids,loop)&&!loop)tvsElevationShift::shift(ids,d,src.id);
+        }
     // width steps at the ends of changed ducts
     for(size_t i=0;i<widened.size();++i){tvsTeeFit::farEnd(AcDbObjectId::kNull,widened[i],true,tol,f);tvsTeeFit::farEnd(AcDbObjectId::kNull,widened[i],false,tol,f);}
     // elevation steps to elements outside the selection

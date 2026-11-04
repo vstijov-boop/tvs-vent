@@ -65,6 +65,7 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
             TVS_TAP* tap=TVS_TAP::cast(e);
             if(TVS_TRANS* tr=TVS_TRANS::cast(e)){   // prelaz: axis and height change along it
                 add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);tvsSection::Member& m=out.back();m.taper=true;
+                m.dir=tvsSection::P(tr->VectTr.x,tr->VectTr.y);   // faces square to the duct, not to the skewed axis
                 const double off=tvsTransAlign::endOffset(tvsTransAlign::read(tr),tr->SizeAp1,tr->SizeBp1,tr->SizeAp2,tr->SizeBp2);
                 if(std::fabs(off)>1e-12){m.sloped=true;m.za=n.elevation;m.zb=n.elevation+off;}
             }
