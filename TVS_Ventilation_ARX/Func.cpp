@@ -1234,6 +1234,7 @@ void func::Change(ads_name &sset)
 	dgAllEdit dg;
 	tvsTeeEdit::prepare(dg, teeGather);
 	dg.TransVert = transGather.common();
+	dg.TransPlan = transGather.commonPlan();
 
 
 
@@ -1476,13 +1477,13 @@ void func::Change(ads_name &sset)
 					if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 					{
 						///
-						const double transBefore = tvsTransAlignCmd::endOffset(Transie);
+						const tvsTransAlignCmd::Before transBefore = tvsTransAlignCmd::before(Transie);
 						if (cSizeA == false) Transie->put_SizeAp1(SizeA);
 						if (cSizeB == false) Transie->put_SizeBp1(SizeB);
 						if (cSizeA2 == false) Transie->put_SizeAp2(SizeA2);
 						if (cSizeB2 == false) Transie->put_SizeBp2(SizeB2);
 						if (cLengthTr == false) Transie->put_Length(LengthTr);
-						tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert);   // poravnanje po visini
+						tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert, dg.TransPlan);   // poravnanje po visini
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
 						if (cD1 == false) Transie->put_This1D(D1);
@@ -1744,6 +1745,7 @@ void func::Change(AcDbEntity *pEnt)
 	dgAllEdit dg;
 	tvsTeeEdit::prepare(dg, teeGather);
 	dg.TransVert = transGather.common();
+	dg.TransPlan = transGather.commonPlan();
 
 
 	strfil(SizeA, vSizeA, sSizeA);
@@ -1972,13 +1974,13 @@ void func::Change(AcDbEntity *pEnt)
 		if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
 		{
 			///
-			const double transBefore = tvsTransAlignCmd::endOffset(Transie);
+			const tvsTransAlignCmd::Before transBefore = tvsTransAlignCmd::before(Transie);
 			if (cSizeA == false) Transie->put_SizeAp1(SizeA);
 			if (cSizeB == false) Transie->put_SizeBp1(SizeB);
 			if (cSizeA2 == false) Transie->put_SizeAp2(SizeA2);
 			if (cSizeB2 == false) Transie->put_SizeBp2(SizeB2);
 			if (cLengthTr == false) Transie->put_Length(LengthTr);
-			tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert);   // poravnanje po visini
+			tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert, dg.TransPlan);   // poravnanje po visini
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
 			if (cD1 == false) Transie->put_This1D(D1);

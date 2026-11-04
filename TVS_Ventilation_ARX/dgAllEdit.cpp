@@ -98,6 +98,7 @@ dgAllEdit::dgAllEdit(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : C
 , ElevDown(FALSE)
 , TeeType(0)
 , TransVert(-1)
+, TransPlan(-1)
 , TeeSecond(_T(""))
 {
 }
@@ -151,6 +152,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_MillimetreString(pDX, IDC_TeeSecond, TeeSecond);
 	if (pDX->m_bSaveAndValidate) {   // prelaz po visini (combo filled in OnShowWindow)
 		if (CComboBox* vert = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit))) if (vert->GetCount() == 3) TransVert = vert->GetCurSel();
+		if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit))) if (plan->GetCount() == 3) { const int v = plan->GetCurSel(); TransPlan = v >= 0 ? v + 1 : -1; }
 	}
 	DDX_MillimetreString(pDX, IDC_ElevVal, Elev);
 	DDX_Text(pDX, IDC_Speed, Speed);
@@ -235,6 +237,16 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 		} else {
 			vert->ShowWindow(false);
 			if (CWnd* label = GetDlgItem(IDC_TransVertLabel)) label->ShowWindow(false);
+		}
+	}
+	if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit)))
+	{
+		if (Ttrans) {
+			if (plan->GetCount() == 0) { plan->AddString(L"Simetrično"); plan->AddString(L"Ravno uz desnu ivicu"); plan->AddString(L"Ravno uz lijevu ivicu"); }
+			plan->SetCurSel(TransPlan >= 1 && TransPlan <= 3 ? TransPlan - 1 : -1);
+		} else {
+			plan->ShowWindow(false);
+			if (CWnd* label = GetDlgItem(IDC_TransPlanLabel)) label->ShowWindow(false);
 		}
 	}
 

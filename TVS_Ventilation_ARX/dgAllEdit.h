@@ -82,6 +82,8 @@
 #define IDC_TeeSecond 1050
 #define IDC_TransVertEdit 1045
 #define IDC_TransVertLabel 10045
+#define IDC_TransPlanEdit 1047
+#define IDC_TransPlanLabel 10047
 #define IDC_TeeSecondLabel 10050
 #define IDC_LabelSizeA 10001
 #define IDC_LabelSizeA2 10003
@@ -208,6 +210,7 @@ public:
 	// T komad TK-O / TK-G (TeeEditDialog.h): 0 = none or mixed, 1 = TK-O, 2 = TK-G
 	int TeeType;
 	int TransVert;   // prelaz po visini: 0 osa, 1 gore, 2 dolje, -1 razno / bez prelaza
+	int TransPlan;   // prelaz u tlocrtu: TransType 1 simetricno, 2 desno, 3 lijevo, -1 razno
 	CString TeeSecond;
 	CEdit fTeeSecond;
 

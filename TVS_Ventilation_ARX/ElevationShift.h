@@ -24,9 +24,22 @@ inline int shift(const std::vector<AcDbObjectId>& ids,double delta,const AcDbObj
     }
     return shifted;
 }
+// Plan translation of elements (whole offset / bypass assemblies may move).
+inline int move(const std::vector<AcDbObjectId>& ids,const AcGeVector3d& d,const AcDbObjectId& skip=AcDbObjectId::kNull){
+    if(d.length()<=1e-12)return 0;
+#ifdef TVS_OFFSET_INTEGRATION
+    tvsOffsetData::WriteScope scope;
+#endif
+    AcGeMatrix3d m;m.setToTranslation(d);int moved=0;
+    for(size_t i=0;i<ids.size();++i){if(ids[i]==skip)continue;
+        AcDbObjectPointer<AcDbEntity> e(ids[i],AcDb::kForWrite);if(e.openStatus()!=Acad::eOk||!TVS_Entity::cast(e.object()))continue;
+        if(e->transformBy(m)==Acad::eOk){e->recordGraphicsModified();++moved;}}
+    return moved;
+}
 // Elements connected to port `port` of element `from`, not through `from`. loop = the side
 // reaches `from` again through another port (closed ring): no side can be moved alone.
-inline bool side(AcDbDatabase* db,const AcDbObjectId& from,int port,double tol,std::vector<AcDbObjectId>& out,bool& loop){
+// seed: where the side touched `from` before a change (the port may have moved); NULL = the port now.
+inline bool side(AcDbDatabase* db,const AcDbObjectId& from,int port,double tol,std::vector<AcDbObjectId>& out,bool& loop,const AcGePoint3d* seed=NULL){
     out.clear();loop=false;
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;if(!tvsMove::snapshot(db,nodes,labels))return false;
     int self=-1;for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==from)self=static_cast<int>(i);
@@ -34,7 +47,8 @@ inline bool side(AcDbDatabase* db,const AcDbObjectId& from,int port,double tol,s
     auto touch=[&](const tvsMove::Point& a,const tvsMove::Point& b){return std::hypot(a.x-b.x,a.y-b.y)<=tol;};
     std::vector<int> seen(nodes.size(),0),queue;seen[self]=1;
     for(size_t k=0;k<nodes.size();++k){if(seen[k])continue;
-        for(size_t j=0;j<nodes[k].ports.size();++j)if(touch(nodes[self].ports[port],nodes[k].ports[j])){seen[k]=1;queue.push_back(static_cast<int>(k));break;}}
+        const tvsMove::Point at=seed?tvsMove::point(*seed):nodes[self].ports[port];
+        for(size_t j=0;j<nodes[k].ports.size();++j)if(touch(at,nodes[k].ports[j])){seen[k]=1;queue.push_back(static_cast<int>(k));break;}}
     for(size_t q=0;q<queue.size();++q){const tvsMove::Node& a=nodes[queue[q]];
         for(size_t i=0;i<a.ports.size();++i){
             for(size_t j=0;j<nodes[self].ports.size();++j)if(static_cast<int>(j)!=port&&touch(a.ports[i],nodes[self].ports[j]))loop=true;

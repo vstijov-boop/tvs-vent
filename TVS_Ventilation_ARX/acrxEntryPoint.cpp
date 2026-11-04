@@ -1683,7 +1683,7 @@ public:
 			pThis1d,
 			pThisRoundp2);
 		SetGlobalProperty(pipi);
-		A1 = A2;
+		A1 = pFirstPoint;   // direction of the new duct (outlet may be shifted sideways): next point continues it
 		A2 = pLastPoint;
 		pt1[0] = A2.x;
 		pt1[1] = A2.y;

@@ -37,12 +37,18 @@ inline void storePlan(int t){
 }
 inline double endOffset(const TVS_TRANS* t,int align){return tvsTransAlign::endOffset(align,t->SizeAp1,t->SizeBp1,t->SizeAp2,t->SizeBp2);}
 inline double endOffset(const TVS_TRANS* t){return endOffset(t,tvsTransAlign::read(t));}
-// State before a change: the end offset it had.
-struct Pending {AcDbObjectId id;double before;};
+// State before a change: the end axis offset and the outlet (port 1) it had.
+struct Before {double offset;AcGePoint3d outlet;bool hasOutlet;Before():offset(0),hasOutlet(false){}};
+inline Before before(TVS_TRANS* t){
+    Before b;if(!t)return b;b.offset=endOffset(t);
+    tvsMove::Node n;if(tvsMove::describe(t,n)&&n.ports.size()==2){b.outlet=tvsMove::acad(n.ports[1]);b.hasOutlet=true;}
+    return b;
+}
+struct Pending {AcDbObjectId id;Before was;};
 inline std::vector<Pending>& pending(){static std::vector<Pending> p;return p;}
-inline void queue(const AcDbObjectId& id,double offsetBefore){
+inline void queue(const AcDbObjectId& id,const Before& was){
     for(size_t i=0;i<pending().size();++i)if(pending()[i].id==id)return;   // first state counts
-    Pending p={id,offsetBefore};pending().push_back(p);
+    Pending p;p.id=id;p.was=was;pending().push_back(p);
 }
 // From Properties / double click (no command running): ask in the command line.
 inline void post(){
@@ -54,45 +60,58 @@ inline void settle(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=2.0/f;
     for(size_t i=0;i<work.size();++i){
-        double delta=0;
-        {AcDbObjectPointer<TVS_TRANS> t(work[i].id,AcDb::kForRead);if(t.openStatus()!=Acad::eOk)continue;delta=endOffset(t.object())-work[i].before;}
-        if(std::fabs(delta)<=1e-9)continue;
-        wchar_t prompt[200];
-        swprintf_s(prompt,L"\nPrelaz: kota ose na kraju se mijenja za %+.0f mm. Koja strana ostaje [Pocetak/Kraj] <Pocetak>: ",delta*f);
+        double dz=0;AcGeVector3d dxy(0,0,0);
+        {AcDbObjectPointer<TVS_TRANS> t(work[i].id,AcDb::kForRead);if(t.openStatus()!=Acad::eOk)continue;
+         const Before now=before(t.object());dz=now.offset-work[i].was.offset;
+         if(now.hasOutlet&&work[i].was.hasOutlet){dxy=now.outlet-work[i].was.outlet;dxy.z=0;}}
+        const bool level=std::fabs(dz)>1e-9,plan=dxy.length()>1e-9;
+        if(!level&&!plan)continue;
+        wchar_t what[160];
+        if(level&&plan)swprintf_s(what,L"kota ose na kraju %+.0f mm i izlaz u tlocrtu %.0f mm",dz*f,dxy.length()*f);
+        else if(level)swprintf_s(what,L"kota ose na kraju %+.0f mm",dz*f);
+        else swprintf_s(what,L"izlaz u tlocrtu %.0f mm",dxy.length()*f);
+        wchar_t prompt[260];swprintf_s(prompt,L"\nPrelaz: mijenja se %ls. Koja strana ostaje [Pocetak/Kraj] <Pocetak>: ",what);
         acedInitGet(0,L"Pocetak Kraj");ACHAR kw[32]=L"";const int rc=acedGetKword(prompt,kw);
-        if(rc!=RTNORM&&rc!=RTNONE){acutPrintf(L"\nMreza nije pomjerena; kote uz prelaz provjerite rucno.");continue;}
+        if(rc!=RTNORM&&rc!=RTNONE){acutPrintf(L"\nMreza nije pomjerena; spojeve uz prelaz provjerite rucno.");continue;}
         const bool keepEnd=rc==RTNORM&&_wcsicmp(kw,L"Kraj")==0;
         std::vector<AcDbObjectId> ids;bool loop=false;
-        if(!tvsElevationShift::side(db,work[i].id,keepEnd?0:1,tol,ids,loop))continue;
-        if(loop){acutPrintf(L"\nPrelaz je u zatvorenom prstenu mreze: strana se ne moze pomjeriti sama. Kote provjerite rucno.");continue;}
+        const AcGePoint3d* seed=(!keepEnd&&work[i].was.hasOutlet)?&work[i].was.outlet:NULL;   // the end side touched the old outlet
+        if(!tvsElevationShift::side(db,work[i].id,keepEnd?0:1,tol,ids,loop,seed))continue;
+        if(loop){acutPrintf(L"\nPrelaz je u zatvorenom prstenu mreze: strana se ne moze pomjeriti sama. Spojeve provjerite rucno.");continue;}
         int n=0;
-        if(keepEnd){   // the start side and the transition go by -delta, the end stays
-            AcDbObjectPointer<TVS_TRANS> t(work[i].id,AcDb::kForWrite);
-            if(t.openStatus()==Acad::eOk&&t->put_Elevation(t->Elev-delta)==Acad::eOk){t->recordGraphicsModified();++n;}
-            t.close();n+=tvsElevationShift::shift(ids,-delta,work[i].id);
-        }else n=tvsElevationShift::shift(ids,delta,work[i].id);
-        acutPrintf(L"\nPomjereno %d elemenata za %+.0f mm; postojece promjene kote su sacuvane.",n,(keepEnd?-delta:delta)*f);
+        if(keepEnd){   // the transition and its start side go back by the change, the end side stays
+            std::vector<AcDbObjectId> withSelf(ids);withSelf.push_back(work[i].id);
+            n=tvsElevationShift::shift(withSelf,-dz);tvsElevationShift::move(withSelf,-dxy);
+        }else{n=tvsElevationShift::shift(ids,dz,work[i].id);n=(std::max)(n,tvsElevationShift::move(ids,dxy,work[i].id));}
+        acutPrintf(L"\nPrilagodjeno %d elemenata; postojece promjene kote su sacuvane.",n);
     }
 }
 // Sets the alignment of an open transition and queues the elevation question.
 inline bool apply(TVS_TRANS* t,int align){
     if(!t||align<0||align>2||tvsTransAlign::read(t)==align)return false;
-    const double before=endOffset(t);
+    const Before was=before(t);
     if(tvsTransAlign::write(t,align)!=Acad::eOk)return false;
-    t->recordGraphicsModified();queue(t->objectId(),before);return true;
+    t->recordGraphicsModified();queue(t->objectId(),was);return true;
 }
-// Svojstva dialog: common alignment of the selected transitions (-1 = mixed or none).
-struct Gather {bool any;int align;bool mixed;Gather():any(false),align(-1),mixed(false){}
-    void add(const TVS_TRANS* t){const int a=tvsTransAlign::read(t);if(!any){any=true;align=a;}else if(a!=align)mixed=true;}
-    int common()const{return any&&!mixed?align:-1;}};
-// After the dialog changed a transition (open for write): alignment from the dialog (-1 = keep),
-// and the elevation question when its end axis moved (alignment or heights).
-inline void afterEdit(TVS_TRANS* t,double offsetBefore,int align){
+// Svojstva dialog: common alignment / plan type of the selected transitions (-1 = mixed or none).
+struct Gather {bool any;int align,plan;bool mixedAlign,mixedPlan;Gather():any(false),align(-1),plan(-1),mixedAlign(false),mixedPlan(false){}
+    void add(const TVS_TRANS* t){const int a=tvsTransAlign::read(t),p=t->TransType==2||t->TransType==3?t->TransType:1;
+        if(!any){any=true;align=a;plan=p;}else{if(a!=align)mixedAlign=true;if(p!=plan)mixedPlan=true;}}
+    int common()const{return any&&!mixedAlign?align:-1;}
+    int commonPlan()const{return any&&!mixedPlan?plan:-1;}};
+// After the dialog changed a transition (open for write): alignment by height and plan type from
+// the dialog (-1 = keep), then the question when its end axis or outlet moved.
+inline void afterEdit(TVS_TRANS* t,const Before& was,int align,int plan){
     if(!t)return;
     if(align>=0&&align<=2&&tvsTransAlign::read(t)!=align&&tvsTransAlign::write(t,align)==Acad::eOk)
         acutPrintf(L"\nPrelaz: poravnanje po visini %ls.",tvsTransAlign::name(align));
+    const int type=t->TransType==2||t->TransType==3?t->TransType:1;
+    if(plan>=1&&plan<=3&&plan!=type){t->put_Type(plan);
+        acutPrintf(L"\nPrelaz: u tlocrtu %ls.",plan==2?L"ravno uz desnu ivicu":plan==3?L"ravno uz lijevu ivicu":L"simetricno");}
     t->recordGraphicsModified();
-    if(std::fabs(endOffset(t)-offsetBefore)>1e-9){const bool wasEmpty=pending().empty();queue(t->objectId(),offsetBefore);if(wasEmpty)post();}
+    const Before now=before(t);
+    const bool moved=std::fabs(now.offset-was.offset)>1e-9||(now.hasOutlet&&was.hasOutlet&&now.outlet.distanceTo(was.outlet)>1e-9);
+    if(moved){const bool wasEmpty=pending().empty();queue(t->objectId(),was);if(wasEmpty)post();}
 }
 // TVS_PRELAZ_KOTA: queued changes, or pick a transition and choose its alignment.
 inline void run(){

@@ -8,6 +8,7 @@
 // with Mreza the elevation is not equalised: the whole network moves by the difference between
 // the source and the picked element, so existing level changes (Z prelazi, obilasci) stay.
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
+#include "../TVS_Ventilation_DBX/TVS_TRANS.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "TeeNeighbours.h"
 #include "TVSMoveCommand.h"
@@ -113,7 +114,8 @@ inline void run(){
         if(o.flow){t->put_Flow(src.flow);any=true;}
         if(o.layer){AcDbObjectPointer<TVS_Pipe> s(src.id,AcDb::kForRead);if(s.openStatus()==Acad::eOk){e->setPropertiesFrom(s.object());any=true;}}
         if(o.elevation&&!whole){
-            const double axis=targetAxis(src,t->SizeA,t->SizeB,o.reference);
+            const TVS_TRANS* tr=TVS_TRANS::cast(e.object());   // prelaz: its start section (Elev = axis at the start)
+            const double axis=tr?targetAxis(src,tr->SizeAp1,tr->SizeBp1,o.reference):targetAxis(src,t->SizeA,t->SizeB,o.reference);
             if(std::fabs(axis-t->Elev)>1e-9&&t->put_Elevation(axis)==Acad::eOk){raised.push_back(id);any=true;}
         }
         if(any){e->recordGraphicsModified();++changed;}
