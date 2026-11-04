@@ -38,11 +38,11 @@ int main(){
  { std::vector<Member> m2;
    Member c=d;c.a=P(500,-100);c.b=P(500,2000);c.A1=c.A2=200;c.B1=c.B2=300;c.z=1000;c.tag=10;m2.push_back(c);   // crosses the line y=0 at x=500
    Member q=d;q.a=P(0,500);q.b=P(2000,500);q.A1=q.A2=400;q.B1=q.B2=200;q.z=1000;q.tag=11;m2.push_back(q);    // parallel, 500 behind
-   Member far=q;far.a=P(0,3000);far.b=P(2000,3000);far.tag=12;m2.push_back(far);                           // outside the depth
+   Member out3=q;out3.a=P(0,3000);out3.b=P(2000,3000);out3.tag=12;m2.push_back(out3);                           // outside the depth
    const P s1(0,0),s2(2000,0);   // looking +y (left of +x)
    std::vector<Cut> cc=cuts(s1,s2,m2,false,1);assert(cc.size()==1&&near(cc[0].s,500));
    std::vector<View> vv=views(s1,s2,m2,false,1000);
-   bool par=false,outside=false;for(size_t i=0;i<vv.size();++i){if(vv[i].tag==11){par=near(vv[i].x0,0)&&near(vv[i].x1,2000)&&near(vv[i].z0,900)&&near(vv[i].z1,1100)&&near(vv[i].near,500);}if(vv[i].tag==12)outside=true;}
+   bool par=false,outside=false;for(size_t i=0;i<vv.size();++i){if(vv[i].tag==11){par=near(vv[i].x0,0)&&near(vv[i].x1,2000)&&near(vv[i].z0,900)&&near(vv[i].z1,1100)&&near(vv[i].closest,500);}if(vv[i].tag==12)outside=true;}
    assert(par&&!outside);
    std::vector<Edge> ee=edges(cc,vv);
    // the parallel duct's top edge (z=1100) is hidden between x=400 and x=600 by the cut 200x300 at z=1000
@@ -68,4 +68,7 @@ class Section(unittest.TestCase):
   self.assertIn('const int n=build(btr.object(),p);refreshReferences(btr.object());',s,'Osvjezi rebuilds the block from stored parameters')
   self.assertIn('const short types[]={1,1,10,10,70,40,40,40};',s)
   for line in s.splitlines():self.assertFalse(line.rstrip().endswith('L"'))
+  import re
+  g=(ROOT/'geometry/Section.h').read_text()
+  for macro in ('near','far','min','max'):self.assertIsNone(re.search(r'[^:(\w]'+macro+r'\b(?!\))',g.replace('(std::min)','').replace('(std::max)','')),'Windows macro name '+macro)
 if __name__=='__main__':unittest.main()
