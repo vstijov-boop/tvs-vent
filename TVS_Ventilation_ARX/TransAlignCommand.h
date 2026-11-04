@@ -89,7 +89,9 @@ struct Gather {bool any;int align;bool mixed;Gather():any(false),align(-1),mixed
 // and the elevation question when its end axis moved (alignment or heights).
 inline void afterEdit(TVS_TRANS* t,double offsetBefore,int align){
     if(!t)return;
-    if(align>=0&&align<=2&&tvsTransAlign::read(t)!=align&&tvsTransAlign::write(t,align)==Acad::eOk)t->recordGraphicsModified();
+    if(align>=0&&align<=2&&tvsTransAlign::read(t)!=align&&tvsTransAlign::write(t,align)==Acad::eOk)
+        acutPrintf(L"\nPrelaz: poravnanje po visini %ls.",tvsTransAlign::name(align));
+    t->recordGraphicsModified();
     if(std::fabs(endOffset(t)-offsetBefore)>1e-9){const bool wasEmpty=pending().empty();queue(t->objectId(),offsetBefore);if(wasEmpty)post();}
 }
 // TVS_PRELAZ_KOTA: queued changes, or pick a transition and choose its alignment.

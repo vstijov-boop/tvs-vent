@@ -8,6 +8,7 @@
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 #include "../TVS_Ventilation_DBX/TVS_TRANS.h"
 #include "../TVS_Ventilation_DBX/TVS_TAP.h"
+#include "../TVS_Ventilation_DBX/TransAlignData.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "TVSMoveCommand.h"
 #include "TvsLinetypes.h"
@@ -62,7 +63,12 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
                 tvsSection::Member m;m.a=tvsSection::P(a.x,a.y);m.b=tvsSection::P(b.x,b.y);
                 m.A1=sa.a;m.B1=sa.b;m.A2=sb.a;m.B2=sb.b;m.round=sa.round;m.z=m.za=m.zb=n.elevation;m.tag=tag;out.push_back(m);};
             TVS_TAP* tap=TVS_TAP::cast(e);
-            if(TVS_Pipe::cast(e)||TVS_TRANS::cast(e)){
+            if(TVS_TRANS* tr=TVS_TRANS::cast(e)){   // prelaz: axis and height change along it
+                add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);tvsSection::Member& m=out.back();m.taper=true;
+                const double off=tvsTransAlign::endOffset(tvsTransAlign::read(tr),tr->SizeAp1,tr->SizeBp1,tr->SizeAp2,tr->SizeBp2);
+                if(std::fabs(off)>1e-12){m.sloped=true;m.za=n.elevation;m.zb=n.elevation+off;}
+            }
+            else if(TVS_Pipe::cast(e)){
                 add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);
 #ifdef TVS_OFFSET_INTEGRATION
                 tvsOffsetData::Record r;

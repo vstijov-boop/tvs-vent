@@ -92,6 +92,14 @@ int main(){
    std::vector<View> vv(1,low);std::vector<Gap> g=gaps(cc,vv,10);
    assert(g.size()==1&&near(g[0].low,2100)&&near(g[0].high,2400)&&near(g[0].lowBottom,1900)&&near(g[0].x,1000));
  }
+ // prelaz 400x300 -> 400x200, ravno uz gornju ivicu: trapezoid with a level top edge
+ { Member tr;tr.a=P(1000,300);tr.b=P(1300,300);tr.A1=tr.A2=400;tr.B1=300;tr.B2=200;tr.taper=true;tr.sloped=true;tr.za=2000;tr.zb=2050;tr.tag=21;
+   std::vector<Member> one(1,tr);std::vector<View> v=views(P(0,0),P(3000,0),one,false,1000,1);
+   assert(v.size()==1&&near(v[0].h,300)&&near(v[0].h1,200)&&!v[0].level());
+   const Prim& top=v[0].outline[2];assert(near(top.y0,2150)&&near(top.y1,2150));      // level top
+   const Prim& bot=v[0].outline[0];assert(near(bot.y0,1850)&&near(bot.y1,1950));      // rising bottom
+   Cut c;assert(cut(P(1150,0),P(1150,1000),tr,c)&&near(c.z,2025)&&near(c.h,250)&&near(c.z+c.h/2,2150));
+ }
  std::puts("PASS SECTION cuts");
 }
 """

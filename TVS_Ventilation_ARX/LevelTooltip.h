@@ -8,6 +8,8 @@
 #include "../TVS_Ventilation_DBX/TVS_Entity.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../TVS_Ventilation_DBX/LevelLabels.h"
+#include "../TVS_Ventilation_DBX/TVS_TRANS.h"
+#include "../TVS_Ventilation_DBX/TransAlignData.h"
 #include <cwchar>
 namespace tvsLevelTooltip {
 inline const wchar_t* regKey(){return L"Software\\TVS_Vent";}
@@ -21,7 +23,7 @@ inline void store(bool on){
     const DWORD v=on?1:0;RegSetValueExW(k,L"LevelTooltip",0,REG_DWORD,reinterpret_cast<const BYTE*>(&v),sizeof(v));RegCloseKey(k);
 }
 class Monitor : public AcEdInputPointMonitor {
-    wchar_t text[160];
+    wchar_t text[260];
 public:
     Monitor(){text[0]=0;}
     virtual Acad::ErrorStatus monitorInputPoint(const AcEdInputPoint& input,AcEdInputPointMonitorResult& output){
@@ -30,6 +32,12 @@ public:
         for(int i=0;i<ids.length();++i){
             AcDbEntity* e=NULL;if(acdbOpenAcDbEntity(e,ids[i],AcDb::kForRead)!=Acad::eOk)continue;
             TVS_Entity* t=TVS_Entity::cast(e);
+            if(TVS_TRANS* tr=TVS_TRANS::cast(e)){   // prelaz: both ends
+                const double f=tvsUnits::factor(e),h1=tvsTransAlign::height(tr->SizeAp1,tr->SizeBp1)/2,h2=tvsTransAlign::height(tr->SizeAp2,tr->SizeBp2)/2;
+                const double z2=tr->Elev+tvsTransAlign::endOffset(tvsTransAlign::read(tr),tr->SizeAp1,tr->SizeBp1,tr->SizeAp2,tr->SizeBp2);
+                swprintf_s(text,L"TVS kote: pocetak gi %.0f / os %.0f / di %.0f, kraj gi %.0f / os %.0f / di %.0f mm (%ls)",
+                    (tr->Elev+h1)*f,tr->Elev*f,(tr->Elev-h1)*f,(z2+h2)*f,z2*f,(z2-h2)*f,tvsTransAlign::name(tvsTransAlign::read(tr)));
+                e->close();output.setAdditionalTooltipString(text);return Acad::eOk;}
             if(t){const double f=tvsUnits::factor(e),half=(t->SizeB>0?t->SizeB:t->SizeA)/2;
                 swprintf_s(text,L"TVS kote: gi %.0f / os %.0f / di %.0f mm",(t->Elev+half)*f,t->Elev*f,(t->Elev-half)*f);
                 e->close();output.setAdditionalTooltipString(text);return Acad::eOk;}

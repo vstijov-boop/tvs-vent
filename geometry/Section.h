@@ -13,8 +13,9 @@ namespace tvsSection {
 struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 inline double cross(const P& a,const P& b){return a.x*b.y-a.y*b.x;}
 // bend: vertical elbow (Gore / Nadolje) between a and b; levelA = its level end is a.
-struct Member {P a,b;double A1,B1,A2,B2;bool round;double z,za,zb;bool sloped,bend,levelA;int tag;
-    Member():A1(0),B1(0),A2(0),B2(0),round(false),z(0),za(0),zb(0),sloped(false),bend(false),levelA(true),tag(0){}
+// taper: prelaz (height and axis change along it, end faces vertical).
+struct Member {P a,b;double A1,B1,A2,B2;bool round;double z,za,zb;bool sloped,bend,levelA,taper;int tag;
+    Member():A1(0),B1(0),A2(0),B2(0),round(false),z(0),za(0),zb(0),sloped(false),bend(false),levelA(true),taper(false),tag(0){}
     double zAt(double u)const{return sloped?za+(zb-za)*u:z;}
     double planLength()const{return std::sqrt((b.x-a.x)*(b.x-a.x)+(b.y-a.y)*(b.y-a.y));}
     bool vertical(double tol)const{return planLength()<=tol&&sloped&&std::fabs(zb-za)>tol;}};
@@ -61,13 +62,14 @@ struct Prim {bool arc;double x0,y0,x1,y1,cx,cy,r,a0,a1,k;   // arc: (cx + k r co
     P at(double t)const{if(!arc)return P(x0+(x1-x0)*t,y0+(y1-y0)*t);const double a=a0+(a1-a0)*t;return P(cx+k*r*std::cos(a),cy+r*std::sin(a));}
     Prim sub(double t0,double t1)const{if(!arc){const P p=at(t0),q=at(t1);return line(p.x,p.y,q.x,q.y);}Prim q=*this;q.a0=a0+(a1-a0)*t0;q.a1=a0+(a1-a0)*t1;return q;}
 };
-struct View {double x0,x1,zc0,zc1,h,closest;int tag;bool round,vertical,bend;std::vector<Prim> outline;std::vector<P> poly;
-    View():x0(0),x1(0),zc0(0),zc1(0),h(0),closest(0),tag(0),round(false),vertical(false),bend(false){}
-    bool level()const{return !bend&&!vertical&&std::fabs(zc0-zc1)<1e-9;}
+// h1 > 0: height at x1 differs from h (prelaz seen from the side: trapezoid).
+struct View {double x0,x1,zc0,zc1,h,h1,closest;int tag;bool round,vertical,bend;std::vector<Prim> outline;std::vector<P> poly;
+    View():x0(0),x1(0),zc0(0),zc1(0),h(0),h1(0),closest(0),tag(0),round(false),vertical(false),bend(false){}
+    bool level()const{return !bend&&!vertical&&std::fabs(zc0-zc1)<1e-9&&!(h1>0&&std::fabs(h1-h)>1e-9);}
     double zc(double x)const{return x1-x0>1e-12?zc0+(zc1-zc0)*(x-x0)/(x1-x0):zc0;}
-    void quad(){outline.clear();
-        outline.push_back(Prim::line(x0,zc0-h/2,x1,zc1-h/2));outline.push_back(Prim::line(x1,zc1-h/2,x1,zc1+h/2));
-        outline.push_back(Prim::line(x1,zc1+h/2,x0,zc0+h/2));outline.push_back(Prim::line(x0,zc0+h/2,x0,zc0-h/2));seal();}
+    void quad(){outline.clear();const double e=h1>0?h1:h;
+        outline.push_back(Prim::line(x0,zc0-h/2,x1,zc1-e/2));outline.push_back(Prim::line(x1,zc1-e/2,x1,zc1+e/2));
+        outline.push_back(Prim::line(x1,zc1+e/2,x0,zc0+h/2));outline.push_back(Prim::line(x0,zc0+h/2,x0,zc0-h/2));seal();}
     void seal(){poly.clear();for(size_t i=0;i<outline.size();++i){const int n=outline[i].arc?24:1;for(int k=0;k<n;++k)poly.push_back(outline[i].at(double(k)/n));}
         if(!poly.empty()){x0=x1=poly[0].x;for(size_t i=1;i<poly.size();++i){x0=(std::min)(x0,poly[i].x);x1=(std::max)(x1,poly[i].x);}}}
     bool inside(double x,double z,double eps)const{   // strictly inside the outline
@@ -143,8 +145,13 @@ inline std::vector<View> views(const P& p1,const P& p2,const std::vector<Member>
         View w;w.tag=m.tag;w.round=m.round;w.closest=(std::min)(v0,v1);w.h=B;
         if(!flip){w.x0=lo;w.x1=hi;w.zc0=zAtU(lo);w.zc1=zAtU(hi);}
         else{w.x0=L-hi;w.x1=L-lo;w.zc0=zAtU(hi);w.zc1=zAtU(lo);}
+        if(m.taper){   // height along the transition, at the seen ends
+            auto hAt=[&](double t){return m.round?m.A1+(m.A2-m.A1)*t:m.B1+(m.B2-m.B1)*t;};
+            const double hlo=rising?hAt(t0):hAt(t1),hhi=rising?hAt(t1):hAt(t0);
+            w.h=flip?hhi:hlo;w.h1=flip?hlo:hhi;
+        }
         double kx=e.x*d.x+e.y*d.y;if(flip)kx=-kx;
-        if(m.sloped&&std::fabs(w.zc1-w.zc0)>1e-9&&std::fabs(kx)>0.05){
+        if(!m.taper&&m.sloped&&std::fabs(w.zc1-w.zc0)>1e-9&&std::fabs(kx)>0.05){
             // sloped piece: thickness and end faces perpendicular to its axis (true shape in the
             // member's vertical plane, projected: plan offsets scale by kx)
             const double ax0=flip?L-u0:u0,ax1=flip?L-u1:u1,ds=(ax1-ax0)/kx,dz=z1-z0,len=std::sqrt(ds*ds+dz*dz);

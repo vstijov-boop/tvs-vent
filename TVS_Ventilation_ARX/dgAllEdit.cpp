@@ -273,6 +273,18 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 
 	this->ChangeSizeA();
 
+	// Koljeno (radius, smjer) only for elbows, T-komad only for tees: not shown for a prelaz or kanal.
+	if (Ttap == false)
+	{
+		static const int elbow[] = {10061,10062,10063,10064,1018,1019,1036,1037,1038,1039,1040,1013,10013,1030,1034,1035};
+		for (size_t k = 0; k < sizeof(elbow) / sizeof(elbow[0]); ++k) if (CWnd* c = GetDlgItem(elbow[k])) c->ShowWindow(false);
+	}
+	if (Twye == false)
+	{
+		static const int tee[] = {10065,123};
+		for (size_t k = 0; k < sizeof(tee) / sizeof(tee[0]); ++k) if (CWnd* c = GetDlgItem(tee[k])) c->ShowWindow(false);
+	}
+
 	if (Ttap == true)
 	{
 

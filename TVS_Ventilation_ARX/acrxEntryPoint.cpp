@@ -1640,22 +1640,35 @@ public:
 			pThisRoundp2,
 			pTransType,
 			pThis1D);
+		const double axisBefore = pipi->Elev;   // axis of the duct before the transition (its start)
 		SetGlobalProperty(transie);
-		{	// poravnanje po visini (TVS_SETTINGS): the duct after the transition continues at the shifted axis
+		{	// poravnanje po visini (TVS_SETTINGS): the transition starts at the axis of the duct
+			// before it; the duct after it continues at that axis + the end offset of the alignment
+			// (osa: same axis), whatever the elevation reference (Vrh / Centar / Dno) of the dialog.
 			const int align = tvsTransAlignCmd::defaultAlign();
-			if (align != tvsTransAlign::Axis) {
-				AcDbObjectPointer<TVS_TRANS> t(transie->objectId(), AcDb::kForWrite);
-				if (t.openStatus() == Acad::eOk && tvsTransAlign::write(t.object(), align) == Acad::eOk) {
-					globalElevMid += tvsTransAlign::endOffset(align, pSizeAp1, pSizeBp1, pSizeAp2, pSizeBp2);
-					globalElev = globalElevMid;
-					t->recordGraphicsModified();
-				}
+			AcDbObjectPointer<TVS_TRANS> t(transie->objectId(), AcDb::kForWrite);
+			if (t.openStatus() == Acad::eOk) {
+				t->put_Elevation(axisBefore);
+				if (align != tvsTransAlign::Axis) tvsTransAlign::write(t.object(), align);
+				t->recordGraphicsModified();
 			}
+			globalElevMid = axisBefore + tvsTransAlign::endOffset(align, pSizeAp1, pSizeBp1, pSizeAp2, pSizeBp2);
+			globalElev = globalElevMid;
 		}
 		pFirstPoint = AcGePoint3d(pFirstPoint.x + pLengthTr*Vect.x,
 			pFirstPoint.y + pLengthTr*Vect.y,
 			pFirstPoint.z + pLengthTr*Vect.z
 		);
+		{	// tip u tlocrtu 2 / 3 (ravno uz desnu / lijevu ivicu): the outlet axis is shifted sideways,
+			// as TVS_TRANS draws it (right = (Vect.y, -Vect.x)); the next duct starts there
+			AcGeVector3d right(Vect.y, -Vect.x, 0);
+			if (right.length() > 1e-12) {
+				right.normalize();
+				const double s = (pSizeAp1 - pSizeAp2) / 2;
+				if (pTransType == 2) pFirstPoint += right * s;
+				else if (pTransType == 3) pFirstPoint -= right * s;
+			}
+		}
 		AcGePoint3d pLastPoint = AcGePoint3d(pFirstPoint.x + 100 * Vect.x,
 			pFirstPoint.y + 100 * Vect.y,
 			pFirstPoint.z + 100 * Vect.z

@@ -7,7 +7,7 @@ class LevelsContract(unittest.TestCase):
   l=text('TVS_Ventilation_DBX/LevelLabels.h')
   self.assertIn('mode->context()->isPlotGeneration()',l,'labels are not plotted')
   self.assertIn('traits.setColor(8);',l);self.assertIn('inline double textMm(){return 25;}',l)
-  for f,call in (('TVS_Pipe','tvsLevelLabels::draw(mode, database(), FirstPoint + (LastPoint - FirstPoint) / 2'),('TVS_WYE','tvsLevelLabels::draw(mode, database(), Basepoint'),('TVS_TRANS','tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr / 2')):
+  for f,call in (('TVS_Pipe','tvsLevelLabels::draw(mode, database(), FirstPoint + (LastPoint - FirstPoint) / 2'),('TVS_WYE','tvsLevelLabels::draw(mode, database(), Basepoint'),('TVS_TRANS','tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.8, VectTr, Elev + tvsTransAlign::endOffset')):
    s=text('TVS_Ventilation_DBX/%s.cpp'%f);self.assertIn(call,s)
    self.assertLess(s.index('#include "StdAfx.h"'),s.index('#include "LevelLabels.h"'),'after the precompiled header')
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
