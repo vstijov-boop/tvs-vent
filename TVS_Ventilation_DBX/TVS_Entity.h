@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+﻿// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -61,6 +61,8 @@
 #include "TVS_Connector.h"
 #include <iostream>
 #include "commonDef.h"
+#include "DrawingUnits.h"
+#include "../geometry/FlexHose.h"
 
 #include <algorithm>
 using namespace std;
@@ -84,6 +86,11 @@ public:
 	//- Dwg Filing protocol
 	virtual Acad::ErrorStatus dwgOutFields(AcDbDwgFiler *pFiler) const;
 	virtual Acad::ErrorStatus dwgInFields(AcDbDwgFiler *pFiler);
+
+#ifdef TVS_OFFSET_INTEGRATION
+    virtual Acad::ErrorStatus subDeepClone(AcDbObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary=true) const;
+    virtual Acad::ErrorStatus subWblockClone(AcRxObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary=true) const;
+#endif
 
 	//- SubXXX() methods (self notification)
 	virtual Acad::ErrorStatus subOpen(AcDb::OpenMode mode);
@@ -140,6 +147,9 @@ public:
 		const AcGeVector3d &curViewDir, const int bitflags) const;
 	virtual Acad::ErrorStatus subMoveGripPointsAt(const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset, const int bitflags);
 
+	// Derived on demand; does not change DWG storage or the virtual table.
+	static unsigned long sheetMetalRevision();
+	bool getSheetMetal(double &areaM2, double &thicknessMm, double &massKg) const;
 	virtual double get_Speed();
 	//----- AcDbCurve protocols
 	//- Curve property tests.
@@ -301,8 +311,13 @@ public:
 	void setCenterProperty(AcDbEntity *pEnt);
 	void setWipeoutProperty(AcGiWorldDraw *mode, AcDbPolyline *pEnt);
 	void setHideProperty(AcDbEntity *pEnt);
+	// tvs_hidden/tvs_centerline: pattern defined in mm (TVS_LineType.lin); scaled by the
+	// element's own linetype scale and the drawing units (LTSCALE applies on top).
+	void setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name) const;
 	void setZigzagProperty(AcDbEntity *pEnt);
 	void setThinProperty(AcDbEntity *pEnt);
+	// Flexible hose (geometry/FlexHose.h): bead edges as bulged polylines, thin ring lines, at plan level z.
+	void setFlexDrawing(const tvsFlex::Drawing& drawing, double z);
 	double get_WipeoutLength(void) const;
 	Acad::ErrorStatus put_WipeoutLength(double newVal);
 	virtual void setFlex(const bool &isFlex);

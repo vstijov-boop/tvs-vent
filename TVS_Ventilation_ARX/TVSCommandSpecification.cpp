@@ -2,6 +2,8 @@
 #include "TVSCommandSpecification.h"
 #include "TVSPropertySpec.h"
 #include "TVSSpecTable.h"
+#include "TablePresentation.h"
+#include "CoordinateInput.h"
 TVSCommandSpecification::TVSCommandSpecification()
 {
 }
@@ -20,19 +22,22 @@ void TVSCommandSpecification::execute(void)
 	acedSSLength(sset, &len);
 	if (len == 0)
 	{
+		acedSSFree(sset);
 		return;
 	}
 	
 	ads_point pt1;
+	if (!tvsTable::prompt()) { acedSSFree(sset); return; }
 	TVSSpecTable table;
-	acedInitGet(RSG_NONULL, _T("Настройки Н н Y y"));
 	int status = 0;
 
 	while (status != RTNORM) {
-		status = acedGetPoint(NULL, _T("\nУкажите точку вставки спецификации или [Настройки]:"), pt1);
+		acedInitGet(RSG_NONULL, _T("Podešavanja P"));
+		status = tvsCoordinates::getPoint(NULL, _T("\nZadajte tačku umetanja specifikacije ili [Podešavanja]: "), pt1);
 		switch (status)
 		{
 		case RTCAN:
+			acedSSFree(sset);
 			return;
 			break;
 		case RTKWORD:
@@ -42,7 +47,12 @@ void TVSCommandSpecification::execute(void)
 	}
 
 	TVSPropertySpec spec;
-	spec.processSetOfObjects(sset);
+	#ifdef TVS_OFFSET_INTEGRATION
+    if(!spec.processSetOfObjects(sset)){acedSSFree(sset);return;}
+#else
+    spec.processSetOfObjects(sset);
+#endif
+	acedSSFree(sset);
 	spec.sort();
 	
 	table.loadColumnsFromSettings();

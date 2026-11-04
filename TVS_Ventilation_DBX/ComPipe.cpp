@@ -23,6 +23,10 @@
 //----- ComPipe.cpp : Implementation of CComPipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include <limits>
+#endif
 #include "ComPipe.h"
 
 //----- CComPipe
@@ -111,7 +115,7 @@ STDMETHODIMP CComPipe::GetCategoryName(PROPCAT propcat, LCID lcid, BSTR* pbstrNa
 	switch ( propcat )
 	{
 	case PROPCAT_Data:
-		*pbstrName = ::SysAllocString(L"Face");
+		*pbstrName = ::SysAllocString(L"Podaci o kanalu");
 		break;
 
 	default:
@@ -130,62 +134,67 @@ STDMETHODIMP CComPipe::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 		// стандартное 
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Воздуховод")); 
+		{
+			// Flexible hose: say so in the Properties palette (same object type, DuctType flex).
+			AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForRead);
+			const bool flex = pSq.openStatus() == Acad::eOk && pSq->DuctType == DuctTypeFlex;
+			*propName = ::SysAllocString(flex ? L"Fleksibilni kanal" : _T("Kanal"));
+		}
 		break; 
 
 	case (DISPID_A): 
-		*propName  = ::SysAllocString(L"Dпр"); 
+		*propName  = ::SysAllocString(L"Dpr");
 		break; 
 
 	case (DISPID_SizeB): 
-		*propName  = ::SysAllocString(L"Hпр"); 
+		*propName  = ::SysAllocString(L"Hpr");
 		break; 
 	case (DISPID_Flow): 
-		*propName  = ::SysAllocString(L"L="); 
+		*propName  = ::SysAllocString(L"Protok, m³/h");
 		break; 
 	case (DISPID_Speed): 
-		*propName  = ::SysAllocString(L"v="); 
+		*propName  = ::SysAllocString(L"Brzina, m/s");
 		break; 
 
 
 
 
 	case (DISPID_Length): 
-		*propName  = ::SysAllocString(L"Длина"); 
+		*propName  = ::SysAllocString(L"Dužina");
 		break; 
 	case (DISPID_1D2D): 
-		*propName  = ::SysAllocString(L"1D"); 
+		*propName  = ::SysAllocString(L"Prikaz 1D");
 		break; 
 	case (DISPID_Rotation): 
-		*propName  = ::SysAllocString(L"Угол"); 
+		*propName  = ::SysAllocString(L"Ugao rotacije");
 		break; 
 	case (DISPID_i): 
-		*propName  = ::SysAllocString(L"i, Па/м"); 
+		*propName  = ::SysAllocString(L"i, Pa/m");
 		break; 
 	case (DISPID_dP): 
-		*propName  = ::SysAllocString(L"dP, Па"); 
+		*propName  = ::SysAllocString(L"dP, Pa");
 		break; 
 	case (DISPID_Wipeout): 
-		*propName  = ::SysAllocString(L"Маскировка"); 
+		*propName  = ::SysAllocString(L"Maskiranje");
 		break; 
 
 	case (DISPID_Grani): 
-		*propName  = ::SysAllocString(L"Грани"); 
+		*propName  = ::SysAllocString(L"Ivice");
 		break; 
 	case (DISPID_Elev): 
-		*propName  = ::SysAllocString(L"Отм. Центр"); 
+		*propName  = ::SysAllocString(L"Kota ose");
 		break; 
 	case (DISPID_ElevUp): 
-		*propName  = ::SysAllocString(L"Отм. Верх"); 
+		*propName  = ::SysAllocString(L"Kota gornje ivice");
 		break; 
 	case (DISPID_ElevDown): 
-		*propName  = ::SysAllocString(L"Отм. Низ"); 
+		*propName  = ::SysAllocString(L"Kota donje ivice");
 		break; 
 	case (DISPID_Tag1): 
-		*propName  = ::SysAllocString(L"Тэг 1"); 
+		*propName  = ::SysAllocString(L"Oznaka 1");
 		break;
 	case (DISPID_Tag2): 
-		*propName  = ::SysAllocString(L"Тэг 2"); 
+		*propName  = ::SysAllocString(L"Oznaka 2");
 		break;
 	} 
 	return S_OK; 
@@ -256,6 +265,7 @@ STDMETHODIMP CComPipe::get_Dpr(double *pVal)
 	size = pSq->SizeA;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -270,6 +280,8 @@ STDMETHODIMP CComPipe::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeA(newVal);
 	Fire_Notification(DISPID_A);
@@ -287,6 +299,7 @@ STDMETHODIMP CComPipe::get_SizeB(double *pVal)
 	size = pSq->SizeB;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -299,6 +312,8 @@ STDMETHODIMP CComPipe::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 	if (newVal==0)pSq->put_ThisRound(true);
 	else pSq->put_ThisRound(false);
 
@@ -320,12 +335,12 @@ STDMETHODIMP CComPipe::get_Speed(double *pVal)
 	{
 		if (pSq->get_ThisRound()==true)
 		{
-			speed=pflow/(3600*3.14*(pSq->SizeA/1000)*(pSq->SizeA/1000)/4);
+			speed=pflow/(3600*3.14*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)/4);
 
 		}
 		else
 		{
-			speed=pflow/(3600*(pSq->SizeA/1000)*(pSq->SizeB/1000));
+			speed=pflow/(3600*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000));
 		}
 	}
 	else speed=0;
@@ -352,12 +367,12 @@ STDMETHODIMP CComPipe::put_Speed(double newVal)
 
 	if ((pSq->get_ThisRound())==true)
 	{
-		pflow=speed*(3600*3.14*((pSq->SizeA)/1000)*((pSq->SizeA)/1000)/4);
+		pflow=speed*(3600*3.14*((tvsUnits::mm(pSq->SizeA, pSq.operator->()))/1000)*((tvsUnits::mm(pSq->SizeA, pSq.operator->()))/1000)/4);
 
 	}
 	else
 	{
-		pflow=speed*(3600*(pSq->SizeA/1000)*(pSq->SizeB/1000));
+		pflow=speed*(3600*(tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000)*(tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000));
 
 	}
 
@@ -416,11 +431,16 @@ STDMETHODIMP CComPipe::get_Length(double  *pVal)
 
 
 
-	*pVal=pSq->Length ;
+	#ifdef TVS_OFFSET_INTEGRATION
+    if(!pSq->getPhysicalLength(*pVal))return E_FAIL;
+#else
+    *pVal=pSq->get_Length();
+#endif
 
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -433,6 +453,8 @@ STDMETHODIMP CComPipe::put_Length(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 
@@ -540,15 +562,15 @@ STDMETHODIMP CComPipe::get_Parami(double *pVal)
 
 	if (pSq->ThisRound==true)
 	{
-		S=pSq->SizeA*pSq->SizeA*M_PI/4/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeA, pSq.operator->())*M_PI/4/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=pSq->SizeA/1000;
+		dekv=tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000;
 	} 
 	else
 	{
-		S=pSq->SizeA*pSq->SizeB/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=2*pSq->SizeA*pSq->SizeB/(pSq->SizeA+pSq->SizeB)/1000;
+		dekv=2*tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/(tvsUnits::mm(pSq->SizeA, pSq.operator->())+tvsUnits::mm(pSq->SizeB, pSq.operator->()))/1000;
 	}
 	v=L/S;
 	Pd=1.2*v*v/2;
@@ -589,22 +611,22 @@ STDMETHODIMP CComPipe::get_ParamdP(double  *pVal)
 
 	if (pSq->ThisRound==true)
 	{
-		S=pSq->SizeA*pSq->SizeA*M_PI/4/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeA, pSq.operator->())*M_PI/4/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=pSq->SizeA/1000;
+		dekv=tvsUnits::mm(pSq->SizeA, pSq.operator->())/1000;
 	} 
 	else
 	{
-		S=pSq->SizeA*pSq->SizeB/1000/1000;
+		S=tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/1000/1000;
 		L=pSq->Flow/3600;
-		dekv=2*pSq->SizeA*pSq->SizeB/(pSq->SizeA+pSq->SizeB)/1000;
+		dekv=2*tvsUnits::mm(pSq->SizeA, pSq.operator->())*tvsUnits::mm(pSq->SizeB, pSq.operator->())/(tvsUnits::mm(pSq->SizeA, pSq.operator->())+tvsUnits::mm(pSq->SizeB, pSq.operator->()))/1000;
 	}
 	v=L/S;
 	Pd=1.2*v*v/2;
 	Re=v*dekv/0.000014;
 	Lambda=0.11*pow((0.1/dekv/1000+68/Re),0.25);
 	i=Pd*Lambda/dekv;
-	*pVal=i*pSq->Length/1000;
+	*pVal=i*tvsUnits::mm(pSq->Length, pSq.operator->())/1000;
 	return S_OK;
 }
 
@@ -719,6 +741,7 @@ STDMETHODIMP CComPipe::get_Elev(double  *pVal)
 	*pVal=pSq->Elev;
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -731,6 +754,8 @@ STDMETHODIMP CComPipe::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);
@@ -757,6 +782,7 @@ STDMETHODIMP CComPipe::get_ElevUp(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -769,6 +795,8 @@ STDMETHODIMP CComPipe::put_ElevUp(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_ElevUp(newVal);
@@ -795,6 +823,7 @@ STDMETHODIMP CComPipe::get_ElevDown(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -807,6 +836,8 @@ STDMETHODIMP CComPipe::put_ElevDown(double  newVal)
 	AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_ElevDown(newVal);
@@ -891,3 +922,39 @@ STDMETHODIMP CComPipe::put_ElevDown(double  newVal)
 // 
 // 	return S_OK;
 // }
+
+STDMETHODIMP CComPipe::get_SheetArea(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 0, pVal);
+}
+
+STDMETHODIMP CComPipe::get_SheetThickness(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 1, pVal);
+}
+
+STDMETHODIMP CComPipe::get_SheetMass(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_Pipe> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 2, pVal);
+}
+
+STDMETHODIMP CComPipe::ShowProperty(DISPID dispId, BOOL *show)
+{
+    if (!show) return E_POINTER;
+    if (dispId >= DISPID_SheetArea && dispId <= DISPID_SheetMass) {
+        // Automation keeps the original VARIANT accessors. OPM gets the typed
+        // dynamic properties registered by the ARX, without duplicate rows.
+        *show=FALSE;
+        return S_OK;
+    }
+    return IOPMPropertyExtensionImpl<CComPipe>::ShowProperty(dispId,show);
+}

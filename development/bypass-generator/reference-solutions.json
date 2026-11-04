@@ -1,0 +1,512 @@
+{
+  "description": "SDK-free generated and independently rechecked reference solutions; not CAD validation or minimum certificates",
+  "sourceCommit": "05252ad0bbb347b6866f4b6fbb6daf2393b54a9a",
+  "linuxRun": 41253216240,
+  "unit": "physical mm",
+  "samples": [
+    {
+      "name": "below45",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 45,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -700,
+        "windowRight": 700,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 360,
+        "s0": -635.685424949238
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "below45",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 360,
+        "s0": -635.685424949238,
+        "Wlo": 1271.370849898476,
+        "Whi": 1271.370849898476,
+        "passLo": -690,
+        "passHi": -690,
+        "gapLo": 64.99999999999656,
+        "gapHi": 65.00000000000344,
+        "calls": 1,
+        "cells": 10,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 18.956594,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "above45",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 45,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -700,
+        "windowRight": 700,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": true,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 360,
+        "s0": -635.685424949238
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "above45",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 360,
+        "s0": -635.685424949238,
+        "Wlo": 1271.370849898476,
+        "Whi": 1271.370849898476,
+        "passLo": -110,
+        "passHi": -110,
+        "gapLo": 64.99999999999716,
+        "gapHi": 65.00000000000284,
+        "calls": 1,
+        "cells": 10,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 18.681338,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "angle30",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 30,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -1100,
+        "windowRight": 1100,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 360,
+        "s0": -789.4744111674236
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "angle30",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 360,
+        "s0": -789.4744111674236,
+        "Wlo": 1578.9488223348471,
+        "Whi": 1578.9488223348471,
+        "passLo": -690,
+        "passHi": -690,
+        "gapLo": 64.99999999999642,
+        "gapHi": 65.00000000000358,
+        "calls": 1,
+        "cells": 10,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 18.861834,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "angle60",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 60,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -1100,
+        "windowRight": 1100,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 360,
+        "s0": -578.3716857408418
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "angle60",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 360,
+        "s0": -578.3716857408418,
+        "Wlo": 1156.7433714816837,
+        "Whi": 1156.7433714816837,
+        "passLo": -690,
+        "passHi": -690,
+        "gapLo": 64.99999999999693,
+        "gapHi": 65.00000000000307,
+        "calls": 1,
+        "cells": 10,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 25.360779,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "insulated",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 45,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 25,
+        "obstacleInsulation": 25,
+        "clearance": 50,
+        "windowLeft": -900,
+        "windowRight": 900,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 340,
+        "C": 460,
+        "s0": -735.685424949238
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "insulated",
+        "found": true,
+        "status": 0,
+        "D": 340,
+        "C": 460,
+        "s0": -735.685424949238,
+        "Wlo": 1471.370849898476,
+        "Whi": 1471.370849898476,
+        "passLo": -740,
+        "passHi": -740,
+        "gapLo": 64.99999999999605,
+        "gapHi": 65.00000000000395,
+        "calls": 1,
+        "cells": 10,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 18.893902,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "narrow-feasible",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 45,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -600,
+        "windowRight": 600,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 250,
+        "s0": -580.685424949238
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "narrow-feasible",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 250,
+        "s0": -580.685424949238,
+        "Wlo": 1161.370849898476,
+        "Whi": 1161.370849898476,
+        "passLo": -690,
+        "passHi": -690,
+        "gapLo": 64.99928738814582,
+        "gapHi": 65.00000000000338,
+        "calls": 1,
+        "cells": 130,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 28.106977,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "asymmetric",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 45,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -580,
+        "windowRight": 820,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 360,
+        "s0": -579
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": true,
+        "maxCheckerCalls": 64
+      },
+      "measured": {
+        "case": "asymmetric",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 360,
+        "s0": -579,
+        "Wlo": 1271.370849898476,
+        "Whi": 1271.370849898476,
+        "passLo": -690,
+        "passHi": -690,
+        "gapLo": 64.95850989558434,
+        "gapHi": 64.9594426836844,
+        "calls": 1,
+        "cells": 286,
+        "seedSolves": 1,
+        "proposals": 1,
+        "improvements": 0,
+        "elapsedMs": 42.878306,
+        "reason": "first verified feasible candidate",
+        "minimumConfirmed": false
+      }
+    },
+    {
+      "name": "bounded-improvement",
+      "input": {
+        "width": 400,
+        "height": 200,
+        "ri": 100,
+        "angleDegrees": 45,
+        "z0": -400,
+        "obstacleS": 0,
+        "obstacleZ": -400,
+        "obstacleWidth": 250,
+        "obstacleHeight": 250,
+        "insulation": 0,
+        "obstacleInsulation": 0,
+        "clearance": 50,
+        "windowLeft": -700,
+        "windowRight": 700,
+        "obstacleTmin": -1000,
+        "obstacleTmax": 1000,
+        "minimumSlope": 100,
+        "minimumBridge": 100,
+        "minimumProjection": 0.1,
+        "above": false,
+        "floor": {
+          "active": false
+        },
+        "ceiling": {
+          "active": false
+        },
+        "D": 290,
+        "C": 250,
+        "s0": -580.685424949238
+      },
+      "searchPolicy": {
+        "designReserveMm": 5,
+        "depthStepMm": 10,
+        "bridgeStepMm": 25,
+        "stopAtFirstFeasible": false,
+        "maxCheckerCalls": 12
+      },
+      "measured": {
+        "case": "bounded-improvement",
+        "found": true,
+        "status": 0,
+        "D": 290,
+        "C": 250,
+        "s0": -580.685424949238,
+        "Wlo": 1161.370849898476,
+        "Whi": 1161.370849898476,
+        "passLo": -690,
+        "passHi": -690,
+        "gapLo": 64.99928738814582,
+        "gapHi": 65.00000000000338,
+        "calls": 12,
+        "cells": 7144,
+        "seedSolves": 1,
+        "proposals": 12,
+        "improvements": 1,
+        "elapsedMs": 494.79093,
+        "reason": "checker-call budget",
+        "minimumConfirmed": false
+      }
+    }
+  ]
+}

@@ -25,11 +25,21 @@
 #pragma once
 #include "StdAfx.h"
 #include "resource.h"
+#include "BypassPreviewCommand.h"
 #include "Func.h"
+#include "CoordinateInput.h"
+#include "TVSMoveCommand.h"
+#ifdef TVS_OFFSET_PROOF
+#include "TVSTestOffset.h"
+#endif
 #include "tdbl.h"
 
 #include "dgPipeSize.h"
 #include "dgChangeZ.h"
+#include "OffsetSessionState.h"
+#include "OffsetIntegrationCommand.h"
+#include "OffsetIntegrationReactor.h"
+#include "OffsetIntegrationDiagnostics.h"
 #include "MSExcel.h"	
 #include "HeatFloor.h"
 #include "dgBlockManager.h"
@@ -45,6 +55,15 @@
 #include "TVSController.h"
 #include "MleaderController.h"
 #include "PropertyAdmin.h"
+#include "TvsLinetypes.h"
+#include "FlexCuffCommand.h"
+#include "MLeaderStyleTools.h"
+#include "TeeCommand.h"
+#include "TeeInsert.h"
+#include "MatchCommand.h"
+#include "SectionCommand.h"
+#include "LevelTooltip.h"
+#include "TransAlignCommand.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -53,6 +72,8 @@
 #include "TVSCommandAddProperties.h"
 #include "TVSCommandExcelSpecification.h"
 #include "TVSCommandSpecification.h"
+#include "TablePresentation.h"
+#include "OffsetSelectionCheck.h"
 //-----------------------------------------------------------------------------
 #define szRDS _RXST("TVS")
 #define dCONTINUE 0
@@ -77,6 +98,12 @@
 //-----------------------------------------------------------------------------
 //----- ObjectARX EntryPoint
 
+#ifdef TVS_BYPASS_PREVIEW
+// Settings.h globals are per translation unit; the live radius mode is this file's copy.
+static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.roundMode=globalRadiusTypeRound;r.typeRoundTap=globalTypeRoundTap;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
+static void tvsBypassCommandEntry(){tvsBypassCommand(tvsBypassRadiusSettings());}
+static void tvsBypassPreviewCommandEntry(){tvsBypassPreviewCommand(tvsBypassRadiusSettings());}
+#endif
 class CTVS_Ventilation_ARXApp : public AcRxArxApp {
 
 public:
@@ -90,13 +117,41 @@ public:
 		delete pdbl;
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
+		tvsLevelTooltip::start();
+		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)
+#ifdef TVS_BYPASS_PREVIEW
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija fixture testa nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_CHECK",L"TVS_BYPASS_DETAIL_CHECK",ACRX_CMD_MODAL,&tvsBypassDetailCheckCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommandEntry)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommandEntry)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand)!=Acad::eOk)
+            acutPrintf(L"\nDEV: registracija TVS_BYPASS_DETALJ nije uspjela.");
+#endif
 		PropertyAdmin::initialize();
-		// TODO: Add your initialization code here
+#ifdef TVS_OFFSET_INTEGRATION
+        acedEditor->addReactor(&offsetReactor());
+#endif
+        tvsLinetypes::ensureCurrent(); // drawing already open when the ARX is loaded
+        { const MLeaderSettings& ml = Settings::get()->mLeader; // TVS label style available to AutoCAD too
+          tvsMLeaderStyle::ensureCurrentDocument(ml.style, ml.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : ml.styleSource); }
+        // TODO: Add your initialization code here
 
 		return (retCode);
 	}
 
 	virtual AcRx::AppRetCode On_kUnloadAppMsg(void *pkt) {
+#ifdef TVS_BYPASS_PREVIEW
+        acedRegCmds->removeGroup(L"TVS_BYPASS_DEV");
+#endif
+        PropertyAdmin::uninitialize();
+        tvsLevelTooltip::stop();
+#ifdef TVS_OFFSET_INTEGRATION
+        acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
+#endif
 		// TODO: Add your code here
 
 		// You *must* call On_kUnloadAppMsg here
@@ -115,6 +170,10 @@ public:
 		MleaderController mctrl;
 		mctrl.registerApp();
 		TVSController::get()->tvsPropertyController.registerApp();
+        PropertyAdmin::initialize();
+        tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
+        { const MLeaderSettings& ml = Settings::get()->mLeader; // TVS label style available to AutoCAD too
+          tvsMLeaderStyle::ensureCurrentDocument(ml.style, ml.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : ml.styleSource); }
 
 		return (retCode);
 	}
@@ -387,13 +446,13 @@ public:
 		//Проверка
 		if (TVSClassCheck(pEnt1) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
 		if (TVSClassCheck(pEnt2) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
@@ -408,12 +467,12 @@ public:
 		AcGeLine3d line1 = AcGeLine3d(p1, p2);
 		AcGeLine3d  line2 = AcGeLine3d(p3, p4);
 		AcGeTol dop;
-		dop.setEqualPoint(0.01);
+		dop.setEqualPoint(0.01 / tvsUnits::factor());
 		int LineStatus = TVSisIntersection;
 		int SizeStatus;
-		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Параллельны")); }
-		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Линейны")); }
-		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Перпендикулярны")); }
+		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
+		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Kolinearni")); }
+		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Upravni")); }
 		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeA == pPipe2->SizeA)) SizeStatus = TVSisSameSize;
 		else SizeStatus = TVSisNoSameSize;
 		int GroseStatus = whyIsGrose(pPipe1, pPipe2);
@@ -449,6 +508,13 @@ public:
 				if (midp.distanceTo(p3) >= midp.distanceTo(p4)) point2 = p3;
 				else point2 = p4;
 			}//end findpoint2
+			// Validate before changing either duct: zero-length or collinear legs cannot form an elbow.
+            double elbowAngle = 0.0;
+            AcGeVector3d elbowStart;
+            if (!GiveStartvectorAndAngle(point1, midp, point2, elbowAngle, elbowStart)) {
+                acutPrintf(L"\nNije moguće napraviti koljeno: provjerite smjerove i krajnje tačke kanala.");
+                return false;
+            }
 			///Tap with point1 midp point2;
 
 			AcDbEntity * pEnt;
@@ -476,6 +542,7 @@ public:
 			}
 #pragma endregion
 			TVS_TAP* pTap = drawTapDirect(point1, midp, point2);
+			if (!pTap) return false;
 			SetGlobalProperty(pTap);
 			SetPropertyLikePipe(pPipe1, pTap);
 
@@ -545,13 +612,13 @@ public:
 		//Проверка
 		if (TVSClassCheck(pEnt1) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
 		if (TVSClassCheck(pEnt2) != isTVS_Pipe)
 		{
-			acutPrintf(_T("\n Выбран не тот обьект"));
+			acutPrintf(_T("\n Izabran je neodgovarajući objekat"));
 			return false;
 		}
 
@@ -566,21 +633,26 @@ public:
 		AcGeLine3d line1 = AcGeLine3d(p1, p2);
 		AcGeLine3d  line2 = AcGeLine3d(p3, p4);
 		AcGeTol dop;
-		dop.setEqualPoint(0.01);
+		dop.setEqualPoint(0.01 / tvsUnits::factor());
 		int LineStatus = TVSisIntersection;
 		int SizeStatus;
-		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Параллельны")); }
-		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Линейны")); }
-		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Перпендикулярны")); }
+		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
+		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Kolinearni")); }
+		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Upravni")); }
 		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeA == pPipe2->SizeA)) SizeStatus = TVSisSameSize;
 		else SizeStatus = TVSisNoSameSize;
 		int GroseStatus = whyIsGrose(pPipe1, pPipe2);
 		AcGePoint3d pointSelect1 = line1.closestPointTo(asPnt3d(pnt1));
 		AcGePoint3d pointSelect2 = line2.closestPointTo(asPnt3d(pnt2));
 		AcDbEntity * pEnt;
+		AcDbObjectId wyeId;
 #pragma region  line intersection
 		if (LineStatus == TVSisPerpendicular || LineStatus == TVSisIntersection)
 		{
+			int teeType = tvsTee::Straight; double teeSecond = 0;
+			if (!pPipe1->ThisRound && !pPipe2->ThisRound && pPipe1->SizeB > 0 && pPipe2->SizeB > 0
+				&& !tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor()))
+				return false;
 
 			AcGePoint3d midp, point1, point2, intersectpoint;
 
@@ -674,6 +746,7 @@ public:
 				pPipe2->This1D);
 			SetGlobalProperty(pWye);
 			SetPropertyLikePipe(pPipe2, pWye);
+			wyeId = pWye->id();
 
 
 			acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
@@ -699,6 +772,7 @@ public:
 
 
 
+			tvsTeeCommand::applyType(wyeId, teeType, teeSecond);   // faza 2: created directly as TK-O / TK-G
 		} //end if line intersection
 #pragma endregion 
 
@@ -840,7 +914,7 @@ public:
 		}
 		else
 		{
-			acutPrintf(_T("\n Обьект блокирован: невозможно копировать свойства"));
+			acutPrintf(_T("\n Objekat je zaključan: svojstva se ne mogu kopirati"));
 		}
 	}
 	static void InstallGlobalProperty(TVS_Entity *pEnt)
@@ -1002,8 +1076,9 @@ public:
 
 
 
-	static bool changesize()
+	static bool changesize(bool allowUnits = false)
 	{
+		syncTVSGlobalUnits();
 
 		//	ads_real sa,sb;
 		double a, b;
@@ -1022,6 +1097,7 @@ public:
 		// 		else globRound=false;
 
 		dgPipeSize dg;
+		dg.allowDrawingUnitsChange = allowUnits;
 		a = dg.SizeA = globSizeA;
 		b = dg.SizeB = globSizeB;
 		dg.Flow = globalFlow;
@@ -1034,8 +1110,10 @@ public:
 		dg.Wipe = globalWipeout;
 		dg.Grani = globalGrani;
 		dg.D1 = global1D;
-		dg.ElevMid = true;
-		dg.Elev = globalElevMid;
+		// Level reference is remembered; the stored value is always the axis level.
+		const double elevHalf = (globSizeB > 0 ? globSizeB : globSizeA) / 2;
+		dg.ElevUp = globalElevRef == 1; dg.ElevDown = globalElevRef == 2; dg.ElevMid = !(dg.ElevUp || dg.ElevDown);
+		dg.Elev = globalElevMid + (globalElevRef == 1 ? elevHalf : globalElevRef == 2 ? -elevHalf : 0);
 		dg.TapForm = globalTapForm;
 		dg.TypeRoundTap = globalTypeRoundTap;
 		dg.RadiusTypeRound = globalRadiusTypeRound;
@@ -1045,6 +1123,9 @@ public:
 
 		dg.WipeoutLength = globalWipeoutLength;
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
+		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
+		dg.TransVert = tvsTransAlignCmd::defaultAlign();
+		dg.TransPlan = ftTransType;
 
 		//AcApDocument *pDoc=acDocManager->curDocument();
 		//acDocManager->lockDocument(pDoc,AcAp::kWrite);
@@ -1053,19 +1134,19 @@ public:
 
 
 
-		dg.DoModal();
+		if (dg.DoModal() != IDOK) return false;
+		syncTVSGlobalUnits();
 		//acDocManager->unlockDocument(pDoc);
 		globSizeA = dg.SizeA;
 		globSizeB = dg.SizeB;
 		double fl = globalFlow = dg.Flow;
 		globalLengthTr = dg.LengthTr;
 		globalLengthW = dg.LengthW;
+		tvsTeeFit::transitionSetting() = globalLengthTr * tvsUnits::factor();   // T komad: transition at a width step
 
 		globalWipeout = dg.Wipe;
 		globalGrani = dg.Grani;
 		global1D = dg.D1;
-		globalElevMid = dg.Elev;
-		globalElev = dg.Elev;
 		globalTapForm = dg.TapForm;
 		globalTypeRoundTap = dg.TypeRoundTap;
 		globalRadiusTypeRound = dg.RadiusTypeRound;
@@ -1075,10 +1156,20 @@ public:
 
 		globalWipeoutLength = dg.WipeoutLength;
 
+		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
+		tvsTransAlignCmd::setDefault(dg.TransVert);              // poravnanje novih prelaza
+		if (dg.TransPlan >= 1 && dg.TransPlan <= 3) { ftTransType = dg.TransPlan; tvsTransAlignCmd::storePlan(ftTransType); }   // tip u tlocrtu
 		if (dg.DuctFlex == TRUE) { globalDuctType = DuctTypeFlex; globSizeB = 0; }
 		else globalDuctType = DuctTypeStill;
 		if (globSizeB == 0) globRound = true;
 		else globRound = false;
+		// Vrh/Dno: entered value is the top/bottom edge of the (new) duct size; convert to axis.
+		globalElevRef = dg.ElevUp == 1 ? 1 : dg.ElevDown == 1 ? 2 : 0;
+		{
+			const double half = (globSizeB > 0 ? globSizeB : globSizeA) / 2;
+			globalElevMid = dg.Elev - (globalElevRef == 1 ? half : globalElevRef == 2 ? -half : 0);
+			globalElev = globalElevMid;
+		}
 		if (a == globSizeA && b == globSizeB)
 			return false;
 		else
@@ -1101,7 +1192,7 @@ public:
 		bool pThisRound = globRound;
 
 		pMidPoint = t2;
-		GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect);
+		if (!GiveStartvectorAndAngle(t1, t2, t3, pSwectangle, pStartVect)) return NULL;
 		pStartVect.normalize();
 		pNormVect = AcGeVector3d(0, 0, 1);
 		TVS_TAP* pEnt = TVS_TAP::add_new(pSizeA, pSizeB, pRadius, pNormVect, pStartVect, pMidPoint, pSwectangle, false, pThisRound);
@@ -1159,6 +1250,7 @@ public:
 		vect22 = AcGeVector3d(-A3.x + A2.x,
 			-A3.y + A2.y,
 			-A3.z + A2.z);
+		if (vect1.length() == 0.0 || vect2.length() == 0.0) return;
 		vect1.normalize();
 		vect2.normalize();
 		vect22.normalize();
@@ -1168,6 +1260,7 @@ public:
 
 
 			pTap = drawTapDirect(A1, A2, A3);
+			if (!pTap) return;
 			SetGlobalProperty(pTap);
 			double delta = length2p(pTap->MA, pTap->MiddlePoint);
 			AcGePoint3d A2a = shortlength(A1, A2, delta);
@@ -1245,7 +1338,7 @@ public:
 		{
 			while (lt == false)
 			{
-				stat = acedEntSel(_T("\nВыберете воздуховод:"), vozd, pt1);
+				stat = tvsCoordinates::selectEntity(_T("\nIzaberite kanal:"), vozd, pt1);
 
 				switch (stat)
 				{
@@ -1276,7 +1369,7 @@ public:
 					}
 
 					else {
-						consoleprint(0, _T("\nОбьект заблокирован"));
+						consoleprint(0, _T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -1295,6 +1388,15 @@ public:
 	}
 
 
+#ifdef TVS_OFFSET_INTEGRATION
+    static tvsOffsetIntegration::Outcome changeZ(TVS_Pipe*& pPipe){
+        double elevation=0,angle=0;
+        tvsOffsetIntegration::Outcome result=tvsOffsetIntegration::execute(pPipe,elevation,angle);
+        if(result==tvsOffsetIntegration::Applied){globalElevMid=elevation;globalElev=elevation;globalAxis=angle;}
+        if(result==tvsOffsetIntegration::Failed)acutPrintf(L"\nTVS OFFSET: operacija nije primijenjena; stanje nastavka trase nije ažurirano.");
+        return result;
+    }
+#else
 	static bool changeZ(TVS_Pipe* &pPipe)
 	{
 		AcDbEntity * pEnt;
@@ -1347,7 +1449,7 @@ public:
 			p4 = shortlength(pPipe->FirstPoint, p2, plecho2 - dLx);
 			p5 = shortlength(pPipe->FirstPoint, p2, -dLx);
 			p6 = shortlength(pPipe->FirstPoint, p2, -dLx - plecho1);
-			p7 = shortlength(pPipe->FirstPoint, p2, -dLx - plecho1 - 300);
+			p7 = shortlength(pPipe->FirstPoint, p2, -dLx - plecho1 - 300 / tvsUnits::factor());
 
 
 			if (startZ > nextZ)
@@ -1406,6 +1508,95 @@ public:
 
 		return true;
 	}
+#endif
+	// T komad faza 2 (TVS_DRAW / TVS_PIPE option Tkomad): TK-O / TK-G placed on the duct being
+	// drawn with a preview (TeeInsert.h); the duct is extended or shortened to the inlet face,
+	// the other outlet gets a short duct, drawing continues from the chosen outlet.
+	static bool teeDuringDrawing(AcGePoint3d &A1, AcGePoint3d &A2, TVS_Pipe *&pipi, ads_point &pt1)
+	{
+		if (!pipi) return false;
+		const AcDbObjectId pipeId = pipi->objectId();
+		tvsTeeInsert::Input in;
+		{
+			AcDbObjectPointer<TVS_Pipe> p(pipeId, AcDb::kForRead);
+			if (p.openStatus() != Acad::eOk) return false;
+			if (p->ThisRound || p->SizeB <= 0) { acutPrintf(L"\nTK-O/TK-G su za pravougaone kanale."); return false; }
+			in.start = p->FirstPoint; in.end = p->LastPoint; in.A = p->SizeA; in.B = p->SizeB;
+		}
+		const double f = tvsUnits::factor();
+		in.l = tvsTeeData::collarMm() / f; in.minimum = 50 / f;
+		const int def = tvsTeeCommand::lastType() == tvsTee::Pants ? tvsTee::Pants : tvsTee::Branch;
+		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)] <%ls>: ", tvsTeeCommand::typeKeyword(def));
+		acedInitGet(0, L"Ogranak Gacasti"); ACHAR kw[32] = L"";
+		const int rc = acedGetKword(prompt, kw);
+		if (rc != RTNORM && rc != RTNONE) return false;
+		in.type = rc == RTNONE ? def : (_wcsicmp(kw, L"Gacasti") == 0 ? tvsTee::Pants : tvsTee::Branch);
+		double w1 = 0, second = 0;
+		const bool pants = in.type == tvsTee::Pants;
+		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina desnog ogranka, mm" : L"\nSirina ogranka, mm", in.A * f, w1)) return false;
+		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina lijevog ogranka, mm" : L"\nSirina izlaza prolaza C, mm", (pants ? w1 / f : in.A) * f, second)) return false;
+		in.w1 = w1 / f; in.second = second / f;
+		if (pants && !tvsTee::pantsFeasible(in.A, in.w1, in.second, in.l)) {
+			acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).", in.A * f);
+			return false;
+		}
+		tvsTeeInsert::Plan plan;
+		for (;;) {
+			tvsTeeInsert::Jig jig(in);
+			if (jig.drag() != AcEdJig::kNormal) return false;
+			if (jig.valid()) { plan = jig.result(); break; }
+			acutPrintf(L"\nT komad se ne moze postaviti na tom mjestu.");
+		}
+		// duct up to the inlet face
+		{
+			AcDbObjectPointer<TVS_Pipe> p(pipeId, AcDb::kForWrite);
+			if (p.openStatus() != Acad::eOk || p->put_Lastpoint(plan.face) != Acad::eOk) { acutPrintf(L"\nKanal nije prilagodjen; T komad nije umetnut."); return false; }
+			p->recordGraphicsModified();
+		}
+		double sApr = plan.SizeApr, sBpr = in.B, sAotv = plan.SizeAotv, sBotv = in.B, len = plan.LengthPl;
+		AcGeVector3d vpr = plan.Vectpr, votv = plan.Vectotv; AcGePoint3d base = plan.Basepoint;
+		TVS_WYE* pWye = TVS_WYE::add_new(sApr, sBpr, sAotv, sBotv, len, vpr, votv, base, false, false, pipi->This1D);
+		if (!pWye) return false;
+		const AcDbObjectId wyeId = pWye->id();
+		SetGlobalProperty(pWye);
+		SetPropertyLikePipe(pipi, pWye);
+		{
+			AcDbObjectPointer<TVS_WYE> w(wyeId, AcDb::kForWrite);
+			if (w.openStatus() == Acad::eOk) {
+				tvsTeeData::Record r; r.type = in.type; r.l = in.l; r.second = pants ? plan.tee.w2 : plan.tee.C;
+				r.radius2 = pants ? tvsTee::defaultRadius(r.second) : 0;
+				if (tvsTeeData::write(w.object(), r) == Acad::eOk) w->recordGraphicsModified();
+			}
+		}
+		tvsTeeCommand::lastType() = in.type;
+		// continuation
+		acedInitGet(0, pants ? L"Desni Lijevi" : L"Prolaz Ogranak"); ACHAR nk[32] = L"";
+		const int nrc = acedGetKword(pants ? L"\nNastavak crtanja [Desni/Lijevi] <Desni>: " : L"\nNastavak crtanja [Prolaz/Ogranak] <Prolaz>: ", nk);
+		int cont = 0;
+		if (nrc == RTNORM && (_wcsicmp(nk, L"Lijevi") == 0 || _wcsicmp(nk, L"Ogranak") == 0)) cont = 1;
+		TVS_Pipe pipie;
+		const int other = 1 - cont;
+		{	// short duct on the other outlet, to be continued later
+			AcGePoint3d s0 = plan.port[other], s1 = s0 + plan.portDir[other] * (300 / f);
+			double wa = plan.portWidth[other], wb = in.B;
+			TVS_Pipe* stub = pipie.add_new(s0, s1, wa, wb, false, false);
+			if (stub) { const AcDbObjectId sid = stub->id(); SetPropertyLikePipe(pipi, stub);
+				AcDbObjectPointer<TVS_Pipe> s(sid, AcDb::kForWrite); if (s.openStatus() == Acad::eOk) s->put_SizeA(plan.portWidth[other]); }
+		}
+		AcGePoint3d c0 = plan.port[cont], c1 = c0 + plan.portDir[cont] * (100 / f);
+		double ca = plan.portWidth[cont], cb = in.B;
+		TVS_Pipe* next = pipie.add_new(c0, c1, ca, cb, false, false);
+		if (!next) return true;
+		const AcDbObjectId nid = next->id();
+		SetPropertyLikePipe(pipi, next);
+		{ AcDbObjectPointer<TVS_Pipe> s(nid, AcDb::kForWrite); if (s.openStatus() == Acad::eOk) s->put_SizeA(ca); }
+		globSizeA = ca;   // drawing goes on with the outlet width
+		pipi = next; A1 = c0; A2 = c1;
+		pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
+		acutPrintf(L"\n%ls umetnut; crtanje se nastavlja iz %ls.", pants ? L"Gacasti T komad TK-G" : L"T komad sa ogrankom TK-O",
+			pants ? (cont ? L"lijevog ogranka" : L"desnog ogranka") : (cont ? L"ogranka" : L"prolaza"));
+		return true;
+	}
 	static void addtrans(double &pSizeAp1,
 		double &pSizeBp1,
 		double &pSizeAp2,
@@ -1449,11 +1640,35 @@ public:
 			pThisRoundp2,
 			pTransType,
 			pThis1D);
+		const double axisBefore = pipi->Elev;   // axis of the duct before the transition (its start)
 		SetGlobalProperty(transie);
+		{	// poravnanje po visini (TVS_SETTINGS): the transition starts at the axis of the duct
+			// before it; the duct after it continues at that axis + the end offset of the alignment
+			// (osa: same axis), whatever the elevation reference (Vrh / Centar / Dno) of the dialog.
+			const int align = tvsTransAlignCmd::defaultAlign();
+			AcDbObjectPointer<TVS_TRANS> t(transie->objectId(), AcDb::kForWrite);
+			if (t.openStatus() == Acad::eOk) {
+				t->put_Elevation(axisBefore);
+				if (align != tvsTransAlign::Axis) tvsTransAlign::write(t.object(), align);
+				t->recordGraphicsModified();
+			}
+			globalElevMid = axisBefore + tvsTransAlign::endOffset(align, pSizeAp1, pSizeBp1, pSizeAp2, pSizeBp2);
+			globalElev = globalElevMid;
+		}
 		pFirstPoint = AcGePoint3d(pFirstPoint.x + pLengthTr*Vect.x,
 			pFirstPoint.y + pLengthTr*Vect.y,
 			pFirstPoint.z + pLengthTr*Vect.z
 		);
+		{	// tip u tlocrtu 2 / 3 (ravno uz desnu / lijevu ivicu): the outlet axis is shifted sideways,
+			// as TVS_TRANS draws it (right = (Vect.y, -Vect.x)); the next duct starts there
+			AcGeVector3d right(Vect.y, -Vect.x, 0);
+			if (right.length() > 1e-12) {
+				right.normalize();
+				const double s = (pSizeAp1 - pSizeAp2) / 2;
+				if (pTransType == 2) pFirstPoint += right * s;
+				else if (pTransType == 3) pFirstPoint -= right * s;
+			}
+		}
 		AcGePoint3d pLastPoint = AcGePoint3d(pFirstPoint.x + 100 * Vect.x,
 			pFirstPoint.y + 100 * Vect.y,
 			pFirstPoint.z + 100 * Vect.z
@@ -1468,7 +1683,7 @@ public:
 			pThis1d,
 			pThisRoundp2);
 		SetGlobalProperty(pipi);
-		A1 = A2;
+		A1 = pFirstPoint;   // direction of the new duct (outlet may be shifted sideways): next point continues it
 		A2 = pLastPoint;
 		pt1[0] = A2.x;
 		pt1[1] = A2.y;
@@ -1479,12 +1694,14 @@ public:
 	static void Ventilation_ARXTVS_SETTINGS(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
-		changesize();
+		syncTVSGlobalUnits();
+		changesize(true);
 	}
 
 	static void Ventilation_ARXTVS_DRAW(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		int index;
 		AcDbObjectId id;
 		TVS_Pipe::GetParamsForDraw(id, index);
@@ -1553,8 +1770,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р h"));
-			Astat = acedGetPoint(NULL, _T("\nУкажите первую точку или [Размер]:"), pt1);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = tvsCoordinates::getPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1565,7 +1782,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1591,8 +1808,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р "));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1603,7 +1820,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1633,7 +1850,7 @@ public:
 		}
 		else
 		{
-			acutPrintf(_T("\nСлой блокирован"));
+			acutPrintf(_T("\nSloj je zaključan"));
 			return false;
 		}
 
@@ -1665,8 +1882,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Размер Р h соедОтвод о j соедТройник n т Z z я вВерх d в вНиз н y"));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер/соедОтвод/соедТройник/Z/вВерх/вНиз]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Tkomad T Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Tkomad/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1682,7 +1899,7 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				oldsizeA = globSizeA;
@@ -1695,7 +1912,7 @@ public:
 				Astat2 = false;
 				acdbRToS(0, 2, 2, resultss);
 			}
-			if ((wcscmp(resultss, _T("соедОтвод")) == 0) || (wcscmp(resultss, _T("j")) == 0) || (wcscmp(resultss, _T("о")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Koljeno")) == 0 || _wcsicmp(resultss, _T("K")) == 0))
 			{
 				reg = dCONNECTT;
 				connect2(pipi, reg);
@@ -1703,33 +1920,58 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("соедТройник")) == 0) || (wcscmp(resultss, _T("т")) == 0) || (wcscmp(resultss, _T("n")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Račva")) == 0 || _wcsicmp(resultss, _T("R")) == 0))
 			{
 				reg = dCONNECTW;
 				connect2(pipi, reg);
 				return false;
 			}
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Tkomad")) == 0 || _wcsicmp(resultss, _T("T")) == 0))
+			{
+				teeDuringDrawing(A1, A2, pipi, pt1);   // faza 2: TK-O / TK-G in the duct being drawn
+			}
 
-			if ((wcscmp(resultss, _T("Z")) == 0) || (wcscmp(resultss, _T("z")) == 0) || (wcscmp(resultss, _T("я")) == 0))
+#ifdef TVS_BYPASS_PREVIEW
+            if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
+                TVSBypassOutput result;
+                if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings())){
+                    // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
+                    // loop keeps carrying a pointer, so pipi still takes the committed object.
+                    AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
+                    if(next.openStatus()==Acad::eOk){A1=next->FirstPoint;A2=next->LastPoint;}
+                    else{A1=result.pipe->FirstPoint;A2=result.pipe->LastPoint;}
+                    pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+            }
+#endif
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
+#ifdef TVS_OFFSET_INTEGRATION
+                if(changeZ(pipi)==tvsOffsetIntegration::Applied){
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+#else
 				changeZ(pipi);
 				A1 = A2;
 				A2 = pipi->LastPoint;
 				pt1[0] = A2.x;
 				pt1[1] = A2.y;
 				pt1[2] = A2.z;
+#endif
 				acdbRToS(0, 2, 2, resultss);
 			}
 
-			if ((wcscmp(resultss, _T("вВерх")) == 0) || (wcscmp(resultss, _T("в")) == 0) || (wcscmp(resultss, _T("d")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Gore")) == 0 || _wcsicmp(resultss, _T("G")) == 0))
 			{
 				reg = dUP;
 				UpDown(pipi, Form_Up);
 				return false;
 			}
 
-			if ((wcscmp(resultss, _T("вНиз")) == 0) || (wcscmp(resultss, _T("н")) == 0) || (wcscmp(resultss, _T("y")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Nadolje")) == 0 || _wcsicmp(resultss, _T("N")) == 0))
 			{
 				reg = dDOWN;
 				UpDown(pipi, Form_Down);
@@ -1739,11 +1981,82 @@ public:
 		}
 
 	}
+#ifdef TVS_OFFSET_PROOF
+#ifdef TVS_OFFSET_INTEGRATION
+    static void Ventilation_ARXTVS_OFFSET(){tvsOffsetIntegration::standalone();}
+    static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeci potvrdeni offset/Z prekida transakciju poslije podataka i kraja izvora.");}
+    static void Ventilation_ARXTVS_OFFSET_STATUS(){tvsOffsetDiagnostics::status();}
+    static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
+    static void Ventilation_ARXTVS_OFFSET_TEST_BAD(){tvsOffsetDiagnostics::corruptTest();}
+#endif
+    static void Ventilation_ARXTVS_TEST_OFFSET(){tvsOffsetProof::create();}
+    static void Ventilation_ARXTVS_TEST_OFFSET_CHECK(){tvsOffsetProof::check();}
+    static void Ventilation_ARXTVS_TEST_OFFSET_FAIL(){tvsOffsetProof::create(true);}
+#endif
+    // Flex hose cuffs: marks ends that do not continue into flex (display + specification).
+    static void Ventilation_ARXTVS_FLEX_MANZETNE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsFlexCuffCommand::run();
+    }
+    // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
+    // TVS_PRELAZ_KOTA: transition alignment by height; asks which side of the network stays.
+    static void Ventilation_ARXTVS_PRELAZ_KOTA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsTransAlignCmd::run();
+    }
+    // TVS_KOTE: on-screen elevation labels on/off (LevelLabels.h, not plotted).
+    static void Ventilation_ARXTVS_KOTE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsLevelTooltip::toggleLabels();
+    }
+    // TVS_PRESJEK: poprecni presjek of the TVS network (SectionCommand.h).
+    static void Ventilation_ARXTVS_PRESJEK(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsSectionCmd::run();
+    }
+    // TVS_MATCH: TVS properties of a source duct onto selected elements (MatchCommand.h).
+    static void Ventilation_ARXTVS_MATCH(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsMatch::run();
+    }
+    static void Ventilation_ARXTVS_TK_TIP(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsTeeCommand::setType();
+    }
+    static void Ventilation_ARXTVS_FLEX_MANZETNA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsFlexCuffCommand::toggle();
+    }
+    static void Ventilation_ARXTVS_STRETCH(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsMove::executeStretch();
+    }
+    // Connected editing is modal so one command owns the complete undo operation.
+    static void Ventilation_ARXTVS_MOVE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsMove::execute();
+    }
+
 	// ----- Ventilation_ARX.TVS_PIPE command
 	static void Ventilation_ARXTVS_PIPE(void)
 	{
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 
 		ads_point pt1, pt2;
 		int reg;
@@ -1756,8 +2069,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р h"));
-			Astat = acedGetPoint(NULL, _T("\nУкажите первую точку или [Размер]:"), pt1);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = tvsCoordinates::getPoint(NULL, _T("\nZadajte prvu tačku ili [Dimenzija]: "), pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1768,7 +2081,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1785,8 +2098,8 @@ public:
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Размер Р "));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1797,7 +2110,7 @@ public:
 				break;
 			}
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				changesize();
@@ -1826,7 +2139,7 @@ public:
 		}
 		else
 		{
-			acutPrintf(_T("\nСлой блокирован"));
+			acutPrintf(_T("\nSloj je zaključan"));
 			return;
 		}
 
@@ -1843,8 +2156,8 @@ public:
 		{
 
 
-			acedInitGet(RSG_NONULL, _T("Размер Р h соедОтвод о j соедТройник n т Z z я вВерх d в вНиз н y"));
-			Astat = acedGetPoint(pt1, _T("\nУкажите следующую точку или [Размер/соедОтвод/соедТройник/Z/вВерх/вНиз]:"), pt2);
+			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Tkomad T Z Gore G Nadolje N Obilazak O"));
+			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Tkomad/Z/Gore/Nadolje/Obilazak]: "), pt2);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -1860,7 +2173,7 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("Размер")) == 0) || (wcscmp(resultss, _T("Р")) == 0) || (wcscmp(resultss, _T("h")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
 			{
 				reg = dSIZE;
 				oldsizeA = globSizeA;
@@ -1873,7 +2186,7 @@ public:
 				Astat2 = false;
 				acdbRToS(0, 2, 2, resultss);
 			}
-			if ((wcscmp(resultss, _T("соедОтвод")) == 0) || (wcscmp(resultss, _T("j")) == 0) || (wcscmp(resultss, _T("о")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Koljeno")) == 0 || _wcsicmp(resultss, _T("K")) == 0))
 			{
 				reg = dCONNECTT;
 				connect2(pipi, reg);
@@ -1881,33 +2194,58 @@ public:
 			}
 
 
-			if ((wcscmp(resultss, _T("соедТройник")) == 0) || (wcscmp(resultss, _T("т")) == 0) || (wcscmp(resultss, _T("n")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Račva")) == 0 || _wcsicmp(resultss, _T("R")) == 0))
 			{
 				reg = dCONNECTW;
 				connect2(pipi, reg);
 				return;
 			}
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Tkomad")) == 0 || _wcsicmp(resultss, _T("T")) == 0))
+			{
+				teeDuringDrawing(A1, A2, pipi, pt1);   // faza 2: TK-O / TK-G in the duct being drawn
+			}
 
-			if ((wcscmp(resultss, _T("Z")) == 0) || (wcscmp(resultss, _T("z")) == 0) || (wcscmp(resultss, _T("я")) == 0))
+#ifdef TVS_BYPASS_PREVIEW
+            if(Astat==RTKWORD&&(_wcsicmp(resultss,L"Obilazak")==0||_wcsicmp(resultss,L"O")==0)){
+                TVSBypassOutput result;
+                if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings())){
+                    // Endpoints from a short read-open of the new outlet by ObjectId; the legacy
+                    // loop keeps carrying a pointer, so pipi still takes the committed object.
+                    AcDbObjectPointer<TVS_Pipe> next(result.id,AcDb::kForRead);
+                    if(next.openStatus()==Acad::eOk){A1=next->FirstPoint;A2=next->LastPoint;}
+                    else{A1=result.pipe->FirstPoint;A2=result.pipe->LastPoint;}
+                    pipi=result.pipe;globalElevMid=result.elevation;globalElev=result.elevation;globalAxis=result.angle;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+            }
+#endif
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Z")) == 0))
 			{
 				reg = dZ;
+#ifdef TVS_OFFSET_INTEGRATION
+                if(changeZ(pipi)==tvsOffsetIntegration::Applied){
+                    A1=pipi->FirstPoint;A2=pipi->LastPoint;
+                    pt1[0]=A2.x;pt1[1]=A2.y;pt1[2]=A2.z;
+                }
+#else
 				changeZ(pipi);
 				A1 = A2;
 				A2 = pipi->LastPoint;
 				pt1[0] = A2.x;
 				pt1[1] = A2.y;
 				pt1[2] = A2.z;
+#endif
 				acdbRToS(0, 2, 2, resultss);
 			}
 
-			if ((wcscmp(resultss, _T("вВерх")) == 0) || (wcscmp(resultss, _T("в")) == 0) || (wcscmp(resultss, _T("d")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Gore")) == 0 || _wcsicmp(resultss, _T("G")) == 0))
 			{
 				reg = dUP;
 				UpDown(pipi, Form_Up);
 				return;
 			}
 
-			if ((wcscmp(resultss, _T("вНиз")) == 0) || (wcscmp(resultss, _T("н")) == 0) || (wcscmp(resultss, _T("y")) == 0))
+			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Nadolje")) == 0 || _wcsicmp(resultss, _T("N")) == 0))
 			{
 				reg = dDOWN;
 				UpDown(pipi, Form_Down);
@@ -1928,12 +2266,13 @@ public:
 	static void Ventilation_ARXTVS_TRANS(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_point pt1, pt2;
-		double pSizeAp1 = 500;
-		double pSizeBp1 = 0;
-		double pSizeAp2 = 300;
-		double pSizeBp2 = 0;
-		double pLengthTr = 300;
+		double pSizeAp1 = 500 / tvsUnits::factor();
+		double pSizeBp1 = 0 / tvsUnits::factor();
+		double pSizeAp2 = 300 / tvsUnits::factor();
+		double pSizeBp2 = 0 / tvsUnits::factor();
+		double pLengthTr = 300 / tvsUnits::factor();
 		AcGeVector3d pVectTr = AcGeVector3d(1, 1, 0);
 		AcGePoint3d pFirstPoint;
 		AcGePoint3d pLastPoint;
@@ -1944,9 +2283,9 @@ public:
 		bool pThis1D = false;
 		TVS_TRANS transie;
 
-		if (acedGetPoint(NULL, _T("Set the first point:\n"), pt1) != RTNORM)
+		if (tvsCoordinates::getPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
 			return;
-		if (acedGetPoint(pt1, _T("Set the second point:\n"), pt2) != RTNORM)
+		if (tvsCoordinates::getPoint(pt1, _T("Set the second point:\n"), pt2) != RTNORM)
 			return;
 		pFirstPoint = asPnt3d(pt1);
 		pLastPoint = asPnt3d(pt2);
@@ -1976,14 +2315,15 @@ public:
 	static void Ventilation_ARXTVS_WYE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_point pt1;
 		TVS_WYE wyeie;
 		ads_real aSizeAotv, aSizeApr;
-		double pSizeApr = 200;
-		double pSizeBpr = 0;
-		double pSizeAotv = 100;
-		double pSizeBotv = 0;
-		double pLengthPl = 150;
+		double pSizeApr = 200 / tvsUnits::factor();
+		double pSizeBpr = 0 / tvsUnits::factor();
+		double pSizeAotv = 100 / tvsUnits::factor();
+		double pSizeBotv = 0 / tvsUnits::factor();
+		double pLengthPl = 150 / tvsUnits::factor();
 		AcGeVector3d pVectpr = AcGeVector3d(1, 0, 0);
 		AcGeVector3d pVectotv = AcGeVector3d(0, 1, 0);
 		AcGePoint3d pBasepoint;
@@ -1991,14 +2331,14 @@ public:
 		bool pThisRoundotv = true;
 		bool pThis1D = false;
 
-		if (acedGetPoint(NULL, _T("Set the first point:\n"), pt1) != RTNORM)
+		if (tvsCoordinates::getPoint(NULL, _T("Zadajte prvu tačku:\n"), pt1) != RTNORM)
 			return;
-		if (acedGetReal(_T("\nВведите ширину прохода: "), &aSizeApr) != RTNORM)
+		if (acedGetReal(_T("\nUnesite širinu glavnog kanala: "), &aSizeApr) != RTNORM)
 			return;
-		pSizeApr = aSizeApr;
-		if (acedGetReal(_T("\nВведите ширину ответвления: "), &aSizeAotv) != RTNORM)
+		pSizeApr = aSizeApr / tvsUnits::factor();
+		if (acedGetReal(_T("\nUnesite širinu ogranka: "), &aSizeAotv) != RTNORM)
 			return;
-		pSizeAotv = aSizeAotv;
+		pSizeAotv = aSizeAotv / tvsUnits::factor();
 
 		pBasepoint = asPnt3d(pt1);
 		wyeie.add_new(pSizeApr,
@@ -2052,6 +2392,7 @@ public:
 	static void Ventilation_ARXTVS_CONNECTW(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -2070,7 +2411,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете 1-ый воздуховод:"), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2093,7 +2434,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2107,7 +2448,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nВыберете 2-ый воздуховод:"), vozd2, pt2) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id, vozd2) == eOk)
@@ -2128,7 +2469,7 @@ public:
 							}
 							else
 							{
-								acutPrintf(_T("\nВыбоан тот же воздуховод"));
+								acutPrintf(_T("\nIzabran je isti kanal"));
 
 							}
 
@@ -2136,7 +2477,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2157,6 +2498,7 @@ public:
 	static void Ventilation_ARXTVS_CONNECTT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -2175,7 +2517,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете 1-ый воздуховод:"), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2198,7 +2540,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2212,7 +2554,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nВыберете 2-ый воздуховод:"), vozd2, pt2) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id, vozd2) == eOk)
@@ -2233,7 +2575,7 @@ public:
 							}
 							else
 							{
-								acutPrintf(_T("\nВыбоан тот же воздуховод"));
+								acutPrintf(_T("\nIzabran je isti kanal"));
 
 							}
 
@@ -2241,7 +2583,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2262,6 +2604,7 @@ public:
 	static void Ventilation_ARXTVS_CONNECTTest(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -2280,7 +2623,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете 1-ый воздуховод:"), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite prvi kanal: "), vozd1, pt1) == RTCAN)
 				return;
 
 
@@ -2304,7 +2647,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2318,7 +2661,7 @@ public:
 		ft = false;
 		while (ft == false)
 		{
-			if (acedEntSel(_T("\nВыберете 2-ый воздуховод:"), vozd2, pt2) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite drugi kanal: "), vozd2, pt2) == RTCAN)
 				return;
 
 			if (acdbGetObjectId(id2, vozd2) == eOk)
@@ -2339,7 +2682,7 @@ public:
 							}
 							else
 							{
-								acutPrintf(_T("\nВыбоан тот же воздуховод"));
+								acutPrintf(_T("\nIzabran je isti kanal"));
 
 							}
 
@@ -2347,7 +2690,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 						return;
 					}
@@ -2387,6 +2730,7 @@ public:
 	static void Ventilation_ARXTVS_DUCT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 
 		// Add your code for command TVSTVS_Vent_ARX.MyCommand1 here
 
@@ -2400,28 +2744,28 @@ public:
 		ads_real sa, sb;
 		AcDbObjectId id = AcDbObjectId::kNull;
 		ads_name eName;
-		double pSizeA = 250, pSizeB = 0, X1, X2, Y1, Y2, pSwectangle, radius = 150, tapradius;
+		double pSizeA = 250, pSizeB = 0, X1, X2, Y1, Y2, pSwectangle, radius = 150 / tvsUnits::factor(), tapradius;
 		AcGePoint3d A1, A2, A3, pCenterpoint, lastpipi;
 		AcGeVector3d pnormvect, pstartvect;
 		bool pThisRound = false;
 
-		if (acedGetReal(_T("\nВведите ширину:"), &sa) != RTNORM)
+		if (acedGetReal(_T("\nUnesite širinu: "), &sa) != RTNORM)
 		{
 			return;
 		}
-		if (acedGetReal(_T("\nВведите высоту:"), &sb) != RTNORM)
+		if (acedGetReal(_T("\nUnesite visinu: "), &sb) != RTNORM)
 		{
 			return;
 		}
-		pSizeA = sa;
-		pSizeB = sb;
+		pSizeA = sa / tvsUnits::factor();
+		pSizeB = sb / tvsUnits::factor();
 
 
 
-		if (acedGetPoint(NULL, _T("\nУкажите первую точку: "), pt1) != RTNORM)
+		if (tvsCoordinates::getPoint(NULL, _T("\nZadajte prvu tačku: "), pt1) != RTNORM)
 			return;
 		A1 = asPnt3d(pt1);
-		if (acedGetPoint(pt1, _T("\nУкажите следующую точку: "), pt2) != RTNORM)
+		if (tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
 			return;
 		A2 = asPnt3d(pt2);
 		pipi = pipie.add_new(A1, A2, pSizeA, pSizeB, false, pThisRound);
@@ -2435,12 +2779,12 @@ public:
 		///////////
 		for (; ;)
 		{
-			if (acedGetPoint(pt1, _T("\nУкажите следующую точку: "), pt2) != RTNORM)
+			if (tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku: "), pt2) != RTNORM)
 				return;
 			A3 = asPnt3d(pt2);
 			if (pThisRound == true)
 			{
-				if (pSizeA < 355)
+				if (pSizeA * tvsUnits::factor() < 355)
 				{
 					tapradius = pSizeA + pSizeA / 2;
 					radius = pSizeA;
@@ -2505,6 +2849,7 @@ public:
 	{
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 
 		ads_name sset, eName;
 		ACHAR  resultss[512];
@@ -2527,7 +2872,7 @@ public:
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
 		acedInitGet(RSG_NOZERO, _T("1 2 1d 2d"));
-		if (acedGetKword(_T("\nПреобразовать в [1d/2d]<2d>:"), resultss) != RTNORM)
+		if (acedGetKword(_T("\nPretvorite u [1d/2d]<2d>: "), resultss) != RTNORM)
 			return;
 
 		if (wcscmp(resultss, results1) == 0 || wcscmp(resultss, results2) == 0)
@@ -2606,1774 +2951,10 @@ public:
 
 	// - Ventilation_ARX.TVS_SPEC command (do not rename)
 	static void Ventilation_ARXTVS_SpecificationOld(void)
-	{
-		if (ActivationErrorMessage() != pError_Ok) return;
-		ads_name sset, eName;
-		AcGeDoubleArray PipPar;
-		AcGeDoubleArray PipArr;
-		AcGeDoubleArray PipArrRound;
-		AcGeDoubleArray PipArrRect;
-		AcArray <SPEC> VRnd;
-		AcArray <SPEC> VRct;
-		AcArray <SPEC> TRct;
-		AcArray <SPEC> TRnd;
-
-		AcArray <SPEC> WPRctORct;
-		AcArray <SPEC> WPRctORnd;
-		AcArray <SPEC> WPRndORct;
-		AcArray <SPEC> WPRndORnd;
-
-
-		AcArray <SPEC> TRctRct;
-		AcArray <SPEC> TRndRct;
-		AcArray <SPEC> TRndRnd;
-		double sA, sB, sWa, sA2, sB2, drad, prad, prad2;
-
-
-		SPEC spc;
-		PipPar.setLogicalLength(3);
-		ads_point pt1, pt2;
-		ads_real sise = 0;
-		AcDbEntity *pEnt = NULL;
-		AcDbObjectId id;
-		TVS_Pipe * Pipi;
-		TVS_TAP * Tapie;
-		TVS_WYE* Wyeie;
-		TVS_TRANS * Transie;
-
-		double NewSiseA;
-		bool p1d;
-		resbuf *rb = NULL;
-
-		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
-			return;
-
-		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
-		if (acedGetPoint(NULL, _T("\nУкажите точку вставки спецификации:"), pt1) != RTNORM)
-			return;
-		pb = asPnt3d(pt1);
-		Int32 len = 0;
-
-		acedSSLength(sset, &len);
-		//consoleprint(double(len),_T("\nL: "));
-		for (long i = 0; i < len; i++)
-		{
-
-
-			if (NULL != (acedSSName(sset, i, eName)))
-			{
-
-				//consoleprint(double(i),_T("\nd"));
-
-
-				acdbGetObjectId(id, eName);
-				if (id != AcDbObjectId::kNull)
-				{
-					acdbOpenAcDbEntity(pEnt, id, AcDb::kForRead);
-					if ((Pipi = TVS_Pipe::cast(pEnt)) != NULL)
-					{
-						if (Pipi->ThisRound == true)
-						{
-							if (Pipi->SizeA > Pipi->SizeB)
-							{
-								sA = Pipi->SizeA;
-								sB = Pipi->SizeB;
-							}
-							else
-							{
-								sA = Pipi->SizeB;
-								sB = Pipi->SizeA;
-							}
-							spc.add(sA,
-								sB,
-								true,
-								Pipi->Length);
-							VRnd.append(spc);
-						}
-						else
-						{
-							if (Pipi->SizeA > Pipi->SizeB)
-							{
-								sA = Pipi->SizeA;
-								sB = Pipi->SizeB;
-							}
-							else
-							{
-								sA = Pipi->SizeB;
-								sB = Pipi->SizeA;
-							}
-
-							spc.add(sA,
-								sB,
-								false,
-								Pipi->Length);
-							VRct.append(spc);
-						}
-
-
-
-
-					}
-
-					if ((Tapie = TVS_TAP::cast(pEnt)) != NULL)
-					{
-
-						if (Tapie->ThisRound == true)
-						{
-
-
-							sA = Tapie->SizeA;
-							sB = Tapie->SizeB;
-							sWa = 5 * floor((Tapie->Swectangle + (2 * M_PI / 180)) / 5 * 180 / M_PI);
-							//consoleprint(sWa,_T("\nSWA:"));
-							//consoleprint(Tapie->Swectangle,_T("\nTapie->Swectangle:"));
-							spc.add(sA,
-								sB,
-								true,
-								1,
-								sWa);
-
-							if (Tapie->Swectangle > (M_PI / 4 + 0.01))
-
-
-								spc.Length2 = M_PI*(length2p(Tapie->pMass[0], Tapie->pMass[1]) * 2 + length2p(Tapie->pMass[5], Tapie->pMass[6]))*Tapie->SizeA / 1000000;
-
-
-							else
-
-								spc.Length2 = M_PI*(length2p(Tapie->pMass45[0], Tapie->pMass45[1]) + length2p(Tapie->pMass45[3], Tapie->pMass45[4]))*Tapie->SizeA / 1000000;
-
-							TRnd.append(spc);
-						}
-						else
-						{
-
-							sA = Tapie->SizeA;
-							sB = Tapie->SizeB;
-
-							sWa = 5 * floor(((Tapie->Swectangle) + (2 * M_PI / 180)) / 5 * 180 / M_PI);
-							//consoleprint(sWa,_T("\nSWA:"));
-							//consoleprint(Tapie->Swectangle,_T("\nTapie->Swectangle:"));
-							//consoleprint((180*M_PI/100),_T("\n(180*M_PI/100):"));
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								sWa);
-
-							spc.Length2 = (Tapie->Swectangle) / (2 * M_PI)
-								*(2 * (M_PI*(Tapie->Radius + Tapie->SizeA)*(Tapie->Radius + Tapie->SizeA) / 1000000
-									- M_PI*(Tapie->Radius)*(Tapie->Radius) / 1000000)
-									+ 2 * M_PI*(Tapie->SizeA + Tapie->Radius) / 1000 * Tapie->SizeB / 1000
-									+ 2 * M_PI*(Tapie->Radius) / 1000 * Tapie->SizeB / 1000);
-							//  							consoleprint(spc.Length2,_T("\nspc.Length2"));
-							//  							consoleprint((Tapie->Swectangle)/(2*M_PI),_T("\n(Tapie->Swectangle)/(2*M_PI)"));
-							//  							consoleprint(M_PI*(Tapie->Radius+Tapie->SizeA)*(Tapie->Radius+Tapie->SizeA)/4000000,_T("\nM_PI*(Tapie->Radius+Tapie->SizeA)*(Tapie->Radius+Tapie->SizeA)/4000000 "));
-							//  							consoleprint(M_PI*(Tapie->Radius)*(Tapie->Radius)/4000000 ,_T("\nM_PI*(Tapie->Radius)*(Tapie->Radius)/4000000 "));
-							//  							consoleprint(M_PI*(Tapie->SizeA+Tapie->Radius)/1000*Tapie->SizeB/1000,_T("\nM_PI*(Tapie->SizeA+Tapie->Radius)/1000*Tapie->SizeB/1000 "));
-							//  							consoleprint(M_PI*(Tapie->Radius)/1000*Tapie->SizeB/1000,_T("\nM_PI*(Tapie->Radius)/1000*Tapie->SizeB/1000 "));
-							// 
-
-							TRct.append(spc);
-						}
-
-					}
-
-					if ((Wyeie = TVS_WYE::cast(pEnt)) != NULL)
-					{
-
-						sA = Wyeie->SizeApr;
-						sB = Wyeie->SizeBpr;
-						sA2 = Wyeie->SizeAotv;
-						sB2 = Wyeie->SizeBotv;
-
-
-						if ((Wyeie->ThisRoundpr == true) && (Wyeie->ThisRoundotv == true))
-						{
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Wyeie->LengthPl,
-								sA2,
-								sB2);
-							if (sA >= sA2)
-							{
-								drad = sA / 2 - sqrt((sA / 2)*(sA / 2) - (sA2 / 2)*(sA2 / 2));
-
-							}
-							else
-								drad = sA / 2;
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*M_PI*sA / 1000000 ///цилиндр прохода
-								+ (Wyeie->LengthPl + drad)*M_PI*sA2 / 1000000;  ///цилиндр отвода
-							WPRndORnd.append(spc);
-						}
-
-						if ((Wyeie->ThisRoundpr == true) && (Wyeie->ThisRoundotv == false))
-						{
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Wyeie->LengthPl,
-								sA2,
-								sB2);
-
-							if (sA >= sB2)
-							{
-								drad = sA / 2 - sqrt((sA / 2)*(sA / 2) - (sB2 / 2)*(sB2 / 2));
-
-							}
-							else
-								drad = sA / 2;
-
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*M_PI*sA / 1000000 ///цилиндр прохода
-								+ (Wyeie->LengthPl + drad)*(sB2 + sA2) / 500000;   ///призма отвода
-							WPRndORct.append(spc);
-						}
-
-						if ((Wyeie->ThisRoundpr == false) && (Wyeie->ThisRoundotv == false))
-						{
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Wyeie->LengthPl,
-								sA2,
-								sB2);
-
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*(sB + sA) / 500000 ///призма прохода
-								+ (Wyeie->LengthPl)*(sB2 + sA2) / 500000;   ///призма отвода
-							WPRctORct.append(spc);
-						}
-
-						if ((Wyeie->ThisRoundpr == false) && (Wyeie->ThisRoundotv == true))
-						{
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Wyeie->LengthPl,
-								sA2,
-								sB2);
-
-							spc.Length2 = (sA2 + Wyeie->LengthPl * 2)*(sB + sA) / 500000 ///призма прохода
-								+ (Wyeie->LengthPl)*M_PI*sA2 / 1000000;  ///цилиндр отвода
-							WPRctORnd.append(spc);
-						}
-
-
-
-					}
-
-					if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
-					{
-
-						sA = Transie->SizeAp1;
-						sB = Transie->SizeBp1;
-						sA2 = Transie->SizeAp2;
-						sB2 = Transie->SizeBp2;
-
-						//круглый круглый
-						if ((Transie->ThisRoundp1 == true) && (Transie->ThisRoundp2 == true))
-						{
-
-							if (Transie->SizeAp1 > Transie->SizeAp2)
-							{
-								sA = Transie->SizeAp1;
-								sB = Transie->SizeBp1;
-								sA2 = Transie->SizeAp2;
-								sB2 = Transie->SizeBp2;
-							}
-
-							else
-							{
-								sA = Transie->SizeAp2;
-								sB = Transie->SizeBp2;
-								sA2 = Transie->SizeAp1;
-								sB2 = Transie->SizeBp1;
-							}
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Transie->LengthTr,
-								sA2,
-								sB2);
-
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (sA / 2 - sA2 / 2)*(sA / 2 - sA2 / 2)) / 1000;
-							spc.Length2 = drad*M_PI*(sA / 2 + sA2 / 2) / 1000;
-							TRndRnd.append(spc);
-						}
-
-
-
-						//круглый прямоугольн
-						if ((Transie->ThisRoundp1 == true) && (Transie->ThisRoundp2 == false))
-						{
-
-							if (Transie->SizeAp2 > Transie->SizeBp2)
-							{
-								sA = Transie->SizeAp1;
-								sB = Transie->SizeBp1;
-								sA2 = Transie->SizeAp2;
-								sB2 = Transie->SizeBp2;
-							}
-
-							else
-							{
-								sA = Transie->SizeAp1;
-								sB = Transie->SizeBp1;
-								sA2 = Transie->SizeBp2;
-								sB2 = Transie->SizeAp2;
-							}
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Transie->LengthTr,
-								sA2,
-								sB2);
-							prad = (sA2 + sB2) / M_PI;
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (sA / 2 - prad)*(sA / 2 - prad)) / 1000;
-							spc.Length2 = drad*M_PI*(sA / 2 + prad) / 1000;
-							TRndRct.append(spc);
-						}
-
-
-						// прямоугольн круглый
-						if ((Transie->ThisRoundp1 == false) && (Transie->ThisRoundp2 == true))
-						{
-
-							if (Transie->SizeAp1 > Transie->SizeBp1)
-							{
-								sA = Transie->SizeAp2;
-								sB = Transie->SizeBp2;
-								sA2 = Transie->SizeAp1;
-								sB2 = Transie->SizeBp1;
-							}
-
-							else
-							{
-								sA = Transie->SizeAp2;
-								sB = Transie->SizeBp2;
-								sA2 = Transie->SizeBp1;
-								sB2 = Transie->SizeAp1;
-							}
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Transie->LengthTr,
-								sA2,
-								sB2);
-							prad = (sA2 + sB2) / M_PI;
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (sA / 2 - prad)*(sA / 2 - prad)) / 1000;
-							spc.Length2 = drad*M_PI*(sA / 2 + prad) / 1000;
-							TRndRct.append(spc);
-						}
-
-						// прямоугольн прямоугольн
-						if ((Transie->ThisRoundp1 == false) && (Transie->ThisRoundp2 == false))
-						{
-
-							if (Transie->SizeAp1 > Transie->SizeBp1)
-							{
-
-
-								if (Transie->SizeAp1 > Transie->SizeAp2)
-								{
-
-									sA = Transie->SizeAp1;
-									sB = Transie->SizeBp1;
-									sA2 = Transie->SizeAp2;
-									sB2 = Transie->SizeBp2;
-								}
-								else
-								{
-									if (Transie->SizeAp2 > Transie->SizeBp2)
-									{
-										sA = Transie->SizeAp2;
-										sB = Transie->SizeBp2;
-										sA2 = Transie->SizeAp1;
-										sB2 = Transie->SizeBp1;
-									}
-									else
-									{
-										sA = Transie->SizeBp2;
-										sB = Transie->SizeAp2;
-										sA2 = Transie->SizeBp1;
-										sB2 = Transie->SizeAp1;
-									}
-								}
-							}
-
-							else
-							{
-								if (Transie->SizeBp1 > Transie->SizeBp2)
-								{
-									sA = Transie->SizeBp1;
-									sB = Transie->SizeAp1;
-									sA2 = Transie->SizeBp2;
-									sB2 = Transie->SizeAp2;
-								}
-								else
-								{
-									if (Transie->SizeBp2 > Transie->SizeAp2)
-									{
-										sA = Transie->SizeBp2;
-										sB = Transie->SizeAp2;
-										sA2 = Transie->SizeBp1;
-										sB2 = Transie->SizeAp1;
-									}
-									else
-									{
-										sA = Transie->SizeAp2;
-										sB = Transie->SizeBp2;
-										sA2 = Transie->SizeAp1;
-										sB2 = Transie->SizeBp1;
-									}
-								}
-
-
-
-
-							}
-
-							spc.add(sA,
-								sB,
-								false,
-								1,
-								Transie->LengthTr,
-								sA2,
-								sB2);
-							prad = (sA2 + sB2) / M_PI;
-							prad2 = (sA + sB) / M_PI;
-							drad = sqrt(Transie->LengthTr*Transie->LengthTr + (prad2 - prad)*(prad2 - prad)) / 1000;
-							spc.Length2 = drad*M_PI*(prad2 + prad) / 1000;
-							TRctRct.append(spc);
-						}
-
-					}
-
-
-					pEnt->close();
-
-				}
-			}
-
-
-		}
-
-
-
-
-		double buf1, buf2, buf3, buf4;
-		long j;
-
-		//Подсчет прямоугольных воздуховодов (переменная VRct)
-		long lenP = VRct.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((VRct[i].SizeA > VRct[j].SizeA) || ((VRct[i].SizeA == VRct[j].SizeA) && (VRct[i].SizeB > VRct[j].SizeB)))
-					{
-						buf1 = VRct[i].SizeA;
-						buf2 = VRct[i].SizeB;
-						buf3 = VRct[i].Length;
-
-						VRct[i].SizeA = VRct[j].SizeA;
-						VRct[i].SizeB = VRct[j].SizeB;
-						VRct[i].Length = VRct[j].Length;
-
-						VRct[j].SizeA = buf1;
-						VRct[j].SizeB = buf2;
-						VRct[j].Length = buf3;
-					}
-
-			AcArray<SPEC> VRct2;
-			VRct2.append(VRct[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((VRct2[j].SizeA == VRct[i].SizeA) && (VRct2[j].SizeB == VRct[i].SizeB))
-
-					VRct2[j].Length = VRct2[j].Length + VRct[i].Length;
-
-
-				else
-				{
-					VRct2.append(VRct[i]);
-					j++;
-
-				}
-
-			}
-			VRct = VRct2;
-			lenP = VRct.logicalLength();
-
-		}
-
-
-
-
-
-
-
-
-		//Подсчет круглых воздуховодов воздуховодов (переменная VRnd)
-
-		lenP = VRnd.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if (VRnd[i].SizeA > VRnd[j].SizeA)
-					{
-						buf1 = VRnd[i].SizeA;
-						buf2 = VRnd[i].SizeB;
-						buf3 = VRnd[i].Length;
-
-						VRnd[i].SizeA = VRnd[j].SizeA;
-						VRnd[i].SizeB = VRnd[j].SizeB;
-						VRnd[i].Length = VRnd[j].Length;
-
-						VRnd[j].SizeA = buf1;
-						VRnd[j].SizeB = buf2;
-						VRnd[j].Length = buf3;
-					}
-
-			AcArray<SPEC> VRnd2;
-			VRnd2.append(VRnd[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((VRnd2[j].SizeA == VRnd[i].SizeA) && (VRnd2[j].SizeB == VRnd[i].SizeB))
-
-					VRnd2[j].Length = VRnd2[j].Length + VRnd[i].Length;
-
-				else
-				{
-					VRnd2.append(VRnd[i]);
-					j++;
-				}
-
-			}
-			VRnd = VRnd2;
-			lenP = VRnd.logicalLength();
-
-
-
-
-		}
-
-
-		//Подсчет прямоугольных отводов (переменная TRct)
-		lenP = TRct.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((TRct[i].Swectangle > TRct[j].Swectangle) ||
-						((TRct[i].Swectangle == TRct[j].Swectangle) &&
-						((TRct[i].SizeA > TRct[j].SizeA) || ((TRct[i].SizeA == TRct[j].SizeA) && (TRct[i].SizeB > TRct[j].SizeB)))))
-					{
-						buf1 = TRct[i].SizeA;
-						buf2 = TRct[i].SizeB;
-						buf3 = TRct[i].Swectangle;
-						buf4 = TRct[i].Length2;
-
-						TRct[i].SizeA = TRct[j].SizeA;
-						TRct[i].SizeB = TRct[j].SizeB;
-						TRct[i].Swectangle = TRct[j].Swectangle;
-						TRct[i].Length2 = TRct[j].Length2;
-
-						TRct[j].SizeA = buf1;
-						TRct[j].SizeB = buf2;
-						TRct[j].Swectangle = buf3;
-						TRct[j].Length2 = buf4;
-
-					}
-
-			AcArray<SPEC> TRct2;
-			TRct2.append(TRct[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((TRct2[j].SizeA == TRct[i].SizeA) && (TRct2[j].SizeB == TRct[i].SizeB) && (TRct2[j].Swectangle == TRct[i].Swectangle))
-
-					TRct2[j].Length = TRct2[j].Length + TRct[i].Length;
-
-				else
-				{
-					TRct2.append(TRct[i]);
-					j++;
-				}
-
-			}
-			TRct = TRct2;
-			lenP = TRct.logicalLength();
-
-
-
-		}
-
-
-
-		//Подсчет круглых отводов (переменная TRnd)
-		lenP = TRnd.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((TRnd[i].Swectangle > TRnd[j].Swectangle) ||
-						((TRnd[i].Swectangle == TRnd[j].Swectangle) &&
-						((TRnd[i].SizeA > TRnd[j].SizeA) || ((TRnd[i].SizeA == TRnd[j].SizeA) && (TRnd[i].SizeB > TRnd[j].SizeB)))))
-					{
-						buf1 = TRnd[i].SizeA;
-						buf2 = TRnd[i].SizeB;
-						buf3 = TRnd[i].Swectangle;
-						buf4 = TRnd[i].Length2;
-
-
-
-						TRnd[i].SizeA = TRnd[j].SizeA;
-						TRnd[i].SizeB = TRnd[j].SizeB;
-						TRnd[i].Swectangle = TRnd[j].Swectangle;
-						TRnd[i].Length2 = TRnd[j].Length2;
-
-						TRnd[j].SizeA = buf1;
-						TRnd[j].SizeB = buf2;
-						TRnd[j].Swectangle = buf3;
-						TRnd[j].Length2 = buf4;
-					}
-
-			AcArray<SPEC> TRnd2;
-			TRnd2.append(TRnd[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((TRnd2[j].SizeA == TRnd[i].SizeA) && (TRnd2[j].SizeB == TRnd[i].SizeB) && (TRnd2[j].Swectangle == TRnd[i].Swectangle))
-
-					TRnd2[j].Length = TRnd2[j].Length + TRnd[i].Length;
-
-				else
-				{
-					TRnd2.append(TRnd[i]);
-					j++;
-				}
-
-			}
-			TRnd = TRnd2;
-			lenP = TRnd.logicalLength();
-
-
-
-		}
-
-
-
-
-		SPEC buff;
-
-		//Подсчет тройников прям прям (переменная WPRctORct)
-		lenP = WPRctORct.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((WPRctORct[i].Swectangle > WPRctORct[j].Swectangle) ||
-						((WPRctORct[i].Swectangle == WPRctORct[j].Swectangle) &&
-						((WPRctORct[i].SizeA > WPRctORct[j].SizeA) ||
-							((WPRctORct[i].SizeA == WPRctORct[j].SizeA) &&
-							((WPRctORct[i].SizeB > WPRctORct[j].SizeB) ||
-								((WPRctORct[i].SizeB == WPRctORct[j].SizeB) &&
-								((WPRctORct[i].SizeA2 > WPRctORct[j].SizeA2) ||
-									((WPRctORct[i].SizeA2 == WPRctORct[j].SizeA2) &&
-									((WPRctORct[i].SizeA3 > WPRctORct[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = WPRctORct[i];
-						WPRctORct[i] = WPRctORct[j];
-						WPRctORct[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> WPRctORct2;
-			WPRctORct2.append(WPRctORct[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((WPRctORct2[j].Swectangle == WPRctORct[i].Swectangle) &&
-					(WPRctORct2[j].SizeA == WPRctORct[i].SizeA) &&
-					(WPRctORct2[j].SizeB == WPRctORct[i].SizeB) &&
-					(WPRctORct2[j].SizeA2 == WPRctORct[i].SizeA2) &&
-					(WPRctORct2[j].SizeA3 == WPRctORct[i].SizeA3)
-
-					)
-
-					WPRctORct2[j].Length = WPRctORct2[j].Length + WPRctORct[i].Length;
-
-				else
-				{
-					WPRctORct2.append(WPRctORct[i]);
-					j++;
-				}
-
-			}
-			WPRctORct = WPRctORct2;
-			lenP = WPRctORct.logicalLength();
-
-
-
-		}
-
-
-
-
-
-		//Подсчет тройников прям кругл (переменная WPRctORnd)
-		lenP = WPRctORnd.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((WPRctORnd[i].Swectangle > WPRctORnd[j].Swectangle) ||
-						((WPRctORnd[i].Swectangle == WPRctORnd[j].Swectangle) &&
-						((WPRctORnd[i].SizeA > WPRctORnd[j].SizeA) ||
-							((WPRctORnd[i].SizeA == WPRctORnd[j].SizeA) &&
-							((WPRctORnd[i].SizeB > WPRctORnd[j].SizeB) ||
-								((WPRctORnd[i].SizeB == WPRctORnd[j].SizeB) &&
-								((WPRctORnd[i].SizeA2 > WPRctORnd[j].SizeA2) ||
-									((WPRctORnd[i].SizeA2 == WPRctORnd[j].SizeA2) &&
-									((WPRctORnd[i].SizeA3 > WPRctORnd[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = WPRctORnd[i];
-						WPRctORnd[i] = WPRctORnd[j];
-						WPRctORnd[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> WPRctORnd2;
-			WPRctORnd2.append(WPRctORnd[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((WPRctORnd2[j].Swectangle == WPRctORnd[i].Swectangle) &&
-					(WPRctORnd2[j].SizeA == WPRctORnd[i].SizeA) &&
-					(WPRctORnd2[j].SizeB == WPRctORnd[i].SizeB) &&
-					(WPRctORnd2[j].SizeA2 == WPRctORnd[i].SizeA2) &&
-					(WPRctORnd2[j].SizeA3 == WPRctORnd[i].SizeA3)
-
-					)
-
-					WPRctORnd2[j].Length = WPRctORnd2[j].Length + WPRctORnd[i].Length;
-
-				else
-				{
-					WPRctORnd2.append(WPRctORnd[i]);
-					j++;
-				}
-
-			}
-			WPRctORnd = WPRctORnd2;
-			lenP = WPRctORnd.logicalLength();
-
-
-
-		}
-
-
-		//Подсчет тройников кругл кругл (переменная WPRndORnd)
-		lenP = WPRndORnd.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((WPRndORnd[i].Swectangle > WPRndORnd[j].Swectangle) ||
-						((WPRndORnd[i].Swectangle == WPRndORnd[j].Swectangle) &&
-						((WPRndORnd[i].SizeA > WPRndORnd[j].SizeA) ||
-							((WPRndORnd[i].SizeA == WPRndORnd[j].SizeA) &&
-							((WPRndORnd[i].SizeB > WPRndORnd[j].SizeB) ||
-								((WPRndORnd[i].SizeB == WPRndORnd[j].SizeB) &&
-								((WPRndORnd[i].SizeA2 > WPRndORnd[j].SizeA2) ||
-									((WPRndORnd[i].SizeA2 == WPRndORnd[j].SizeA2) &&
-									((WPRndORnd[i].SizeA3 > WPRndORnd[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = WPRndORnd[i];
-						WPRndORnd[i] = WPRndORnd[j];
-						WPRndORnd[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> WPRndORnd2;
-			WPRndORnd2.append(WPRndORnd[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((WPRndORnd2[j].Swectangle == WPRndORnd[i].Swectangle) &&
-					(WPRndORnd2[j].SizeA == WPRndORnd[i].SizeA) &&
-					(WPRndORnd2[j].SizeB == WPRndORnd[i].SizeB) &&
-					(WPRndORnd2[j].SizeA2 == WPRndORnd[i].SizeA2) &&
-					(WPRndORnd2[j].SizeA3 == WPRndORnd[i].SizeA3)
-
-					)
-
-					WPRndORnd2[j].Length = WPRndORnd2[j].Length + WPRndORnd[i].Length;
-
-				else
-				{
-					WPRndORnd2.append(WPRndORnd[i]);
-					j++;
-				}
-
-			}
-			WPRndORnd = WPRndORnd2;
-			lenP = WPRndORnd.logicalLength();
-
-
-
-		}
-
-
-		//Подсчет тройников кругл прям  (переменная WPRndORct)
-		lenP = WPRndORct.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((WPRndORct[i].Swectangle > WPRndORct[j].Swectangle) ||
-						((WPRndORct[i].Swectangle == WPRndORct[j].Swectangle) &&
-						((WPRndORct[i].SizeA > WPRndORct[j].SizeA) ||
-							((WPRndORct[i].SizeA == WPRndORct[j].SizeA) &&
-							((WPRndORct[i].SizeB > WPRndORct[j].SizeB) ||
-								((WPRndORct[i].SizeB == WPRndORct[j].SizeB) &&
-								((WPRndORct[i].SizeA2 > WPRndORct[j].SizeA2) ||
-									((WPRndORct[i].SizeA2 == WPRndORct[j].SizeA2) &&
-									((WPRndORct[i].SizeA3 > WPRndORct[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = WPRndORct[i];
-						WPRndORct[i] = WPRndORct[j];
-						WPRndORct[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> WPRndORct2;
-			WPRndORct2.append(WPRndORct[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((WPRndORct2[j].Swectangle == WPRndORct[i].Swectangle) &&
-					(WPRndORct2[j].SizeA == WPRndORct[i].SizeA) &&
-					(WPRndORct2[j].SizeB == WPRndORct[i].SizeB) &&
-					(WPRndORct2[j].SizeA2 == WPRndORct[i].SizeA2) &&
-					(WPRndORct2[j].SizeA3 == WPRndORct[i].SizeA3)
-
-					)
-
-					WPRndORct2[j].Length = WPRndORct2[j].Length + WPRndORct[i].Length;
-
-				else
-				{
-					WPRndORct2.append(WPRndORct[i]);
-					j++;
-				}
-
-			}
-			WPRndORct = WPRndORct2;
-			lenP = WPRndORct.logicalLength();
-
-
-
-		}
-
-
-
-
-		//Подсчет переход кругл кругл (переменная TRndRnd)
-		lenP = TRndRnd.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((TRndRnd[i].Swectangle > TRndRnd[j].Swectangle) ||
-						((TRndRnd[i].Swectangle == TRndRnd[j].Swectangle) &&
-						((TRndRnd[i].SizeA > TRndRnd[j].SizeA) ||
-							((TRndRnd[i].SizeA == TRndRnd[j].SizeA) &&
-							((TRndRnd[i].SizeB > TRndRnd[j].SizeB) ||
-								((TRndRnd[i].SizeB == TRndRnd[j].SizeB) &&
-								((TRndRnd[i].SizeA2 > TRndRnd[j].SizeA2) ||
-									((TRndRnd[i].SizeA2 == TRndRnd[j].SizeA2) &&
-									((TRndRnd[i].SizeA3 > TRndRnd[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = TRndRnd[i];
-						TRndRnd[i] = TRndRnd[j];
-						TRndRnd[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> TRndRnd2;
-			TRndRnd2.append(TRndRnd[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((TRndRnd2[j].Swectangle == TRndRnd[i].Swectangle) &&
-					(TRndRnd2[j].SizeA == TRndRnd[i].SizeA) &&
-					(TRndRnd2[j].SizeB == TRndRnd[i].SizeB) &&
-					(TRndRnd2[j].SizeA2 == TRndRnd[i].SizeA2) &&
-					(TRndRnd2[j].SizeA3 == TRndRnd[i].SizeA3)
-
-					)
-
-					TRndRnd2[j].Length = TRndRnd2[j].Length + TRndRnd[i].Length;
-
-				else
-				{
-					TRndRnd2.append(TRndRnd[i]);
-					j++;
-				}
-
-			}
-			TRndRnd = TRndRnd2;
-			lenP = TRndRnd.logicalLength();
-
-
-
-		}
-
-
-
-		//Подсчет переход кругл прям(переменная TRndRct)
-		lenP = TRndRct.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((TRndRct[i].Swectangle > TRndRct[j].Swectangle) ||
-						((TRndRct[i].Swectangle == TRndRct[j].Swectangle) &&
-						((TRndRct[i].SizeA > TRndRct[j].SizeA) ||
-							((TRndRct[i].SizeA == TRndRct[j].SizeA) &&
-							((TRndRct[i].SizeB > TRndRct[j].SizeB) ||
-								((TRndRct[i].SizeB == TRndRct[j].SizeB) &&
-								((TRndRct[i].SizeA2 > TRndRct[j].SizeA2) ||
-									((TRndRct[i].SizeA2 == TRndRct[j].SizeA2) &&
-									((TRndRct[i].SizeA3 > TRndRct[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = TRndRct[i];
-						TRndRct[i] = TRndRct[j];
-						TRndRct[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> TRndRct2;
-			TRndRct2.append(TRndRct[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((TRndRct2[j].Swectangle == TRndRct[i].Swectangle) &&
-					(TRndRct2[j].SizeA == TRndRct[i].SizeA) &&
-					(TRndRct2[j].SizeB == TRndRct[i].SizeB) &&
-					(TRndRct2[j].SizeA2 == TRndRct[i].SizeA2) &&
-					(TRndRct2[j].SizeA3 == TRndRct[i].SizeA3)
-
-					)
-
-					TRndRct2[j].Length = TRndRct2[j].Length + TRndRct[i].Length;
-
-				else
-				{
-					TRndRct2.append(TRndRct[i]);
-					j++;
-				}
-
-			}
-			TRndRct = TRndRct2;
-			lenP = TRndRct.logicalLength();
-
-
-
-		}
-
-
-
-		//Подсчет переход прям прям(переменная TRctRct)
-		lenP = TRctRct.logicalLength();
-		if (lenP > 0)
-		{
-
-			for (long i = 0; i < lenP; i++)
-
-				for (long j = i + 1; j < lenP; j++)
-
-					if ((TRctRct[i].Swectangle > TRctRct[j].Swectangle) ||
-						((TRctRct[i].Swectangle == TRctRct[j].Swectangle) &&
-						((TRctRct[i].SizeA > TRctRct[j].SizeA) ||
-							((TRctRct[i].SizeA == TRctRct[j].SizeA) &&
-							((TRctRct[i].SizeB > TRctRct[j].SizeB) ||
-								((TRctRct[i].SizeB == TRctRct[j].SizeB) &&
-								((TRctRct[i].SizeA2 > TRctRct[j].SizeA2) ||
-									((TRctRct[i].SizeA2 == TRctRct[j].SizeA2) &&
-									((TRctRct[i].SizeA3 > TRctRct[j].SizeA3)
-										)
-										)
-									)
-									)
-								)
-								)
-							)
-							)
-						)
-					{
-
-
-						buff = TRctRct[i];
-						TRctRct[i] = TRctRct[j];
-						TRctRct[j] = buff;
-
-
-
-					}
-
-			AcArray<SPEC> TRctRct2;
-			TRctRct2.append(TRctRct[0]);
-			j = 0;
-			for (long i = 1; i < lenP; i++)
-
-			{
-				if ((TRctRct2[j].Swectangle == TRctRct[i].Swectangle) &&
-					(TRctRct2[j].SizeA == TRctRct[i].SizeA) &&
-					(TRctRct2[j].SizeB == TRctRct[i].SizeB) &&
-					(TRctRct2[j].SizeA2 == TRctRct[i].SizeA2) &&
-					(TRctRct2[j].SizeA3 == TRctRct[i].SizeA3)
-
-					)
-
-					TRctRct2[j].Length = TRctRct2[j].Length + TRctRct[i].Length;
-
-				else
-				{
-					TRctRct2.append(TRctRct[i]);
-					j++;
-				}
-
-			}
-			TRctRct = TRctRct2;
-			lenP = TRctRct.logicalLength();
-
-
-
-		}
-
-
-
-		//отрисовка спец
-		ACHAR buffer[512], buffer1[512], buffer2[512];
-
-		double pArea = 0;
-		double pSumArea = 0;
-
-
-
-
-		if ((VRct.logicalLength() > 0) ||
-			(VRnd.logicalLength() > 0)
-			)
-		{
-			pb = AddSpecLine(pb, _T("Воздуховоды:"));
-		}
-
-
-
-		if (VRnd.logicalLength() != 0)
-		{
-			//отрисовка круглых
-
-			for (long i = 0; i < VRnd.logicalLength(); i++)
-			{
-				//подщет площади
-				VRnd[i].Area = ceil(VRnd[i].Length / 1000)*M_PI*VRnd[i].SizeA / 1000;
-				pArea = VRnd[i].Area + pArea;
-				//
-
-
-				wcscpy_s(buffer1, _T("%%C"));
-				acdbRToS(VRnd[i].SizeA, 2, 2, buffer);
-				wcscat_s(buffer1, buffer);
-				acdbRToS(ceil(VRnd[i].Length / 100) / 10, 2, 1, buffer2);
-				acdbRToS(VRnd[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("м"), buffer2, _T("м2"), buffer);
-
-			}
-			//acdbRToS(pArea,2,2,buffer);
-			//pb=AddSpecLine(pb,_T("Всего:"),_T(""),_T(""),_T("м2"),buffer);
-			//pSumArea=pSumArea+pArea;
-			//pArea=0;
-		}
-
-
-
-		//отрисовка прямоугольных
-		if (VRct.logicalLength() != 0)
-		{
-			/*pb=AddSpecLine(pb,_T("Прямоугольные воздуховоды:"));*/
-			for (long i = 0; i < VRct.logicalLength(); i++)
-			{
-				//подщет площади
-				VRct[i].Area = ceil(VRct[i].Length / 1000) * 2 * (VRct[i].SizeA + VRct[i].SizeB) / 1000;
-				pArea = VRct[i].Area + pArea;
-				//	
-				acdbRToS(VRct[i].SizeA, 2, 2, buffer1);
-				acdbRToS(VRct[i].SizeB, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				acdbRToS(ceil(VRct[i].Length / 100) / 10, 2, 1, buffer2);
-				acdbRToS(VRct[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("м"), buffer2, _T("м2"), buffer);
-
-			}
-
-		}
-
-
-
-		if ((VRct.logicalLength() > 0) ||
-			(VRnd.logicalLength() > 0)
-			)
-		{
-			acdbRToS(pArea, 2, 2, buffer);
-			pb = AddSpecLine(pb, _T("Всего:"), _T(""), _T(""), _T("м2"), buffer);
-			pSumArea = pSumArea + pArea;
-			pArea = 0;
-		}
-
-
-		/////отводы
-
-		if ((TRct.logicalLength() > 0) ||
-			(TRnd.logicalLength() > 0)
-			)
-		{
-			pb = AddSpecLine(pb, _T("Отводы:"));
-		}
-
-
-
-		double pl1, pl2;
-		//отрисовка круглых отводов
-		if (TRnd.logicalLength() != 0)
-		{
-
-			for (long i = 0; i < TRnd.logicalLength(); i++)
-			{
-				//подщет площади
-
-
-				TRnd[i].Area = ceil(TRnd[i].Length)*TRnd[i].Length2;
-				pArea = TRnd[i].Area + pArea;
-
-				//
-
-
-				wcscpy_s(buffer1, _T("%%C"));
-				acdbRToS(TRnd[i].SizeA, 2, 2, buffer);
-				wcscat_s(buffer1, buffer);
-
-				acdbRToS(TRnd[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" ("));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("%%d)"));
-
-				acdbRToS(ceil(TRnd[i].Length), 2, 2, buffer2);
-				acdbRToS(TRnd[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-
-		}
-
-
-
-
-		//отрисовка прямоугольных отводов
-		if (TRct.logicalLength() != 0)
-		{
-			//pb=AddSpecLine(pb,_T("Прямоугольные отводы:"));
-			for (long i = 0; i < TRct.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				TRct[i].Area = ceil(TRct[i].Length)*TRct[i].Length2;
-				pArea = TRct[i].Area + pArea;
-
-				//
-
-				acdbRToS(TRct[i].SizeA, 2, 2, buffer1);
-				acdbRToS(TRct[i].SizeB, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				acdbRToS(TRct[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" ("));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("%%d)"));
-
-				acdbRToS(ceil(TRct[i].Length), 2, 2, buffer2);
-				acdbRToS(TRct[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-
-		}
-
-
-		if ((TRct.logicalLength() > 0) ||
-			(TRnd.logicalLength() > 0)
-			)
-		{
-			acdbRToS(pArea, 2, 2, buffer);
-			pb = AddSpecLine(pb, _T("Всего:"), _T(""), _T(""), _T("м2"), buffer);
-			pSumArea = pSumArea + pArea;
-			pArea = 0;
-		}
-
-
-
-
-		/////тройники
-
-
-		if ((WPRctORct.logicalLength() > 0) ||
-			(WPRctORnd.logicalLength() > 0) ||
-			(WPRndORct.logicalLength() > 0) ||
-			(WPRndORnd.logicalLength() > 0)
-			)
-		{
-			pb = AddSpecLine(pb, _T("Тройники:"));
-		}
-
-
-
-
-
-		//отрисовка тройника  кругл кругл
-		if (WPRndORnd.logicalLength() != 0)
-		{
-
-			for (long i = 0; i < WPRndORnd.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				WPRndORnd[i].Area = ceil(WPRndORnd[i].Length)*WPRndORnd[i].Length2;
-				pArea = WPRndORnd[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("%%c"));
-				acdbRToS(WPRndORnd[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-				wcscat_s(buffer1, _T("x%%c"));
-				acdbRToS(WPRndORnd[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-
-
-				acdbRToS(WPRndORnd[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(WPRndORnd[i].Length), 2, 2, buffer2);
-				acdbRToS(WPRndORnd[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-			/*	acdbRToS(pArea,2,2,buffer);
-			pb=AddSpecLine(pb,_T("Всего:"),_T(""),_T(""),_T("м2"),buffer);
-			pSumArea=pSumArea+pArea;
-			pArea=0;*/
-
-
-
-		}
-
-
-
-		//отрисовка тройника  кругл прям
-		if (WPRndORct.logicalLength() != 0)
-		{
-			//pb=AddSpecLine(pb,_T("Тройник кругл-прям:"));
-			for (long i = 0; i < WPRndORct.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				WPRndORct[i].Area = ceil(WPRndORct[i].Length)*WPRndORct[i].Length2;
-				pArea = WPRndORct[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("%%c"));
-				acdbRToS(WPRndORct[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-				wcscat_s(buffer1, _T("x("));
-				acdbRToS(WPRndORct[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(WPRndORct[i].SizeA3, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-
-
-
-				acdbRToS(WPRndORct[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(WPRndORct[i].Length), 2, 2, buffer2);
-				acdbRToS(WPRndORct[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-			/*	acdbRToS(pArea,2,2,buffer);
-			pb=AddSpecLine(pb,_T("Всего:"),_T(""),_T(""),_T("м2"),buffer);
-			pSumArea=pSumArea+pArea;
-			pArea=0;*/
-
-
-
-		}
-
-
-
-
-
-
-
-		//отрисовка тройника  прям кругл
-		if (WPRctORnd.logicalLength() != 0)
-		{
-			//pb=AddSpecLine(pb,_T("Тройник прям-кругл:"));
-			for (long i = 0; i < WPRctORnd.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				WPRctORnd[i].Area = ceil(WPRctORnd[i].Length)*WPRctORnd[i].Length2;
-				pArea = WPRctORnd[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("("));
-				acdbRToS(WPRctORnd[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(WPRctORnd[i].SizeB, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-
-				wcscat_s(buffer1, _T("x%%c"));
-				acdbRToS(WPRctORnd[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-
-
-				acdbRToS(WPRctORnd[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(WPRctORnd[i].Length), 2, 2, buffer2);
-				acdbRToS(WPRctORnd[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-			// 			acdbRToS(pArea,2,2,buffer);
-			// 			pb=AddSpecLine(pb,_T("Всего:"),_T(""),_T(""),_T("м2"),buffer);
-			// 			pSumArea=pSumArea+pArea;
-			// 			pArea=0;
-
-
-
-		}
-
-		//отрисовка тройника прям прям 
-		if (WPRctORct.logicalLength() != 0)
-		{
-			//pb=AddSpecLine(pb,_T("Тройник Прям-Прям:"));
-			for (long i = 0; i < WPRctORct.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				WPRctORct[i].Area = ceil(WPRctORct[i].Length)*WPRctORct[i].Length2;
-				pArea = WPRctORct[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("("));
-				acdbRToS(WPRctORct[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(WPRctORct[i].SizeB, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-				wcscat_s(buffer1, _T("x("));
-				acdbRToS(WPRctORct[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(WPRctORct[i].SizeA3, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-
-
-				acdbRToS(WPRctORct[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(WPRctORct[i].Length), 2, 2, buffer2);
-				acdbRToS(WPRctORct[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-
-
-
-
-		}
-
-		if ((WPRctORct.logicalLength() > 0) ||
-			(WPRctORnd.logicalLength() > 0) ||
-			(WPRndORct.logicalLength() > 0) ||
-			(WPRndORnd.logicalLength() > 0)
-			)
-		{
-			acdbRToS(pArea, 2, 2, buffer);
-			pb = AddSpecLine(pb, _T("Всего:"), _T(""), _T(""), _T("м2"), buffer);
-			pSumArea = pSumArea + pArea;
-			pArea = 0;
-		}
-
-
-
-
-
-
-
-
-		//переходы
-
-		if ((TRndRnd.logicalLength() > 0) ||
-			(TRndRct.logicalLength() > 0) ||
-			(TRctRct.logicalLength() > 0)
-			)
-		{
-			pb = AddSpecLine(pb, _T("Переходы:"));
-		}
-
-		//отрисовка перехода  кругл кругл
-		if (TRndRnd.logicalLength() != 0)
-		{
-
-			for (long i = 0; i < TRndRnd.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				TRndRnd[i].Area = ceil(TRndRnd[i].Length)*TRndRnd[i].Length2;
-				pArea = TRndRnd[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("%%c"));
-				acdbRToS(TRndRnd[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-				wcscat_s(buffer1, _T("x%%c"));
-				acdbRToS(TRndRnd[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-
-
-				acdbRToS(TRndRnd[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(TRndRnd[i].Length), 2, 2, buffer2);
-				acdbRToS(TRndRnd[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-			/*	acdbRToS(pArea,2,2,buffer);
-			pb=AddSpecLine(pb,_T("Всего:"),_T(""),_T(""),_T("м2"),buffer);
-			pSumArea=pSumArea+pArea;
-			pArea=0;*/
-
-		}
-		//отрисовка перехода  кругл прям
-		if (TRndRct.logicalLength() != 0)
-		{
-			//pb=AddSpecLine(pb,_T("Тройник кругл-прям:"));
-			for (long i = 0; i < TRndRct.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				TRndRct[i].Area = ceil(TRndRct[i].Length)*TRndRct[i].Length2;
-				pArea = TRndRct[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("%%c"));
-				acdbRToS(TRndRct[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-
-
-				wcscat_s(buffer1, _T("x("));
-				acdbRToS(TRndRct[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(TRndRct[i].SizeA3, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-
-
-
-				acdbRToS(TRndRct[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(TRndRct[i].Length), 2, 2, buffer2);
-				acdbRToS(TRndRct[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-			/*	acdbRToS(pArea,2,2,buffer);
-			pb=AddSpecLine(pb,_T("Всего:"),_T(""),_T(""),_T("м2"),buffer);
-			pSumArea=pSumArea+pArea;
-			pArea=0;*/
-
-
-
-		}
-
-
-
-		//отрисовка перехода прям прям 
-		if (TRctRct.logicalLength() != 0)
-		{
-			//pb=AddSpecLine(pb,_T("Тройник Прям-Прям:"));
-			for (long i = 0; i < TRctRct.logicalLength(); i++)
-			{
-
-				//подщет площади
-
-
-				TRctRct[i].Area = ceil(TRctRct[i].Length)*TRctRct[i].Length2;
-				pArea = TRctRct[i].Area + pArea;
-
-				//
-				wcscpy_s(buffer1, _T("("));
-				acdbRToS(TRctRct[i].SizeA, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(TRctRct[i].SizeB, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-				wcscat_s(buffer1, _T("x("));
-				acdbRToS(TRctRct[i].SizeA2, 2, 2, buffer2);
-				wcscat_s(buffer1, buffer2);
-				acdbRToS(TRctRct[i].SizeA3, 2, 2, buffer);
-				wcscat_s(buffer1, _T("x"));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T(")"));
-
-
-
-				acdbRToS(TRctRct[i].Swectangle, 2, 2, buffer);
-				wcscat_s(buffer1, _T(" (L="));
-				wcscat_s(buffer1, buffer);
-				wcscat_s(buffer1, _T("мм)"));
-
-				acdbRToS(ceil(TRctRct[i].Length), 2, 2, buffer2);
-				acdbRToS(TRctRct[i].Area, 2, 2, buffer);
-				pb = AddSpecLine(pb, buffer1, _T("шт"), buffer2, _T("м2"), buffer);
-
-			}
-
-
-
-
-		}
-
-
-
-
-
-
-		if ((TRndRnd.logicalLength() > 0) ||
-			(TRndRct.logicalLength() > 0) ||
-			(TRctRct.logicalLength() > 0)
-			)
-		{
-			acdbRToS(pArea, 2, 2, buffer);
-			pb = AddSpecLine(pb, _T("Всего:"), _T(""), _T(""), _T("м2"), buffer);
-			pSumArea = pSumArea + pArea;
-			pArea = 0;
-		}
-
-
-		//общее количество
-		acdbRToS(pSumArea, 2, 2, buffer);
-		pb = AddSpecLine(pb, _T("Общее количество:"), _T(""), _T(""), _T("м2"), buffer);
-
-
-	}
+    {
+        // Share the legacy table pipeline: one area/mass calculation for all commands.
+        Ventilation_ARXTVS_SPEC();
+    }
 
 
 
@@ -4382,6 +2963,7 @@ public:
 	static void Ventilation_ARXTVS_Show(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		acutRelRb(acutBuildList(RTSTR, _T("(TVS_TEST2)"), RTNONE, RTNONE));
 		//acedCommand(RTSTR,_T("(TVS_TEST2)"),RTNONE,RTNONE);
 		// Add your code for command Ventilation_ARX.TVS_Show here
@@ -4391,6 +2973,7 @@ public:
 	static void Ventilation_ARXTVS_CUT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		AcGePoint3d pCut;
 		double Lx, Ly, startangle;
 		ads_name vozd1, vozd2, eName;
@@ -4414,7 +2997,7 @@ public:
 		while (ft == false)
 		{
 
-			if (acedEntSel(_T("\nВыберете воздуховод:"), vozd1, pt1) == RTCAN)
+			if (tvsCoordinates::selectEntity(_T("\nIzaberite kanal:"), vozd1, pt1) == RTCAN)
 				return;
 
 			pCut = asPnt3d(pt1);
@@ -4484,7 +3067,7 @@ public:
 					}
 
 					else {
-						acutPrintf(_T("\nОбьект заблокирован"));
+						acutPrintf(_T("\nObjekat je zaključan"));
 
 
 					}
@@ -4510,6 +3093,7 @@ public:
 	static void Ventilation_ARXTVS_Change(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -4542,17 +3126,17 @@ public:
 			->getSymbolTable(pBtbl, AcDb::kForRead);
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to open block table");
+			acutPrintf(L"\nNije moguće otvoriti tabelu blokova");
 			return es;
 		}
 		es = pBtbl->getAt(ACDB_MODEL_SPACE, pBtblr, AcDb::kForWrite);
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to open block table record");
+			acutPrintf(L"\nNije moguće otvoriti zapis tabele blokova");
 			es = pBtbl->close();
 			if (es != Acad::eOk)
 			{
-				acutPrintf(L"\nFailed to close block table");
+				acutPrintf(L"\nNije moguće zatvoriti tabelu blokova");
 			}
 			return es;
 		}
@@ -4560,7 +3144,7 @@ public:
 		es = pBtbl->close();
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to close block table");
+			acutPrintf(L"\nNije moguće zatvoriti tabelu blokova");
 			return es;
 		}
 
@@ -4571,20 +3155,20 @@ public:
 			es = pBtblr->appendAcDbEntity(ObjId, pNewEnt);
 			if (es != Acad::eOk)
 			{
-				acutPrintf(L"\nFailed to append entity");
+				acutPrintf(L"\nNije moguće dodati objekat");
 			}
 
 			es = pNewEnt->close();
 			if (es != Acad::eOk)
 			{
-				acutPrintf(L"\nFailed to close entity");
+				acutPrintf(L"\nNije moguće zatvoriti objekat");
 			}
 		}
 
 		es = pBtblr->close();
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nFailed to close block table record");
+			acutPrintf(L"\nNije moguće zatvoriti zapis tabele blokova");
 		}
 		return es;
 	}
@@ -4598,6 +3182,7 @@ public:
 	static void Ventilation_ARXTVS_ERASE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 		ACHAR  resultss[512];
 		ACHAR  results1[512] = _T("2");
@@ -4724,6 +3309,7 @@ public:
 	static void Ventilation_ARXTVSSomeParts(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name ent;
 		bool  Astat = false, status = false;
 		//acedInitGet(RSG_NONULL);
@@ -4735,7 +3321,7 @@ public:
 		while (status == false)
 		{
 
-			Astat = acedEntSel(_T("\nВыберете линию: "), ent, pt1);
+			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite liniju: "), ent, pt1);
 			if (Astat == true)
 			{
 
@@ -4761,7 +3347,7 @@ public:
 			}
 		}
 		int * quantity = new int;
-		if (acedGetInt(_T("\nКоличество сегментов: "), quantity) != RTNORM) return;
+		if (acedGetInt(_T("\nBroj segmenata: "), quantity) != RTNORM) return;
 		double pDist = pstart.distanceTo(pend);
 		for (int i = 1; i < *quantity + 1; i++)
 		{
@@ -4818,6 +3404,7 @@ public:
 	static void Ventilation_ARXTVS_Flex(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		TVS_Pipe* pEnt = new TVS_Pipe();
 
 		pEnt->FirstPoint = AcGePoint3d(0, 0, 0);
@@ -4941,6 +3528,15 @@ public:
 								if (spec.add(pEnt) == true)
 								{
 									speclistflex.append(spec);
+									// Cuffs marked by TVS_FLEX_MANZETNE: one piece per marked end.
+									bool cuffStart = false, cuffEnd = false;
+									if (tvsFlexCuff::read(pEnt, cuffStart, cuffEnd) && (cuffStart || cuffEnd)) {
+										SPEC cuff;
+										wcscpy_s(cuff.grad, grad);
+										wcscpy_s(cuff.d, d);
+										cuff.addCuffs(pEnt, spec.SizeA, int(cuffStart) + int(cuffEnd));
+										speclistflex.append(cuff);
+									}
 								}
 							}
 
@@ -4975,19 +3571,24 @@ public:
 	static void Ventilation_ARXTVS_SPEC(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
+#ifdef TVS_OFFSET_INTEGRATION
+        if(!offsetSelectionValid(sset)){acedSSFree(sset);return;}
+#endif
+		if (!tvsTable::prompt()) { acedSSFree(sset); return; }
 		ads_point pt1;
 		AcGePoint3d pb = AcGePoint3d(0, 0, 0);
-		if (acedGetPoint(NULL, _T("\nУкажите точку вставки спецификации:"), pt1) != RTNORM)
-			return;
+		if (tvsCoordinates::getPoint(NULL, _T("\nZadajte tačku umetanja specifikacije:"), pt1) != RTNORM) { acedSSFree(sset); return; }
 		pb = asPnt3d(pt1);
 
 		SPEClist speclist, speclistflex;
 		SpecWithAttrlist specatrlist;
 		fillspecification(sset, speclist, speclistflex, specatrlist, L"%%d", L"%%c");
+		acedSSFree(sset);
 		if (speclist.specList.physicalLength() != 0)
 		{
 			//speclist.print();
@@ -5012,10 +3613,14 @@ public:
 	static void Ventilation_ARXTVS_EXCELSPEC(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
+#ifdef TVS_OFFSET_INTEGRATION
+        if(!offsetSelectionValid(sset)){acedSSFree(sset);return;}
+#endif
 
 
 		long idx = 1;
@@ -5025,9 +3630,9 @@ public:
 
 		fillspecification(sset, speclist, speclistflex, specatrlist, L"°", L"⌀");
 		CMSExcel* m_msExcel = new CMSExcel;
-		acedSetStatusBarProgressMeter(_T("Экспорт в Excel"), 0, 100);
+		acedSetStatusBarProgressMeter(_T("Izvoz u Excel"), 0, 100);
 
-		if (FAILED(m_msExcel->NewExcelBook(false) == E_FAIL)) { acutPrintf(_T("\n Ошибка")); acedRestoreStatusBar(); delete m_msExcel; return; }
+		if (FAILED(m_msExcel->NewExcelBook(false) == E_FAIL)) { acutPrintf(_T("\n Greška")); acedRestoreStatusBar(); delete m_msExcel; return; }
 		acedRestoreStatusBar();
 		if (speclist.specList.physicalLength() != 0)
 		{
@@ -5082,7 +3687,7 @@ public:
 
 		if (!pBlkTbl->has(pName))
 		{
-			acutPrintf(L"\nBlock definition TEST does not exist");
+			acutPrintf(L"\nDefinicija bloka TEST ne postoji");
 			pBlkTbl->close();
 			return false;
 		}
@@ -5129,18 +3734,18 @@ public:
 						}
 					}
 					else {
-						acutPrintf(_T("\nНе удалось открыть примитив в блоке! Ошибка: %s",
+						acutPrintf(_T("\nNije moguće otvoriti element u bloku! Greška: %s",
 							LPCTSTR(acadErrorStatusText(es))));
 					}
 				}
 				else {
-					acutPrintf(_T("\nНе удалось получить AcDbObjectId примитва в блоке! Ошибка: %s",
+					acutPrintf(_T("\nNije moguće dobiti AcDbObjectId elementa u bloku! Greška: %s",
 						LPCTSTR(acadErrorStatusText(es))));
 				}
 			}
 		}
 		else {
-			acutPrintf(_T("\nНе удалось создать итератор для записи таблицы блоков! Ошибка: %s", LPCTSTR(acadErrorStatusText(es))));
+			acutPrintf(_T("\nNije moguće napraviti iterator zapisa tabele blokova! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 		}
 
 
@@ -5166,7 +3771,7 @@ public:
 		// specify the text,tag and prompt
 		ACHAR text[] = { L"" };
 
-		ACHAR prompt[] = { L"Введите значение" };
+		ACHAR prompt[] = { L"Unesite vrijednost" };
 
 		pCurDb =
 			acdbHostApplicationServices()->workingDatabase();
@@ -5176,7 +3781,7 @@ public:
 
 		if (!pBlkTbl->has(pName))
 		{
-			acutPrintf(L"\nBlock definition TEST does not exist");
+			acutPrintf(L"\nDefinicija bloka TEST ne postoji");
 			pBlkTbl->close();
 			return;
 
@@ -5203,6 +3808,7 @@ public:
 
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -5239,6 +3845,7 @@ public:
 
 
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName;
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
@@ -5317,6 +3924,7 @@ public:
 	static void Ventilation_ARXTVS_AddAtrib(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_point pt1;
 		ads_name ent;
 		Acad::ErrorStatus es;
@@ -5331,7 +3939,7 @@ public:
 		Astat2 = false;
 		while (Astat2 == false)
 		{
-			Astat = acedEntSel(_T("\nВыберете блок для добавления атрибутов: "), ent, pt1);
+			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite blok za dodavanje atributa: "), ent, pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -5438,6 +4046,7 @@ public:
 	static void Ventilation_ARXTVS_SCALE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name sset, eName, ent;
 		ads_point pt1;
 		bool isOk = false;
@@ -5451,7 +4060,7 @@ public:
 		isOk = false;
 		while (isOk == false)
 		{
-			acadStatus = acedEntSel(_T("\nВыбирите контрольную линию: "), ent, pt1);
+			acadStatus = acedEntSel(_T("\nIzaberite referentnu liniju: "), ent, pt1);
 			switch (acadStatus)
 			{
 			case RTCAN:
@@ -5480,7 +4089,7 @@ public:
 		{
 			double newLength;
 
-			acadStatus = acedGetReal(_T("\nВведите Требуемую длину: "), &len);
+			acadStatus = acedGetReal(_T("\nUnesite potrebnu dužinu: "), &len);
 			switch (acadStatus)
 			{
 			case RTCAN:
@@ -5505,6 +4114,7 @@ public:
 	static void Ventilation_ARXTVS_HEATFLOOR(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
+		syncTVSGlobalUnits();
 		ads_name eName, ent;
 		ads_point pt1;
 		bool isOk = false;
@@ -5517,7 +4127,7 @@ public:
 		isOk = false;
 		while (isOk == false)
 		{
-			acadStatus = acedEntSel(_T("\nВыбирите полилинию для построения ТП: "), ent, pt1);
+			acadStatus = tvsCoordinates::selectEntity(_T("\nIzaberite poliliniju za crtanje podnog grijanja: "), ent, pt1);
 			switch (acadStatus)
 			{
 			case RTCAN:
@@ -5568,7 +4178,7 @@ public:
 	// 		isOk=false;
 	// 		while (isOk==false)
 	// 		{
-	// 			acadStatus=acedGetPoint(pt1,_T("\nУкажите точку:"),pt1);
+	// 			acadStatus=tvsCoordinates::getPoint(pt1,_T("\nУкажите точку:"),pt1);
 	// 			switch (acadStatus)
 	// 			{
 	// 			case RTCAN:
@@ -5640,6 +4250,8 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddProp
 
 
 
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MOVE, TVS_MOVE, ACRX_CMD_MODAL, NULL)
+
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_TRANSPARENT, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_DRAW, TVS_DRAW, ACRX_CMD_TRANSPARENT, NULL)
@@ -5675,4 +4287,31 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, TVSMyGroup, MyCommand, MyCom
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, TVSMyGroup, MyPickFirst, MyPickFirstLocal, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, TVSMyGroup, MySessionCmd, MySessionCmdLocal, ACRX_CMD_MODAL | ACRX_CMD_SESSION, NULL)
 ACED_ADSSYMBOL_ENTRY_AUTO(CTVS_Ventilation_ARXApp, MyLispFunction, false)
+
+
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH, TVS_STRETCH, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRELAZ_KOTA, TVS_PRELAZ_KOTA, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOTE, TVS_KOTE, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MATCH, TVS_MATCH, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
+
+#ifdef TVS_OFFSET_PROOF
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET, TVS_TEST_OFFSET, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET_CHECK, TVS_TEST_OFFSET_CHECK, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OFFSET_FAIL, TVS_TEST_OFFSET_FAIL, ACRX_CMD_MODAL, NULL)
+#endif
+
+#ifdef TVS_OFFSET_INTEGRATION
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_STATUS, TVS_OFFSET_STATUS, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET, TVS_OFFSET, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_POLICY, TVS_OFFSET_POLICY, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_TEST_BAD, TVS_OFFSET_TEST_BAD, ACRX_CMD_MODAL, NULL)
+#endif
+
+#ifdef TVS_OFFSET_INTEGRATION
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_FAIL_NEXT, TVS_OFFSET_FAIL_NEXT, ACRX_CMD_MODAL, NULL)
+#endif
 

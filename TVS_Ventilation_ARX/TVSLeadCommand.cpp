@@ -3,9 +3,12 @@
 #include "SPEC.h"
 #include <dbmleader.h>
 #include "Func.h"
+#include "CoordinateInput.h"
 #include "dgMLeadProperty.h"
 #include "MleaderController.h"
 #include "TVSController.h"
+#include "MLeaderStyleTools.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
 using namespace func;
 
 TVSCommandLead::TVSCommandLead(void)
@@ -26,17 +29,14 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 {
 
 	AcDbMText *mText = new AcDbMText();
-	AcGeVector3d vec;
-	if (ptStart.x < ptEnd.x)
-	{
-		vec = AcGeVector3d(0, 1, 0);
-	}
-	else
-	{
-		vec = AcGeVector3d(0, -1, 0);
-	}
+	// Side of the text: to the left of the landing point when it was picked left of the
+	// duct point, otherwise to the right (also for a vertical leader). AutoCAD takes the
+	// side from the dogleg direction of each label; the style cannot decide it.
+	const bool textLeft = ptEnd.x < ptStart.x;
+	const AcGeVector3d side = textLeft ? AcGeVector3d(-1, 0, 0) : AcGeVector3d(1, 0, 0);
 
 	mText->setLocation(ptEnd);
+	mText->setAttachment(textLeft ? AcDbMText::kTopRight : AcDbMText::kTopLeft);
 
 	mText->setColorIndex(AcDb::kByLayer);
 	mText->setContents(message.GetString());
@@ -48,14 +48,33 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 	//pEnt->setLineWeight(AcDb::kLnWt025);
 	//pEnt->setColor(pEnt1->color());
 
+	// Style and scale from the label settings: style heights are paper mm, the overall
+	// scale is drawing scale / drawing units. A style missing in this drawing is copied
+	// again from the DWG it was chosen from.
+	{
+		AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
+		const MLeaderSettings& m = Settings::get()->mLeader;
+		AcDbObjectId styleId = tvsMLeaderStyle::ensure(db, m.style, m.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : m.styleSource);
+		if (styleId.isNull() && db) styleId = db->mleaderstyle();
+		const double scale = m.scale > 0 ? m.scale / tvsUnits::factor(db) : 1;
+		if (!styleId.isNull()) {
+			pEnt->setMLeaderStyle(styleId);
+			AcDbObjectPointer<AcDbMLeaderStyle> style(styleId, AcDb::kForRead);
+			// MText content keeps an absolute height; AutoCAD shows it as Height = absolute /
+			// Overall scale. So the absolute height is style height x scale (Height 2.5,
+			// Overall scale 50 -> 125), consistent with a plain AutoCAD multileader.
+			if (style.openStatus() == Acad::eOk) { mText->setTextStyle(style->textStyleId()); mText->setTextHeight(style->textHeight() * scale); }
+		}
+		pEnt->setScale(scale);
+	}
+
 	int i;
 	pEnt->setContentType(AcDbMLeaderStyle::kMTextContent);
 	pEnt->addLeader(i);
+	const int leader = i; // cluster index (i becomes the leader line index below)
 	pEnt->addLeaderLine(ptStart, i);
 	pEnt->addLastVertex(i, ptEnd);
-	//pEnt->setEnableDogleg(false);
-	//pEnt->setDoglegLength(10);
-	//pEnt->setDoglegDirection(i,vec);
+	pEnt->setDoglegDirection(leader, side);
 
 	pEnt->setMText(mText);
 
@@ -65,7 +84,18 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 		AcDbObjectPointer<AcDbMLeader>pEnt1(pEnt->id(), AcDb::kForWrite);
 		if (pEnt1.openStatus() == Acad::eOk)
 		{
-			pEnt1->setLastVertex(i, ptEnd);
+			// The MText sits with its top-left corner at ptEnd, while the style attaches the
+			// leader elsewhere (e.g. underline of the first line). First let AutoCAD re-attach
+			// the leader end to the content (tiny move of content + dogleg, as a manual text
+			// move does), read where it attached, then move content and leader end together
+			// so the attachment lands on the picked point ptEnd. The arrow stays on the duct.
+			// a tiny real move (a zero vector could be ignored); the second move corrects it
+			pEnt1->moveMLeader(AcGeVector3d(1e-4, 0, 0), AcDbMLeader::kMoveContentAndDoglegPoints);
+			AcGePoint3d attached;
+			if (pEnt1->getLastVertex(i, attached) == Acad::eOk) {
+				const AcGeVector3d shift = ptEnd - attached;
+				if (shift.length() > 1e-9) pEnt1->moveMLeader(shift, AcDbMLeader::kMoveContentAndDoglegPoints);
+			}
 			//pEnt1->mtext()->setColorIndex(-1);
 		}
 
@@ -124,8 +154,8 @@ void TVSCommandLead::execute(void)
 		while (Astat2 == false)
 		{
 			Astat2 = true;
-			acedInitGet(RSG_NONULL, _T("Настройки Н y"));
-			Astat = acedEntSel(_T("\nВыберете Блок или Воздуховод или Настройки  [Н]: "), vozd1, pt1);
+			acedInitGet(RSG_NONULL, _T("Podešavanja P"));
+			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite blok ili kanal ili [Podešavanja]: "), vozd1, pt1);
 			switch (Astat)
 			{
 			case RTCAN:
@@ -211,7 +241,7 @@ void TVSCommandLead::execute(void)
 
 				}
 				else {
-					acutPrintf(_T("\nОбьект заблокирован"));
+					acutPrintf(_T("\nObjekat je zaključan"));
 				}
 			}
 			if (ft) {
@@ -225,7 +255,7 @@ void TVSCommandLead::execute(void)
 	pt1[0] = pCut.x;
 	pt1[1] = pCut.y;
 	pt1[2] = pCut.z;
-	if (acedGetPoint(pt1, _T("\nУкажите 2 точку:"), pt2) == RTCAN)
+	if (tvsCoordinates::getPoint(pt1, _T("\nZadajte drugu tačku: "), pt2) == RTCAN)
 		return;
 	createMLeader(resultMessage, pCut, asPnt3d(pt2), id);
 	return;

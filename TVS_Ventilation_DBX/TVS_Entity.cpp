@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -24,7 +24,105 @@
 //-----------------------------------------------------------------------------
 
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include "BypassAssemblyData.h"
+#include <limits>
+#endif
 #include "TVS_Entity.h"
+#include "TVS_Pipe.h"
+#include "TVS_TAP.h"
+#include "TVS_TRANS.h"
+#include "TVS_WYE.h"
+#include "SheetMetal.h"
+
+// Invalidate the selection total when native geometry is opened/closed for write.
+// This is process-local bookkeeping, not stored object state.
+static unsigned long s_sheetMetalRevision = 1;
+unsigned long TVS_Entity::sheetMetalRevision() {
+#ifdef TVS_OFFSET_INTEGRATION
+    return s_sheetMetalRevision+tvsOffsetData::revision();
+#else
+    return s_sheetMetalRevision;
+#endif
+}
+
+bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &massKg) const
+{
+    assertReadEnabled();
+    areaM2 = thicknessMm = massKg = 0.0;
+#ifdef TVS_OFFSET_INTEGRATION
+    const tvsOffsetData::Status integrity=tvsOffsetData::quantityStatus(this);
+    if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
+        acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
+#endif
+    if ((TVS_Pipe::cast(this) || TVS_TAP::cast(this)) && DuctType == DuctTypeFlex) return false;
+    const double f = tvsUnits::factor(this);
+    double largest = 0.0;
+    if (const TVS_Pipe *p = TVS_Pipe::cast(this)) {
+        const double a = p->SizeA*f, b = p->ThisRound ? 0.0 : p->SizeB*f;
+        #ifdef TVS_OFFSET_INTEGRATION
+        double physical=0;if(!p->getPhysicalLength(physical))return false;
+        const double length=physical*f;
+#else
+        const double length = p->get_Length()*f;
+#endif
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::nonnegative(length)) return false;
+        largest = tvsSheetMetal::larger(a,b);
+        areaM2 = tvsSheetMetal::pipeArea(a,b,length);
+    }
+    else if (const TVS_TAP *p = TVS_TAP::cast(this)) {
+        // Stored A/B remain plan width/height. Vertical elbows bend through height B.
+        const bool vertical = !p->ThisRound && (p->get_Form() == Form_Up || p->get_Form() == Form_Down);
+        const double a = (vertical ? p->SizeB : p->SizeA)*f;
+        const double b = p->ThisRound ? 0.0 : (vertical ? p->SizeA : p->SizeB)*f;
+        const double radius = p->get_radius()*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::nonnegative(radius)
+            || !tvsSheetMetal::nonnegative(std::fabs(p->Swectangle))) return false;
+        largest = tvsSheetMetal::larger(a,b);
+        areaM2 = tvsSheetMetal::elbowArea(a,b,radius,p->Swectangle);
+    }
+    else if (const TVS_TRANS *p = TVS_TRANS::cast(this)) {
+        const double a = p->SizeAp1*f, b = p->ThisRoundp1 ? 0.0 : p->SizeBp1*f;
+        const double a2 = p->SizeAp2*f, b2 = p->ThisRoundp2 ? 0.0 : p->SizeBp2*f;
+        const double length = p->LengthTr*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::section(a2,b2)
+            || !tvsSheetMetal::nonnegative(length)) return false;
+        largest = tvsSheetMetal::larger(tvsSheetMetal::larger(a,b),tvsSheetMetal::larger(a2,b2));
+        areaM2 = tvsSheetMetal::transitionArea(a,b,a2,b2,length);
+    }
+    else if (const TVS_WYE *p = TVS_WYE::cast(this)) {
+        const double a = p->SizeApr*f, b = p->ThisRoundpr ? 0.0 : p->SizeBpr*f;
+        const double a2 = p->SizeAotv*f, b2 = p->ThisRoundotv ? 0.0 : p->SizeBotv*f;
+        const double length = p->LengthPl*f;
+        if (!tvsSheetMetal::section(a,b) || !tvsSheetMetal::section(a2,b2)
+            || !tvsSheetMetal::nonnegative(length)) return false;
+        largest = tvsSheetMetal::larger(tvsSheetMetal::larger(a,b),tvsSheetMetal::larger(a2,b2));
+        areaM2 = tvsSheetMetal::wyeArea(a,b,a2,b2,length);
+        // T komad TK-O / TK-G: run/inlet + branch quarter elbows + collars (geometry/TeeShape.h).
+        tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
+        if (b > 0.0 && b2 > 0.0 && p->teeShape(tee, o, ex, ey)) {
+            tvsTee::Tee mm = tee; mm.A *= f; mm.C *= f; mm.w1 *= f; mm.w2 *= f; mm.R1 *= f; mm.R2 *= f; mm.l *= f;
+            // TK-O: run height b, branch b2; TK-G: inlet = TVS branch (b2), outlets = TVS run (b).
+            areaM2 = tee.type == tvsTee::Branch ? tvsTee::area(mm, b, b2) : tvsTee::area(mm, b2, b);
+            largest = tvsSheetMetal::larger(largest, tvsSheetMetal::larger(mm.C, mm.w2));
+        }
+    }
+    else return false;
+    thicknessMm = tvsSheetMetal::thickness(largest);
+    massKg = tvsSheetMetal::mass(areaM2,thicknessMm);
+    if (!tvsSheetMetal::nonnegative(areaM2) || !tvsSheetMetal::nonnegative(massKg)) {
+        areaM2 = thicknessMm = massKg = 0.0;
+#ifdef TVS_OFFSET_INTEGRATION
+    const tvsOffsetData::Status integrity=tvsOffsetData::quantityStatus(this);
+    if(integrity!=tvsOffsetData::Legacy&&integrity!=tvsOffsetData::Valid&&integrity!=tvsOffsetData::Incomplete){
+        acutPrintf(L"\nTVS OFFSET: fizički obračun odbijen — %s.",tvsOffsetData::statusText(integrity));return false;}
+#endif
+        return false;
+    }
+    return thicknessMm > 0.0;
+}
+
 
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_Entity::kCurrentVersionNumber =TVS_Version ;
@@ -66,6 +164,7 @@ Acad::ErrorStatus TVS_Entity::dwgOutFields (AcDbDwgFiler *pFiler) const {
 }
 
 Acad::ErrorStatus TVS_Entity::dwgInFields (AcDbDwgFiler *pFiler) {
+    ++s_sheetMetalRevision;
 	assertWriteEnabled () ;
 	//----- Read parent class information first.
 	Acad::ErrorStatus es =AcDbCurve::dwgInFields (pFiler) ;
@@ -88,17 +187,35 @@ Acad::ErrorStatus TVS_Entity::dwgInFields (AcDbDwgFiler *pFiler) {
 }
 
 //- SubXXX() methods (self notification)
+#ifdef TVS_OFFSET_INTEGRATION
+Acad::ErrorStatus TVS_Entity::subDeepClone(AcDbObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
+    if(tvsBypassData::marked(this)){cloned=NULL;acutPrintf(L"\nDEV BYPASS: COPY sklopa nije podrzan; original ostaje nepromijenjen.");return Acad::eNotApplicable;}
+    Acad::ErrorStatus result=AcDbCurve::subDeepClone(owner,cloned,mapping,primary);
+    if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
+    return result;
+}
+Acad::ErrorStatus TVS_Entity::subWblockClone(AcRxObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
+    if(tvsBypassData::marked(this)){cloned=NULL;acutPrintf(L"\nDEV BYPASS: WBLOCK/INSERT kloniranje nije podrzano.");return Acad::eNotApplicable;}
+    Acad::ErrorStatus result=AcDbCurve::subWblockClone(owner,cloned,mapping,primary);
+    if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
+    return result;
+}
+#endif
 Acad::ErrorStatus TVS_Entity::subOpen (AcDb::OpenMode mode) {
-	return (AcDbCurve::subOpen (mode)) ;
+    const Acad::ErrorStatus status = AcDbCurve::subOpen(mode);
+    if (status == Acad::eOk && mode == AcDb::kForWrite) ++s_sheetMetalRevision;
+    return status;
 }
 
 
 
 Acad::ErrorStatus TVS_Entity::subCancel () {
+    ++s_sheetMetalRevision;
 	return (AcDbCurve::subCancel ()) ;
 }
 
 Acad::ErrorStatus TVS_Entity::subClose () {
+    if (isWriteEnabled()) ++s_sheetMetalRevision;
 	return (AcDbCurve::subClose ()) ;
 }
 
@@ -223,6 +340,9 @@ Acad::ErrorStatus TVS_Entity::subGetOsnapPoints (
 Acad::ErrorStatus TVS_Entity::subGetGripPoints (
 	AcGePoint3dArray &gripPoints, AcDbIntArray &osnapModes, AcDbIntArray &geomIds
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled () ;
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new getGripPoints() method below (which is the default implementation)
@@ -231,6 +351,9 @@ Acad::ErrorStatus TVS_Entity::subGetGripPoints (
 }
 
 Acad::ErrorStatus TVS_Entity::subMoveGripPointsAt (const AcDbIntArray &indices, const AcGeVector3d &offset) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new moveGripPointsAt() method below (which is the default implementation)
@@ -242,6 +365,9 @@ Acad::ErrorStatus TVS_Entity::subGetGripPoints (
 	AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize, 
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled () ;
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -254,6 +380,9 @@ Acad::ErrorStatus TVS_Entity::subMoveGripPointsAt (
 	const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset,
 	const int bitflags
 ) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled () ;
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -264,14 +393,14 @@ Acad::ErrorStatus TVS_Entity::subMoveGripPointsAt (
 
 double TVS_Entity::get_Speed() {
 
-	if (SizeA == 0) return 0;
+	if (tvsUnits::mm(SizeA, this) == 0) return 0;
 	if (get_ThisRound() == true)
 	{
-		return Flow / (3600 * 3.14*(SizeA / 1000)*(SizeA / 1000) / 4);
+		return Flow / (3600 * 3.14*(tvsUnits::mm(SizeA, this) / 1000)*(tvsUnits::mm(SizeA, this) / 1000) / 4);
 	}
 	else
 	{
-		return Flow / (3600 * (SizeA / 1000)*(SizeB / 1000));
+		return Flow / (3600 * (tvsUnits::mm(SizeA, this) / 1000)*(tvsUnits::mm(SizeB, this) / 1000));
 	}
 }
 
@@ -469,6 +598,9 @@ double TVS_Entity::get_Axis(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Axis(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Axis =newVal ;
 	return (Acad::eOk) ;
@@ -486,6 +618,9 @@ double TVS_Entity::get_SizeA(void) const
 
 Acad::ErrorStatus TVS_Entity::put_SizeA(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	SizeA =newVal ;
 	put_Elevation(Elev);
@@ -499,6 +634,9 @@ double TVS_Entity::get_SizeB(void) const
 
 Acad::ErrorStatus TVS_Entity::put_SizeB(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	SizeB =newVal ;
 	if (newVal==0) ThisRound=true;
@@ -515,6 +653,9 @@ bool TVS_Entity::get_ThisRound(void) const
 
 Acad::ErrorStatus TVS_Entity::put_ThisRound (bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	ThisRound =newVal ;
 	return (Acad::eOk) ;
@@ -527,6 +668,9 @@ bool TVS_Entity::get_This1D(void) const
 
 Acad::ErrorStatus TVS_Entity::put_This1D (bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	This1D =newVal ;
 	return (Acad::eOk) ;
@@ -544,6 +688,9 @@ double TVS_Entity::get_Flow(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Flow(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Flow =newVal ;
 	return (Acad::eOk) ;
@@ -559,6 +706,9 @@ int TVS_Entity::get_Direct(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Direct(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Direct =newVal ;
 	return (Acad::eOk) ;
@@ -572,6 +722,9 @@ double TVS_Entity::get_Elevation(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Elevation(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	if (SizeB==0)
 	{
@@ -595,6 +748,9 @@ bool TVS_Entity::get_Wipeout(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Wipeout(bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Wipeout =newVal ;
 	return (Acad::eOk) ;
@@ -608,6 +764,9 @@ int TVS_Entity::get_Param(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Param(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Param =newVal ;
 	return (Acad::eOk) ;
@@ -702,6 +861,9 @@ bool TVS_Entity::get_Grani(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Grani(bool newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Grani =newVal ;
 	return (Acad::eOk) ;
@@ -720,6 +882,9 @@ double TVS_Entity::get_ElevUp(void) const
 
 Acad::ErrorStatus TVS_Entity::put_ElevUp(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	if (SizeB==0)
 	{
@@ -745,6 +910,9 @@ double TVS_Entity::get_ElevDown(void) const
 
 Acad::ErrorStatus TVS_Entity::put_ElevDown(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	if (SizeB==0)
 	{
@@ -771,6 +939,9 @@ TCHAR * TVS_Entity::get_Tag1(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Tag1(TCHAR * newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	acutDelString(Tag1);
 	Tag1 = NULL;
@@ -791,6 +962,9 @@ TCHAR * TVS_Entity::get_Tag2(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Tag2(TCHAR * newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	acutDelString(Tag2);
 	Tag2 = NULL;
@@ -832,6 +1006,9 @@ int TVS_Entity::get_Form(void) const
 
 Acad::ErrorStatus TVS_Entity::put_Form(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	Form=newVal;
 	return Acad::eOk;
@@ -847,36 +1024,34 @@ void TVS_Entity::setMainProperty(AcDbEntity *pEnt)
 	ListOfEntity.append(pEnt);
 }
 
+void TVS_Entity::setAuxLinetype(AcDbEntity *pEnt, const ACHAR* name) const
+{
+	AcDbDatabase *pDb = database() ? database() : acdbHostApplicationServices()->workingDatabase();
+	AcDbLinetypeTable *pLtTable = NULL;
+	AcDbObjectId ltId;
+	if (pDb && pDb->getSymbolTable(pLtTable, AcDb::kForRead) == Acad::eOk) {
+		pLtTable->getAt(name, ltId);
+		pLtTable->close();
+	}
+	pEnt->setLinetype(ltId);
+	pEnt->setLinetypeScale(this->linetypeScale() / tvsUnits::factor(pDb));
+}
+
 void TVS_Entity::setCenterProperty(AcDbEntity *pEnt)
 {
-	AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-	AcDbLinetypeTable *pLtTable;
-	AcDbObjectId ltId;
-	pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-	pLtTable->getAt(_T("tvs_centerline"), ltId);
-
-	pLtTable->close();
 	pEnt->setLineWeight(AcDb::LineWeight(15));
 	pEnt->setLayer(this->layerId());
-	pEnt->setLinetype(ltId);
+	setAuxLinetype(pEnt, _T("tvs_centerline"));
 	pEnt->setColor(this->color());
 	ListOfEntity.append(pEnt);
 }
 
 void TVS_Entity::setHideProperty(AcDbEntity *pEnt)
 {
-	AcDbDatabase *pDb = acdbHostApplicationServices()->workingDatabase();
-	AcDbLinetypeTable *pLtTable;
-	AcDbObjectId ltId;
-	pDb->getSymbolTable(pLtTable, AcDb::kForRead);
-	pLtTable->getAt(_T("tvs_hidden"), ltId);
-
-	pLtTable->close();
 	pEnt->setLineWeight(AcDb::LineWeight(15));
 	pEnt->setLayer(this->layerId());
-	pEnt->setLinetype(ltId);
+	setAuxLinetype(pEnt, _T("tvs_hidden"));
 	pEnt->setColor(this->color());
-	pEnt->setLinetypeScale(this->linetypeScale());
 	ListOfEntity.append(pEnt);
 }
 
@@ -900,6 +1075,31 @@ void TVS_Entity::setZigzagProperty(AcDbEntity *pEnt)
 	ListOfEntity.append(pEnt);
 }
 
+void TVS_Entity::setFlexDrawing(const tvsFlex::Drawing& drawing, double z)
+{
+	for (int side = 0; side < 2; ++side) {
+		const std::vector<tvsFlex::Vertex>& edge = drawing.edges[side];
+		if (edge.size() < 2) continue;
+		AcDbPolyline* pl = new AcDbPolyline(static_cast<unsigned int>(edge.size()));
+		for (size_t j = 0; j < edge.size(); ++j)
+			pl->addVertexAt(static_cast<unsigned int>(j), AcGePoint2d(edge[j].x, edge[j].y), edge[j].bulge);
+		pl->setElevation(z);
+		setMainProperty(pl);
+	}
+	for (size_t c = 0; c < drawing.cuffs.size(); ++c) {
+		const std::vector<tvsFlex::Vertex>& q = drawing.cuffs[c];
+		AcDbPolyline* pl = new AcDbPolyline(static_cast<unsigned int>(q.size()));
+		for (size_t j = 0; j < q.size(); ++j)
+			pl->addVertexAt(static_cast<unsigned int>(j), AcGePoint2d(q[j].x, q[j].y), q[j].bulge);
+		pl->setClosed(Adesk::kTrue); pl->setElevation(z);
+		setMainProperty(pl);
+	}
+	for (size_t j = 0; j < drawing.rings.size(); ++j) {
+		const tvsFlex::Line& l = drawing.rings[j];
+		setThinProperty(new AcDbLine(AcGePoint3d(l.x0, l.y0, z), AcGePoint3d(l.x1, l.y1, z)));
+	}
+}
+
 void TVS_Entity::setThinProperty( AcDbEntity *pEnt )
 {
 	pEnt->setLineWeight(AcDb::LineWeight(15));
@@ -918,6 +1118,9 @@ double TVS_Entity::get_WipeoutLength(void) const
 
 Acad::ErrorStatus TVS_Entity::put_WipeoutLength(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled () ;
 	WipeoutLength=newVal;
 	return Acad::eOk;
@@ -932,6 +1135,9 @@ void TVS_Entity::setFlex( const bool &isFlex )
 
 void TVS_Entity::setStill()
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled () ;
 	DuctType=DuctTypeStill;
 }
@@ -944,12 +1150,18 @@ int TVS_Entity::getDuctType()
 
 void TVS_Entity::setDuctType(int pDuctType)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType=pDuctType;
 }
 
 void TVS_Entity::setNewParameters()
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType=DuctTypeStill;
 }
@@ -1005,11 +1217,11 @@ void TVS_Entity::setWipeoutProperty(AcGiWorldDraw *mode, AcDbPolyline *pEnt)
 		    rgbColor = (COLORREF)pAcadColors.dwGfxLayoutBkColor; 
 	} 
 
-	backcolor.setCOLORREF(rgbColor);
+	backcolor.setRGB(GetRValue(rgbColor), GetGValue(rgbColor), GetBValue(rgbColor));
 	
 	
 	AcCmColor bgcolor;
-	bgcolor.setCOLORREF(rgbColor);
+	bgcolor.setRGB(GetRValue(rgbColor), GetGValue(rgbColor), GetBValue(rgbColor));
 	pEnt->setColor(bgcolor);
 	if (This1D==false) pEnt->setConstantWidth(SizeA+WipeoutLength*2);
 	else pEnt->setConstantWidth(WipeoutLength*2);

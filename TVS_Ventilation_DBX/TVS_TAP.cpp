@@ -23,7 +23,12 @@
 //----- TVS_TAP.cpp : Implementation of TVS_TAP
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#include <limits>
+#endif
 #include "TVS_TAP.h"
+#include "FlexCuffData.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_TAP::kCurrentVersionNumber = TVS_Version;
@@ -51,12 +56,12 @@ void TVS_TAP::getSizeString(CString &sizeStr, const bool &sortSize/*=false*/)
 {
 	double SA, SB;
 	if (Form == Form_Direct || SizeB==0) {
-		SA = get_SizeA();
-		SB = get_SizeB();
+		SA = tvsUnits::mm(get_SizeA(), this);
+		SB = tvsUnits::mm(get_SizeB(), this);
 	}
 	else {
-		SB = get_SizeA();
-		SA = get_SizeB();
+		SB = tvsUnits::mm(get_SizeA(), this);
+		SA = tvsUnits::mm(get_SizeB(), this);
 	}
 
 	if (SB == 0)
@@ -386,8 +391,15 @@ Adesk::Boolean TVS_TAP::subWorldDraw(AcGiWorldDraw *mode) {
 
 
 
-				setZigzagProperty(arcie1);
-				setZigzagProperty(arcie2);
+				// Air hose elbow: convex beads around the bend (geometry/FlexHose.h); zigzag fallback.
+				tvsFlex::Drawing hose;
+				bool cuffStart = false, cuffEnd = false; tvsFlexCuff::read(this, cuffStart, cuffEnd); // start = MA side
+				const double unit = tvsUnits::factor(this), cuff = tvsFlexCuff::lengthMm() / unit;
+				const tvsFlex::Cuffs cuffs(cuffStart ? cuff : 0, cuffEnd ? cuff : 0, tvsFlexCuff::extraMm() / unit);
+				if (tvsFlex::elbow(CenterPoint.x, CenterPoint.y, Radius + SizeA / 2, startangle, Swectangle, SizeA, tvsFlex::defaultPitch(), hose, cuffs)) {
+					setFlexDrawing(hose, CenterPoint.z); delete arcie1; delete arcie2;
+				}
+				else { setZigzagProperty(arcie1); setZigzagProperty(arcie2); }
 				setCenterProperty(arcie3);
 				// 			setMainProperty(pLine1);
 				// 			setMainProperty(pLine2);
@@ -950,9 +962,9 @@ Adesk::Boolean TVS_TAP::subWorldDraw(AcGiWorldDraw *mode) {
 				double flanez = 0;
 
 
-				if (SizeA < 630)
+				if (tvsUnits::mm(SizeA, this) < 630)
 				{
-					flanez = 45;
+					flanez = tvsUnits::drawing(45.0, this);
 				}
 				AcGePoint3d pM16, pM25;
 				double bigRl = atan(flanez / (Radius + SizeA));
@@ -1927,6 +1939,9 @@ Acad::ErrorStatus TVS_TAP::subGetOsnapPoints(
 Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 	AcGePoint3dArray &gripPoints, AcDbIntArray &osnapModes, AcDbIntArray &geomIds
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled();
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new getGripPoints() method below (which is the default implementation)
@@ -1944,6 +1959,9 @@ Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 }
 
 Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(const AcDbIntArray &indices, const AcGeVector3d &offset) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	//----- This method is never called unless you return eNotImplemented 
 	//----- from the new moveGripPointsAt() method below (which is the default implementation)
 	assertWriteEnabled();
@@ -1997,6 +2015,9 @@ Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 	AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize,
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eOk;
+#endif
 	assertReadEnabled();
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -2009,6 +2030,9 @@ Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(
 	const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset,
 	const int bitflags
 ) {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
+#endif
 	assertWriteEnabled();
 
 	//----- If you return eNotImplemented here, that will force AutoCAD to call
@@ -2188,7 +2212,7 @@ void TVS_TAP::getCount(double &count)
 
 	if (DuctType == DuctTypeFlex)
 	{
-		count = M_PI*Radius*Swectangle / 2 / M_PI / 1000;
+		count = tvsUnits::metres(M_PI*Radius*Swectangle / 2 / M_PI, this);
 	}
 	else {
 
@@ -2253,13 +2277,13 @@ TVS_TAP *TVS_TAP::add_new(double &pSizeA,
 	pEnt->RadiusTypeRect = RadiusTypeRect_RadiusConstant;
 	pEnt->RadiusTypeRound = RadiusTypeRound_RadiusSpecific;
 	pEnt->RadiusVariableParameter = 1;
-	pEnt->RadiusConst = 150;
+	pEnt->RadiusConst = tvsUnits::drawing(150.0, pEnt);
 	pEnt->Form = Form_Direct;
 	pEnt->setNewParameters();
 
 	if (pThisRound == true)
 	{
-		if (pSizeA < 355)
+		if (tvsUnits::mm(pSizeA, pEnt) < 355)
 		{
 			pEnt->Radius = pSizeA;
 		}
@@ -2295,6 +2319,9 @@ TVS_TAP *TVS_TAP::add_new(double &pSizeA,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS: clan obilaska/offseta se moze samo pomjeriti ili rotirati oko Z (SCALE/MIRROR nisu dozvoljeni).");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Acad::ErrorStatus retCode = AcDbEntity::subTransformBy(xform);
 	MiddlePoint.transformBy(xform);
@@ -2339,6 +2366,9 @@ double TVS_TAP::get_SizeA(void) const
 
 Acad::ErrorStatus TVS_TAP::put_SizeA(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 
 
@@ -2353,6 +2383,9 @@ double TVS_TAP::get_SizeB(void) const
 
 Acad::ErrorStatus TVS_TAP::put_SizeB(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 
 
@@ -2401,6 +2434,9 @@ double TVS_TAP::get_Swectangle(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Swectangle(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Swectangle = newVal;
 	return (Acad::eOk);
@@ -2413,6 +2449,9 @@ AcGeVector3d TVS_TAP::get_Startvector(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Startvector(AcGeVector3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Startvector = newVal;
 	return (Acad::eOk);
@@ -2426,6 +2465,9 @@ AcGePoint3d TVS_TAP::get_Centerpoint(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Centerpoint(AcGePoint3d newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	MiddlePoint = newVal;
 	return (Acad::eOk);
@@ -2876,6 +2918,9 @@ int TVS_TAP::get_TypeRoundTap(void) const
 }
 Acad::ErrorStatus TVS_TAP::put_TypeRoundTap(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	TypeRoundTap = newVal;
 	return (Acad::eOk);
@@ -2888,12 +2933,18 @@ int TVS_TAP::get_RadiusTypeRound(void) const
 }
 Acad::ErrorStatus TVS_TAP::put_RadiusTypeRound(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusTypeRound = newVal;
 	return (Acad::eOk);
 }
 Acad::ErrorStatus TVS_TAP::put_Radius(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Radius = newVal;
 	return (Acad::eOk);
@@ -2901,65 +2952,23 @@ Acad::ErrorStatus TVS_TAP::put_Radius(double newVal)
 
 double TVS_TAP::get_radius(void) const
 {
-	assertReadEnabled();
-	return (Radius);
+    assertReadEnabled();
+    if (DuctType == DuctTypeFlex) return SizeA*RadiusVariableParameter;
+    const bool vertical = !ThisRound && (Form == Form_Up || Form == Form_Down);
+    const double bendSide = vertical ? SizeB : SizeA;
+    const int mode = static_cast<int>(ThisRound ? RadiusTypeRound : RadiusTypeRect);
+    if (mode == (ThisRound ? RadiusTypeRound_RadiusConstant : RadiusTypeRect_RadiusConstant))
+        return RadiusConst;
+    if (mode == (ThisRound ? RadiusTypeRound_RadiusVariable : RadiusTypeRect_RadiusVariable))
+        return bendSide*RadiusVariableParameter;
+    if (mode == (ThisRound ? RadiusTypeRound_RadiusSpecific : RadiusTypeRect_RadiusSpecific))
+        return tvsUnits::mm(bendSide,this) < 355.0 ? bendSide : bendSide/2.0;
+    return Radius;
 }
 
 void TVS_TAP::setRadius()
 {
-	if (DuctType == DuctTypeFlex)
-	{
-		Radius = SizeA*RadiusVariableParameter;
-		return;
-	}
-	if (ThisRound == true)
-	{
-		switch ((int)RadiusTypeRound)
-		{
-		case RadiusTypeRound_RadiusConstant:
-			Radius = RadiusConst;
-			return;
-		case RadiusTypeRound_RadiusSpecific:
-			if (SizeA < 355)
-			{
-				Radius = SizeA;
-			}
-			else Radius = SizeA / 2;
-			return;
-		case RadiusTypeRound_RadiusVariable:
-			Radius = SizeA*RadiusVariableParameter;
-			return;
-
-		default:
-			return;
-		}
-	}
-	else
-	{
-		switch ((int)RadiusTypeRect)
-		{
-		case RadiusTypeRect_RadiusConstant:
-			Radius = RadiusConst;
-			return;
-		case RadiusTypeRect_RadiusSpecific:
-			if (SizeA < 355)
-			{
-				Radius = SizeA;
-			}
-			else Radius = SizeA / 2;
-			return;
-		case RadiusTypeRect_RadiusVariable:
-			Radius = SizeA*RadiusVariableParameter;
-			return;
-
-		default:
-			return;
-		}
-	}
-
-
-
-
+    Radius = get_radius();
 }
 
 int TVS_TAP::get_Form(void) const
@@ -2969,8 +2978,12 @@ int TVS_TAP::get_Form(void) const
 
 Acad::ErrorStatus TVS_TAP::put_Form(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	Form = newVal;
+    setRadius();
 	return (Acad::eOk);
 }
 
@@ -2987,7 +3000,7 @@ void TVS_TAP::checkRadiusTypeRound()
 		return;
 	default:
 		RadiusTypeRound = RadiusTypeRound_RadiusSpecific;
-		RadiusConst = 150;
+		RadiusConst = tvsUnits::drawing(150.0, this);
 		return;
 	}
 
@@ -3006,7 +3019,7 @@ void TVS_TAP::checkRadiusTypeRect()
 		return;
 	default:
 		RadiusTypeRect = RadiusTypeRect_RadiusConstant;
-		RadiusConst = 150;
+		RadiusConst = tvsUnits::drawing(150.0, this);
 		return;
 	}
 
@@ -3054,6 +3067,9 @@ int TVS_TAP::get_RadiusTypeRect(void) const
 
 Acad::ErrorStatus TVS_TAP::put_RadiusTypeRect(int newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusTypeRect = newVal;
 	return (Acad::eOk);
@@ -3067,6 +3083,9 @@ int TVS_TAP::get_RadiusVariableParameter(void) const
 
 void TVS_TAP::setFlex(const bool &isFlex)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	if (isFlex)
 	{
@@ -3082,6 +3101,9 @@ void TVS_TAP::setFlex(const bool &isFlex)
 
 Acad::ErrorStatus TVS_TAP::put_RadiusVariableParameter(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusVariableParameter = newVal;
 	return (Acad::eOk);
@@ -3095,6 +3117,9 @@ int TVS_TAP::get_RadiusConst(void) const
 
 Acad::ErrorStatus TVS_TAP::put_RadiusConst(double newVal)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return Acad::eNotApplicable;}
+#endif
 	assertWriteEnabled();
 	RadiusConst = newVal;
 	return (Acad::eOk);
@@ -3118,6 +3143,9 @@ void TVS_TAP::chekMiddlePoint()
 
 void TVS_TAP::setDuctType(int pDuctType)
 {
+#ifdef TVS_OFFSET_INTEGRATION
+    if(!tvsOffsetData::editable(this)){acutPrintf(L"\nTVS OFFSET: parcijalno editovanje člana sklopa je zabranjeno.");return;}
+#endif
 	assertWriteEnabled();
 	DuctType = pDuctType;
 }

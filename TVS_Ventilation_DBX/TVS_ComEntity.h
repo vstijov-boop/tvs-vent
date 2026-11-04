@@ -27,6 +27,9 @@
 #include "TVS_Entity.h"
 #include "TVS_Ventilation_DBX_i.h"
 #define DISPID_A  0x01
+#define DISPID_SheetArea 90
+#define DISPID_SheetThickness 91
+#define DISPID_SheetMass 92
 
 class ATL_NO_VTABLE CTVS_ComEntity
 
@@ -38,6 +41,7 @@ public:
 
 
 public:
+	HRESULT sheetValue(const TVS_Entity *entity, int property, VARIANT *value);
 	bool tryToSetCommonDisplayName(const DISPID &dispId, BSTR *propName);
 	
 } ;

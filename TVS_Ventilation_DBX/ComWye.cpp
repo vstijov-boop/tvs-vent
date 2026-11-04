@@ -157,49 +157,55 @@ STDMETHODIMP CComWye::GetDisplayName (DISPID dispId, BSTR *propName)
 	{ 
 	
 	case (0x401): 
-		*propName  = ::SysAllocString(_T("Тройник")); 
+		{
+			// T komad type (TVS_TEE_V1): TK-O sa ogrankom, TK-G gacasti, otherwise the plain T.
+			AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+			tvsTeeData::Record r;
+			const bool tee = pSq.openStatus() == Acad::eOk && tvsTeeData::read(pSq.operator->(), r);
+			*propName = ::SysAllocString(!tee ? L"T-komad" : r.type == tvsTee::Branch ? L"T komad sa ogrankom (TK-O)" : L"Gaćasti T komad (TK-G)");
+		}
 		break; 
 		
 	//////////////////////////////////////////////////////////////////////////
 
 //personal
 	case (DISPID_A): 
-		*propName  = ::SysAllocString(L"Dпр"); 
+		*propName  = ::SysAllocString(L"Dpr");
 		break; 
 
 	case (DISPID_SizeB): 
-		*propName  = ::SysAllocString(L"Hпр"); 
+		*propName  = ::SysAllocString(L"Hpr");
 		break; 
 	case (DISPID_A2): 
-		*propName  = ::SysAllocString(L"Dотв"); 
+		*propName  = ::SysAllocString(L"Dotv");
 		break; 
 
 	case (DISPID_SizeB2): 
-		*propName  = ::SysAllocString(L"Hотв"); 
+		*propName  = ::SysAllocString(L"Hotv");
 		break; 
 
 	case (DISPID_Wipeout): 
-		*propName  = ::SysAllocString(L"Маскировка"); 
+		*propName  = ::SysAllocString(L"Maskiranje");
 		break; 
 
 	case (DISPID_Length): 
-		*propName  = ::SysAllocString(L"Длина"); 
+		*propName  = ::SysAllocString(L"Dužina");
 		break; 
 	case (DISPID_1D2D): 
-		*propName  = ::SysAllocString(L"1D"); 
+		*propName  = ::SysAllocString(L"Prikaz 1D");
 		break; 
 	case (DISPID_Rotation): 
-		*propName  = ::SysAllocString(L"Угол"); 
+		*propName  = ::SysAllocString(L"Ugao rotacije");
 		break; 
 	case (DISPID_Elev): 
-		*propName  = ::SysAllocString(L"Отм. Центр"); 
+		*propName  = ::SysAllocString(L"Kota ose");
 		break; 
 
 	case (DISPID_Tag1): 
-		*propName  = ::SysAllocString(L"Тэг 1"); 
+		*propName  = ::SysAllocString(L"Oznaka 1");
 		break;
 	case (DISPID_Tag2): 
-		*propName  = ::SysAllocString(L"Тэг 2"); 
+		*propName  = ::SysAllocString(L"Oznaka 2");
 		break;
 
 	} 
@@ -223,6 +229,7 @@ STDMETHODIMP CComWye::get_Dpr(double *pVal)
 	size = pSq->SizeApr;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -235,6 +242,8 @@ STDMETHODIMP CComWye::put_Dpr(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeApr(newVal);
 	Fire_Notification(DISPID_A);
@@ -253,6 +262,7 @@ STDMETHODIMP CComWye::get_SizeB(double *pVal)
 	size = pSq->SizeBpr;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -265,6 +275,8 @@ STDMETHODIMP CComWye::put_SizeB(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBpr(newVal);
@@ -286,6 +298,7 @@ STDMETHODIMP CComWye::get_Dpr2(double *pVal)
 	size = pSq->SizeAotv;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -298,6 +311,8 @@ STDMETHODIMP CComWye::put_Dpr2(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 	pSq->put_SizeAotv(newVal);
 	Fire_Notification(DISPID_A2);
@@ -316,6 +331,7 @@ STDMETHODIMP CComWye::get_SizeB2(double *pVal)
 	size = pSq->SizeBotv;
 	*pVal = size;
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -328,6 +344,8 @@ STDMETHODIMP CComWye::put_SizeB2(double newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;          
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_SizeBotv(newVal);
@@ -352,6 +370,7 @@ STDMETHODIMP CComWye::get_Length(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -364,6 +383,8 @@ STDMETHODIMP CComWye::put_Length(double  newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 
@@ -513,6 +534,7 @@ STDMETHODIMP CComWye::get_Elev(double  *pVal)
 
 
 
+	*pVal *= tvsUnits::factor(pSq.operator->());
 	return S_OK;
 }
 
@@ -525,6 +547,8 @@ STDMETHODIMP CComWye::put_Elev(double  newVal)
 	AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForWrite);
 	if (pSq.openStatus() != Acad::eOk)
 		return E_ACCESSDENIED;   
+
+	newVal /= tvsUnits::factor(pSq.operator->());
 
 
 	pSq->put_Elevation(newVal);
@@ -607,3 +631,39 @@ STDMETHODIMP CComWye::put_Elev(double  newVal)
 // 
 // 	return S_OK;
 // }
+
+STDMETHODIMP CComWye::get_SheetArea(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 0, pVal);
+}
+
+STDMETHODIMP CComWye::get_SheetThickness(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 1, pVal);
+}
+
+STDMETHODIMP CComWye::get_SheetMass(VARIANT *pVal)
+{
+    if (!pVal) return E_POINTER;
+    AcAxObjectRefPtr<TVS_WYE> pSq(&m_objRef, AcDb::kForRead);
+    if (pSq.openStatus() != Acad::eOk) return E_ACCESSDENIED;
+    return sheetValue(pSq.operator->(), 2, pVal);
+}
+
+STDMETHODIMP CComWye::ShowProperty(DISPID dispId, BOOL *show)
+{
+    if (!show) return E_POINTER;
+    if (dispId >= DISPID_SheetArea && dispId <= DISPID_SheetMass) {
+        // Automation keeps the original VARIANT accessors. OPM gets the typed
+        // dynamic properties registered by the ARX, without duplicate rows.
+        *show=FALSE;
+        return S_OK;
+    }
+    return IOPMPropertyExtensionImpl<CComWye>::ShowProperty(dispId,show);
+}

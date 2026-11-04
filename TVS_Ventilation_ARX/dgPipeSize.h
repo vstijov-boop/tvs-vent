@@ -1,4 +1,4 @@
-// (C) Copyright 2002-2007 by Autodesk, Inc. 
+// (C) Copyright 2002-2007 by Autodesk, Inc.
 //
 // Permission to use, copy, modify, and distribute this software in
 // object code form for any purpose and without fee is hereby granted, 
@@ -83,6 +83,9 @@
 
 
 #define IDC_DuctFlex 1041
+#define IDC_LevelTooltip 1043
+#define IDC_TransVert 1044
+#define IDC_TransPlan 1046
 //-----------------------------------------------------------------------------
 class dgPipeSize : public CAdUiBaseDialog {
 	DECLARE_DYNAMIC(dgPipeSize)
@@ -98,6 +101,10 @@ protected:
 
 	DECLARE_MESSAGE_MAP()
 public:
+	bool allowDrawingUnitsChange;
+	double unitsFactor;
+	CComboBox drawingUnits;
+	virtual BOOL OnInitDialog();
 
 public:
 	CEdit fSizeA;
@@ -209,6 +216,9 @@ public:
 
 	CButton fDuctFlex;
 	BOOL DuctFlex;
+	BOOL LevelTooltip;   // TVS_SETTINGS: oblacic sa kotama (LevelTooltip.h)
+	int TransVert;       // TVS_SETTINGS: poravnanje novih prelaza po visini (TransAlignData.h)
+	int TransPlan;       // TVS_SETTINGS: tip novih prelaza u tlocrtu, TransType 1..3
 	BOOL bDuctFlex;
 	//	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
 
