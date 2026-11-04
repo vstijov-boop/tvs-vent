@@ -81,17 +81,20 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
     delete it;
     // vertical elbows: each end at the elevation of the member it joins (nearest to the elbow's own)
     for(size_t k=0;k<bends.size();++k){
-        tvsSection::Member& m=out[bends[k]];
+        tvsSection::Member& m=out[bends[k]];bool slopedA=false,slopedB=false;
         for(int end=0;end<2;++end){
-            const tvsSection::P q=end?m.b:m.a;double best=bendElev[k],gap=-1;
+            const tvsSection::P q=end?m.b:m.a;double best=bendElev[k],gap=-1;bool slopedNext=false;
             for(size_t i=0;i<out.size();++i){if(out[i].tag==m.tag)continue;
                 bool isBend=false;for(size_t j=0;j<bends.size();++j)if(bends[j]==i)isBend=true;if(isBend)continue;
                 const tvsSection::Member& o=out[i];
                 for(int oe=0;oe<2;++oe){const tvsSection::P r=oe?o.b:o.a;if(std::hypot(r.x-q.x,r.y-q.y)>tol)continue;
-                    const double z=o.zAt(oe?1.0:0.0),g=std::fabs(z-bendElev[k]);if(gap<0||g<gap){gap=g;best=z;}}}
+                    const double z=o.zAt(oe?1.0:0.0),g=std::fabs(z-bendElev[k]);if(gap<0||g<gap){gap=g;best=z;slopedNext=o.sloped;}}}
             if(end)m.zb=best;else m.za=best;
+            if(end)slopedB=slopedNext;else slopedA=slopedNext;
         }
-        m.levelA=std::fabs(m.za-bendElev[k])<=std::fabs(m.zb-bendElev[k]);   // the end at the elbow's own level
+        // level end: where the elbow joins a level duct (the other end joins the sloped piece)
+        if(slopedA!=slopedB)m.levelA=!slopedA;
+        else m.levelA=std::fabs(m.za-bendElev[k])<=std::fabs(m.zb-bendElev[k]);
         if(std::fabs(m.zb-m.za)<=1e-9){m.sloped=false;m.bend=false;}
     }
 }
@@ -137,7 +140,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
         if(btr->newIterator(it)==Acad::eOk){for(;!it->done();it->step()){AcDbEntity* e=NULL;if(it->getEntity(e,AcDb::kForWrite)==Acad::eOk){e->erase();e->close();}}delete it;}
     }
     const AcDbObjectId layerId=layer(db),style=textStyle(db);
-    const double th=2.5*p.scale/f,gap=0.6*th;
+    const double th=0.8*p.scale/f,gap=0.5*th;   // section labels: 0.8 mm x scale (1:50 -> 40 mm)
     std::vector<tvsSection::Member> net;members(db,net);
     const tvsSection::P a(p.p1.x,p.p1.y),b(p.p2.x,p.p2.y);
     const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(a,b,net,p.flip,2.0/f);
@@ -209,7 +212,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
         }
     }
     const std::wstring title=L"PRESJEK "+p.letter+L"-"+p.letter;
-    text(btr,AcGePoint3d(L/2,-4*th,0),title.c_str(),1.4*th,style,layerId);
+    text(btr,AcGePoint3d(L/2,-6*th,0),title.c_str(),2.5*th,style,layerId);
     if(!views.empty())acutPrintf(L"\nPresjek %ls: vidljivih elemenata u dubini %d.",p.letter.c_str(),static_cast<int>(views.size()));
     return static_cast<int>(cuts.size());
 }

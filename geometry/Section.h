@@ -143,6 +143,17 @@ inline std::vector<View> views(const P& p1,const P& p2,const std::vector<Member>
         View w;w.tag=m.tag;w.round=m.round;w.closest=(std::min)(v0,v1);w.h=B;
         if(!flip){w.x0=lo;w.x1=hi;w.zc0=zAtU(lo);w.zc1=zAtU(hi);}
         else{w.x0=L-hi;w.x1=L-lo;w.zc0=zAtU(hi);w.zc1=zAtU(lo);}
+        double kx=e.x*d.x+e.y*d.y;if(flip)kx=-kx;
+        if(m.sloped&&std::fabs(w.zc1-w.zc0)>1e-9&&std::fabs(kx)>0.05){
+            // sloped piece: thickness and end faces perpendicular to its axis (true shape in the
+            // member's vertical plane, projected: plan offsets scale by kx)
+            const double ax0=flip?L-u0:u0,ax1=flip?L-u1:u1,ds=(ax1-ax0)/kx,dz=z1-z0,len=std::sqrt(ds*ds+dz*dz);
+            if(len>1e-12){const double ns=-dz/len*B/2,nz=ds/len*B/2,ox=ns*kx;
+                w.outline.clear();
+                w.outline.push_back(Prim::line(ax0-ox,z0-nz,ax1-ox,z1-nz));w.outline.push_back(Prim::line(ax1-ox,z1-nz,ax1+ox,z1+nz));
+                w.outline.push_back(Prim::line(ax1+ox,z1+nz,ax0+ox,z0+nz));w.outline.push_back(Prim::line(ax0+ox,z0+nz,ax0-ox,z0-nz));
+                w.seal();out.push_back(w);continue;}
+        }
         w.quad();out.push_back(w);
     }
     // one outline per element at one level (elbow / T komad chords -> one box, no inner lines)

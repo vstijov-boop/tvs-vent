@@ -61,12 +61,13 @@ int main(){
    Member riser=l1;riser.a=riser.b=P(2500,100);riser.sloped=true;riser.za=2600;riser.zb=3200;riser.tag=4;z3.push_back(riser);
    std::vector<View> v=views(s1,s2,z3,false,1000,1);assert(v.size()==4);
    bool slope=false,vert=false;for(size_t i=0;i<v.size();++i){
-     if(v[i].tag==2)slope=near(v[i].x0,1000)&&near(v[i].x1,1600)&&near(v[i].zc0,2000)&&near(v[i].zc1,2600);
+     if(v[i].tag==2){const double o=100/std::sqrt(2.0);slope=near(v[i].x0,1000-o,1e-6)&&near(v[i].x1,1600+o,1e-6)&&near(v[i].zc0,2000)&&near(v[i].zc1,2600);}
      if(v[i].tag==4)vert=v[i].vertical&&near(v[i].x0,2300)&&near(v[i].x1,2700)&&near(v[i].zc0,2900)&&near(v[i].h,600);}
    assert(slope&&vert);
    // sloped top edge drawn as one straight (not stepped) visible line
    std::vector<Edge> e=edges(std::vector<Cut>(),v);bool top=false;
-   for(size_t i=0;i<e.size();++i)if(!e[i].hidden&&near(e[i].g.x0,1000)&&near(e[i].g.y0,1900)&&near(e[i].g.x1,1600)&&near(e[i].g.y1,2500))top=true;   // bottom edge
+   const double o=100/std::sqrt(2.0);   // thickness perpendicular to the 45 deg axis
+   for(size_t i=0;i<e.size();++i)if(!e[i].hidden&&near(e[i].g.x0,1000+o,1e-6)&&near(e[i].g.y0,2000-o,1e-6)&&near(e[i].g.x1,1600+o,1e-6)&&near(e[i].g.y1,2600-o,1e-6))top=true;   // bottom edge
    assert(top);
    // cut through the sloped piece: elevation interpolated
    Cut c;assert(cut(P(1300,0),P(1300,1000),sl,c)&&near(c.z,2300));
