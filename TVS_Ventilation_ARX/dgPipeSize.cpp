@@ -23,6 +23,7 @@
 //----- dgPipeSize.cpp : Implementation of dgPipeSize
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "ElevRefSwitch.h"
 #include "Resource.h"
 #include "dgPipeSize.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
@@ -317,6 +318,7 @@ void dgPipeSize::ChangeSpeed()
 
 void dgPipeSize::SetElevUp()
 {
+	tvsElevRef::convert(this, fElevDown.GetCheck() ? 2 : fElevMid.GetCheck() ? 0 : 1, 1);   // the other box still shows the previous reference
 
 	fElevUp.SetCheck(1);
 	fElevMid.SetCheck(0);
@@ -330,6 +332,7 @@ void dgPipeSize::SetElevUp()
 
 void dgPipeSize::SetElevMid()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevDown.GetCheck() ? 2 : 0, 0);   // the other box still shows the previous reference
 
 
 	fElevUp.SetCheck(0);
@@ -340,6 +343,7 @@ void dgPipeSize::SetElevMid()
 
 void dgPipeSize::SetElevDown()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevMid.GetCheck() ? 0 : 2, 2);   // the other box still shows the previous reference
 	fElevUp.SetCheck(0);
 	fElevMid.SetCheck(0);
 	fElevDown.SetCheck(1);

@@ -84,6 +84,7 @@
 #define IDC_TransVertLabel 10045
 #define IDC_TransPlanEdit 1047
 #define IDC_TransPlanLabel 10047
+#define IDC_TransPreview 10070
 #define IDC_TeeSecondLabel 10050
 #define IDC_LabelSizeA 10001
 #define IDC_LabelSizeA2 10003
@@ -227,6 +228,8 @@ public:
 	int iRadiusTypeRect;
 
 	afx_msg void OnShowWindow(BOOL bShow, UINT nStatus);
+	afx_msg void OnDrawItem(int id, LPDRAWITEMSTRUCT item);   // prelaz sketch (TransPreview.h)
+	afx_msg void RefreshPreview();
 
 	void change_BOOL(BOOL &var, CButton &but);
 	/*void checked (CButton &master, CButton &slave);*/

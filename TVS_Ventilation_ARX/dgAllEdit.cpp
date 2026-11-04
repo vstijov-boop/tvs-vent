@@ -23,6 +23,8 @@
 //----- dgAllEdit.cpp : Implementation of dgAllEdit
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "ElevRefSwitch.h"
+#include "TransPreview.h"
 #include "resource.h"
 #include "dgAllEdit.h"
 
@@ -51,6 +53,11 @@ BEGIN_MESSAGE_MAP(dgAllEdit, CAdUiBaseDialog)
 	ON_MESSAGE(WM_ACAD_KEEPFOCUS, OnAcadKeepFocus)
 
 	ON_WM_SHOWWINDOW()
+	ON_WM_DRAWITEM()
+	ON_CBN_SELCHANGE(IDC_TransVertEdit, &dgAllEdit::RefreshPreview)
+	ON_CBN_SELCHANGE(IDC_TransPlanEdit, &dgAllEdit::RefreshPreview)
+	ON_EN_CHANGE(IDC_SizeA2, &dgAllEdit::RefreshPreview)
+	ON_EN_CHANGE(IDC_SizeB2, &dgAllEdit::RefreshPreview)
 	ON_EN_CHANGE(IDC_SizeA, &dgAllEdit::ChangeSizeA)
 	ON_EN_CHANGE(IDC_SizeB, &dgAllEdit::ChangeSizeA)
 	//ON_EN_CHANGE(IDC_SizeA2, &dgAllEdit::ChangeSizeA2)
@@ -239,6 +246,7 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 			if (CWnd* label = GetDlgItem(IDC_TransVertLabel)) label->ShowWindow(false);
 		}
 	}
+	if (CWnd* preview = GetDlgItem(IDC_TransPreview)) preview->ShowWindow(Ttrans && !Ttap ? SW_SHOW : SW_HIDE);   // sketch only for prelazi
 	if (CComboBox* plan = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit)))
 	{
 		if (Ttrans) {
@@ -376,8 +384,27 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 
 
 
+void dgAllEdit::RefreshPreview()
+{
+	if (CWnd* w = GetDlgItem(IDC_TransPreview)) w->Invalidate(FALSE);
+}
+
+void dgAllEdit::OnDrawItem(int id, LPDRAWITEMSTRUCT item)
+{
+	if (id != IDC_TransPreview || !item) { CAdUiBaseDialog::OnDrawItem(id, item); return; }
+	CDC* dc = CDC::FromHandle(item->hDC);
+	double v[4] = {0, 0, 0, 0};
+	const int ids[4] = {IDC_SizeA, IDC_SizeB, IDC_SizeA2, IDC_SizeB2};
+	for (int k = 0; k < 4; ++k) tvsElevRef::number(this, ids[k], v[k]);
+	int plan = -1, vert = -1;
+	if (CComboBox* c = static_cast<CComboBox*>(GetDlgItem(IDC_TransPlanEdit))) { const int s = c->GetCurSel(); plan = s >= 0 ? s + 1 : -1; }
+	if (CComboBox* c = static_cast<CComboBox*>(GetDlgItem(IDC_TransVertEdit))) vert = c->GetCurSel();
+	tvsTransPreview::sketch(dc, CRect(item->rcItem), plan, vert, v[0], v[1], v[2], v[3]);
+}
+
 void dgAllEdit::ChangeSizeA()
 {
+	RefreshPreview();
 
 	double pSpeed, pFlow, pI, pDp, pSizeA, pSizeB;
 	CString zSizeA, zSizeB, zFlow, zSpeed, zI;
@@ -431,6 +458,7 @@ void dgAllEdit::ChangeSpeed()
 
 void dgAllEdit::SetElevUp()
 {
+	tvsElevRef::convert(this, fElevDown.GetCheck() ? 2 : fElevMid.GetCheck() ? 0 : 1, 1);   // the other box still shows the previous reference
 
 	fElevUp.SetCheck(1);
 	fElevMid.SetCheck(0);
@@ -444,6 +472,7 @@ void dgAllEdit::SetElevUp()
 
 void dgAllEdit::SetElevMid()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevDown.GetCheck() ? 2 : 0, 0);   // the other box still shows the previous reference
 
 
 	fElevUp.SetCheck(0);
@@ -454,6 +483,7 @@ void dgAllEdit::SetElevMid()
 
 void dgAllEdit::SetElevDown()
 {
+	tvsElevRef::convert(this, fElevUp.GetCheck() ? 1 : fElevMid.GetCheck() ? 0 : 2, 2);   // the other box still shows the previous reference
 	fElevUp.SetCheck(0);
 	fElevMid.SetCheck(0);
 	fElevDown.SetCheck(1);

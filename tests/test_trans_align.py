@@ -33,6 +33,10 @@ class TransAlign(unittest.TestCase):
   self.assertIn('const AcGePoint3d* seed=(!keepEnd&&work[i].was.hasOutlet)?&work[i].was.outlet:NULL;',c,'end side found at the old outlet')
   r=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc');self.assertIn('COMBOBOX        1044,300,122',r);self.assertIn('COMBOBOX        1046,300,104',r)
   self.assertIn('ftTransType = dg.TransPlan; tvsTransAlignCmd::storePlan(ftTransType);',e);self.assertIn('ftTransType = tvsTransAlignCmd::loadPlan();',e);self.assertIn('COMBOBOX        1045,300,178',r);self.assertIn('COMBOBOX        1047,300,160',r)
+  g=text('TVS_Ventilation_ARX/dgAllEdit.cpp');self.assertIn('tvsTransPreview::sketch(dc, CRect(item->rcItem), plan, vert, v[0], v[1], v[2], v[3]);',g)
+  self.assertIn('CONTROL         "",10070,"Static",SS_OWNERDRAW',r)
+  for dlg in ('dgAllEdit','dgPipeSize'):
+   d=text('TVS_Ventilation_ARX/%s.cpp'%dlg);self.assertEqual(d.count('tvsElevRef::convert(this,'),3,dlg+': Vrh/Centar/Dno recalculates the value')
   for fn in ('TVS_Ventilation_ARX/TransAlignCommand.h','TVS_Ventilation_ARX/ElevationShift.h','TVS_Ventilation_ARX/TVSPropertyTransAlignDyn.h','TVS_Ventilation_DBX/TransAlignData.h'):
    for line in text(fn).splitlines():self.assertFalse(line.rstrip().endswith('L"'),fn)
 if __name__=='__main__':unittest.main()
