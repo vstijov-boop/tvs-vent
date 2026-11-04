@@ -3,7 +3,7 @@ name: Build AutoCAD 2020
 on:
   workflow_dispatch:
   push:
-    branches: [srpski-prevod, unapredjenja-jedinice, unapredjenja-masa]
+    branches: [master, razvoj-tkomad]
     paths:
       - '.github/workflows/build-autocad-2020.yml'
       - 'TVS_Ventilation_ARX/**'
@@ -99,7 +99,7 @@ jobs:
           Get-ChildItem (Join-Path $env:TVS_VS2017 'VC/Tools/MSVC') | Select-Object Name | Out-File build-logs/msvc-versions.txt
       - name: Build Release x64
         run: |
-          & $env:TVS_MSBUILD 'TVS_Ventilation 2020.sln' /m /t:Build /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.17763.0 /bl:build-logs/build.binlog /fl '/flp:logfile=build-logs/build.log;verbosity=normal'
+          & $env:TVS_MSBUILD 'TVS_Ventilation 2020.sln' /m /t:Build /p:TVSBypassPreview=true /p:TVSOffsetProof=true /p:TVSOffsetIntegration=true /p:Configuration=Release /p:Platform=x64 /p:WindowsTargetPlatformVersion=10.0.17763.0 /bl:build-logs/build.binlog /fl '/flp:logfile=build-logs/build.log;verbosity=normal'
           if ($LASTEXITCODE -ne 0) { throw "MSBuild failed with exit code $LASTEXITCODE. See build.log." }
       - name: Package new binaries and translated menus
         run: |
@@ -112,6 +112,7 @@ jobs:
           Copy-Item "$output/*.arx", "$output/*.dbx" dist
           Copy-Item Installer/TVS_VENT/TVS_VENT.cuix, Installer/TVS_TOOLS/TVS_TOOLS.cuix dist
           if (Test-Path Installer/TVS_TOOLS/KGTEZ.lsp) { Copy-Item Installer/TVS_TOOLS/KGTEZ.lsp dist }
+          Copy-Item Installer/Resources/TVS_Oznake.dwg, development/TESTIRANJE.md dist
           "Build commit: $env:GITHUB_SHA`nTarget: AutoCAD 2020 x64`nRuntime testing in AutoCAD is still required." | Out-File dist/BUILD.txt -Encoding utf8
       - uses: actions/upload-artifact@v4
         if: always()
@@ -122,6 +123,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: tvs-vent-srpski-autocad-2020-x64
+          name: tvs-vent-autocad-2020-x64
           path: dist/
           if-no-files-found: error

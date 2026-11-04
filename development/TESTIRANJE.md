@@ -18,7 +18,7 @@ Nove komande su u meniju "Crtanje kanala", na traci TVS_VENT i na ribbonu:
 | TVS_BYPASS_DETALJ | Detalj obilaska | Oznake |
 
 TVS_MOVE i TVS_STRETCH imaju nove ikone.
-TVS_OFFSET, TVS_BYPASS i TVS_BYPASS_DETALJ rade samo u DEV paketu (DEV-BYPASS-PERSISTENT).
+Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande, uključujući TVS_OFFSET, TVS_BYPASS i TVS_BYPASS_DETALJ.
 
 ## Otvoreno – treba testirati i javiti nazad
 **Prelaz – prenos dimenzija na susjedne kanale**
