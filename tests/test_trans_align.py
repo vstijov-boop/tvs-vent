@@ -26,7 +26,7 @@ class TransAlign(unittest.TestCase):
   self.assertIn('globalElevMid += tvsTransAlign::endOffset(align, pSizeAp1, pSizeBp1, pSizeAp2, pSizeBp2);',e,'drawing continues at the shifted axis')
   self.assertIn('tvsTransAlignCmd::setDefault(dg.TransVert);',e)
   self.assertIn('if (ok && types[i]==TVS_TRANS::desc()) ok=add(item->manager,item->align);',text('TVS_Ventilation_ARX/PropertyAdmin.cpp'))
-  self.assertIn('COM_INTERFACE_ENTRY_IID(IID_IDynamicEnumProperty,IDynamicEnumProperty)',text('TVS_Ventilation_ARX/TVSPropertyTransAlignDyn.h'))
+  self.assertIn('COM_INTERFACE_ENTRY(IDynamicEnumProperty)',text('TVS_Ventilation_ARX/TVSPropertyTransAlignDyn.h'))
   f=text('TVS_Ventilation_ARX/Func.cpp');self.assertEqual(f.count('tvsTransAlignCmd::afterEdit(Transie, transBefore, dg.TransVert);'),2)
   r=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc');self.assertIn('COMBOBOX        1044,300,104',r);self.assertIn('COMBOBOX        1045,300,160',r)
   for fn in ('TVS_Ventilation_ARX/TransAlignCommand.h','TVS_Ventilation_ARX/ElevationShift.h','TVS_Ventilation_ARX/TVSPropertyTransAlignDyn.h','TVS_Ventilation_DBX/TransAlignData.h'):

@@ -8,7 +8,7 @@ class ATL_NO_VTABLE CTVSTransAlignDyn : public CTVSPropertyMassDyn, public IDyna
     static bool idOf(IUnknown* object,AcDbObjectId& id){CComQIPtr<IAcadBaseObject> e(object);return e&&SUCCEEDED(e->GetObjectId(&id))&&!id.isNull();}
 public:
     BEGIN_COM_MAP(CTVSTransAlignDyn)
-        COM_INTERFACE_ENTRY_IID(IID_IDynamicEnumProperty,IDynamicEnumProperty)
+        COM_INTERFACE_ENTRY(IDynamicEnumProperty)   // __uuidof, as IDynamicProperty2 (no IID_ symbol in the libs)
         COM_INTERFACE_ENTRY_CHAIN(CTVSPropertyMassDyn)
     END_COM_MAP()
     STDMETHOD(GetGUID)(GUID* value){
