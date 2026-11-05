@@ -19,3 +19,5 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–3 su u radu, ostale idu redom.
 9. **Brzina na velikim crtežima** – jedan indeks elemenata (položaj, kote) umjesto prolaska kroz cijeli Model prostor u TVS_STRETCH, presjeku i provjeri etaža.
 10. **Razbijanje `acrxEntryPoint.cpp`** (~4300 linija) – komande u zasebne fajlove.
 11. **Instalacioni paket** – build pravi gotov `TVS.bundle` (PackageContents.xml, verzija, Resources\TVS_Oznake.dwg).
+12. **Promjena kote tokom crtanja → etaž** – kad se u dijalogu dimenzija tokom TVS_DRAW/TVS_PIPE promijeni kota, ponuditi „Umetnuti etaž? [Da/Ne]“ (isti put kao opcija Z: tvsOffsetIntegration); ako se mijenja i dimenzija, prvo etaž na postojećoj dimenziji, pa prelaz.
+13. **Prošireni dijalog promjene kote (Z)** – postojeće stanje: vrh / osa / dno kanala (samo prikaz); novo stanje: izbor reference (Vrh/Osa/Dno) i vrijednost (npr. vrh 2950 → 2750); ugao (30/45/60°); odmah prikaz razlike kota, kosog dijela, dužine u osnovi i da li je izvodljivo (premala razlika za dva koljena); skica kao kod prelaza.
