@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetService.h"
 #include "acgiTransient.h"
@@ -52,6 +52,20 @@ public:
 inline Outcome interact(const AcDbObjectId& source,tvsOffsetOperation::End end,double defaultAngle,tvsOffsetService::Commit& output){
     tvsOffsetService::Snapshot snapshot;if(!tvsOffsetService::capture(source,end,snapshot))return Failed;
     dgChangeZ dg;dg.startZ=snapshot.physical.elevation;dg.nextZ=dg.startZ;dg.Axis=defaultAngle;
+    dg.height=snapshot.physical.b;   // vrh / dno of this duct (round: the diameter)
+    // the dialog shows at once what TVS_OFFSET would write for its values (same plan)
+    dg.evaluate=[&](double next,double angle,tvsOffset::Result& g,CString& why)->bool{
+        tvsOffsetOperation::Request q;q.elevation=next;q.angleDegrees=angle;
+        q.minimumStraight=integrationPolicy().minimumStraightMm;q.minimumProjection=integrationPolicy().minimumProjectionMm;
+        if(globalRadiusTypeRect==RadiusTypeRect_RadiusConstant)q.ri=globalTapRadiusConst*snapshot.physical.factor;
+        else if(globalRadiusTypeRect==RadiusTypeRect_RadiusVariable)q.ri=globalTapRadiusVariableParameter*snapshot.physical.b*snapshot.physical.factor;
+        else {why=L"izaberite konstantni ili k*B radijus pravougaonog koljena (TVS_SETTINGS).";return false;}
+        const auto p=tvsOffsetOperation::prepare(snapshot.physical,q);
+        if(p.status==tvsOffsetOperation::Ready){g=p.geometry;return true;}
+        if(p.status==tvsOffsetOperation::NoChange)why=L"nova kota je ista kao postojeća.";
+        else if(p.status==tvsOffsetOperation::TooShort)why=L"kanal je prekratak za koljeno ili je razlika kota premala za dva koljena.";
+        else why=errorText(p.geometryStatus);
+        return false;};
     if(dg.DoModal()!=IDOK)return Cancelled;
     if(!tvsOffset::finite(dg.startZ)||std::fabs(dg.startZ-snapshot.physical.elevation)*snapshot.physical.factor>.001){
         tvsOffsetService::reject(L"Pocetna apsolutna kota mora odgovarati izabranom kanalu.");return Failed;}

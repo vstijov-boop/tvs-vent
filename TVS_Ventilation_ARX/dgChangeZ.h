@@ -23,9 +23,13 @@
 //----- hangeZdg.h : Declaration of the dgChangeZ
 //-----------------------------------------------------------------------------
 #pragma once
-
+// Promjena kote Z (etaz): existing top / axis / bottom of the duct, new level by reference
+// (Vrh / Osa / Dno), angle, and at once the result of the same plan TVS_OFFSET writes
+// (difference, sloped piece, length in plan, or why it is not possible) with a side sketch.
 //-----------------------------------------------------------------------------
 #include "adui.h"
+#include "../geometry/OffsetGeometry.h"
+#include <functional>
 
 //-----------------------------------------------------------------------------
 class dgChangeZ : public CAdUiBaseDialog {
@@ -35,11 +39,24 @@ public:
 	dgChangeZ(CWnd *pParent = NULL, HINSTANCE hInstance = NULL);
 
 	enum { IDD = IDD_HANGEZDG };
-	double startZ, nextZ, Axis;
+	double startZ, nextZ, Axis;   // axis levels (drawing units), angle in degrees
+	double height;                // duct height for top / bottom (drawing units); 0 = axis only
+	// Plan for the new axis level and angle: true + geometry (mm), or false + reason.
+	std::function<bool(double next, double angle, tvsOffset::Result& g, CString& why)> evaluate;
 
 protected:
 	virtual void DoDataExchange(CDataExchange *pDX);
+	virtual BOOL OnInitDialog();
+	virtual void OnOK();
 	afx_msg LRESULT OnAcadKeepFocus(WPARAM, LPARAM);
+	afx_msg void OnChanged();
+	afx_msg void OnDrawItem(int id, LPDRAWITEMSTRUCT item);
+	int reference() const;
+	bool read(double& axis, double& angle) const;
+	void update();
+	bool ready;
+	bool feasible;
+	tvsOffset::Result geometry;
 
 	DECLARE_MESSAGE_MAP()
 };
