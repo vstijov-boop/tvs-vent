@@ -797,6 +797,15 @@ Acad::ErrorStatus TVS_WYE::subTransformBy(const AcGeMatrix3d & xform)
 Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 {
 	assertReadEnabled();
+	// Explode = exactly what is drawn (TK-O/TK-G/stucna, side-flush prelazi, ...), as TVS_Pipe
+	// and TVS_TAP do; the old fixed outline below only when nothing was drawn yet.
+	if (ListOfEntity.length() > 0) {
+		for each (AcDbEntity* var in ListOfEntity) {
+			AcDbEntity* clonedEntity = (AcDbEntity*)var->clone();
+			if (clonedEntity) entitySet.append(clonedEntity);
+		}
+		return Acad::eOk;
+	}
 
 	AcGePoint2d massforarray[2];
 	AcGePoint2d massforarray2[8];
@@ -1161,7 +1170,11 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 	if (u.length() < 1e-12 || v.length() < 1e-12) return false;
 	u.normalize(); v.normalize();
 	tee = tvsTee::Tee(); tee.type = r.type; tee.l = r.l; tee.flange = tvsTeeData::flangeMm() / tvsUnits::factor(this);
-	if (r.type == tvsTee::Branch) {
+	if (r.type == tvsTee::Tap) {   // stucna SR5-3: collar = LengthPl, straight main
+		tee.A = SizeApr; tee.C = SizeApr; tee.w1 = SizeAotv; tee.l = LengthPl;
+		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
+	}
+	else if (r.type == tvsTee::Branch) {
 		tee.A = SizeApr; tee.w1 = SizeAotv; tee.C = r.second > 0 ? r.second : SizeApr;
 		tee.R1 = LengthPl - r.l + tee.w1;
 		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
@@ -1189,7 +1202,7 @@ bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
 	tvsTee::Shape s; if (!tvsTee::shape(tee, s)) return false;   // drawn as a plain T otherwise
 	AcGeVector3d u = Vectpr, v = Vectotv; u.z = v.z = 0; u.normalize(); v.normalize();
 	ports[2] = Basepoint + v * (SizeApr / 2 + LengthPl);
-	if (tee.type == tvsTee::Branch) {
+	if (tee.type == tvsTee::Branch || tee.type == tvsTee::Tap) {
 		const double half = LengthPl + SizeAotv / 2;
 		ports[0] = Basepoint - u * half; ports[1] = Basepoint + u * half;
 		widths[0] = tee.A; widths[1] = tee.C; widths[2] = tee.w1;

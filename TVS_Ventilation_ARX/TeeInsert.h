@@ -14,7 +14,7 @@ namespace tvsTeeInsert {
 struct Input {
     AcGePoint3d start,end;   // current duct (plan direction start -> end)
     double A,B;              // duct width / height
-    int type;                // tvsTee::Branch or tvsTee::Pants
+    int type;                // tvsTee::Branch, tvsTee::Pants or tvsTee::Tap (stucna: l = L)
     double w1,second,l;      // TK-O: branch w1, outlet C; TK-G: right w1, left second; collar l
     double minimum;          // shortest duct that stays before the T komad
 };
@@ -37,10 +37,11 @@ inline bool plan(const Input& in,const AcGePoint3d& cursor,Plan& p){
     p.face=in.start+d*p.t;p.face.z=in.end.z;
     const AcGeVector3d left(-d.y,d.x,0),right(d.y,-d.x,0);
     tvsTee::Tee& t=p.tee;t.type=in.type;t.A=in.A;t.l=in.l;t.flange=0;
-    if(in.type==tvsTee::Branch){
+    if(in.type!=tvsTee::Pants){
+        const bool tap=in.type==tvsTee::Tap;
         p.side=c.dotProduct(left)>=0?1:-1;const AcGeVector3d n=p.side>0?left:right;
-        t.w1=in.w1;t.C=in.second>0?in.second:in.A;t.R1=tvsTee::defaultRadius(in.w1);
-        p.SizeApr=in.A;p.SizeAotv=in.w1;p.LengthPl=tvsTee::lengthPl(in.l,t.R1,in.w1);
+        t.w1=in.w1;t.C=!tap&&in.second>0?in.second:in.A;t.R1=tvsTee::defaultRadius(in.w1);
+        p.SizeApr=in.A;p.SizeAotv=in.w1;p.LengthPl=tap?in.l:tvsTee::lengthPl(in.l,t.R1,in.w1);
         p.Vectpr=d;p.Vectotv=n;p.Basepoint=p.face+d*(p.LengthPl+in.w1/2);
         p.ey=d;p.ex=n;
         p.port[0]=p.face+d*(2*p.LengthPl+in.w1);p.portDir[0]=d;p.portWidth[0]=t.C;
@@ -84,7 +85,8 @@ class Jig : public AcEdJig {
 public:
     explicit Jig(const Input& in):sampled(false){
         preview.in=in;last=in.end;preview.valid=plan(in,last,preview.p);
-        setDispPrompt(in.type==tvsTee::Branch?L"\nPolozaj T komada na kanalu (strana kursora = strana ogranka; Esc: odustani): "
+        setDispPrompt(in.type==tvsTee::Tap?L"\nPolozaj stucne na kanalu (strana kursora = strana ogranka; Esc: odustani): "
+                     :in.type==tvsTee::Branch?L"\nPolozaj T komada na kanalu (strana kursora = strana ogranka; Esc: odustani): "
                                               :L"\nPolozaj gacastog T komada na kanalu (Esc: odustani): ");
         setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode));
     }

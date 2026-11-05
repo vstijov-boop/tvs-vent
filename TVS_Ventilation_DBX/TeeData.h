@@ -14,6 +14,7 @@ namespace tvsTeeData {
 inline const ACHAR* key(){return L"TVS_TEE_V1";}
 inline double collarMm(){return 25;}   // ravni prikljucak, as in the block
 inline double flangeMm(){return 25;}   // flange tick beyond the duct edge
+inline double tapMinimumMm(){return 75;} // stucna SR5-3: L = 0.25 w, at least 75 mm
 struct Record {int type;double l,second,radius2;Record():type(0),l(0),second(0),radius2(0){}};
 inline bool read(const AcDbObject* o,Record& r){
     r=Record();if(!o)return false;const AcDbObjectId dictId=o->extensionDictionary();if(dictId.isNull())return false;
@@ -25,7 +26,7 @@ inline bool read(const AcDbObject* o,Record& r){
     for(int j=0;j<5;++j){if(!p||p->restype!=types[j]){ok=false;break;}
         if(j==1)r.type=p->resval.rint;if(j==2)r.l=p->resval.rreal;if(j==3)r.second=p->resval.rreal;if(j==4)r.radius2=p->resval.rreal;p=p->rbnext;}
     acutRelRb(data);
-    if(!ok||(r.type!=tvsTee::Branch&&r.type!=tvsTee::Pants)||!(r.l>0)){r=Record();return false;}
+    if(!ok||(r.type!=tvsTee::Branch&&r.type!=tvsTee::Pants&&r.type!=tvsTee::Tap)||!(r.l>0)){r=Record();return false;}
     return true;
 }
 // Object open for write; uses the active transaction when there is one. type 0 removes the record.

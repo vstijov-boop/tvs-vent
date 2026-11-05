@@ -14,6 +14,7 @@
 #include <vector>
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
+#include "BypassAssemblyData.h"
 #endif
 
 namespace tvsMove {
@@ -586,6 +587,43 @@ inline void execute(){
     if(!tx.commit()){acutPrintf(L"\nTVS_MOVE: izmjena nije sačuvana.");return;}
     acutPrintf(L"\nTVS_MOVE: pomjerena dionica i dva koljena; susjedne dužine prilagođene. Bočni pomjeraj: %.2f mm.",plan.offset*factor);
 }
+// TVS_STRETCH: an etaz (TVS_OFFSET triple: elbow, sloped piece, elbow) is one rigid piece
+// with the two outer ports of its elbows; it moves whole when the window holds both. members[i]
+// = the three ids for the body that stands for it (the other two bodies are left empty).
+inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
+                        std::vector<std::vector<AcDbObjectId> >& members,double tol){
+    members.assign(nodes.size(),std::vector<AcDbObjectId>());
+#ifdef TVS_OFFSET_INTEGRATION
+    auto find=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
+    auto flat=[&](const Point& u,const Point& v){return std::hypot(u.x-v.x,u.y-v.y);};
+    for(size_t i=0;i<nodes.size();++i){
+        tvsOffsetData::Record r;AcGePoint3d first,last;double elev[2]={0,0},A=0,B=0;bool round=false;
+        {AcDbObjectPointer<TVS_TAP> a(nodes[i].id,AcDb::kForRead);if(a.openStatus()!=Acad::eOk)continue;
+         if(tvsOffsetData::read(a.object(),r)!=tvsOffsetData::Valid||r.role!=tvsOffsetData::FirstElbow||tvsBypassData::marked(a.object()))continue;
+         elev[0]=a->Elev;A=a->SizeA;B=a->SizeB;round=a->ThisRound;}
+        {AcDbObjectPointer<TVS_TAP> b(r.members[2],AcDb::kForRead);if(b.openStatus()!=Acad::eOk)continue;elev[1]=b->Elev;}
+        {AcDbObjectPointer<TVS_Pipe> q(r.members[1],AcDb::kForRead);if(q.openStatus()!=Acad::eOk)continue;first=q->FirstPoint;last=q->LastPoint;}
+        const int ip=find(r.members[1]),ib=find(r.members[2]);
+        if(ip<0||ib<0||nodes[i].ports.size()!=2||nodes[ib].ports.size()!=2)continue;
+        Point axis;if(!tvsMoveGeometry::unit(Point(last.x-first.x,last.y-first.y,0),axis))continue;
+        const Point ends[2]={point(first),point(last)};
+        tvsMoveNetwork::Body body;body.kind=tvsMoveNetwork::Rigid;
+        const int elbows[2]={static_cast<int>(i),ib};
+        for(int e=0;e<2;++e){const Node& n=nodes[elbows[e]];
+            // outer port: the one away from the sloped piece
+            const double d0=(std::min)(flat(n.ports[0],ends[0]),flat(n.ports[0],ends[1])),d1=(std::min)(flat(n.ports[1],ends[0]),flat(n.ports[1],ends[1]));
+            Point q=d0>d1?n.ports[0]:n.ports[1];
+            for(size_t k=0;k<nodes.size();++k)if(nodes[k].kind==1)for(size_t j=0;j<nodes[k].ports.size();++j)
+                if(flat(nodes[k].ports[j],q)<=tol)q.z=nodes[k].ports[j].z;   // same plane as the duct it joins
+            body.ports.push_back(q);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(A,round?0:B,round,elev[e]));
+        }
+        bodies[i]=body;bodies[ip]=tvsMoveNetwork::Body();bodies[ib]=tvsMoveNetwork::Body();
+        members[i].push_back(nodes[i].id);members[i].push_back(r.members[1]);members[i].push_back(r.members[2]);
+    }
+#else
+    (void)nodes;(void)bodies;(void)tol;
+#endif
+}
 inline void executeStretch(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
@@ -599,7 +637,10 @@ inline void executeStretch(){
         tvsMoveNetwork::Body b;b.ports=nodes[i].ports;b.axes=nodes[i].axes;b.sections=nodes[i].sections;
         b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
         if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
-        bodies.push_back(b);int mask=0;
+        bodies.push_back(b);}
+    std::vector<std::vector<AcDbObjectId> > members;fuseOffsets(nodes,bodies,members,tol);
+    for(size_t i=0;i<nodes.size();++i){
+        const tvsMoveNetwork::Body& b=bodies[i];int mask=0;
         for(size_t j=0;j<b.ports.size();++j){
             ads_point w={b.ports[j].x,b.ports[j].y,b.ports[j].z},u;
             if(tvsCoordinates::transformPoint(w,0,1,u)!=RTNORM)return;
@@ -608,7 +649,7 @@ inline void executeStretch(){
                 mask|=1<<static_cast<int>(j);
         }
         if(mask&&b.kind!=tvsMoveNetwork::Pipe&&mask!=(1<<static_cast<int>(b.ports.size()))-1){
-            stretchProblem(nodes,static_cast<int>(i),L"Okvir presijeca fiting. Obuhvatite sve njegove priključke ili ga izostavite.");return;}
+            stretchProblem(nodes,static_cast<int>(i),members[i].empty()?L"Okvir presijeca fiting. Obuhvatite sve njegove priključke ili ga izostavite.":L"Okvir presijeca etaž. Obuhvatite cijeli etaž ili ga izostavite.");return;}
         masks.push_back(mask);
     }
     bool any=false;for(size_t i=0;i<masks.size();++i)if(masks[i])any=true;
@@ -630,11 +671,24 @@ inline void executeStretch(){
         acutPrintf(L"\nTVS_STRETCH: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
     Transaction tx;if(!tx.good())return;
     std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
+    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
     for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
+        if(!members[i].empty()){   // etaz: all three members move together
+#ifdef TVS_OFFSET_INTEGRATION
+            tvsOffsetData::WriteScope scope;
+            for(size_t k=0;k<members[i].size();++k){AcDbObject* o=NULL;
+                if(actrTransactionManager->getObject(o,members[i][k],AcDb::kForWrite)!=Acad::eOk||!AcDbEntity::cast(o)){
+                    acutPrintf(L"\nTVS_STRETCH: etaž nije dostupan. Izmjena je poništena.");return;}
+                AcDbEntity* e=AcDbEntity::cast(o);
+                AcDbObjectPointer<AcDbLayerTableRecord> layer(e->layerId(),AcDb::kForRead);
+                if(layer.openStatus()!=Acad::eOk||layer->isLocked()){acutPrintf(L"\nTVS_STRETCH: etaž je na zaključanom sloju. Izmjena je poništena.");return;}
+                if(e->transformBy(translation)!=Acad::eOk){acutPrintf(L"\nTVS_STRETCH: etaž nije moguće pomjeriti. Izmjena je poništena.");return;}
+                e->recordGraphicsModified();}
+#endif
+            continue;}
         entities[i]=tx.write(nodes[i].id);
         if(!entities[i]){acutPrintf(L"\nTVS_STRETCH: povezani element je zaključan ili nedostupan. Izmjena je poništena.");return;}
     }
-    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
     int stretched=0;
     for(size_t i=0;i<nodes.size();++i)if(entities[i]){
         if(nodes[i].kind==1){

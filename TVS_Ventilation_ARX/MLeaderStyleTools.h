@@ -9,6 +9,7 @@
 #include <vector>
 #include <memory>
 #include <shlobj.h>
+#include "acestext.h"
 namespace tvsMLeaderStyle {
 inline bool names(AcDbDatabase* db,std::vector<CString>& out){
     out.clear();if(!db)return false;AcDbDictionary* raw=NULL;if(db->getMLeaderStyleDictionary(raw,AcDb::kForRead)!=Acad::eOk||!raw)return false;
@@ -45,35 +46,51 @@ inline bool info(const AcDbObjectId& id,double& height,CString& textStyle){
     if(t.openStatus()==Acad::eOk){const ACHAR* n=NULL;if(t->getName(n)==Acad::eOk&&n)textStyle=n;}
     return true;
 }
-// Style shipped with TVS (TVS.bundle\Contents\Resources\TVS_Oznake.dwg). Found on the
-// AutoCAD support path first, otherwise in the ProgramData bundle folder.
+// Style shipped with TVS (TVS.bundle\Contents\Resources\TVS_Oznake.dwg). The bundle's
+// Resources folder comes first, so a copy elsewhere on the support path (e.g. next to the
+// ARX from a downloaded package) cannot shadow it; otherwise the AutoCAD support path.
 inline const wchar_t* bundledStyle(){return L"TVS_MleaderStyle";}
 inline CString bundledSource(){
-    ACHAR found[MAX_PATH*2]={0};
-    if(acedFindFile(L"TVS_Oznake.dwg",found)==RTNORM&&found[0])return CString(found);
     wchar_t base[MAX_PATH]={0};
     if(SUCCEEDED(SHGetFolderPathW(NULL,CSIDL_COMMON_APPDATA,NULL,0,base))){
         CString p(base);p+=L"\\Autodesk\\ApplicationPlugins\\TVS.bundle\\Contents\\Resources\\TVS_Oznake.dwg";
         if(GetFileAttributesW(p)!=INVALID_FILE_ATTRIBUTES)return p;}
+    ACHAR found[MAX_PATH*2]={0};
+    if(acedFindFile(L"TVS_Oznake.dwg",found)==RTNORM&&found[0])return CString(found);
     return CString();
+}
+// One message per style/source and session when the style cannot be taken from the DWG.
+inline void report(const CString& name,const CString& source,const wchar_t* why){
+    static std::vector<CString> told;CString key=name+L"|"+source;
+    for(const CString& k:told)if(k==key)return;told.push_back(key);
+    acutPrintf(L"\nTVS oznake: stil \"%s\" nije učitan iz \"%s\": %s",name.GetString(),source.IsEmpty()?L"TVS_Oznake.dwg":source.GetString(),why);
 }
 // Copies `name` from `source` when missing. A freshly copied style becomes the drawing's
 // current multileader style only while the drawing still uses "Standard", so a user's own
 // choice is never overwritten. Returns the style id (null when unavailable).
 inline AcDbObjectId ensure(AcDbDatabase* db,const CString& name,const CString& source){
-    AcDbObjectId id=find(db,name);if(!id.isNull()||!db||name.IsEmpty()||source.IsEmpty())return id;
-    if(GetFileAttributesW(source)==INVALID_FILE_ATTRIBUTES)return id;
-    if(import(db,source,name,id)!=Acad::eOk)return AcDbObjectId();
+    AcDbObjectId id=find(db,name);if(!id.isNull()||!db||name.IsEmpty())return id;
+    if(source.IsEmpty()){report(name,source,L"fajl nije pronađen (Resources ni putanja podrške)");return id;}
+    if(GetFileAttributesW(source)==INVALID_FILE_ATTRIBUTES){report(name,source,L"fajl ne postoji");return id;}
+    const Acad::ErrorStatus es=import(db,source,name,id);
+    if(es!=Acad::eOk){report(name,source,es==Acad::eKeyNotFound?L"stil ne postoji u fajlu":acadErrorStatusText(es));return AcDbObjectId();}
     const AcDbObjectId current=db->mleaderstyle();
     const bool standard=current.isNull()||current==find(db,L"Standard");
     if(standard)db->setMLeaderstyle(id);
     return id;
 }
-// Drawing open / ARX load: make the shipped style available in the current document.
+// The shipped TVS_MleaderStyle is always made available, whatever style the user chose
+// (an empty/other saved choice must not stop it); then the chosen style from its own DWG.
+inline void ensureAll(AcDbDatabase* db,const CString& name,const CString& source){
+    if(!db)return;
+    ensure(db,bundledStyle(),bundledSource());
+    if(!name.IsEmpty()&&name!=bundledStyle())ensure(db,name,source.IsEmpty()?bundledSource():source);
+}
+// Drawing open / ARX load / label dialog: same for the current document.
 inline void ensureCurrentDocument(const CString& name,const CString& source){
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc||!doc->database())return;
     const bool locked=acDocManager->lockDocument(doc,AcAp::kWrite)==Acad::eOk;
-    ensure(doc->database(),name,source);
+    ensureAll(doc->database(),name,source);
     if(locked)acDocManager->unlockDocument(doc);
 }
 }

@@ -3,6 +3,7 @@
 #include "aced.h"
 #include "rxevent.h"
 #include "OffsetAssemblyData.h"
+#include "OffsetRefit.h"
 // AcEditorReactor inherits the audited AcRxEventReactor clone callbacks.
 class OffsetIntegrationReactor : public AcEditorReactor {
 public:
@@ -11,7 +12,7 @@ public:
         Acad::ErrorStatus es=tvsOffsetData::remapClones(mapping);
         if(es!=Acad::eOk)acutPrintf(L"\nTVS OFFSET: COPY podaci nisu završeni; kopija nije potvrđen operativni sklop (%d).",es);
     }
-    virtual void commandEnded(const ACHAR* command){tvsOffsetData::clearClonePermits();tvsOffsetSession::afterUndoRedo(command);}
+    virtual void commandEnded(const ACHAR* command){tvsOffsetData::clearClonePermits();tvsOffsetSession::afterUndoRedo(command);tvsOffsetRefit::commandEnded(command);}
     virtual void commandCancelled(const ACHAR*){tvsOffsetData::clearClonePermits();}
     virtual void commandFailed(const ACHAR*){tvsOffsetData::clearClonePermits();}
 };

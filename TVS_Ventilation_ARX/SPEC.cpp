@@ -21,6 +21,7 @@ using namespace std;
 #define FlexCuff 7
 #define TeeBranch 8
 #define TeePants 9
+#define TeeTap 10
 #define TypeInt 0
 #define TypeDouble1 1
 #define TypeDouble2 2
@@ -293,6 +294,14 @@ bool SPEC::add(AcDbEntity * pEnt)
 					if (SizeB > 0 && SizeA3 > 0 && pWye->teeShape(tee, o, ex, ey)) {
 						const double f = tvsUnits::factor(pWye);
 						tvsTee::Tee mm = tee; mm.A *= f; mm.C *= f; mm.w1 *= f; mm.w2 *= f; mm.R1 *= f; mm.R2 *= f; mm.l *= f;
+						if (tee.type == tvsTee::Tap) {   // stucna SR5-3: A x B / w x b (L=)
+							status = TeeTap; Extra = mm.l;
+							setName(L"Štucna 45° SR5-3");
+							setLable(SizeA); appendLable(_T("x")); appendLable(SizeB); appendLable(_T(" / "));
+							appendLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3);
+							appendLable(_T(" (L=")); appendLable(mm.l); appendLable(_T(" mm)"));
+							Area = tvsTee::area(mm, SizeB, SizeA3);
+						} else {
 						const bool branchTee = tee.type == tvsTee::Branch;
 						status = branchTee ? TeeBranch : TeePants;
 						Extra = branchTee ? mm.C : mm.w2;
@@ -310,6 +319,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 						if (!branchTee && std::fabs(mm.R2 - mm.R1) > 0.05) { appendLable(_T("/")); appendLable(mm.R2); }
 						appendLable(_T(" mm)"));
 						Area = branchTee ? tvsTee::area(mm, SizeB, SizeA3) : tvsTee::area(mm, SizeA3, SizeB);
+						}
 					}
 				}
 				setParam1(1, TypeDouble1);

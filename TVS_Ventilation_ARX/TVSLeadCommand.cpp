@@ -54,7 +54,8 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 	{
 		AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
 		const MLeaderSettings& m = Settings::get()->mLeader;
-		AcDbObjectId styleId = tvsMLeaderStyle::ensure(db, m.style, m.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : m.styleSource);
+		tvsMLeaderStyle::ensureAll(db, m.style, m.styleSource);
+		AcDbObjectId styleId = tvsMLeaderStyle::find(db, m.style); // empty = drawing's current style (below)
 		if (styleId.isNull() && db) styleId = db->mleaderstyle();
 		const double scale = m.scale > 0 ? m.scale / tvsUnits::factor(db) : 1;
 		if (!styleId.isNull()) {
