@@ -8,10 +8,12 @@
 #include "TVS_TAP.h"
 #include "TVS_WYE.h"
 #include "TVS_TRANS.h"
+#include "TVSMoveCommand.h"
 #include "dbsymtb.h"
 #include "dbobjptr.h"
 #include <memory>
 #include <vector>
+#include <map>
 namespace tvsExport {
 inline AcDbObjectId byName(AcDbSymbolTable* table,const ACHAR* name){
     AcDbObjectId id;if(table&&name&&table->getAt(name,id)!=Acad::eOk)id.setNull();return id;
@@ -28,6 +30,16 @@ inline void retarget(AcDbEntity* e,AcDbDatabase* to,AcDbLayerTable* layers,AcDbL
     e->setColor(color);e->setLineWeight(weight);e->setLinetypeScale(scale);e->setTransparency(transparency);
     if(layer)acutDelString(layer);if(linetype)acutDelString(linetype);
 }
+// Identity of a TVS element independent of handles: class, ports and elevation.
+inline bool signature(AcDbEntity* e,CString& out){
+    tvsMove::Node n;if(!TVS_Entity::cast(e))return false;tvsMove::describe(e,n);
+    out=e->isA()->name();CString v;
+    // elbow ports may be values cached at drawing time: an elbow is known by its middle point
+    if(!TVS_TAP::cast(e))for(size_t j=0;j<n.ports.size();++j){v.Format(L"|%.3f,%.3f,%.3f",n.ports[j].x,n.ports[j].y,n.ports[j].z);out+=v;}
+    v.Format(L"|%.3f|%.3f|%.3f",n.elevation,n.a,n.b);out+=v;
+    if(TVS_TAP* t=TVS_TAP::cast(e)){v.Format(L"|%.3f,%.3f",t->MiddlePoint.x,t->MiddlePoint.y);out+=v;}
+    return true;
+}
 inline void run(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     // file name
@@ -41,7 +53,16 @@ inline void run(){
     acedCommandS(RTSTR,L"_.REGENALL",RTNONE);
     AcDbDatabase* raw=NULL;if(db->wblock(raw)!=Acad::eOk||!raw){acutPrintf(L"\nKopija crteza nije napravljena.");return;}
     std::unique_ptr<AcDbDatabase> copy(raw);
-    int replaced=0,empty=0;
+    int replaced=0,empty=0,missing=0;
+    // originals by signature (used when the copy did not keep the handle)
+    std::map<CString,std::vector<AcDbObjectId> > bySignature;
+    {AcDbBlockTable* t=NULL;if(db->getBlockTable(t,AcDb::kForRead)==Acad::eOk){AcDbObjectPointer<AcDbBlockTable> bt;bt.acquire(t);
+        AcDbBlockTableIterator* bi=NULL;bt->newIterator(bi);std::unique_ptr<AcDbBlockTableIterator> it(bi);
+        for(;it&&!it->done();it->step()){AcDbObjectId r;if(it->getRecordId(r)!=Acad::eOk)continue;
+            AcDbObjectPointer<AcDbBlockTableRecord> btr(r,AcDb::kForRead);if(btr.openStatus()!=Acad::eOk)continue;
+            AcDbBlockTableRecordIterator* ei=NULL;if(btr->newIterator(ei)!=Acad::eOk)continue;std::unique_ptr<AcDbBlockTableRecordIterator> eit(ei);
+            for(;!eit->done();eit->step()){AcDbEntity* e=NULL;if(eit->getEntity(e,AcDb::kForRead)!=Acad::eOk)continue;
+                CString key;if(signature(e,key))bySignature[key].push_back(e->objectId());e->close();}}}}
     {
         AcDbObjectPointer<AcDbLayerTable> layers;AcDbObjectPointer<AcDbLinetypeTable> types;
         {AcDbLayerTable* l=NULL;copy->getLayerTable(l,AcDb::kForRead);layers.acquire(l);}
@@ -52,13 +73,19 @@ inline void run(){
         for(;bit&&!bit->done();bit->step()){
             AcDbObjectId btrId;if(bit->getRecordId(btrId)!=Acad::eOk)continue;
             AcDbObjectPointer<AcDbBlockTableRecord> btr(btrId,AcDb::kForWrite);if(btr.openStatus()!=Acad::eOk||btr->isFromExternalReference())continue;
-            std::vector<AcDbObjectId> tvs;
+            std::vector<AcDbObjectId> tvs;std::vector<CString> keys;
             {AcDbBlockTableRecordIterator* ei=NULL;if(btr->newIterator(ei)!=Acad::eOk)continue;std::unique_ptr<AcDbBlockTableRecordIterator> eit(ei);
              for(;!eit->done();eit->step()){AcDbEntity* e=NULL;if(eit->getEntity(e,AcDb::kForRead)!=Acad::eOk)continue;
-                 if(TVS_Entity::cast(e))tvs.push_back(e->objectId());e->close();}}
+                 CString key;if(signature(e,key)){tvs.push_back(e->objectId());keys.push_back(key);}e->close();}}
             for(size_t i=0;i<tvs.size();++i){
-                // the same element in the open drawing (full copy keeps handles)
-                AcDbObjectId original;if(db->getAcDbObjectId(original,false,tvs[i].handle())!=Acad::eOk)continue;
+                // the same element in the open drawing: same handle and class, else same signature
+                AcDbObjectId original;bool found=false;
+                if(db->getAcDbObjectId(original,false,tvs[i].handle())==Acad::eOk&&!original.isNull()){
+                    AcDbObjectPointer<AcDbEntity> o(original,AcDb::kForRead);CString key;
+                    found=o.openStatus()==Acad::eOk&&signature(o.object(),key)&&key==keys[i];}
+                if(!found){std::map<CString,std::vector<AcDbObjectId> >::iterator m=bySignature.find(keys[i]);
+                    if(m!=bySignature.end()&&!m->second.empty()){original=m->second.back();m->second.pop_back();found=true;}}
+                if(!found){++missing;continue;}
                 AcDbVoidPtrArray parts;
                 {AcDbObjectPointer<AcDbEntity> o(original,AcDb::kForRead);if(o.openStatus()!=Acad::eOk||!TVS_Entity::cast(o.object()))continue;
                  if(o->explode(parts)!=Acad::eOk)parts.removeAll();}
@@ -73,6 +100,7 @@ inline void run(){
     const Acad::ErrorStatus es=copy->saveAs(path);
     if(es!=Acad::eOk){acutPrintf(L"\nIzvoz nije sacuvan (%ls).",acadErrorStatusText(es));return;}
     acutPrintf(L"\nTVS_IZVOZ: %d TVS elemenata zamijenjeno crtezom; sacuvano u %ls.",replaced,path.GetString());
+    if(missing)acutPrintf(L"\n%d TVS elemenata nije povezano sa originalom i ostali su TVS objekti.",missing);
     if(empty)acutPrintf(L"\n%d elemenata nije prikazano (npr. zamrznut sloj) i ostali su TVS objekti; odmrznite slojeve i ponovite izvoz.",empty);
     acutPrintf(L"\nOtvoreni crtez nije mijenjan.");
 }
