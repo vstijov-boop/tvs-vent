@@ -20,6 +20,7 @@ CMDS = [
  ('PRESJEK', 'Poprečni presjek', 'Generiše poprečni presjek kroz TVS kanale; ponovnim izborom presjek se osvježava.', 'Crtanje kanala', 'Oznake', 'PR'),
  ('KOTE', 'Prikaz kota', 'Uključuje ili isključuje prikaz visinskih kota na ekranu (ne štampa se).', 'Crtanje kanala', 'Oznake', 'KO'),
  ('BYPASS_DETALJ', 'Detalj obilaska', 'Bočni detalj postojećeg obilaska prepreke.', 'Crtanje kanala', 'Oznake', 'BD'),
+ ('IZVOZ', 'Izvoz bez TVS', 'Kopija crteža u kojoj su TVS elementi zamijenjeni linijama, za korisnike bez TVS_VENT; otvoreni crtež se ne mijenja.', 'Specifikacija', 'Specifikacija', 'IZ'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)
