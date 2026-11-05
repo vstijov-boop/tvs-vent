@@ -8,6 +8,8 @@ on:
       - '.github/workflows/build-autocad-2022.yml'
       - 'TVS_Ventilation_ARX/**'
       - 'TVS_Ventilation_DBX/**'
+      - 'geometry/**'
+      - 'Installer/TVS_VENT/TVS_VENT.cuix'
       - 'GridCtrl_src/**'
       - 'Installer/TVS_TOOLS/KGTEZ.lsp'
       - 'Installer/TVS_TOOLS/TVS_TOOLS.cuix'
