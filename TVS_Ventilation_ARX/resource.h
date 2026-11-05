@@ -35,6 +35,14 @@
 #define IDR_TVSPROPERTYZDYN             115
 #define IDR_TVSPROPERTYAADYN            116
 #define IDD_MATCHSET                    117
+#define IDC_ZOldTop                     1210
+#define IDC_ZOldBottom                  1211
+#define IDC_ZRefTop                     1212
+#define IDC_ZRefAxis                    1213
+#define IDC_ZRefBottom                  1214
+#define IDC_ZNewInfo                    1215
+#define IDC_ZResult                     1216
+#define IDC_ZSketch                     1217
 
 // Next default values for new objects
 // 
