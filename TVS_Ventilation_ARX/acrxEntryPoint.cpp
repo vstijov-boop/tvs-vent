@@ -1187,6 +1187,41 @@ public:
 	}
 
 
+	// Elevation changed in the size dialog while drawing: offer an etaz (TVS_OFFSET triple) from
+	// the current duct, at its present size; a size change follows as a transition after it.
+	// The etaz targets the axis that, after that transition (its height alignment), gives the
+	// level entered in the dialog. Ne: as before, the next duct starts at the new level.
+	static void etazAfterSize(double oldA, double oldB, bool sized, AcGePoint3d &A1, AcGePoint3d &A2, TVS_Pipe *&pipi, ads_point &pt1)
+	{
+#ifdef TVS_OFFSET_INTEGRATION
+		if (!pipi) return;
+		double current = 0;
+		{ AcDbObjectPointer<TVS_Pipe> p(pipi->objectId(), AcDb::kForRead); if (p.openStatus() != Acad::eOk) return; current = p->Elev; }
+		const double f = tvsUnits::factor(), newAxis = globalElevMid;
+		const double target = newAxis - (sized ? tvsTransAlign::endOffset(tvsTransAlignCmd::defaultAlign(), oldA, oldB, globSizeA, globSizeB) : 0);
+		if (std::fabs(target - current) * f <= 0.5) return;
+		wchar_t prompt[200]; swprintf_s(prompt, L"\nKota je promijenjena za %+.0f mm. Umetnuti etaz? [Da/Ne] <Da>: ", (target - current) * f);
+		acedInitGet(0, L"Da Ne"); ACHAR kw[16] = L""; const int rc = acedGetKword(prompt, kw);
+		if (rc == RTCAN || (rc == RTNORM && _wcsicmp(kw, L"Ne") == 0)) return;
+		// angle of the etaz: last one used if valid (TVS default 90 is not an etaz angle), else 45
+		double use = globalAxis > 0 && globalAxis < 90 ? globalAxis : 45;
+		{ wchar_t ap[120]; swprintf_s(ap, L"\nUgao etaza, stepeni (manje od 90) <%g>: ", use);
+		  acedInitGet(RSG_NOZERO | RSG_NONEG, NULL); double v = 0; const int ar = acedGetReal(ap, &v);
+		  if (ar == RTCAN) return; if (ar == RTNORM) { if (v >= 90) { acutPrintf(L"\nUgao mora biti manji od 90; etaz nije umetnut."); return; } use = v; } }
+		double accepted = 0, angle = 0;
+		const tvsOffsetIntegration::Outcome r = tvsOffsetIntegration::executeTo(pipi, target, use, accepted, angle);
+		if (r == tvsOffsetIntegration::Applied) {
+			A1 = pipi->FirstPoint; A2 = pipi->LastPoint; pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
+			if (!sized) { globalElevMid = accepted; globalElev = accepted; }
+			globalAxis = angle;
+			acutPrintf(L"\nEtaz umetnut; crtanje se nastavlja na koti %.0f mm.", newAxis * f);
+		}
+		else acutPrintf(L"\nEtaz nije umetnut (%ls); sljedeci kanal pocinje na novoj koti.", r == tvsOffsetIntegration::NoChange ? L"nema razlike kota" : r == tvsOffsetIntegration::Cancelled ? L"otkazano" : L"vidi poruku iznad");
+#else
+		(void)oldA; (void)oldB; (void)sized; (void)A1; (void)A2; (void)pipi; (void)pt1;
+#endif
+	}
+
 	static TVS_TAP* drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 	{
 
@@ -1917,7 +1952,9 @@ public:
 				oldsizeA = globSizeA;
 				oldsizeB = globSizeB;
 				oldRound = globRound;
-				if (changesize() == true)
+				const bool sized = changesize();
+				etazAfterSize(oldsizeA, oldsizeB, sized, A1, A2, pipi, pt1);   // kota promijenjena u dijalogu: ponudi etaz
+				if (sized)
 				{
 					addtrans(oldsizeA, oldsizeB, globSizeA, globSizeB, A1, A2, A3, pipi, pt1);
 				}
@@ -2205,7 +2242,9 @@ public:
 				oldsizeA = globSizeA;
 				oldsizeB = globSizeB;
 				oldRound = globRound;
-				if (changesize() == true)
+				const bool sized = changesize();
+				etazAfterSize(oldsizeA, oldsizeB, sized, A1, A2, pipi, pt1);   // kota promijenjena u dijalogu: ponudi etaz
+				if (sized)
 				{
 					addtrans(oldsizeA, oldsizeB, globSizeA, globSizeB, A1, A2, A3, pipi, pt1);
 				}

@@ -91,6 +91,34 @@ inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acce
     }
     return result;
 }
+// Etaz to a given axis elevation without the Z dialog (elevation changed in the size dialog
+// while drawing; the question is asked by the caller). Same request, plan and writer as interact.
+inline Outcome executeTo(TVS_Pipe*& current,double elevation,double angle,double& acceptedElevation,double& acceptedAngle){
+    if(!current)return Failed;
+    const AcDbObjectId original=current->objectId();
+    tvsOffsetService::Snapshot snapshot;if(!tvsOffsetService::capture(original,tvsOffsetOperation::Last,snapshot))return Failed;
+    tvsOffsetOperation::Request request;request.elevation=elevation;request.angleDegrees=angle;
+    request.minimumStraight=integrationPolicy().minimumStraightMm;request.minimumProjection=integrationPolicy().minimumProjectionMm;
+    if(globalRadiusTypeRect==RadiusTypeRect_RadiusConstant)request.ri=globalTapRadiusConst*snapshot.physical.factor;
+    else if(globalRadiusTypeRect==RadiusTypeRect_RadiusVariable)request.ri=globalTapRadiusVariableParameter*snapshot.physical.b*snapshot.physical.factor;
+    else {tvsOffsetService::reject(L"Izaberite konstantni ili k*B radijus pravougaonog koljena.");return Failed;}
+    const auto plan=tvsOffsetOperation::prepare(snapshot.physical,request);
+    if(plan.status==tvsOffsetOperation::NoChange)return NoChange;
+    if(plan.status!=tvsOffsetOperation::Ready){
+        if(plan.status==tvsOffsetOperation::TooShort)acutPrintf(L"\nEtaz nije moguc: kanal je prekratak ili je razlika kota premala za dva koljena.");
+        else acutPrintf(L"\nEtaz nije moguc: %s",errorText(plan.geometryStatus));
+        return Failed;
+    }
+    tvsOffsetService::Commit output;Outcome result;
+    try {result=tvsOffsetService::write(snapshot,request,plan,output);}
+    catch(...){acutPrintf(L"\nTVS OFFSET: izuzetak; nepotvrdjena transakcija je ponistena.");return Failed;}
+    if(result==Applied){
+        current=output.residentOutput;acceptedElevation=output.elevation;acceptedAngle=output.angle;
+        try {tvsOffsetSession::applied(acdbHostApplicationServices()->workingDatabase(),original,output.output,output.before);}
+        catch(...){}
+    }
+    return result;
+}
 inline void standalone(){
     try {
         ads_name entity;ads_point pick;
