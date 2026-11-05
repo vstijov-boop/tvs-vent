@@ -10,6 +10,7 @@
 #include "TVS_TRANS.h"
 #include "TVSMoveCommand.h"
 #include "dbsymtb.h"
+#include "dbdict.h"
 #include "dbobjptr.h"
 #include <memory>
 #include <vector>
@@ -104,6 +105,14 @@ inline void run(){
             }
         }
     }
+    // TVS assembly records (obilazak parent records point at the replaced elements) are not
+    // needed without TVS_VENT: removed from the copy so it saves clean.
+    {AcDbDictionary* raw=NULL;if(copy->getNamedObjectsDictionary(raw,AcDb::kForWrite)==Acad::eOk){
+        AcDbObjectPointer<AcDbDictionary> nod;nod.acquire(raw);std::vector<CString> keys;
+        std::unique_ptr<AcDbDictionaryIterator> it(nod->newIterator());
+        for(;it&&!it->done();it->next())if(!_wcsnicmp(it->name(),L"TVS_",4))keys.push_back(it->name());
+        for(size_t k=0;k<keys.size();++k){AcDbObjectId id;if(nod->remove(keys[k],id)==Acad::eOk){
+            AcDbObjectPointer<AcDbObject> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk)o->erase();}}}}
     const Acad::ErrorStatus es=copy->saveAs(path);
     if(es!=Acad::eOk){acutPrintf(L"\nIzvoz nije sacuvan (%ls).",acadErrorStatusText(es));return;}
     acutPrintf(L"\nTVS_IZVOZ: %d TVS elemenata zamijenjeno crtezom; sacuvano u %ls.",replaced,path.GetString());
