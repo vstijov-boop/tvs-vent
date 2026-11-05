@@ -195,7 +195,8 @@ Acad::ErrorStatus TVS_Entity::subDeepClone(AcDbObject* owner,AcDbObject*& cloned
     return result;
 }
 Acad::ErrorStatus TVS_Entity::subWblockClone(AcRxObject* owner,AcDbObject*& cloned,AcDbIdMapping& mapping,Adesk::Boolean primary) const {
-    if(tvsBypassData::marked(this)){cloned=NULL;acutPrintf(L"\nDEV BYPASS: WBLOCK/INSERT kloniranje nije podrzano.");return Acad::eNotApplicable;}
+    // TVS_IZVOZ copies the whole drawing inside a write scope (the copy is exploded afterwards).
+    if(tvsBypassData::marked(this)&&!tvsOffsetData::editable(this)){cloned=NULL;acutPrintf(L"\nDEV BYPASS: WBLOCK/INSERT kloniranje nije podrzano.");return Acad::eNotApplicable;}
     Acad::ErrorStatus result=AcDbCurve::subWblockClone(owner,cloned,mapping,primary);
     if(result==Acad::eOk&&cloned&&tvsOffsetData::marked(this))tvsOffsetData::permitClone(cloned->objectId());
     return result;

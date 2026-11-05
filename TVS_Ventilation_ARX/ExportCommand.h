@@ -51,7 +51,14 @@ inline void run(){
     CString path(rb->resval.rstring);acutRelRb(rb);
     // every TVS element must have been drawn once (its drawn shape is what is exported)
     acedCommandS(RTSTR,L"_.REGENALL",RTNONE);
-    AcDbDatabase* raw=NULL;if(db->wblock(raw)!=Acad::eOk||!raw){acutPrintf(L"\nKopija crteza nije napravljena.");return;}
+    AcDbDatabase* raw=NULL;Acad::ErrorStatus wb;
+    {
+#ifdef TVS_OFFSET_INTEGRATION
+        tvsOffsetData::WriteScope scope;   // etaz / obilazak are copied too (they are exploded in the copy)
+#endif
+        wb=db->wblock(raw);
+    }
+    if(wb!=Acad::eOk||!raw){acutPrintf(L"\nKopija crteza nije napravljena (%ls).",acadErrorStatusText(wb));return;}
     std::unique_ptr<AcDbDatabase> copy(raw);
     int replaced=0,empty=0,missing=0;
     // originals by signature (used when the copy did not keep the handle)
