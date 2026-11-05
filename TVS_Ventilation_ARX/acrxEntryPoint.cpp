@@ -134,6 +134,7 @@ public:
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->addReactor(&offsetReactor());
+        tvsOffsetRefit::attachAll();   // etaz follows a changed duct elevation (TVS_ETAZ_KOTA)
 #endif
         tvsLinetypes::ensureCurrent(); // drawing already open when the ARX is loaded
         { const MLeaderSettings& ml = Settings::get()->mLeader; // TVS label style available to AutoCAD too
@@ -150,7 +151,7 @@ public:
         PropertyAdmin::uninitialize();
         tvsLevelTooltip::stop();
 #ifdef TVS_OFFSET_INTEGRATION
-        acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();
+        acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();tvsOffsetRefit::detachAll();
 #endif
 		// TODO: Add your code here
 
@@ -172,6 +173,9 @@ public:
 		TVSController::get()->tvsPropertyController.registerApp();
         PropertyAdmin::initialize();
         tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
+#ifdef TVS_OFFSET_INTEGRATION
+        tvsOffsetRefit::attach(acdbHostApplicationServices()->workingDatabase());
+#endif
         { const MLeaderSettings& ml = Settings::get()->mLeader; // TVS label style available to AutoCAD too
           tvsMLeaderStyle::ensureCurrentDocument(ml.style, ml.styleSource.IsEmpty() ? tvsMLeaderStyle::bundledSource() : ml.styleSource); }
 
@@ -1987,6 +1991,8 @@ public:
 #ifdef TVS_OFFSET_PROOF
 #ifdef TVS_OFFSET_INTEGRATION
     static void Ventilation_ARXTVS_OFFSET(){tvsOffsetIntegration::standalone();}
+    // TVS_ETAZ_KOTA: etaz follows a changed duct elevation (run automatically, OffsetRefit.h).
+    static void Ventilation_ARXTVS_ETAZ_KOTA(){if(ActivationErrorMessage()!=pError_Ok)return;tvsOffsetRefit::run();}
     static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeci potvrdeni offset/Z prekida transakciju poslije podataka i kraja izvora.");}
     static void Ventilation_ARXTVS_OFFSET_STATUS(){tvsOffsetDiagnostics::status();}
     static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
@@ -4310,6 +4316,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OF
 #ifdef TVS_OFFSET_INTEGRATION
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_STATUS, TVS_OFFSET_STATUS, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET, TVS_OFFSET, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_ETAZ_KOTA, TVS_ETAZ_KOTA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_POLICY, TVS_OFFSET_POLICY, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_TEST_BAD, TVS_OFFSET_TEST_BAD, ACRX_CMD_MODAL, NULL)
 #endif
