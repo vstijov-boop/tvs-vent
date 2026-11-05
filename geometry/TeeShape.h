@@ -67,11 +67,11 @@ inline bool shape(const Tee& t,Shape& out){
     out=Shape();if(!valid(t))return false;
     const double a=t.A/2,l=t.l,f=t.flange;
     if(t.type==Tap){
-        // Straight main y = 0..2L+w (no wall under the opening); branch face at x = a + L
-        // from y = L to L + w; 45 deg entry (a,0) -> (a+L,L) on the upstream side.
+        // The main looks continuous (SR5-3 sits on an unbroken duct): both walls y = 0..2L+w,
+        // no end lines, nothing inside the main. On it the stucna only: 45 deg entry
+        // (a,0) -> (a+L,L) upstream, downstream wall at y = L + w, face x = a + L.
         const double w=t.w1,Lr=2*l+w;
-        out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,l+w),P(a,Lr)));
-        out.lines.push_back(Seg(P(-a,0),P(a,0)));out.lines.push_back(Seg(P(-a,Lr),P(a,Lr)));
+        out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,0),P(a,Lr)));
         out.lines.push_back(Seg(P(a,0),P(a+l,l)));out.lines.push_back(Seg(P(a,l+w),P(a+l,l+w)));
         out.lines.push_back(Seg(P(a+l,l-f),P(a+l,l+w+f)));
         return true;

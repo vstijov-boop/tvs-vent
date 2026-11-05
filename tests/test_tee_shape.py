@@ -55,15 +55,17 @@ int main(int argc,char**){
  assert(near(area(o,b,bb),ref,1e-12));
  const double pants=(2*(100+200)*25+2*(2*(100+200)*(150-50)*pi()/2+2*(100+200)*25))/1e6;assert(near(area(g,b,bb),pants,1e-12));
  // Stucna SR5-3: L = 0.25 w, at least 75 mm; straight main 2L + w; branch face at a + L
- // from y = L to L + w; 45 deg entry (a,0) -> (a+L,L) upstream; no wall under the opening.
+ // from y = L to L + w; 45 deg entry (a,0) -> (a+L,L) upstream; main continuous, no end lines.
  assert(near(tapLength(200,75),75)&&near(tapLength(400,75),100)&&near(tapLength(250,75),75));
  Tee k;k.type=Tap;k.A=500;k.C=500;k.w1=400;k.l=tapLength(400,75);k.flange=25;Shape ts;assert(shape(k,ts)&&ts.arcs.empty());
  assert(near(runLength(k),2*100+400));
- bool chamfer=false,tface=false,open=true;
+ bool chamfer=false,tface=false,open=true;wall=false;
  for(const Seg& g:ts.lines){
   if(near(g.a.x,250)&&near(g.a.y,0)&&near(g.b.x,350)&&near(g.b.y,100))chamfer=true;
   if(near(g.a.x,350)&&near(g.b.x,350)&&near(g.a.y,100-25)&&near(g.b.y,500+25))tface=true;
-  if(near(g.a.x,250)&&near(g.b.x,250)&&std::min(g.a.y,g.b.y)<500-1e-9)open=false;}
+  if(near(g.a.y,g.b.y)&&std::min(g.a.x,g.b.x)<0)open=false;   // no end lines across the main
+  if(near(g.a.x,250)&&near(g.b.x,250)&&near(g.a.y,0)&&near(g.b.y,600))wall=true;}
+ assert(wall);
  assert(chamfer&&tface&&open);
  {const double bb=300,L=100,w=400;const double ref=(2*(500+300)*600-(w+L)*bb+L*(2*w+L)+bb*L+bb*L*std::sqrt(2.0))/1e6;assert(near(area(k,300,bb),ref,1e-12));}
  // Invalid input draws nothing.
