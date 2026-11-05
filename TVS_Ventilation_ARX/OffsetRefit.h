@@ -109,53 +109,63 @@ inline bool nearXY(const AcGePoint3d& u,const AcGePoint3d& v,double tol){return 
 inline const wchar_t* why(tvsOffset::Status s){
     return s==tvsOffset::TooShort?L"razlika kota je premala za dva koljena":s==tvsOffset::NoChange?L"kote su jednake (etaz nije potreban; obrisite ga rucno)":L"nova geometrija nije moguca";
 }
-// Rebuild for the new elevation of side `side` (0 = first elbow, 2 = second elbow); the
-// duct `duct` end `end` follows. One transaction.
+// Rebuild for the new elevation of side `side` (0 = first elbow, 2 = second elbow): the old
+// triple is replaced by a new one made exactly as TVS_OFFSET makes it (makeElbow/makePipe,
+// new assembly record), the elbow on the other side keeps its place, the duct `duct` end
+// `end` follows. One transaction; afterwards the new assembly is validated.
 inline bool refit(const Assembly& s,int side,double elevation,const AcDbObjectId& duct,int end,double f){
-    AcTransaction* tr=actrTransactionManager->startTransaction();if(!tr)return false;
-    bool ok=false;
+    AcDbDatabase* db=s.a.database();if(!db)return false;
+    AcDbObjectId newA;bool ok=false;
     {
+        tvsOffsetProof::BuildTransaction tx(db);if(!tx.space)return false;
         tvsOffsetData::WriteScope scope;
         AcDbObject *oa=NULL,*op=NULL,*ob=NULL,*od=NULL;
-        if(tr->getObject(oa,s.a,AcDb::kForWrite)==Acad::eOk&&tr->getObject(op,s.p,AcDb::kForWrite)==Acad::eOk
-            &&tr->getObject(ob,s.b,AcDb::kForWrite)==Acad::eOk&&tr->getObject(od,duct,AcDb::kForWrite)==Acad::eOk){
-            TVS_TAP* a=TVS_TAP::cast(oa);TVS_TAP* b=TVS_TAP::cast(ob);TVS_Pipe* p=TVS_Pipe::cast(op);TVS_Pipe* q=TVS_Pipe::cast(od);
-            if(a&&b&&p&&q){
-                const double elevA=side==0?elevation:a->get_Elevation(),elevB=side==2?elevation:b->get_Elevation();
-                const AcGePoint3d bOld=rectMiddle(b);
-                tvsOffset::Result g;tvsOffsetAdapter::Result d;
-                if(!plan(a,p,elevA,elevB,f,g,d)){
-                    const double bend=p->ThisRound?p->SizeA:p->SizeB;
-                    const tvsOffset::Result t=tvsOffset::solve(tvsOffset::Input((elevB-elevA)*f,p->SizeA*f,bend*f,a->get_radius()*f,a->Swectangle,0));
-                    acutPrintf(L"\nEtaz nije prilagodjen: %ls.",why(t.status));
-                }else{
-                    // the elbow on the unchanged side stays where it is
-                    AcGeVector3d T(0,0,0);if(side==0)T=AcGeVector3d(bOld.x-d.elbows[1].middle.x,bOld.y-d.elbows[1].middle.y,0);
-                    TVS_TAP* taps[2]={a,b};
-                    for(int j=0;j<2;++j){const tvsOffsetAdapter::Elbow& e=d.elbows[j];TVS_TAP* tap=taps[j];
-                        AcGePoint3d m(e.middle.x,e.middle.y,e.middle.z);m+=T;
-                        if(tap->ThisRound){const tvsRoundElbow::P r=tvsRoundElbow::middleFromMc(tvsRoundElbow::P(m.x,m.y),e.startVector.x,e.startVector.y,e.angle,e.innerRadius+e.sizeA/2);m=AcGePoint3d(r.x,r.y,m.z);}
-                        tap->assertWriteEnabled();tap->MiddlePoint=m;tap->CenterPoint=m;tap->Startvector=AcGeVector3d(e.startVector.x,e.startVector.y,0);
-                        tap->put_Form(e.form==tvsOffsetAdapter::Up?Form_Up:Form_Down);tap->put_Elevation(e.elevation);tap->recordGraphicsModified();}
-                    p->assertWriteEnabled();
-                    p->FirstPoint=AcGePoint3d(d.middle.first.x,d.middle.first.y,d.middle.first.z)+T;
-                    p->LastPoint=AcGePoint3d(d.middle.last.x,d.middle.last.y,d.middle.last.z)+T;
-                    p->put_Elevation((d.middle.firstElevationMm+d.middle.lastElevationMm)/2/f);
-                    tvsOffsetData::Record r;
-                    if(tvsOffsetData::read(p,r)==tvsOffsetData::Valid){r.rise=g.axis[2].z-g.axis[1].z;tvsOffsetData::write(p,r);}
-                    p->recordGraphicsModified();
-                    // the changed duct's end follows its elbow (outer port), along the duct axis
-                    const tvsOffset::WorldPoint& w=side==0?d.incomingLast:d.outgoingFirst;
-                    AcGePoint3d& at=end==0?q->FirstPoint:q->LastPoint;q->assertWriteEnabled();
-                    at=AcGePoint3d(w.x+T.x,w.y+T.y,at.z);q->recordGraphicsModified();
-                    acutPrintf(L"\nEtaz prilagodjen: razlika kota %.0f mm, kosi dio %.0f mm, duzina u osnovi %.0f mm.",
-                        std::fabs(elevB-elevA)*f,g.straightLength,g.totalRun);
-                    ok=true;
-                }
-            }
+        if(actrTransactionManager->getObject(oa,s.a,AcDb::kForWrite)!=Acad::eOk||actrTransactionManager->getObject(op,s.p,AcDb::kForWrite)!=Acad::eOk
+            ||actrTransactionManager->getObject(ob,s.b,AcDb::kForWrite)!=Acad::eOk||actrTransactionManager->getObject(od,duct,AcDb::kForWrite)!=Acad::eOk)return false;
+        TVS_TAP* a=TVS_TAP::cast(oa);TVS_TAP* b=TVS_TAP::cast(ob);TVS_Pipe* p=TVS_Pipe::cast(op);TVS_Pipe* q=TVS_Pipe::cast(od);
+        if(!a||!b||!p||!q)return false;
+        const double elevA=side==0?elevation:a->get_Elevation(),elevB=side==2?elevation:b->get_Elevation();
+        tvsOffset::Result g;tvsOffsetAdapter::Result d;
+        if(!plan(a,p,elevA,elevB,f,g,d)){
+            const double bend=p->ThisRound?p->SizeA:p->SizeB;
+            const tvsOffset::Result t=tvsOffset::solve(tvsOffset::Input((elevB-elevA)*f,p->SizeA*f,bend*f,a->get_radius()*f,a->Swectangle,0));
+            acutPrintf(L"\nEtaz nije prilagodjen: %ls.",why(t.status));return false;
         }
+        // the elbow on the unchanged side stays where it is
+        const AcGePoint3d bOld=rectMiddle(b);
+        double tx_=0,ty_=0;if(side==0){tx_=bOld.x-d.elbows[1].middle.x;ty_=bOld.y-d.elbows[1].middle.y;}
+        auto move=[&](tvsOffset::WorldPoint& w){w.x+=tx_;w.y+=ty_;};
+        for(int j=0;j<2;++j)move(d.elbows[j].middle);
+        move(d.middle.first);move(d.middle.last);move(d.incomingLast);move(d.outgoingFirst);
+        tvsOffsetService::Snapshot snap;snap.db=db;snap.physical.factor=f;snap.physical.a=p->SizeA;
+        snap.round=p->ThisRound;snap.physical.b=p->ThisRound?p->SizeA:p->SizeB;snap.typeRoundTap=a->TypeRoundTap;
+        AcDbEntity* old[3]={a,p,b};AcDbObjectId ids[3];AcDbEntity* made[3]={NULL,NULL,NULL};
+        for(int j=0;j<2;++j){
+            std::unique_ptr<TVS_TAP> tap=tvsOffsetService::makeElbow(p,snap,d.elbows[j]);if(!tap)return false;
+            TVS_TAP* raw=tap.release();if(!tx.append(raw,ids[j==0?0:2]))return false;made[j==0?0:2]=raw;
+        }
+        std::unique_ptr<TVS_Pipe> slope=tvsOffsetService::makePipe(p,snap,d.middle.first,d.middle.last,(d.middle.firstElevationMm+d.middle.lastElevationMm)/2/f);
+        if(!slope)return false;{TVS_Pipe* raw=slope.release();if(!tx.append(raw,ids[1]))return false;made[1]=raw;}
+        const CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return false;
+        for(int j=0;j<3;++j){
+            tvsOffsetData::Record r;r.guid=guid;r.role=j;for(int k=0;k<3;++k)r.members[k]=ids[k];
+            r.rise=j==1?g.axis[2].z-g.axis[1].z:0;
+            if(tvsOffsetData::write(made[j],r)!=Acad::eOk)return false;
+            if(resbuf* x=old[j]->xData(NULL)){made[j]->setXData(x);acutRelRb(x);}   // manufacturer, note ...
+        }
+        for(int j=0;j<3;++j)if(old[j]->erase()!=Acad::eOk)return false;
+        // the changed duct's end follows its elbow (outer port), along the duct axis
+        const tvsOffset::WorldPoint& w=side==0?d.incomingLast:d.outgoingFirst;
+        AcGePoint3d& at=end==0?q->FirstPoint:q->LastPoint;q->assertWriteEnabled();
+        at=AcGePoint3d(w.x,w.y,at.z);q->recordGraphicsModified();
+        if(!tx.commit())return false;
+        newA=ids[0];ok=true;
+        acutPrintf(L"\nEtaz prilagodjen: razlika kota %.0f mm, kosi dio %.0f mm, duzina u osnovi %.0f mm.",
+            std::fabs(elevB-elevA)*f,g.straightLength,g.totalRun);
     }
-    if(ok)actrTransactionManager->endTransaction();else actrTransactionManager->abortTransaction();
+    if(ok){AcDbObjectPointer<TVS_TAP> check(newA,AcDb::kForRead);
+        if(check.openStatus()==Acad::eOk){const tvsOffsetData::Status st=tvsOffsetData::validate(check.object());
+            if(st!=tvsOffsetData::Valid)acutPrintf(L"\nUPOZORENJE: provjera novog etaza: %ls.",tvsOffsetData::statusText(st));}}
     return ok;
 }
 // One etaz joined to `duct` with a different elevation: ask and rebuild. true = rebuilt.
