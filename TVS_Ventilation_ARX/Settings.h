@@ -63,7 +63,7 @@ static int globalElevRef = 0; // TVS_SETTINGS level reference: 0 axis (Centar), 
 static double globalElev = globalElevdown;
 static double globalAxis = 90;
 static int globalDuctType = DuctTypeStill;
-static double globalWipeoutLength = 50;
+static double globalWipeoutLength = 1;   // Maskiranje (mm): default 1
 
 class Settings
 {

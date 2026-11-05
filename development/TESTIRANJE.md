@@ -34,8 +34,10 @@ prva dimenzija prelaza → ulazni kanal) i javiti šta je očekivano ponašanje.
 - **Etaž prati kotu kanala:** promjena kote kanala uz etaž (Properties, Svojstva, TVS_MATCH) pita „Prilagoditi etaž? [Da/Ne]“. Ugao, radijus i dimenzije ostaju; mijenja se dužina etaža u osnovi, a promijenjeni kanal prati koljeno (komanda TVS_ETAZ_KOTA se pokreće sama). Obilazak (TVS_BYPASS) se ne mijenja ovim putem.
 - **Stil oznaka:** TVS_MleaderStyle iz Resources\TVS_Oznake.dwg se učitava sam.
 
+- **TVS_STRETCH i etaž:** etaž (TVS_OFFSET) se pomjera cijeli kad ga okvir obuhvati; ako ga okvir presijeca, komanda to javi. Susjedni kanali se produžavaju/skraćuju.
+- **Maskiranje:** zadana vrijednost za nove elemente je 1 mm (umjesto 50).
+
 ## Odloženo
-- Svojstva: zadana vrijednost „Maskiranje“ = 1 (umjesto 50) — u sljedećem buildu.
 - Koljeno direktno na priključku grane T komada.
 - P2 – podužni presjek.
 - Detalji koljena u presjeku (kao TVS koljena gore/dolje).
