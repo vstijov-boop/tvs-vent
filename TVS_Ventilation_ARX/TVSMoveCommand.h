@@ -464,6 +464,36 @@ inline bool moveDestination(const std::vector<Node>& nodes,int selected,const ad
     if(!valid){stretchProblem(nodes,problem,networkError(error),L"TVS_MOVE");return false;}
     return true;
 }
+inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
+                        std::vector<std::vector<AcDbObjectId> >& members,double tol);
+// Network bodies for TVS_MOVE: an etaz is one rigid body (see fuseOffsets) and its members move together.
+inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
+                      std::vector<std::vector<AcDbObjectId> >& members,double tol){
+    bodies.clear();
+    for(size_t i=0;i<nodes.size();++i){
+        tvsMoveNetwork::Body b;b.ports=nodes[i].ports;b.axes=nodes[i].axes;b.sections=nodes[i].sections;
+        b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
+        if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
+        bodies.push_back(b);
+    }
+    fuseOffsets(nodes,bodies,members,tol);
+}
+inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatrix3d& translation){
+#ifdef TVS_OFFSET_INTEGRATION
+    tvsOffsetData::WriteScope scope;
+    for(size_t k=0;k<ids.size();++k){AcDbObject* o=NULL;
+        if(actrTransactionManager->getObject(o,ids[k],AcDb::kForWrite)!=Acad::eOk||!AcDbEntity::cast(o)){
+            acutPrintf(L"\nTVS_MOVE: etaž nije dostupan. Izmjena je poništena.");return false;}
+        AcDbEntity* e=AcDbEntity::cast(o);
+        AcDbObjectPointer<AcDbLayerTableRecord> layer(e->layerId(),AcDb::kForRead);
+        if(layer.openStatus()!=Acad::eOk||layer->isLocked()){acutPrintf(L"\nTVS_MOVE: etaž je na zaključanom sloju. Izmjena je poništena.");return false;}
+        if(e->transformBy(translation)!=Acad::eOk){acutPrintf(L"\nTVS_MOVE: etaž nije moguće pomjeriti. Izmjena je poništena.");return false;}
+        e->recordGraphicsModified();}
+    return true;
+#else
+    (void)ids;(void)translation;return false;
+#endif
+}
 inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
                            int selected,const ads_point picked,double factor,double tol,double minimum){
     Point origin;ads_point destination;
@@ -473,13 +503,9 @@ inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
     Point normal(-axis.y,axis.x,0),target(destination[0],destination[1],destination[2]);
     Point delta=normal*((target-origin).dot(normal));
     if(!tvsMoveGeometry::valid(delta)||delta.length()<=tol){acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja.");return;}
-    std::vector<tvsMoveNetwork::Body> bodies;
-    for(size_t i=0;i<nodes.size();++i){
-        tvsMoveNetwork::Body b;b.ports=nodes[i].ports;b.axes=nodes[i].axes;b.sections=nodes[i].sections;
-        b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
-        if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
-        bodies.push_back(b);
-    }
+    std::vector<tvsMoveNetwork::Body> bodies;std::vector<std::vector<AcDbObjectId> > members;
+    bodiesFor(nodes,bodies,members,tol);
+    if(bodies[selected].ports.empty()){acutPrintf(L"\nTVS_MOVE: kanal je dio etaža; izaberite pravu dionicu van etaža.");return;}
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
         acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
@@ -488,11 +514,12 @@ inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
         acutPrintf(L"\nTVS_MOVE: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
     Transaction tx;if(!tx.good())return;
     std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
+    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
     for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
+        if(!members[i].empty()){if(!moveEtazMembers(members[i],translation))return;continue;}
         entities[i]=tx.write(nodes[i].id);
         if(!entities[i]){acutPrintf(L"\nTVS_MOVE: povezani element je zaključan ili nedostupan. Izmjena je poništena.");return;}
     }
-    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
     int stretched=0;
     for(size_t i=0;i<nodes.size();++i)if(entities[i]){
         if(nodes[i].kind==1){
@@ -521,7 +548,11 @@ inline void execute(){
     int center=-1;for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==selected)center=static_cast<int>(i);
     if(center<0||nodes[center].kind!=1){acutPrintf(L"\nTVS_MOVE: izaberite kruti TVS kanal u trenutnom prostoru.");return;}
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
-    if(!simpleChain(nodes,center,tol)){
+    // Etaz in the drawing: the network path fuses it into one rigid body (same as TVS_STRETCH).
+    std::vector<tvsMoveNetwork::Body> probe;std::vector<std::vector<AcDbObjectId> > probeMembers;
+    bodiesFor(nodes,probe,probeMembers,tol);
+    bool etaz=false;for(size_t i=0;i<probeMembers.size();++i)if(!probeMembers[i].empty())etaz=true;
+    if(etaz||!simpleChain(nodes,center,tol)){
         executeNetwork(db,nodes,center,picked,factor,tol,minimum);return;
     }
     const Node& main=nodes[center];Contact elbows[2],neighbors[2];int neighborPorts[2];
