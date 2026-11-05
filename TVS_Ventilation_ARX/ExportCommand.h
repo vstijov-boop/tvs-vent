@@ -111,7 +111,7 @@ inline void run(){
         AcDbObjectPointer<AcDbDictionary> nod;nod.acquire(raw);std::vector<CString> keys;
         std::unique_ptr<AcDbDictionaryIterator> it(nod->newIterator());
         for(;it&&!it->done();it->next())if(!_wcsnicmp(it->name(),L"TVS_",4))keys.push_back(it->name());
-        for(size_t k=0;k<keys.size();++k){AcDbObjectId id;if(nod->remove(keys[k],id)==Acad::eOk){
+        for(size_t k=0;k<keys.size();++k){AcDbObjectId id;if(nod->getAt(keys[k],id)==Acad::eOk){   // erasing removes the entry
             AcDbObjectPointer<AcDbObject> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk)o->erase();}}}}
     const Acad::ErrorStatus es=copy->saveAs(path);
     if(es!=Acad::eOk){acutPrintf(L"\nIzvoz nije sacuvan (%ls).",acadErrorStatusText(es));return;}
