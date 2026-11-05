@@ -797,6 +797,15 @@ Acad::ErrorStatus TVS_WYE::subTransformBy(const AcGeMatrix3d & xform)
 Acad::ErrorStatus TVS_WYE::subExplode(AcDbVoidPtrArray & entitySet) const
 {
 	assertReadEnabled();
+	// Explode = exactly what is drawn (TK-O/TK-G/stucna, side-flush prelazi, ...), as TVS_Pipe
+	// and TVS_TAP do; the old fixed outline below only when nothing was drawn yet.
+	if (ListOfEntity.length() > 0) {
+		for each (AcDbEntity* var in ListOfEntity) {
+			AcDbEntity* clonedEntity = (AcDbEntity*)var->clone();
+			if (clonedEntity) entitySet.append(clonedEntity);
+		}
+		return Acad::eOk;
+	}
 
 	AcGePoint2d massforarray[2];
 	AcGePoint2d massforarray2[8];
