@@ -35,6 +35,7 @@ prva dimenzija prelaza → ulazni kanal) i javiti šta je očekivano ponašanje.
 - **Stil oznaka:** TVS_MleaderStyle iz Resources\TVS_Oznake.dwg se učitava sam.
 
 ## Odloženo
+- Svojstva: zadana vrijednost „Maskiranje“ = 1 (umjesto 50) — u sljedećem buildu.
 - Koljeno direktno na priključku grane T komada.
 - P2 – podužni presjek.
 - Detalji koljena u presjeku (kao TVS koljena gore/dolje).
