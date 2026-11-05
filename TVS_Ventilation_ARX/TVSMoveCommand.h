@@ -466,6 +466,8 @@ inline bool moveDestination(const std::vector<Node>& nodes,int selected,const ad
 }
 inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                         std::vector<std::vector<AcDbObjectId> >& members,double tol);
+inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
+                         std::vector<std::vector<AcDbObjectId> >& members,double tol);
 // Network bodies for TVS_MOVE: an etaz is one rigid body (see fuseOffsets) and its members move together.
 inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                       std::vector<std::vector<AcDbObjectId> >& members,double tol){
@@ -477,6 +479,7 @@ inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork:
         bodies.push_back(b);
     }
     fuseOffsets(nodes,bodies,members,tol);
+    fuseBypasses(nodes,bodies,members,tol);
 }
 inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatrix3d& translation){
 #ifdef TVS_OFFSET_INTEGRATION
@@ -505,7 +508,7 @@ inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
     if(!tvsMoveGeometry::valid(delta)||delta.length()<=tol){acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja.");return;}
     std::vector<tvsMoveNetwork::Body> bodies;std::vector<std::vector<AcDbObjectId> > members;
     bodiesFor(nodes,bodies,members,tol);
-    if(bodies[selected].ports.empty()){acutPrintf(L"\nTVS_MOVE: kanal je dio etaža; izaberite pravu dionicu van etaža.");return;}
+    if(bodies[selected].ports.empty()){acutPrintf(L"\nTVS_MOVE: kanal je dio etaža; izaberite pravu dionicu van etaža i obilaska.");return;}
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
         acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
@@ -655,6 +658,52 @@ inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwor
     (void)nodes;(void)bodies;(void)tol;
 #endif
 }
+// TVS_BYPASS: the whole obilazak (members[0..6]: two etazes and the piece between them) is one rigid
+// body with the outer ports of its two end elbows, so it moves whole, as an etaz does. A member that is
+// not part of a valid, complete obilazak keeps its old behaviour.
+inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
+                         std::vector<std::vector<AcDbObjectId> >& members,double tol){
+#ifdef TVS_OFFSET_INTEGRATION
+    auto find=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
+    auto flat=[&](const Point& u,const Point& v){return std::hypot(u.x-v.x,u.y-v.y);};
+    for(size_t i=0;i<nodes.size();++i){
+        if(nodes[i].kind!=2||nodes[i].ports.size()!=2||!members[i].empty())continue;
+        tvsBypassData::Record r;
+        {AcDbObjectPointer<AcDbObject> o(nodes[i].id,AcDb::kForRead);if(o.openStatus()!=Acad::eOk)continue;
+         if(tvsBypassData::assembly(o.object(),r)!=tvsOffsetData::Valid)continue;}
+        if(r.members[0]!=nodes[i].id)continue;
+        int idx[7];bool ok=true;
+        for(int m=0;m<7;++m){idx[m]=find(r.members[m]);if(idx[m]<0)ok=false;}
+        if(!ok)continue;
+        const int elbow[2]={idx[0],idx[6]},slope[2]={idx[1],idx[5]};
+        Point q[2];
+        for(int e=0;e<2&&ok;++e){
+            const Node& n=nodes[elbow[e]];const Node& s=nodes[slope[e]];
+            if(n.kind!=2||n.ports.size()!=2||s.kind!=1||s.ports.size()!=2){ok=false;break;}
+            // outer port: the one away from the sloped piece
+            const double d0=(std::min)(flat(n.ports[0],s.ports[0]),flat(n.ports[0],s.ports[1])),d1=(std::min)(flat(n.ports[1],s.ports[0]),flat(n.ports[1],s.ports[1]));
+            Point p=d0>d1?n.ports[0]:n.ports[1];
+            for(size_t k=0;k<nodes.size();++k)if(nodes[k].kind==1)for(size_t j=0;j<nodes[k].ports.size();++j)
+                if(flat(nodes[k].ports[j],p)<=tol)p.z=nodes[k].ports[j].z;   // same plane as the duct it joins
+            q[e]=p;
+        }
+        if(!ok)continue;
+        double sizeA=0,sizeB=0,elevA=0,elevB=0;bool round=false;
+        {AcDbObjectPointer<TVS_TAP> a(nodes[idx[0]].id,AcDb::kForRead);if(a.openStatus()!=Acad::eOk)continue;
+         elevA=a->Elev;sizeA=a->SizeA;sizeB=a->SizeB;round=a->ThisRound;}
+        {AcDbObjectPointer<TVS_TAP> b(nodes[idx[6]].id,AcDb::kForRead);if(b.openStatus()!=Acad::eOk)continue;elevB=b->Elev;}
+        Point axis;if(!tvsMoveGeometry::unit(Point(q[1].x-q[0].x,q[1].y-q[0].y,0),axis))continue;
+        tvsMoveNetwork::Body body;body.kind=tvsMoveNetwork::Rigid;
+        body.ports.push_back(q[0]);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(sizeA,round?0:sizeB,round,elevA));
+        body.ports.push_back(q[1]);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(sizeA,round?0:sizeB,round,elevB));
+        bodies[idx[0]]=body;
+        for(int m=1;m<7;++m)bodies[idx[m]]=tvsMoveNetwork::Body();
+        members[idx[0]].assign(r.members,r.members+7);
+    }
+#else
+    (void)nodes;(void)bodies;(void)members;(void)tol;
+#endif
+}
 inline void executeStretch(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
@@ -669,7 +718,7 @@ inline void executeStretch(){
         b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
         if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
         bodies.push_back(b);}
-    std::vector<std::vector<AcDbObjectId> > members;fuseOffsets(nodes,bodies,members,tol);
+    std::vector<std::vector<AcDbObjectId> > members;fuseOffsets(nodes,bodies,members,tol);fuseBypasses(nodes,bodies,members,tol);
     for(size_t i=0;i<nodes.size();++i){
         const tvsMoveNetwork::Body& b=bodies[i];int mask=0;
         for(size_t j=0;j<b.ports.size();++j){
