@@ -11,13 +11,13 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–3 su u radu, ostale idu redom.
 - **TVS_IZVOZ sa obilaskom:** izvoz crteža koji ima TVS_BYPASS uspije, ali AutoCAD pri snimanju kopije javi „An error occurred during save. We recommend that you run RECOVER“ (AUDIT ne nalazi greške). Uklanjanje TVS zapisa iz NOD-a kopije nije pomoglo. Crtež bez obilaska se izvozi bez upozorenja. Sumnja: kloniranje članova obilaska (subWblockClone / remapClones) ili njihovi zapisi u kopiji.
 
 ## Sljedeće (redom)
-4. **ASHRAE oznaka fitinga** (SR5-3 štucna, CR3-x koljeno, SR4-x prelaz …) u specifikaciji i izvozu – osnova za proračun pada pritiska (KanCalc).
-5. **Etaž u TVS_MOVE i obilazak (TVS_BYPASS)** – isto ponašanje kao TVS_STRETCH i prilagođavanje kote.
-6. **Odloženo iz ranijih faza** – podužni presjek P2, detalji koljena u presjeku, koljeno direktno na grani T komada, finese nastavka crtanja poslije T komada.
-7. **Okrugla štucna** (konusna / 45° na okruglom kanalu).
-8. **Podešavanja na jednom mjestu** – `Settings.h` statičke promjenljive (kopija po .cpp fajlu) u jedan zajednički objekat.
-9. **Brzina na velikim crtežima** – jedan indeks elemenata (položaj, kote) umjesto prolaska kroz cijeli Model prostor u TVS_STRETCH, presjeku i provjeri etaža.
-10. **Razbijanje `acrxEntryPoint.cpp`** (~4300 linija) – komande u zasebne fajlove.
-11. **Instalacioni paket** – build pravi gotov `TVS.bundle` (PackageContents.xml, verzija, Resources\TVS_Oznake.dwg).
-12. **Promjena kote tokom crtanja → etaž** – kad se u dijalogu dimenzija tokom TVS_DRAW/TVS_PIPE promijeni kota, ponuditi „Umetnuti etaž? [Da/Ne]“ (isti put kao opcija Z: tvsOffsetIntegration); ako se mijenja i dimenzija, prvo etaž na postojećoj dimenziji, pa prelaz.
-13. **Prošireni dijalog promjene kote (Z)** – postojeće stanje: vrh / osa / dno kanala (samo prikaz); novo stanje: izbor reference (Vrh/Osa/Dno) i vrijednost (npr. vrh 2950 → 2750); ugao (30/45/60°); odmah prikaz razlike kota, kosog dijela, dužine u osnovi i da li je izvodljivo (premala razlika za dva koljena); skica kao kod prelaza.
+4. **Promjena kote tokom crtanja → etaž** – kad se u dijalogu dimenzija tokom TVS_DRAW/TVS_PIPE promijeni kota, ponuditi „Umetnuti etaž? [Da/Ne]“ (isti put kao opcija Z: tvsOffsetIntegration); ako se mijenja i dimenzija, prvo etaž na postojećoj dimenziji, pa prelaz.
+5. **Prošireni dijalog promjene kote (Z)** – postojeće stanje: vrh / osa / dno kanala (samo prikaz); novo stanje: izbor reference (Vrh/Osa/Dno) i vrijednost (npr. vrh 2950 → 2750); ugao (30/45/60°); odmah prikaz razlike kota, kosog dijela, dužine u osnovi i da li je izvodljivo (premala razlika za dva koljena); skica kao kod prelaza.
+6. **Etaž u TVS_MOVE i obilazak (TVS_BYPASS)** – isto ponašanje kao TVS_STRETCH i prilagođavanje kote.
+7. **Odloženo iz ranijih faza** – podužni presjek P2, detalji koljena u presjeku, koljeno direktno na grani T komada, finese nastavka crtanja poslije T komada.
+8. **Okrugla štucna** (konusna / 45° na okruglom kanalu).
+9. **ASHRAE oznaka fitinga** (SR5-3 štucna, CR3-x koljeno, SR4-x prelaz …) u specifikaciji i izvozu – osnova za proračun pada pritiska (KanCalc).
+10. **Podešavanja na jednom mjestu** – `Settings.h` statičke promjenljive (kopija po .cpp fajlu) u jedan zajednički objekat.
+11. **Brzina na velikim crtežima** – jedan indeks elemenata (položaj, kote) umjesto prolaska kroz cijeli Model prostor u TVS_STRETCH, presjeku i provjeri etaža.
+12. **Razbijanje `acrxEntryPoint.cpp`** (~4300 linija) – komande u zasebne fajlove.
+13. **Instalacioni paket** – build pravi gotov `TVS.bundle` (PackageContents.xml, verzija, Resources\TVS_Oznake.dwg).
