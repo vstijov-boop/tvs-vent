@@ -664,21 +664,25 @@ inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwor
 }
 // TVS_BYPASS: the whole obilazak (members[0..6]: two etazes and the piece between them) is one rigid
 // body with the outer ports of its two end elbows, so it moves whole, as an etaz does. A member that is
-// not part of a valid, complete obilazak keeps its old behaviour.
+// not part of a valid, complete obilazak keeps its old behaviour; the reason is printed.
 inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                          std::vector<std::vector<AcDbObjectId> >& members,double tol){
 #ifdef TVS_OFFSET_INTEGRATION
     auto find=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
     auto flat=[&](const Point& u,const Point& v){return std::hypot(u.x-v.x,u.y-v.y);};
+    auto note=[&](const ACHAR* why){acutPrintf(L"\nObilazak nije spojen: %s.",why);};
     for(size_t i=0;i<nodes.size();++i){
         if(nodes[i].kind!=2||nodes[i].ports.size()!=2||!members[i].empty())continue;
-        tvsBypassData::Record r;
+        tvsBypassData::Record r;tvsOffsetData::Status st=tvsOffsetData::Corrupt;bool marked=false;
         {AcDbObjectPointer<AcDbObject> o(nodes[i].id,AcDb::kForRead);if(o.openStatus()!=Acad::eOk)continue;
-         if(tvsBypassData::assembly(o.object(),r)!=tvsOffsetData::Valid)continue;}
+         marked=tvsBypassData::marked(o.object());
+         if(marked)st=tvsBypassData::assembly(o.object(),r);}
+        if(!marked)continue;
+        if(st!=tvsOffsetData::Valid){acutPrintf(L"\nObilazak nije prepoznat (status %d).",static_cast<int>(st));continue;}
         if(r.members[0]!=nodes[i].id)continue;
         int idx[7];bool ok=true;
         for(int m=0;m<7;++m){idx[m]=find(r.members[m]);if(idx[m]<0)ok=false;}
-        if(!ok)continue;
+        if(!ok){note(L"član obilaska nije u izboru");continue;}
         const int elbow[2]={idx[0],idx[6]},slope[2]={idx[1],idx[5]};
         Point q[2];
         for(int e=0;e<2&&ok;++e){
@@ -691,12 +695,12 @@ inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwo
                 if(flat(nodes[k].ports[j],p)<=tol)p.z=nodes[k].ports[j].z;   // same plane as the duct it joins
             q[e]=p;
         }
-        if(!ok)continue;
+        if(!ok){note(L"koljeno ili kanal uz koljeno nema očekivani oblik");continue;}
         double sizeA=0,sizeB=0,elevA=0,elevB=0;bool round=false;
-        {AcDbObjectPointer<TVS_TAP> a(nodes[idx[0]].id,AcDb::kForRead);if(a.openStatus()!=Acad::eOk)continue;
+        {AcDbObjectPointer<TVS_TAP> a(nodes[idx[0]].id,AcDb::kForRead);if(a.openStatus()!=Acad::eOk){note(L"prvo koljeno nije dostupno");continue;}
          elevA=a->Elev;sizeA=a->SizeA;sizeB=a->SizeB;round=a->ThisRound;}
-        {AcDbObjectPointer<TVS_TAP> b(nodes[idx[6]].id,AcDb::kForRead);if(b.openStatus()!=Acad::eOk)continue;elevB=b->Elev;}
-        Point axis;if(!tvsMoveGeometry::unit(Point(q[1].x-q[0].x,q[1].y-q[0].y,0),axis))continue;
+        {AcDbObjectPointer<TVS_TAP> b(nodes[idx[6]].id,AcDb::kForRead);if(b.openStatus()!=Acad::eOk){note(L"drugo koljeno nije dostupno");continue;}elevB=b->Elev;}
+        Point axis;if(!tvsMoveGeometry::unit(Point(q[1].x-q[0].x,q[1].y-q[0].y,0),axis)){note(L"osa obilaska nije definisana");continue;}
         tvsMoveNetwork::Body body;body.kind=tvsMoveNetwork::Rigid;
         body.ports.push_back(q[0]);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(sizeA,round?0:sizeB,round,elevA));
         body.ports.push_back(q[1]);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(sizeA,round?0:sizeB,round,elevB));
