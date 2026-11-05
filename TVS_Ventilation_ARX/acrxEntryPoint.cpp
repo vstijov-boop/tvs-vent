@@ -1203,15 +1203,20 @@ public:
 		wchar_t prompt[200]; swprintf_s(prompt, L"\nKota je promijenjena za %+.0f mm. Umetnuti etaz? [Da/Ne] <Da>: ", (target - current) * f);
 		acedInitGet(0, L"Da Ne"); ACHAR kw[16] = L""; const int rc = acedGetKword(prompt, kw);
 		if (rc == RTCAN || (rc == RTNORM && _wcsicmp(kw, L"Ne") == 0)) return;
+		// angle of the etaz: last one used if valid (TVS default 90 is not an etaz angle), else 45
+		double use = globalAxis > 0 && globalAxis < 90 ? globalAxis : 45;
+		{ wchar_t ap[120]; swprintf_s(ap, L"\nUgao etaza, stepeni (manje od 90) <%g>: ", use);
+		  acedInitGet(RSG_NOZERO | RSG_NONEG, NULL); double v = 0; const int ar = acedGetReal(ap, &v);
+		  if (ar == RTCAN) return; if (ar == RTNORM) { if (v >= 90) { acutPrintf(L"\nUgao mora biti manji od 90; etaz nije umetnut."); return; } use = v; } }
 		double accepted = 0, angle = 0;
-		const tvsOffsetIntegration::Outcome r = tvsOffsetIntegration::executeTo(pipi, target, globalAxis, accepted, angle);
+		const tvsOffsetIntegration::Outcome r = tvsOffsetIntegration::executeTo(pipi, target, use, accepted, angle);
 		if (r == tvsOffsetIntegration::Applied) {
 			A1 = pipi->FirstPoint; A2 = pipi->LastPoint; pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
 			if (!sized) { globalElevMid = accepted; globalElev = accepted; }
 			globalAxis = angle;
 			acutPrintf(L"\nEtaz umetnut; crtanje se nastavlja na koti %.0f mm.", newAxis * f);
 		}
-		else if (r == tvsOffsetIntegration::Failed) acutPrintf(L"\nEtaz nije umetnut; sljedeci kanal pocinje na novoj koti.");
+		else acutPrintf(L"\nEtaz nije umetnut (%ls); sljedeci kanal pocinje na novoj koti.", r == tvsOffsetIntegration::NoChange ? L"nema razlike kota" : r == tvsOffsetIntegration::Cancelled ? L"otkazano" : L"vidi poruku iznad");
 #else
 		(void)oldA; (void)oldB; (void)sized; (void)A1; (void)A2; (void)pipi; (void)pt1;
 #endif
