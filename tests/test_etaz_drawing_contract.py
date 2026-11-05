@@ -7,7 +7,7 @@ class EtazWhileDrawing(unittest.TestCase):
   self.assertEqual(e.count('etazAfterSize(oldsizeA, oldsizeB, sized, A1, A2, pipi, pt1);'),2,'TVS_DRAW and TVS_PIPE')
   # etaz first, then the transition to the new size
   i=e.index('etazAfterSize(oldsizeA');self.assertLess(i,e.index('addtrans(oldsizeA, oldsizeB, globSizeA, globSizeB',i))
-  self.assertIn('Umetnuti etaz? [Da/Ne] <Da>',e)
+  self.assertIn('tvsOffsetIntegration::dialogTo(pipi, target, use, accepted, angle)',e)   # Z dialog, Otkazi = no etaz
   self.assertIn('tvsTransAlign::endOffset(tvsTransAlignCmd::defaultAlign(), oldA, oldB, globSizeA, globSizeB)',e)
   o=(ROOT/'TVS_Ventilation_ARX/OffsetIntegrationCommand.h').read_text(encoding='utf-8-sig')
   self.assertIn('inline Outcome executeTo(TVS_Pipe*& current,double elevation,double angle',o)
