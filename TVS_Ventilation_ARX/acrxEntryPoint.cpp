@@ -64,6 +64,8 @@
 #include "SectionCommand.h"
 #include "LevelTooltip.h"
 #include "TransAlignCommand.h"
+#include "SizeFollow.h"
+#include "ExportCommand.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -118,6 +120,7 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		tvsLevelTooltip::start();
+		tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
 		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)
 #ifdef TVS_BYPASS_PREVIEW
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)
@@ -150,6 +153,7 @@ public:
 #endif
         PropertyAdmin::uninitialize();
         tvsLevelTooltip::stop();
+        tvsSizeFollow::stop();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();tvsOffsetRefit::detachAll();
 #endif
@@ -173,6 +177,7 @@ public:
 		TVSController::get()->tvsPropertyController.registerApp();
         PropertyAdmin::initialize();
         tvsLinetypes::ensureCurrent(); // hidden/centre lines dashed even without TVS_EnterPoint.lsp
+        tvsSizeFollow::attach(acdbHostApplicationServices()->workingDatabase());
 #ifdef TVS_OFFSET_INTEGRATION
         tvsOffsetRefit::attach(acdbHostApplicationServices()->workingDatabase());
 #endif
@@ -2010,6 +2015,18 @@ public:
     }
     // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
     // TVS_PRELAZ_KOTA: transition alignment by height; asks which side of the network stays.
+    // TVS_IZVOZ: copy of the drawing with TVS elements replaced by their drawn shape (ExportCommand.h).
+    static void Ventilation_ARXTVS_IZVOZ(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsExport::run();
+    }
+    // TVS_DIM_PRATI: duct / transition sizes at their joints follow an edit (run automatically, SizeFollow.h).
+    static void Ventilation_ARXTVS_DIM_PRATI(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsSizeFollow::run();
+    }
     static void Ventilation_ARXTVS_PRELAZ_KOTA(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
@@ -4303,6 +4320,8 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MA
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRELAZ_KOTA, TVS_PRELAZ_KOTA, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_DIM_PRATI, TVS_DIM_PRATI, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_IZVOZ, TVS_IZVOZ, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOTE, TVS_KOTE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MATCH, TVS_MATCH, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)

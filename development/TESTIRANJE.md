@@ -21,12 +21,7 @@ TVS_MOVE i TVS_STRETCH imaju nove ikone.
 Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande, uključujući TVS_OFFSET, TVS_BYPASS i TVS_BYPASS_DETALJ.
 
 ## Otvoreno – treba testirati i javiti nazad
-**Prelaz – prenos dimenzija na susjedne kanale**
-1. Promjena dimenzije kanala na ulazu u prelaz: prva dimenzija prelaza se NE mijenja.
-2. Promjena druge dimenzije prelaza iz dijaloga: izlaznom kanalu se mijenja dimenzija.
-
-Provjeriti oba slučaja i ostale kombinacije (izlazni kanal → druga dimenzija prelaza,
-prva dimenzija prelaza → ulazni kanal) i javiti šta je očekivano ponašanje.
+**Prelaz – prenos dimenzija na susjedne kanale:** ispravljeno (vidi „Dimenzije na spojevima prelaz–kanal“ niže); provjeriti oba smjera.
 
 ## Novo – testirati
 - **Štucna 45° (ASHRAE SR5-3):** opcija `Stucna` u TVS_CONNECTW, pri spajanju tokom crtanja, u opciji Tkomad i u TVS_TK_TIP. L = 0,25 × širina ogranka, min. 75 mm; kosi ulaz uzvodno (oKreni ga prebacuje); glavni kanal se crta neprekinut.
@@ -36,6 +31,9 @@ prva dimenzija prelaza → ulazni kanal) i javiti šta je očekivano ponašanje.
 
 - **TVS_STRETCH i etaž:** etaž (TVS_OFFSET) se pomjera cijeli kad ga okvir obuhvati; ako ga okvir presijeca, komanda to javi. Susjedni kanali se produžavaju/skraćuju.
 - **Maskiranje:** zadana vrijednost za nove elemente je 1 mm (umjesto 50).
+
+- **Dimenzije na spojevima prelaz–kanal:** promjena dimenzije kanala (Svojstva, dvoklik, Properties) mijenja dimenziju prelaza na tom kraju; promjena dimenzije prelaza mijenja kanal na tom kraju (i dalje do sljedećeg prelaza na drugom kraju tog kanala). Komande TVS (crtanje, TVS_MATCH ...) ovo ne pokreću. Pokreće se samo (TVS_DIM_PRATI).
+- **TVS_IZVOZ (Izvoz bez TVS):** pravi kopiju crteža u kojoj su TVS elementi zamijenjeni linijama; otvoreni crtež ostaje netaknut. Elementi na zamrznutim slojevima ostaju TVS objekti (komanda javi broj).
 
 ## Odloženo
 - Koljeno direktno na priključku grane T komada.
