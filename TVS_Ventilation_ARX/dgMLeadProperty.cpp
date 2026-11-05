@@ -40,6 +40,7 @@ BOOL dgMLeadProperty::OnInitDialog() {
 	MLeaderSettings& m = Settings::get()->mLeader;
 	CString scale; scale.Format(L"%.6g", m.scale); SetDlgItemText(IDC_MLSCALE, scale);
 	fileSource = m.styleSource;
+	tvsMLeaderStyle::ensureCurrentDocument(m.style, m.styleSource); // TVS_MleaderStyle always in the list
 	fillStyles(m.style);
 	updateInfo();
 	return result;

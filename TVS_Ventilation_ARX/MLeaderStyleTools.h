@@ -79,11 +79,18 @@ inline AcDbObjectId ensure(AcDbDatabase* db,const CString& name,const CString& s
     if(standard)db->setMLeaderstyle(id);
     return id;
 }
-// Drawing open / ARX load: make the shipped style available in the current document.
+// The shipped TVS_MleaderStyle is always made available, whatever style the user chose
+// (an empty/other saved choice must not stop it); then the chosen style from its own DWG.
+inline void ensureAll(AcDbDatabase* db,const CString& name,const CString& source){
+    if(!db)return;
+    ensure(db,bundledStyle(),bundledSource());
+    if(!name.IsEmpty()&&name!=bundledStyle())ensure(db,name,source.IsEmpty()?bundledSource():source);
+}
+// Drawing open / ARX load / label dialog: same for the current document.
 inline void ensureCurrentDocument(const CString& name,const CString& source){
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc||!doc->database())return;
     const bool locked=acDocManager->lockDocument(doc,AcAp::kWrite)==Acad::eOk;
-    ensure(doc->database(),name,source);
+    ensureAll(doc->database(),name,source);
     if(locked)acDocManager->unlockDocument(doc);
 }
 }
