@@ -650,6 +650,7 @@ public:
 		if (LineStatus == TVSisPerpendicular || LineStatus == TVSisIntersection)
 		{
 			int teeType = tvsTee::Straight; double teeSecond = 0;
+			const AcGeVector3d mainFlow = p4 - p3;   // main duct as drawn = air flow (stucna entry upstream)
 			if (!pPipe1->ThisRound && !pPipe2->ThisRound && pPipe1->SizeB > 0 && pPipe2->SizeB > 0
 				&& !tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor()))
 				return false;
@@ -772,7 +773,7 @@ public:
 
 
 
-			tvsTeeCommand::applyType(wyeId, teeType, teeSecond);   // faza 2: created directly as TK-O / TK-G
+			tvsTeeCommand::applyType(wyeId, teeType, teeSecond, mainFlow);   // faza 2: created directly as TK-O / TK-G / stucna
 		} //end if line intersection
 #pragma endregion 
 
@@ -1525,17 +1526,19 @@ public:
 		}
 		const double f = tvsUnits::factor();
 		in.l = tvsTeeData::collarMm() / f; in.minimum = 50 / f;
-		const int def = tvsTeeCommand::lastType() == tvsTee::Pants ? tvsTee::Pants : tvsTee::Branch;
-		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)] <%ls>: ", tvsTeeCommand::typeKeyword(def));
-		acedInitGet(0, L"Ogranak Gacasti"); ACHAR kw[32] = L"";
+		const int last = tvsTeeCommand::lastType();
+		const int def = last == tvsTee::Pants || last == tvsTee::Tap ? last : tvsTee::Branch;
+		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Stucna (SR5-3)] <%ls>: ", tvsTeeCommand::typeKeyword(def));
+		acedInitGet(0, L"Ogranak Gacasti Stucna"); ACHAR kw[32] = L"";
 		const int rc = acedGetKword(prompt, kw);
 		if (rc != RTNORM && rc != RTNONE) return false;
-		in.type = rc == RTNONE ? def : (_wcsicmp(kw, L"Gacasti") == 0 ? tvsTee::Pants : tvsTee::Branch);
+		in.type = rc == RTNONE ? def : (_wcsicmp(kw, L"Gacasti") == 0 ? tvsTee::Pants : _wcsicmp(kw, L"Stucna") == 0 ? tvsTee::Tap : tvsTee::Branch);
 		double w1 = 0, second = 0;
-		const bool pants = in.type == tvsTee::Pants;
+		const bool pants = in.type == tvsTee::Pants, tap = in.type == tvsTee::Tap;
 		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina desnog ogranka, mm" : L"\nSirina ogranka, mm", in.A * f, w1)) return false;
-		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina lijevog ogranka, mm" : L"\nSirina izlaza prolaza C, mm", (pants ? w1 / f : in.A) * f, second)) return false;
+		if (!tap && !tvsTeeCommand::askWidth(pants ? L"\nSirina lijevog ogranka, mm" : L"\nSirina izlaza prolaza C, mm", (pants ? w1 / f : in.A) * f, second)) return false;
 		in.w1 = w1 / f; in.second = second / f;
+		if (tap) { in.l = tvsTeeCommand::tapLength(in.w1, f); in.second = 0; }
 		if (pants && !tvsTee::pantsFeasible(in.A, in.w1, in.second, in.l)) {
 			acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).", in.A * f);
 			return false;
@@ -1563,7 +1566,7 @@ public:
 		{
 			AcDbObjectPointer<TVS_WYE> w(wyeId, AcDb::kForWrite);
 			if (w.openStatus() == Acad::eOk) {
-				tvsTeeData::Record r; r.type = in.type; r.l = in.l; r.second = pants ? plan.tee.w2 : plan.tee.C;
+				tvsTeeData::Record r; r.type = in.type; r.l = in.l; r.second = pants ? plan.tee.w2 : tap ? 0 : plan.tee.C;
 				r.radius2 = pants ? tvsTee::defaultRadius(r.second) : 0;
 				if (tvsTeeData::write(w.object(), r) == Acad::eOk) w->recordGraphicsModified();
 			}
@@ -1593,7 +1596,7 @@ public:
 		globSizeA = ca;   // drawing goes on with the outlet width
 		pipi = next; A1 = c0; A2 = c1;
 		pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
-		acutPrintf(L"\n%ls umetnut; crtanje se nastavlja iz %ls.", pants ? L"Gacasti T komad TK-G" : L"T komad sa ogrankom TK-O",
+		acutPrintf(L"\n%ls umetnut%ls; crtanje se nastavlja iz %ls.", pants ? L"Gacasti T komad TK-G" : tap ? L"Stucna SR5-3" : L"T komad sa ogrankom TK-O", tap ? L"a" : L"",
 			pants ? (cont ? L"lijevog ogranka" : L"desnog ogranka") : (cont ? L"ogranka" : L"prolaza"));
 		return true;
 	}

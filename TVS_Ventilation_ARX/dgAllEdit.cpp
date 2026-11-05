@@ -273,6 +273,7 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 	}
 	else
 	{
+		if (TeeType == 3) { SetDlgItemTextW(IDC_LabelSizeA2, L"Ogr. Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ogr. Hotv"); }   // stucna SR5-3
 		fTeeSecond.ShowWindow(false);
 		if (CWnd* label = GetDlgItem(IDC_TeeSecondLabel)) label->ShowWindow(false);
 	}

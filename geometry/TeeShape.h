@@ -12,7 +12,9 @@
 #include <vector>
 #include <cmath>
 namespace tvsTee {
-enum Type {Straight=0,Branch=1,Pants=2};   // 0 = existing TVS_WYE drawing
+enum Type {Straight=0,Branch=1,Pants=2,Tap=3};   // 0 = existing TVS_WYE drawing
+// Tap = stucna, ASHRAE SR5-3: rectangular branch on a straight main with a 45 deg entry on the
+// upstream side; collar L = 0.25 w (branch width), at least 75 mm. TVS_WYE LengthPl = L.
 struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
@@ -22,8 +24,10 @@ struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange;
 inline double pi(){return 3.14159265358979323846;}
 inline double defaultRadius(double w){return 1.5*w;}           // outer radius: centre line R - w/2 = w
 inline double lengthPl(double l,double R,double w){return l+R-w;} // TVS_WYE equivalent
-inline double runLength(const Tee& t){return 2*lengthPl(t.l,t.R1,t.w1)+t.w1;} // TK-O inlet->outlet
+inline double runLength(const Tee& t){return t.type==Tap?2*t.l+t.w1:2*lengthPl(t.l,t.R1,t.w1)+t.w1;} // inlet->outlet
+inline double tapLength(double w,double minimum){return 0.25*w>minimum?0.25*w:minimum;} // SR5-3: L = 0.25 w, >= 75 mm
 inline bool valid(const Tee& t){
+    if(t.type==Tap)return t.A>0&&t.w1>0&&t.l>0;
     if(!(t.A>0)||!(t.w1>0)||!(t.l>0)||!(t.R1>t.w1))return false;
     if(t.type==Branch&&!(t.C>0))return false;
     if(t.type==Pants&&(!(t.w2>0)||!(t.R2>t.w2)))return false;
@@ -62,6 +66,16 @@ inline bool pantsFeasible(double A,double w1,double w2,double l){
 inline bool shape(const Tee& t,Shape& out){
     out=Shape();if(!valid(t))return false;
     const double a=t.A/2,l=t.l,f=t.flange;
+    if(t.type==Tap){
+        // Straight main y = 0..2L+w (no wall under the opening); branch face at x = a + L
+        // from y = L to L + w; 45 deg entry (a,0) -> (a+L,L) on the upstream side.
+        const double w=t.w1,Lr=2*l+w;
+        out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,l+w),P(a,Lr)));
+        out.lines.push_back(Seg(P(-a,0),P(a,0)));out.lines.push_back(Seg(P(-a,Lr),P(a,Lr)));
+        out.lines.push_back(Seg(P(a,0),P(a+l,l)));out.lines.push_back(Seg(P(a,l+w),P(a+l,l+w)));
+        out.lines.push_back(Seg(P(a+l,l-f),P(a+l,l+w+f)));
+        return true;
+    }
     // inlet collar and flange
     out.lines.push_back(Seg(P(-a,0),P(-a,l)));out.lines.push_back(Seg(P(a,0),P(a,l)));
     out.lines.push_back(Seg(P(-a,l),P(a,l)));out.lines.push_back(Seg(P(-a-f,0),P(a+f,0)));
@@ -107,7 +121,10 @@ inline double arm(double w,double R,double bb,double l){return perimeter(w,bb)*(
 inline double area(const Tee& t,double b,double bb){
     if(!valid(t))return 0;
     double s=0;
-    if(t.type==Branch){const double L=runLength(t);
+    if(t.type==Tap){   // main minus opening (w + L) + two trapezoids, downstream wall, 45 deg wall
+        const double L=runLength(t),w=t.w1,l=t.l;
+        s=perimeter(t.A,b)*L-(w+l)*bb+l*(2*w+l)+bb*l+bb*l*std::sqrt(2.0);}
+    else if(t.type==Branch){const double L=runLength(t);
         s=(perimeter(t.A,b)+perimeter(t.C,b))/2*L-t.w1*bb+arm(t.w1,t.R1,bb,t.l);}
     else{const PantsFrame p=pantsFrame(t);
         s=perimeter(t.A,b)*t.l+arm(t.w1,t.R1,bb,t.l)+arm(t.w2,t.R2,bb,t.l)

@@ -104,7 +104,7 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
         if (b > 0.0 && b2 > 0.0 && p->teeShape(tee, o, ex, ey)) {
             tvsTee::Tee mm = tee; mm.A *= f; mm.C *= f; mm.w1 *= f; mm.w2 *= f; mm.R1 *= f; mm.R2 *= f; mm.l *= f;
             // TK-O: run height b, branch b2; TK-G: inlet = TVS branch (b2), outlets = TVS run (b).
-            areaM2 = tee.type == tvsTee::Branch ? tvsTee::area(mm, b, b2) : tvsTee::area(mm, b2, b);
+            areaM2 = tee.type != tvsTee::Pants ? tvsTee::area(mm, b, b2) : tvsTee::area(mm, b2, b);
             largest = tvsSheetMetal::larger(largest, tvsSheetMetal::larger(mm.C, mm.w2));
         }
     }

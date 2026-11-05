@@ -1,10 +1,11 @@
 #pragma once
-// Svojstva dialog (dgAllEdit) for T komadi TK-O / TK-G: the extra width of the TVS_TEE_V1
+// Svojstva dialog (dgAllEdit) for T komadi TK-O / TK-G / stucna (L = 0.25 w, >= 75 mm): the extra width of the TVS_TEE_V1
 // record (TK-O: outlet of the run C; TK-G: left branch, may differ from the right one, as
 // in the dynamic block). When the first branch width changes and L was not edited, L is
 // recomputed so the branch centre-line radius stays = branch width.
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
+#include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "dgAllEdit.h"
 #include "TeeNeighbours.h"
 #include <map>
@@ -38,12 +39,13 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
             r.second=v;if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);changed=true;}
     }
     // TK-G: both branch widths set L (axes on one line); TK-O: the branch width.
-    const bool branchWidth=r.type==tvsTee::Branch?widthA2Changed:(widthAChanged||changed);
+    const bool branchWidth=r.type!=tvsTee::Pants?widthA2Changed:(widthAChanged||changed);
     if(changed){w->assertWriteEnabled();if(tvsTeeData::write(w,r)!=Acad::eOk)return;}
     if(branchWidth&&!lengthChanged){
-        const double w1=r.type==tvsTee::Branch?w->SizeAotv:w->SizeApr;
+        const double w1=r.type!=tvsTee::Pants?w->SizeAotv:w->SizeApr;
         const double w2=r.second>0?r.second:w->SizeApr;
-        w->put_Length(r.type==tvsTee::Branch?tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1):tvsTee::pantsLengthPl(r.l,w1,w2));
+        if(r.type==tvsTee::Tap){const double L=tvsTee::tapLength(w1,tvsTeeData::tapMinimumMm()/tvsUnits::factor(w));w->put_Length(L);r.l=L;w->assertWriteEnabled();tvsTeeData::write(w,r);}
+        else w->put_Length(r.type==tvsTee::Branch?tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1):tvsTee::pantsLengthPl(r.l,w1,w2));
     }
     if(r.type==tvsTee::Pants&&!tvsTee::pantsFeasible(w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,r.l))
         acutPrintf(L"\nGacasti T komad: ogranci su preuski za ulaz (potrebno priblizno lijevi + desni >= ulaz); prikazan je kao obican T-komad.");
