@@ -14,7 +14,7 @@ struct Section {
 };
 struct Body {Kind kind;std::vector<Point> ports,axes,junctions;std::vector<Section> sections;Body():kind(Blocked){}};
 struct Contact {int body,port,count;Contact():body(-1),port(-1),count(0){}};
-enum Error { Ok,Invalid,Ambiguous,Unsupported,SectionMismatch,NotTangent,NonPlanar,TooShort,SideBranch,NewContact,Cycle,TooMany };
+enum Error { Ok,Invalid,Ambiguous,Unsupported,SectionMismatch,NotTangent,NonPlanar,TooShort,SideBranch,NewContact,Cycle,TooMany,MaskMismatch };
 struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;int problem;Result():changed(0),error(Invalid),problem(-1){}};
 inline Contact contact(const std::vector<Body>& bodies,int owner,int port,double tol){
     Contact c;
@@ -175,7 +175,7 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
                 if(!tvsMoveGeometry::unit(bodies[i].axes[j],aAxis)||!tvsMoveGeometry::unit(b.axes[c.port],bAxis)
                     ||std::fabs(aAxis.dot(bAxis))<1-1e-6){out.error=NotTangent;return false;}
                 if(bool(masks[i]&(1<<static_cast<int>(j)))!=bool(masks[c.body]&(1<<c.port))){
-                    out.error=Unsupported;return false;}
+                    out.error=MaskMismatch;return false;}
             }
         }
 

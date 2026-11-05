@@ -256,6 +256,7 @@ inline const ACHAR* networkError(tvsMoveNetwork::Error e){
     switch(e){
     case tvsMoveNetwork::Ambiguous:return L"Priključak ima više mogućih veza.";
     case tvsMoveNetwork::Unsupported:return L"Veza vodi do nepodržanog elementa ili izbor razdvaja povezane priključke.";
+    case tvsMoveNetwork::MaskMismatch:return L"Okvir ne obuhvata isti kraj na spoju kanala i koljena (presijecite kanal tačno na spoju).";
     case tvsMoveNetwork::SectionMismatch:return L"Presjeci ili elevacije na spoju ne odgovaraju.";
     case tvsMoveNetwork::NotTangent:return L"Ose nisu usklađene na priključku.";
     case tvsMoveNetwork::NonPlanar:return L"Mreža nije u zajedničkoj ravni osnove.";
