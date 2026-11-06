@@ -42,18 +42,5 @@ int main(){
      assert(tvsMoveGeometry::pointsNear(out.ports[12][1],Point(4100,-1000),1e-9));
      for(int m=4;m<10;++m)assert(!out.masks[m]);
     }
-    // Stucna with a round branch at its own elevation: stretch along the main carries the branch.
-    {std::vector<Body> n;
-     n.push_back(body(Pipe,Point(0,0),Point(1000,0),400));                      // 0 main in
-     Body tee=body(Rigid,Point(1000,0),Point(1400,0),400);tee.ports.push_back(Point(1200,250));
-     tee.axes.push_back(Point(0,1));tee.sections.push_back(Section(200,0,true,0));tee.junctions.push_back(Point(1200,0));n.push_back(tee); // 1
-     n.push_back(body(Pipe,Point(1400,0),Point(2000,0),400));                   // 2 main out
-     Body branch=body(Pipe,Point(1200,250),Point(1200,1000),200);for(int k=0;k<2;++k)branch.sections[k]=Section(200,0,true,150);n.push_back(branch); // 3
-     std::vector<int> masks(4,0);masks[0]=2;masks[1]=7;masks[2]=1;masks[3]=3;
-     assert(!planSelection(n,masks,Point(300,0),1,.1,out));assert(out.error==SectionMismatch);
-     n[1].sections[2].anyElevation=true;
-     assert(planSelection(n,masks,Point(300,0),1,.1,out));assert(out.problem==-1);
-     n[3].sections[0].a=250;assert(!planSelection(n,masks,Point(300,0),1,.1,out));assert(out.error==SectionMismatch); // diameter still checked
-    }
     return 0;
 }

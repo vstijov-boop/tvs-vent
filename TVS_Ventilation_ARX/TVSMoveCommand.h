@@ -98,7 +98,6 @@ inline bool describe(AcDbEntity* entity,Node& n){
             // T komad TK-O / TK-G: drawn ports and widths (prolaz C, left branch, fixed collars).
             AcGePoint3d teePort[3];double teeWidth[3];
             if(p->teePorts(teePort,teeWidth))for(int k=0;k<3;++k){n.ports[k]=point(teePort[k]);n.sections[k].a=teeWidth[k];}
-            if(!p->ThisRoundpr&&p->ThisRoundotv)n.sections[2].anyElevation=true;   // round branch: own Elev
             if(std::fabs(p->Vectpr.z)<1e-8&&std::fabs(p->Vectotv.z)<1e-8
                 &&std::fabs(mainAxis.dot(branchAxis))<1e-6)n.kind=4;
         }
@@ -236,7 +235,7 @@ inline bool sameSnapshot(const std::vector<Node>& before,const std::vector<Node>
         for(size_t p=0;p<a.axes.size();++p)if(!tvsMoveGeometry::pointsNear(a.axes[p],b.axes[p],epsilon))return false;
         for(size_t p=0;p<a.sections.size();++p){
             const tvsMoveNetwork::Section& x=a.sections[p];const tvsMoveNetwork::Section& y=b.sections[p];
-            if(x.a!=y.a||x.b!=y.b||x.elevation!=y.elevation||x.round!=y.round||x.anyElevation!=y.anyElevation)return false;
+            if(x.a!=y.a||x.b!=y.b||x.elevation!=y.elevation||x.round!=y.round)return false;
         }
     }return true;
 }
