@@ -192,14 +192,24 @@ struct Dialog {
   move(700,12,616,130,30);move(702,156,616,145,30);move(701,315,616,143,30);move(703,12,666,145,30);move(704,165,666,145,30);move(IDCANCEL,318,666,140,30);
   InvalidateRect(window,NULL,TRUE);
  }
- // Window size the user last chose (this AutoCAD session; UI geometry only, never drawing data).
+ // Window size the user last chose (this AutoCAD session; UI geometry only, never drawing data),
+ // in 96-dpi units (100 %): the same size on a laptop at 200 % and on a monitor at 100 %.
  static SIZE& lastSize(){static SIZE size={0,0};return size;}
- void init(HWND h){window=h;
+ // Scale of the monitor the dialog is on (1 = 96 dpi = 100 %). AutoCAD is DPI aware, so the
+ // window is in physical pixels: the base size is multiplied by this (high-resolution laptops).
+ static double dpiScale(HWND h){
+  typedef UINT (WINAPI *DpiForWindow)(HWND);
+  static DpiForWindow forWindow=(DpiForWindow)GetProcAddress(GetModuleHandleW(L"user32.dll"),"GetDpiForWindow");
+  UINT dpi=forWindow&&h?forWindow(h):0;
+  if(!dpi){HDC dc=GetDC(h);const int d=dc?GetDeviceCaps(dc,LOGPIXELSX):96;if(dc)ReleaseDC(h,dc);dpi=d>0?static_cast<UINT>(d):96;}
+  const double k=dpi/96.0;return k<1?1:k>4?4:k;
+ }
+ void init(HWND h){window=h;const double k=dpiScale(h);
   RECT work;SystemParametersInfo(SPI_GETWORKAREA,0,&work,0);
   MONITORINFO monitor={};monitor.cbSize=sizeof(monitor);if(GetMonitorInfoW(MonitorFromWindow(GetParent(h),MONITOR_DEFAULTTONEAREST),&monitor))work=monitor.rcWork;
   // Compact default (85 % of the 1220x760 base); resizable, and the chosen size is kept.
   const LONG availableW=work.right-work.left-20,availableH=work.bottom-work.top-20;
-  const LONG width=(std::min)(lastSize().cx>0?lastSize().cx:1040L,availableW),height=(std::min)(lastSize().cy>0?lastSize().cy:650L,availableH);
+  const LONG width=(std::min)((LONG)((lastSize().cx>0?lastSize().cx:1040L)*k),availableW),height=(std::min)((LONG)((lastSize().cy>0?lastSize().cy:650L)*k),availableH);
   SetWindowPos(h,NULL,work.left+(work.right-work.left-width)/2,work.top+(work.bottom-work.top-height)/2,width,height,SWP_NOZORDER);
   build();
  }
@@ -303,8 +313,11 @@ struct Dialog {
   if(!self)return FALSE;
   if(m==WM_PAINT){self->paint();return TRUE;}
   if(m==WM_CLOSE){EndDialog(h,IDCANCEL);return TRUE;}
-  if(m==WM_GETMINMAXINFO){MINMAXINFO* mm=(MINMAXINFO*)l;mm->ptMinTrackSize.x=820;mm->ptMinTrackSize.y=520;return TRUE;}
-  if(m==WM_EXITSIZEMOVE){RECT r;GetWindowRect(h,&r);SIZE now={r.right-r.left,r.bottom-r.top};SIZE& last=lastSize();
+  if(m==WM_GETMINMAXINFO){MINMAXINFO* mm=(MINMAXINFO*)l;const double k=dpiScale(h);mm->ptMinTrackSize.x=(LONG)(820*k);mm->ptMinTrackSize.y=(LONG)(520*k);return TRUE;}
+  if(m==0x02E0&&self){   // WM_DPICHANGED: moved to a monitor with another scale (laptop <-> external monitor)
+   const RECT* r=(const RECT*)l;SetWindowPos(h,NULL,r->left,r->top,r->right-r->left,r->bottom-r->top,SWP_NOZORDER|SWP_NOACTIVATE);
+   self->rebuild();return TRUE;}
+  if(m==WM_EXITSIZEMOVE){RECT r;GetWindowRect(h,&r);const double k=dpiScale(h);SIZE now={(LONG)((r.right-r.left)/k),(LONG)((r.bottom-r.top)/k)};SIZE& last=lastSize();
    RECT c;GetClientRect(h,&c);if(std::fabs(c.right/1204.0-self->scaleX)>1e-3||std::fabs(c.bottom/720.0-self->scaleY)>1e-3){last=now;self->rebuild();}return TRUE;}
   if(m==WM_COMMAND){int id=LOWORD(w),code=HIWORD(w);
    if(id==IDCANCEL){EndDialog(h,IDCANCEL);return TRUE;}
