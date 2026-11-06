@@ -149,7 +149,7 @@ inline CString boundary(const AcDbObject* o){
     return L"drugi element";
 }
 inline bool ask(const wchar_t* prompt,const wchar_t* keywords,ACHAR* answer,const wchar_t* def){
-    acedInitGet(0,keywords);answer[0]=0;const int rc=acedGetKword(prompt,answer);
+    acedInitGet(0,keywords);answer[0]=0;const int rc=acedGetKword(prompt,answer,32);
     if(rc==RTNONE){wcscpy_s(answer,32,def);return true;}
     return rc==RTNORM;
 }
