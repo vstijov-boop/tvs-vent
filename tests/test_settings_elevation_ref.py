@@ -4,7 +4,8 @@ root=pathlib.Path(__file__).resolve().parents[1]
 class ElevationReference(unittest.TestCase):
  def test_dialog_round_trip(self):
   src=(root/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8',errors='replace')
-  self.assertIn('static int globalElevRef = 0;',(root/'TVS_Ventilation_ARX/Settings.h').read_text(encoding='utf-8',errors='replace'))
+  self.assertIn('extern int globalElevRef;',(root/'TVS_Ventilation_ARX/Settings.h').read_text(encoding='utf-8',errors='replace'))
+  self.assertIn('int globalElevRef = 0;',(root/'TVS_Ventilation_ARX/Settings.cpp').read_text(encoding='utf-8',errors='replace'))
   self.assertNotIn('dg.ElevMid = true;',src,'reference no longer forced to the axis')
   self.assertNotRegex(src,r'globalElevMid = dg\.Elev;','entered value is not stored as the axis unchanged')
   self.assertRegex(src,r'(?s)dg\.ElevUp = globalElevRef == 1;.*dg\.Elev = globalElevMid \+ \(globalElevRef == 1 \? elevHalf : globalElevRef == 2 \? -elevHalf : 0\);.*DoModal')

@@ -33,7 +33,7 @@ class TeeContract(unittest.TestCase):
   n=text('TVS_Ventilation_ARX/TeeNeighbours.h');self.assertIn('es=ends[0].first?p->put_FirstPoint(to):p->put_Lastpoint(to);',n);self.assertIn('es=p->put_SizeA(after.w[k]);',n)
   e2=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp');i=e2.index('static bool ConnectWithWye(');j=e2.index('#pragma region linear',i)
   self.assertIn('tvsTeeCommand::applyType(wyeId, teeType, teeSecond, mainFlow);',e2[i:j],'faza 2: Racva / TVS_CONNECTW create TK-O / TK-G directly')
-  self.assertIn('tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor())',e2[i:j])
+  self.assertIn('tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor(), pPipe1->ThisRound)',e2[i:j])   # round branch: stucna only
   self.assertEqual(e2.count('teeDuringDrawing(A1, A2, pipi, pt1);'),2,'Tkomad option in TVS_DRAW and TVS_PIPE')
   self.assertEqual(e2.count('Tkomad T Z Gore'),2)
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_bytes().startswith(b'\xef\xbb\xbf'),'acrxEntryPoint.cpp keeps its UTF-8 BOM (prompts with č/ć)')
