@@ -79,6 +79,70 @@ Acad::ErrorStatus write(AcDbObject* object,const Record& r){
 }
 
 bool marked(const AcDbObject* o){Record r;return read(o,r)!=Legacy||tvsBypassData::marked(o);}
+// Duplicate-identity check of validateCore (failed clone finalisation): one index of the
+// TVS_OFFSET_MEMBER records per block, rebuilt only after the database changed (database
+// reactor counter) or an assembly record was written (dataRevision). Before, every
+// validation of a member scanned the whole block, so quantities (mass, specification,
+// Properties) of all etaz/obilazak members grew with the square of the drawing size.
+namespace {
+class ChangeStamp : public AcDbDatabaseReactor {
+public:
+    std::map<const AcDbDatabase*,unsigned long> stamp;
+    void bump(const AcDbDatabase* db){++stamp[db];}
+    virtual void objectAppended(const AcDbDatabase* db,const AcDbObject*){bump(db);}
+    virtual void objectUnAppended(const AcDbDatabase* db,const AcDbObject*){bump(db);}
+    virtual void objectReAppended(const AcDbDatabase* db,const AcDbObject*){bump(db);}
+    virtual void objectModified(const AcDbDatabase* db,const AcDbObject*){bump(db);}
+    virtual void objectErased(const AcDbDatabase* db,const AcDbObject*,Adesk::Boolean){bump(db);}
+    virtual void goodbye(const AcDbDatabase* db);
+};
+ChangeStamp changes;
+std::set<AcDbDatabase*> watched;
+struct GuidEntry {AcDbObjectId members[3];bool mixed;};
+struct GuidIndex {const AcDbDatabase* db;unsigned long stamp,revision;std::map<CString,GuidEntry> byGuid;};
+std::map<AcDbObjectId,GuidIndex> indexes;
+void ChangeStamp::goodbye(const AcDbDatabase* db){
+    stamp.erase(db);watched.erase(const_cast<AcDbDatabase*>(db));
+    for(std::map<AcDbObjectId,GuidIndex>::iterator it=indexes.begin();it!=indexes.end();){if(it->second.db==db)it=indexes.erase(it);else ++it;}
+}
+}
+void releaseCache(){
+    for(std::set<AcDbDatabase*>::iterator it=watched.begin();it!=watched.end();++it)(*it)->removeReactor(&changes);
+    watched.clear();changes.stamp.clear();indexes.clear();
+}
+// true: another record in the block carries r's identity with other members, or the block
+// cannot be read now (then nothing is cached: e.g. a member open for write at the moment).
+static bool identityConflict(const AcDbObject* o,const Record& r){
+    AcDbDatabase* db=o->database();const AcDbObjectId owner=o->ownerId();
+    if(db&&watched.insert(db).second)db->addReactor(&changes);
+    const unsigned long now=db?changes.stamp[db]:0;
+    std::map<AcDbObjectId,GuidIndex>::iterator hit=indexes.find(owner);
+    if(!db||hit==indexes.end()||hit->second.db!=db||hit->second.stamp!=now||hit->second.revision!=dataRevision){
+        GuidIndex index;index.db=db;index.stamp=now;index.revision=dataRevision;
+        AcDbObjectPointer<AcDbBlockTableRecord> block(owner,AcDb::kForRead);if(block.openStatus()!=Acad::eOk)return true;
+        AcDbBlockTableRecordIterator* iterator=NULL;if(block->newIterator(iterator)!=Acad::eOk)return true;
+        bool broken=false;
+        for(;!iterator->done();iterator->step()){
+            AcDbEntity* other=NULL;if(iterator->getEntity(other,AcDb::kForRead)!=Acad::eOk){broken=true;break;}
+            Record record;const Status os=read(other,record);other->close();
+            if(os==Legacy||record.guid.IsEmpty())continue;
+            std::map<CString,GuidEntry>::iterator e=index.byGuid.find(record.guid);
+            if(e==index.byGuid.end()){GuidEntry g;for(int j=0;j<3;++j)g.members[j]=record.members[j];g.mixed=false;index.byGuid[record.guid]=g;}
+            else for(int j=0;j<3;++j)if(e->second.members[j]!=record.members[j])e->second.mixed=true;
+        }
+        delete iterator;
+        if(broken)return true;
+        if(!db){std::map<CString,GuidEntry>::const_iterator e=index.byGuid.find(r.guid);
+            if(e==index.byGuid.end())return false;if(e->second.mixed)return true;
+            for(int j=0;j<3;++j)if(e->second.members[j]!=r.members[j])return true;return false;}
+        indexes[owner]=index;hit=indexes.find(owner);
+    }
+    std::map<CString,GuidEntry>::const_iterator e=hit->second.byGuid.find(r.guid);
+    if(e==hit->second.byGuid.end())return false;
+    if(e->second.mixed)return true;
+    for(int j=0;j<3;++j)if(e->second.members[j]!=r.members[j])return true;
+    return false;
+}
 bool editable(const AcDbObject* o){return writeDepth>0||!marked(o)||clones.find(o->objectId())!=clones.end();}
 // Rigid in plan: translation (any) plus rotation about Z; no scale, mirror or tilt.
 static bool rigidPlan(const AcGeMatrix3d& m){
@@ -115,16 +179,7 @@ Status validateCore(const AcDbObject* o,bool geometry){
         for(int k=0;k<3;++k)if(members[j].members[k]!=r.members[k])return Corrupt;}
     if(!geometry)return Valid;
     // Detect failed clone finalization / duplicate identities without rewriting DWG.
-    AcDbObjectPointer<AcDbBlockTableRecord> owner(o->ownerId(),AcDb::kForRead);
-    if(owner.openStatus()!=Acad::eOk)return Corrupt;
-    AcDbBlockTableRecordIterator* iterator=NULL;if(owner->newIterator(iterator)!=Acad::eOk)return Corrupt;
-    bool conflict=false;
-    for(;!iterator->done();iterator->step()){
-        AcDbEntity* other=NULL;if(iterator->getEntity(other,AcDb::kForRead)!=Acad::eOk){conflict=true;break;}
-        Record record;Status os=read(other,record);other->close();
-        if(os!=Legacy&&record.guid==r.guid){for(int j=0;j<3;++j)if(record.members[j]!=r.members[j])conflict=true;}
-    }
-    delete iterator;if(conflict)return Corrupt;
+    if(identityConflict(o,r))return Corrupt;
     double f=tvsUnits::factor(o);double delta=(b->get_Elevation()-a->get_Elevation())*f;
     // Whole triple rectangular, or whole triple round (bypass of a round duct: smooth
     // constant-radius TVS elbows, bend dimension = diameter, SizeB = 0).

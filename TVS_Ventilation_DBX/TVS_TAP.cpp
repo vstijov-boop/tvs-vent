@@ -2324,6 +2324,10 @@ Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 #endif
 	assertWriteEnabled();
 	Acad::ErrorStatus retCode = AcDbEntity::subTransformBy(xform);
+	// MIRROR (negative determinant): the arc of a plan elbow runs the other way, so the
+	// mirrored end direction becomes the start direction (same sweep angle).
+	if (xform.det() < 0 && std::fabs(std::fabs(Normvector.z) - 1) < 1e-8)
+		Startvector.rotateBy(Swectangle, Normvector);
 	MiddlePoint.transformBy(xform);
 	Startvector.transformBy(xform);
 	return (Acad::eOk);

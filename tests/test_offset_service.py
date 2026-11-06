@@ -2,6 +2,7 @@
 No ObjectARX filing, real transactions, MFC, UCS or Undo/Redo runtime claim.
 """
 import pathlib
+from entry_source import entry_source
 import subprocess
 import tempfile
 import unittest
@@ -154,7 +155,7 @@ int main(){
 
     def test_both_actual_drawing_callers_preserve_outcomes(self):
         ui = (ROOT/'TVS_Ventilation_ARX/OffsetIntegrationCommand.h').read_text(encoding='utf-8-sig')
-        entry = (ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+        entry = entry_source()
         execute = function(ui, 'inline Outcome execute(')
         wrapper = function(entry, 'static tvsOffsetIntegration::Outcome changeZ(')
         needle = 'if(changeZ(pipi)==tvsOffsetIntegration::Applied)'

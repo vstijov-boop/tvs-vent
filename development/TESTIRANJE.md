@@ -49,6 +49,13 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 
 - **oKreni uz prikaz:** pri spajanju sa štucnom / TK-O / TK-G (TVS_CONNECTW, spajanje tokom crtanja) i u TVS_TK_TIP T komad je nacrtan i istaknut prije pitanja „[oKreni] <Gotovo>“; oKreni se može ponavljati dok se ne pritisne Enter.
 
+- **Dimenzija cijele dionice do prelaza (plan 14, faza 1):** promijeni dimenziju kanala (Svojstva / Properties) u dionici sa koljenima u osnovi; program pita „Promijeniti cijelu dionicu do prelaza (koljena N, kanala M)? [Da/Ne] <Da>“. Na Da: koljena dobiju novu dimenziju i radijus, kanali iste stare dimenzije novu dimenziju, krajevi kanala prate priključke koljena; prelaz na kraju preuzme dimenziju kao do sada. Staje na obilasku, TK-G, koljenu gore/dolje, elementu druge dimenzije (ispiše gdje). Ako bi kanal postao prekratak – ništa se ne mijenja.
+  - **Faza 2 – T komad:** dionica ulazi u ogranak (TK0, štucna, TK-O) → ogranak dobije novu dimenziju (štucna novu L, TK-O novi radijus), dionica staje. Ulazi u glavni kanal TK0 / štucne → pitanje „[Nastavi iza T komada/Prelaz iza T komada/Stani] <Nastavi>“ (Prelaz: iza T komada se ubaci prelaz na staru dimenziju). TK-O na glavnom: mijenja se samo ta strana (A ili C). Kanal na ogranku prati pomjereni priključak.
+  - **Faza 3 – obilazak:** „Dionica prolazi kroz obilazak: preračunati ga za novu dimenziju (otvara se dijalog obilaska)? [Da/Ne] <Da>“ → dionica ide i iza obilaska; na kraju se otvara dijalog obilaska sa novom dimenzijom, prvobitnom pravom trasom, preprekom na trenutnom mjestu i postavkama postojećeg obilaska (ugao, strana, razmak, izolacija, rezerva). Prihvati: stari obilazak se uklanja, ulaz i izlaz spajaju u pravu trasu i upisuje se novi (kao TVS_BYPASS). Odustani / nije moguće: obilazak ostaje star (poruka; U vraća sve).
+  - **Faza 2 – etaž:** „Dionica prolazi kroz etaž: preračunati ga za novu dimenziju? [Da/Ne] <Da>“ → etaž se ponovo napravi sa istom razlikom kota, uglom i radijusom; susjedni kanali prate nove priključke. Ako sa novom visinom ne staje – poruka, ništa se ne mijenja.
+
+- **MIRROR fitinga:** koljena u osnovi i prelazi poravnati uz jednu stranu se ispravno preslikavaju (koljeno obrne luk, prelaz zamijeni stranu); T komadi i kanali kao i do sada. Etaž i obilazak se i dalje ne mogu preslikati (poruka) – samo pomjeriti / rotirati.
+
 ## Odloženo
 - Koljeno direktno na priključku grane T komada.
 - Detalji koljena u presjeku (kao TVS koljena gore/dolje).

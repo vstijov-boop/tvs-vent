@@ -1,5 +1,6 @@
 """TVS_KOTE labels and the elevation tooltip (source contracts)."""
 import pathlib,unittest
+from entry_source import entry_source
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def text(p):return (ROOT/p).read_text(encoding='utf-8-sig',errors='replace')
 class LevelsContract(unittest.TestCase):
@@ -10,7 +11,7 @@ class LevelsContract(unittest.TestCase):
   for f,call in (('TVS_Pipe','tvsLevelLabels::draw(mode, database(), FirstPoint + (LastPoint - FirstPoint) / 2'),('TVS_WYE','tvsLevelLabels::draw(mode, database(), Basepoint'),('TVS_TRANS','tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.8, VectTr, Elev + tvsTransAlign::endOffset')):
    s=text('TVS_Ventilation_DBX/%s.cpp'%f);self.assertIn(call,s)
    self.assertLess(s.index('#include "StdAfx.h"'),s.index('#include "LevelLabels.h"'),'after the precompiled header')
-  e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
+  e=entry_source()
   self.assertIn('Ventilation_ARX, TVS_KOTE, TVS_KOTE, ACRX_CMD_MODAL',e);self.assertIn('tvsLevelTooltip::start();',e);self.assertIn('tvsLevelTooltip::stop();',e)
   self.assertIn('tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);',e)
   self.assertIn('"Oblačić sa kotama",1043',text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc'))

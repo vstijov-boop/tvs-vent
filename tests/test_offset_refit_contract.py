@@ -1,10 +1,11 @@
 """Etaz follows a changed duct elevation (OffsetRefit.h, TVS_ETAZ_KOTA): wiring contract."""
 import pathlib,unittest
+from entry_source import entry_source
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def text(p):return (ROOT/p).read_text(encoding='utf-8-sig')
 class OffsetRefit(unittest.TestCase):
  def test_wiring(self):
-  e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
+  e=entry_source()
   self.assertIn('Ventilation_ARX, TVS_ETAZ_KOTA, TVS_ETAZ_KOTA, ACRX_CMD_MODAL',e)
   self.assertIn('tvsOffsetRefit::attachAll();',e);self.assertIn('tvsOffsetRefit::detachAll();',e)
   self.assertIn('tvsOffsetRefit::attach(acdbHostApplicationServices()->workingDatabase());',e)

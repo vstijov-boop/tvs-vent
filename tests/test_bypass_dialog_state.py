@@ -2,6 +2,7 @@
 Pure C++ for the rules; static checks for the Win32/ObjectARX wiring. No AutoCAD runtime.
 """
 import pathlib, re, subprocess, tempfile, unittest
+from entry_source import entry_source
 from test_offset_service import function
 from bypass_compiler import compile_cpp, executable
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -94,7 +95,7 @@ int main(){
         self.assertNotIn('calculate(',body)
         self.assertNotIn('tvsBypassService::write(',body)
         self.assertRegex(body,r"(?s)deviation<=\.001.*?tvsSideDetail::insert\(")
-        entry=(ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+        entry=entry_source()
         self.assertIn('L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand',entry)
 
 if __name__=='__main__':

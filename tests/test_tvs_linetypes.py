@@ -1,5 +1,6 @@
 """ARX creates missing tvs_hidden/tvs_centerline with the TVS_LineType.lin patterns."""
 import pathlib,re,unittest
+from entry_source import entry_source
 root=pathlib.Path(__file__).resolve().parents[1]
 class Linetypes(unittest.TestCase):
  def test_patterns_and_hooks(self):
@@ -12,7 +13,7 @@ class Linetypes(unittest.TestCase):
    self.assertIsNotNone(m,name);values=[float(x) for x in m.group(2).split(',')][:int(m.group(1))]
    self.assertEqual(values,dashes,name)
   self.assertIn('if(table->has(p.name))continue;',h,'existing linetypes are never replaced')
-  src=(root/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8',errors='replace')
+  src=entry_source()
   self.assertEqual(src.count('tvsLinetypes::ensureCurrent();'),2,'on ARX load and on each drawing load')
   dbx=root/'TVS_Ventilation_DBX'
   entity=(dbx/'TVS_Entity.cpp').read_text(encoding='utf-8',errors='replace')

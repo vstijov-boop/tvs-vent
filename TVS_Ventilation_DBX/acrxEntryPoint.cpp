@@ -24,6 +24,9 @@
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
 #include "resource.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetAssemblyData.h"
+#endif
 //#include <vld.h> 
 #include <iostream>
 //-----------------------------------------------------------------------------
@@ -53,7 +56,9 @@ public:
 	}
 
 	virtual AcRx::AppRetCode On_kUnloadAppMsg (void *pkt) {
-		// TODO: Add your code here
+#ifdef TVS_OFFSET_INTEGRATION
+		tvsOffsetData::releaseCache();   // database reactor of the etaz identity index
+#endif
 
 		// You *must* call On_kUnloadAppMsg here
 		AcRx::AppRetCode retCode =AcRxDbxApp::On_kUnloadAppMsg (pkt) ;

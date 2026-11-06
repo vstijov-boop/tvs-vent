@@ -37,33 +37,36 @@
 
 
 
-static double globSizeA = 150;
-static double globSizeB = 150;
-static bool globRound = false;
-static bool globalWipeout = false;
-static bool globalGrani = false;
-static bool global1D = false;
-static double ftSizeB = 100;
-static double ftSizeroundA = 160;
-static double ftLengthp = 150;
-static int ftTransType = 1;
-static int globalMlead = 1;
-static int globalRadiusTypeRound = RadiusTypeRound_RadiusVariable;
-static int globalRadiusTypeRect = RadiusTypeRect_RadiusVariable;
-static int globalTypeRoundTap = 1;
-static int globalTapForm = Form_Direct;
-static int globalTransType = 0;
-static double globalTapRadiusVariableParameter = 0.5;
-static double globalTapRadiusConst = 150;
-static double globalFlow = 0;
-static double globalLengthTr = 300;
-static double globalLengthW = 50;
-static double globalElevMid = 0;
-static int globalElevRef = 0; // TVS_SETTINGS level reference: 0 axis (Centar), 1 top (Vrh), 2 bottom (Dno); globalElevMid stays the axis
-static double globalElev = globalElevdown;
-static double globalAxis = 90;
-static int globalDuctType = DuctTypeStill;
-static double globalWipeoutLength = 1;   // Maskiranje (mm): default 1
+// Drawing defaults (TVS_SETTINGS, last used sizes ...): one shared copy for the whole module,
+// defined in Settings.cpp. (They used to be `static` here, so every .cpp had its own copy and a
+// value set in one part of the program was not seen in another.)
+extern double globSizeA;
+extern double globSizeB;
+extern bool globRound;
+extern bool globalWipeout;
+extern bool globalGrani;
+extern bool global1D;
+extern double ftSizeB;
+extern double ftSizeroundA;
+extern double ftLengthp;
+extern int ftTransType;
+extern int globalMlead;
+extern int globalRadiusTypeRound;
+extern int globalRadiusTypeRect;
+extern int globalTypeRoundTap;
+extern int globalTapForm;
+extern int globalTransType;
+extern double globalTapRadiusVariableParameter;
+extern double globalTapRadiusConst;
+extern double globalFlow;
+extern double globalLengthTr;
+extern double globalLengthW;
+extern double globalElevMid;
+extern int globalElevRef; // TVS_SETTINGS level reference: 0 axis (Centar), 1 top (Vrh), 2 bottom (Dno); globalElevMid stays the axis
+extern double globalElev;
+extern double globalAxis;
+extern int globalDuctType;
+extern double globalWipeoutLength;   // Maskiranje (mm): default 1
 
 class Settings
 {
@@ -77,15 +80,6 @@ public:
 
 
 
-// Geometry defaults follow the active DWG; dialog and COM values remain in mm.
-static double tvsGlobalUnitsFactor = 1.0;
-static void syncTVSGlobalUnits() {
-    const double next = tvsUnits::factor();
-    if (next == tvsGlobalUnitsFactor) return;
-    double* values[] = { &globSizeA, &globSizeB, &ftSizeB, &ftSizeroundA, &ftLengthp,
-        &globalTapRadiusConst, &globalLengthTr, &globalLengthW, &globalElevMid,
-        &globalWipeoutLength };
-    for (size_t i = 0; i < sizeof(values)/sizeof(values[0]); ++i)
-        *values[i] *= tvsGlobalUnitsFactor / next;
-    tvsGlobalUnitsFactor = next;
-}
+// Geometry defaults follow the active DWG; dialog and COM values remain in mm (Settings.cpp).
+extern double tvsGlobalUnitsFactor;
+void syncTVSGlobalUnits();

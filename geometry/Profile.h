@@ -38,16 +38,27 @@ inline bool joined(const std::vector<Port>& a,const std::vector<Port>& b,double 
     return false;
 }
 // Shortest chain of elements (tags) from `first` to `last` through joined ports (plan and z).
+// Ports are looked up in a plan grid (cell 4 tol), so the search stays linear in the drawing.
 inline bool route(const std::vector<Member>& ms,int first,int last,double tol,std::vector<int>& tags){
     tags.clear();const std::map<int,std::vector<int> > groups=byTag(ms);
-    if(!groups.count(first)||!groups.count(last))return false;
+    if(!groups.count(first)||!groups.count(last)||!(tol>0))return false;
     std::map<int,std::vector<Port> > pt;
     for(std::map<int,std::vector<int> >::const_iterator g=groups.begin();g!=groups.end();++g)pt[g->first]=ports(ms,g->second);
+    const double cell=4*tol;typedef std::pair<long long,long long> Key;
+    auto key=[&](const P& p){return Key(static_cast<long long>(std::floor(p.x/cell)),static_cast<long long>(std::floor(p.y/cell)));};
+    std::map<Key,std::vector<int> > grid;
+    for(std::map<int,std::vector<Port> >::const_iterator t=pt.begin();t!=pt.end();++t)
+        for(size_t k=0;k<t->second.size();++k){std::vector<int>& v=grid[key(t->second[k].p)];if(v.empty()||v.back()!=t->first)v.push_back(t->first);}
     std::map<int,int> from;from[first]=first;std::deque<int> open;open.push_back(first);
     while(!open.empty()&&!from.count(last)){
-        const int t=open.front();open.pop_front();
-        for(std::map<int,std::vector<Port> >::const_iterator o=pt.begin();o!=pt.end();++o)
-            if(!from.count(o->first)&&joined(pt[t],o->second,tol)){from[o->first]=t;open.push_back(o->first);}
+        const int t=open.front();open.pop_front();const std::vector<Port>& own=pt[t];
+        for(size_t k=0;k<own.size();++k){const Key c=key(own[k].p);
+            for(long long dx=-1;dx<=1;++dx)for(long long dy=-1;dy<=1;++dy){
+                std::map<Key,std::vector<int> >::const_iterator g=grid.find(Key(c.first+dx,c.second+dy));if(g==grid.end())continue;
+                for(size_t j=0;j<g->second.size();++j){const int o=g->second[j];
+                    if(o==t||from.count(o))continue;
+                    for(size_t q=0;q<pt[o].size();++q)if(touches(own[k],pt[o][q],tol)){from[o]=t;open.push_back(o);break;}}
+            }}
     }
     if(!from.count(last))return false;
     for(int t=last;;t=from[t]){tags.insert(tags.begin(),t);if(t==first)break;}

@@ -1,9 +1,10 @@
 """Plan 4: kota promijenjena u dijalogu dimenzija tokom crtanja nudi etaz (etazAfterSize)."""
 import pathlib,unittest
+from entry_source import entry_source
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 class EtazWhileDrawing(unittest.TestCase):
  def test_wiring(self):
-  e=(ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+  e=entry_source()
   self.assertEqual(e.count('etazAfterSize(oldsizeA, oldsizeB, sized, A1, A2, pipi, pt1);'),2,'TVS_DRAW and TVS_PIPE')
   # etaz first, then the transition to the new size
   i=e.index('etazAfterSize(oldsizeA');self.assertLess(i,e.index('addtrans(oldsizeA, oldsizeB, globSizeA, globSizeB',i))
