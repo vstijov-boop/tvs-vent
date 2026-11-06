@@ -11,8 +11,9 @@ struct Record {
 DLLIMPEXP bool marked(const AcDbObject* object);
 DLLIMPEXP bool pinned(const AcDbObjectId& source,bool first);
 DLLIMPEXP tvsOffsetData::Status validate(const AcDbObject* object,bool geometry=true);
-// Validated parent record of a bypass member (geometry checked). Read-only.
-DLLIMPEXP tvsOffsetData::Status assembly(const AcDbObject* member,Record& record);
+// Validated parent record of a bypass member (geometry checked unless geometry=false:
+// then only the record and the reciprocal member links). Read-only.
+DLLIMPEXP tvsOffsetData::Status assembly(const AcDbObject* member,Record& record,bool geometry=true);
 DLLIMPEXP Acad::ErrorStatus write(AcDbDatabase* db,Record& record,AcDbObject* members[7],AcDbObjectId& parent);
 }
 #endif

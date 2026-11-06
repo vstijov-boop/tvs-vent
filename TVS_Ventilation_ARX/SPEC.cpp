@@ -291,16 +291,19 @@ bool SPEC::add(AcDbEntity * pEnt)
 				// T komad TK-O / TK-G (TVS_TEE_V1): own name, sizes, radius and sheet area.
 				{
 					tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
-					if (SizeB > 0 && SizeA3 > 0 && pWye->teeShape(tee, o, ex, ey)) {
+					if (SizeB > 0 && (SizeA3 > 0 || pWye->ThisRoundotv) && pWye->teeShape(tee, o, ex, ey)
+						&& (!pWye->ThisRoundotv || tee.type == tvsTee::Tap)) {   // okrugli ogranak: samo stucna
 						const double f = tvsUnits::factor(pWye);
 						tvsTee::Tee mm = tee; mm.A *= f; mm.C *= f; mm.w1 *= f; mm.w2 *= f; mm.R1 *= f; mm.R2 *= f; mm.l *= f;
 						if (tee.type == tvsTee::Tap) {   // stucna SR5-3: A x B / w x b (L=)
 							status = TeeTap; Extra = mm.l;
-							setName(L"Štucna 45° SR5-3");
+							const bool roundBranch = pWye->ThisRoundotv;   // A x B / D: kutija D x D, prikljucak D
+							setName(roundBranch ? L"Štucna 45°, okrugli ogranak" : L"Štucna 45° SR5-3");
 							setLable(SizeA); appendLable(_T("x")); appendLable(SizeB); appendLable(_T(" / "));
-							appendLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3);
+							if (roundBranch) { appendLable(d); appendLable(SizeA2); }
+							else { appendLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3); }
 							appendLable(_T(" (L=")); appendLable(mm.l); appendLable(_T(" mm)"));
-							Area = tvsTee::area(mm, SizeB, SizeA3);
+							Area = tvsTee::area(mm, SizeB, roundBranch ? SizeA2 : SizeA3);
 						} else {
 						const bool branchTee = tee.type == tvsTee::Branch;
 						status = branchTee ? TeeBranch : TeePants;
