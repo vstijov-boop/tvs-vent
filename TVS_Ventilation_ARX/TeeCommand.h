@@ -29,65 +29,90 @@ inline void flip(TVS_WYE* w){
     if(after.ok){std::swap(after.p[0],after.p[1]);std::swap(after.w[0],after.w[1]);}
     tvsTeeFit::fit(w,before,after);
 }
-// Type of the T komad `id`: prompt with keywords, Okreni flips and asks again. Connected TVS
-// ducts follow the ports (TeeNeighbours.h). Returns false on cancel.
-inline bool chooseType(const AcDbObjectId& id){
-    AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
-    if(w->ThisRoundpr||w->SizeBpr<=0){acutPrintf(L"\nTK-O/TK-G i stucna su za pravougaoni glavni kanal.");return true;}
-    const bool round=w->ThisRoundotv;   // okrugli ogranak: samo stucna (iste mjere: L = 0.25 x D, min. 75 mm)
-    const double f=tvsUnits::factor(w.object());
+// The T komad as it is now, on screen before a question: closed (so AutoCAD redraws it), graphics
+// flushed. While the user answers, nothing of it is open.
+inline void showNow(const AcDbObjectId& id){
+    {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()==Acad::eOk)w->recordGraphicsModified();}
+    if(actrTransactionManager){actrTransactionManager->queueForGraphicsFlush();actrTransactionManager->flushGraphics();}
+    acedUpdateDisplay();
+}
+inline bool flipById(const AcDbObjectId& id){
+    AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)return false;flip(w.object());return true;
+}
+// oKreni until Enter, each time with the drawn result on screen (highlighted).
+inline void orient(const AcDbObjectId& id,const wchar_t* prompt,const wchar_t* done){
     for(;;){
-        tvsTeeData::Record current;tvsTeeData::read(w.object(),current);
-        const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
+        showNow(id);tvsMove::StretchHighlight mark;mark.add(id);
+        acedInitGet(0,L"oKreni");ACHAR k[32]=L"";
+        if(acedGetKword(prompt,k)!=RTNORM)return;
+        mark.clear();if(flipById(id))acutPrintf(L"%ls",done);
+    }
+}
+// Type of the T komad `id`: prompt with keywords, Okreni flips and asks again. Connected TVS
+// ducts follow the ports (TeeNeighbours.h). The T komad is closed and redrawn before every
+// question, so each answer is seen at once. Returns false on cancel.
+inline bool chooseType(const AcDbObjectId& id){
+    bool round=false;double f=1,sizeApr=0,sizeAotv=0;
+    {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
+     if(w->ThisRoundpr||w->SizeBpr<=0){acutPrintf(L"\nTK-O/TK-G i stucna su za pravougaoni glavni kanal.");return true;}
+     round=w->ThisRoundotv;   // okrugli ogranak: samo stucna (iste mjere: L = 0.25 x D, min. 75 mm)
+     f=tvsUnits::factor(w.object());sizeApr=w->SizeApr;sizeAotv=w->SizeAotv;}
+    for(;;){
+        tvsTeeData::Record current;
+        {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)return false;tvsTeeData::read(w.object(),current);}
         const int def=current.type?current.type:lastType();
         const int shown=round&&def!=tvsTee::Tap&&def!=tvsTee::Straight?tvsTee::Tap:def;
         wchar_t prompt[200];
         if(round)swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna (45)/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
         else swprintf_s(prompt,L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Stucna (SR5-3)/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
-        acedInitGet(0,round?L"Stucna Ravni oKreni":L"Ogranak Gacasti Stucna Ravni oKreni");ACHAR kw[32]=L"";
-        const int rc=acedGetKword(prompt,kw);
+        showNow(id);
+        int rc;ACHAR kw[32]=L"";
+        {tvsMove::StretchHighlight mark;mark.add(id);
+         acedInitGet(0,round?L"Stucna Ravni oKreni":L"Ogranak Gacasti Stucna Ravni oKreni");rc=acedGetKword(prompt,kw);}
         if(rc==RTNONE)wcscpy_s(kw,typeKeyword(shown));else if(rc!=RTNORM)return false;
-        if(_wcsicmp(kw,L"oKreni")==0||_wcsicmp(kw,L"Okreni")==0){flip(w.object());acutPrintf(L"\nT komad je okrenut.");continue;}
+        if(_wcsicmp(kw,L"oKreni")==0||_wcsicmp(kw,L"Okreni")==0){if(flipById(id))acutPrintf(L"\nT komad je okrenut.");continue;}
         tvsTeeData::Record r;
         if(_wcsicmp(kw,L"Ravni")==0){
             lastType()=tvsTee::Straight;
             if(current.type==0)return true;
+            AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)return false;
+            const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
             if(tvsTeeData::write(w.object(),r)==Acad::eOk){acutPrintf(L"\nT-komad je ponovo obican (TK0).");w->recordGraphicsModified();tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));}
             return true;
         }
         if(_wcsicmp(kw,L"Stucna")==0){
-            const double L=tapLength(w->SizeAotv,f);
-            r.type=tvsTee::Tap;r.l=L;w->assertWriteEnabled();w->LengthPl=L;
-            const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
-            if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return true;}
-            w->recordGraphicsModified();lastType()=r.type;
-            tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
-            acutPrintf(round?L"\nStucna 45, okrugli ogranak: L = %.0f mm (0.25 x D %.0f, min. %.0f).":L"\nStucna 45 SR5-3: L = %.0f mm (0.25 x %.0f, min. %.0f).",L*f,w->SizeAotv*f,tvsTeeData::tapMinimumMm());
-            acedInitGet(0,L"oKreni");ACHAR k3[32]=L"";
-            if(acedGetKword(L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ",k3)==RTNORM){flip(w.object());acutPrintf(L"\nStucna je okrenuta.");}
+            const double L=tapLength(sizeAotv,f);
+            {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)return false;
+             const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
+             r.type=tvsTee::Tap;r.l=L;w->LengthPl=L;
+             const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
+             if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return true;}
+             w->recordGraphicsModified();lastType()=r.type;
+             tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));}
+            acutPrintf(round?L"\nStucna 45, okrugli ogranak: L = %.0f mm (0.25 x D %.0f, min. %.0f).":L"\nStucna 45 SR5-3: L = %.0f mm (0.25 x %.0f, min. %.0f).",L*f,sizeAotv*f,tvsTeeData::tapMinimumMm());
+            orient(id,L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ",L"\nStucna je okrenuta.");
             return true;
         }
         const bool pants=_wcsicmp(kw,L"Gacasti")==0;
         r.type=pants?tvsTee::Pants:tvsTee::Branch;r.l=tvsTeeData::collarMm()/f;
         // TK-O: run = TVS run (A in -> C out), branch = TVS branch. TK-G: inlet = TVS branch, outlets = TVS run.
-        const double w1=pants?w->SizeApr:w->SizeAotv;
-        const double defSecond=current.type==r.type&&current.second>0?current.second:w->SizeApr;
+        const double w1=pants?sizeApr:sizeAotv;
+        const double defSecond=current.type==r.type&&current.second>0?current.second:sizeApr;
         double secondMm=0;
         if(!askWidth(pants?L"\nSirina lijevog ogranka, mm":L"\nSirina izlaza prolaza C, mm",defSecond*f,secondMm))return false;
         r.second=secondMm/f;r.radius2=pants?tvsTee::defaultRadius(r.second):0;
-        if(pants&&!tvsTee::pantsFeasible(w->SizeAotv,w1,r.second,r.l)){
-            acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).",w->SizeAotv*f);continue;}
-        w->assertWriteEnabled();w->LengthPl=pants?tvsTee::pantsLengthPl(r.l,w1,r.second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
-        const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
-        if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return true;}
-        w->recordGraphicsModified();lastType()=r.type;
-        tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
+        if(pants&&!tvsTee::pantsFeasible(sizeAotv,w1,r.second,r.l)){
+            acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).",sizeAotv*f);continue;}
+        {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)return false;
+         const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
+         w->LengthPl=pants?tvsTee::pantsLengthPl(r.l,w1,r.second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
+         const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
+         if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return true;}
+         w->recordGraphicsModified();lastType()=r.type;
+         tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));}
         acutPrintf(L"\n%ls: R = %.0f mm, prikljucak %.0f mm.",
             pants?L"Gacasti T komad TK-G":L"T komad sa ogrankom TK-O",tvsTee::defaultRadius(w1)*f,tvsTeeData::collarMm());
-        // offer Okreni once more (inlet side / left-right), Enter keeps it
-        acedInitGet(0,L"oKreni");ACHAR k2[32]=L"";
-        const int rc2=acedGetKword(L"\n[oKreni] <Gotovo>: ",k2);
-        if(rc2==RTNORM){flip(w.object());acutPrintf(L"\nT komad je okrenut.");}
+        orient(id,L"\n[oKreni] <Gotovo>: ",L"\nT komad je okrenut.");   // inlet side / left-right, Enter keeps it
         return true;
     }
 }
@@ -129,21 +154,20 @@ inline bool askType(int& type,double& second,double main,double branch,double f,
 // put on the upstream side (oKreni still offered).
 inline void applyType(const AcDbObjectId& id,int type,double second,const AcGeVector3d& flow=AcGeVector3d::kIdentity){
     if(id.isNull()||type==tvsTee::Straight)return;
-    AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);
-    if(w.openStatus()!=Acad::eOk||w->ThisRoundpr||(w->ThisRoundotv&&type!=tvsTee::Tap))return;
-    const double f=tvsUnits::factor(w.object());
-    const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
-    tvsTeeData::Record r;r.type=type;r.l=tvsTeeData::collarMm()/f;r.second=second;
-    const bool pants=type==tvsTee::Pants,tap=type==tvsTee::Tap;r.radius2=pants?tvsTee::defaultRadius(second):0;
-    const double w1=pants?w->SizeApr:w->SizeAotv;
-    if(tap){r.l=tapLength(w1,f);r.second=0;}
-    w->LengthPl=tap?r.l:pants?tvsTee::pantsLengthPl(r.l,w1,second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
-    if(tvsTeeData::write(w.object(),r)!=Acad::eOk)return;
-    w->recordGraphicsModified();lastType()=type;
-    tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
-    if(tap&&!flow.isZeroLength()){AcGeVector3d u=w->Vectpr,d=flow;u.z=d.z=0;if(u.dotProduct(d)<0)flip(w.object());}
-    acedInitGet(0,L"oKreni");ACHAR k2[32]=L"";
-    if(tap)acutPrintf(w->ThisRoundotv?L"\nStucna 45, okrugli ogranak: L = %.0f mm.":L"\nStucna 45 SR5-3: L = %.0f mm.",r.l*f);
-    if(acedGetKword(tap?L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ":L"\n[oKreni] <Gotovo>: ",k2)==RTNORM){flip(w.object());acutPrintf(L"\nT komad je okrenut.");}
+    const bool pants=type==tvsTee::Pants,tap=type==tvsTee::Tap;bool round=false;double f=1,L=0;
+    {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);
+     if(w.openStatus()!=Acad::eOk||w->ThisRoundpr||(w->ThisRoundotv&&type!=tvsTee::Tap))return;
+     f=tvsUnits::factor(w.object());round=w->ThisRoundotv;
+     const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
+     tvsTeeData::Record r;r.type=type;r.l=tvsTeeData::collarMm()/f;r.second=second;r.radius2=pants?tvsTee::defaultRadius(second):0;
+     const double w1=pants?w->SizeApr:w->SizeAotv;
+     if(tap){r.l=tapLength(w1,f);r.second=0;}
+     w->LengthPl=tap?r.l:pants?tvsTee::pantsLengthPl(r.l,w1,second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
+     if(tvsTeeData::write(w.object(),r)!=Acad::eOk)return;
+     w->recordGraphicsModified();lastType()=type;L=r.l;
+     tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
+     if(tap&&!flow.isZeroLength()){AcGeVector3d u=w->Vectpr,d=flow;u.z=d.z=0;if(u.dotProduct(d)<0)flip(w.object());}}
+    if(tap)acutPrintf(round?L"\nStucna 45, okrugli ogranak: L = %.0f mm.":L"\nStucna 45 SR5-3: L = %.0f mm.",L*f);
+    orient(id,tap?L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ":L"\n[oKreni] <Gotovo>: ",L"\nT komad je okrenut.");
 }
 }
