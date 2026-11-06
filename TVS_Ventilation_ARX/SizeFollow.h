@@ -13,6 +13,10 @@
 // size, and says where.
 #include "TVSMoveCommand.h"
 #include "TransAlignCommand.h"
+#include "TeeCommand.h"
+#ifdef TVS_OFFSET_INTEGRATION
+#include "OffsetRefit.h"
+#endif
 #include "acdocman.h"
 #include "aced.h"
 #include <algorithm>
@@ -101,7 +105,7 @@ inline void stop(){
 }
 // --- settle ---
 inline bool nearXY(const tvsMove::Point& u,const tvsMove::Point& v,double tol){return std::hypot(u.x-v.x,u.y-v.y)<=tol;}
-// --- whole run up to the next prelaz (plan 14, phase 1) ---
+// --- whole run up to the next prelaz (plan 14, phases 1-2) ---
 inline bool plainElbow(const AcDbObject* o){
     if(!o||o->isA()!=TVS_TAP::desc())return false;
 #ifdef TVS_OFFSET_INTEGRATION
@@ -122,7 +126,18 @@ inline bool elbowPortsFor(const TVS_TAP* p,double A,tvsMove::Point out[2]){
     if(specific)radius=tvsUnits::mm(A,p)<355?A:A/2;
     return tvsMoveGeometry::elbowPorts(tvsMove::point(p->MiddlePoint),tvsMove::Point(p->Startvector.x,p->Startvector.y,0),p->Swectangle,radius+A/2,out);
 }
-struct Run {std::vector<int> elbows,ducts;std::vector<CString> stops;};
+// T komad on the run. port: 0/1 main (run start / end), 2 branch. mode: 0 port only,
+// 1 main both sides, run continues behind it, 2 main both sides + prelaz back to the old size
+// behind it.
+struct TeeStep {int node,port,mode;};
+// Etaz on the run (index into the etaz list, entered at its first elbow side).
+struct EtazStep {int index;bool atA;};
+struct Run {std::vector<int> elbows,ducts;std::vector<TeeStep> tees;std::vector<EtazStep> etazes;std::vector<CString> stops;};
+#ifdef TVS_OFFSET_INTEGRATION
+typedef std::vector<tvsOffsetRefit::Assembly> Etazes;
+#else
+struct NoEtaz {};typedef std::vector<NoEtaz> Etazes;
+#endif
 inline CString boundary(const AcDbObject* o){
     if(TVS_WYE::cast(o))return L"T komad";
 #ifdef TVS_OFFSET_INTEGRATION
@@ -133,17 +148,26 @@ inline CString boundary(const AcDbObject* o){
     if(TVS_Pipe::cast(o))return L"kanal druge dimenzije";
     return L"drugi element";
 }
-// From both ends of duct `start`, through joined ducts and plan elbows of the old size.
-inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& old,double tol,Run& run,std::set<int>& seen){
+inline bool ask(const wchar_t* prompt,const wchar_t* keywords,ACHAR* answer,const wchar_t* def){
+    acedInitGet(0,keywords);answer[0]=0;const int rc=acedGetKword(prompt,answer);
+    if(rc==RTNONE){wcscpy_s(answer,32,def);return true;}
+    return rc==RTNORM;
+}
+// From both ends of duct `start`, through joined ducts, plan elbows, T komadi and etazi of the
+// old size; T komad on the main and etaz ask how to go on.
+inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& old,double tol,const Etazes& etazes,Run& run,std::set<int>& seen){
     const bool round=nodes[start].round;
-    auto same=[&](const tvsMove::Node& n){return n.round==round&&std::fabs(n.a-old.a[0])<=1e-6&&(round||std::fabs(n.b-old.b[0])<=1e-6);};
-    for(int side=0;side<2&&side<static_cast<int>(nodes[start].ports.size());++side){
-        int prev=start;tvsMove::Point at=nodes[start].ports[side];
+    auto same=[&](double a,double b,bool r){return r==round&&std::fabs(a-old.a[0])<=1e-6&&(round||std::fabs(b-old.b[0])<=1e-6);};
+    auto indexOf=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
+    std::vector<std::pair<int,tvsMove::Point> > open;
+    for(int side=0;side<2&&side<static_cast<int>(nodes[start].ports.size());++side)open.push_back(std::make_pair(start,nodes[start].ports[side]));
+    for(size_t o=0;o<open.size();++o){
+        int prev=open[o].first;tvsMove::Point at=open[o].second;
         for(int guard=0;guard<2000;++guard){
-            int next=-1,count=0;
+            int next=-1,count=0,port=-1;
             for(size_t k=0;k<nodes.size();++k){if(static_cast<int>(k)==prev)continue;
                 for(size_t j=0;j<nodes[k].ports.size();++j)
-                    if(nearXY(nodes[k].ports[j],at,tol)&&std::fabs(nodes[k].elevation-nodes[prev].elevation)<=tol){next=static_cast<int>(k);++count;break;}}
+                    if(nearXY(nodes[k].ports[j],at,tol)&&std::fabs(nodes[k].elevation-nodes[prev].elevation)<=tol){next=static_cast<int>(k);port=static_cast<int>(j);++count;break;}}
             if(count==0)break;                                            // free end
             if(count>1){run.stops.push_back(L"spoj sa više elemenata");break;}
             if(seen.count(next))break;                                    // closed loop
@@ -151,43 +175,212 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
             if(TVS_TRANS::cast(e.object()))break;                         // prelaz: the size follow below
             const tvsMove::Node& n=nodes[next];
             const bool duct=plainDuct(e.object())&&n.kind==1,elbow=plainElbow(e.object())&&n.kind==2;
-            if((duct||elbow)&&same(n)&&n.ports.size()==2){
+            if(duct||elbow){
+                if(!same(n.a,n.b,n.round)||n.ports.size()!=2){run.stops.push_back(L"element druge dimenzije");break;}
                 seen.insert(next);(duct?run.ducts:run.elbows).push_back(next);
                 const int farPort=std::hypot(n.ports[0].x-at.x,n.ports[0].y-at.y)>std::hypot(n.ports[1].x-at.x,n.ports[1].y-at.y)?0:1;
                 prev=next;at=n.ports[farPort];continue;
             }
-            run.stops.push_back(duct||elbow?CString(L"element druge dimenzije"):boundary(e.object()));break;
+            if(const TVS_WYE* w=TVS_WYE::cast(e.object())){
+                if(n.ports.size()!=3||port<0){run.stops.push_back(L"T komad");break;}
+                tvsTeeData::Record r;tvsTeeData::read(w,r);
+                const bool branch=port==2;
+                const double pa=branch?w->SizeAotv:(port==1&&r.type==tvsTee::Branch&&r.second>0?r.second:w->SizeApr);
+                const double pb=branch?w->SizeBotv:w->SizeBpr;const bool pr=branch?w->ThisRoundotv:w->ThisRoundpr;
+                if(r.type==tvsTee::Pants){run.stops.push_back(L"gaćasti T komad (TK-G)");break;}
+                if(!same(pa,pb,pr)){run.stops.push_back(L"T komad druge dimenzije");break;}
+                if(r.type==tvsTee::Branch&&port==1&&std::fabs(pb-old.b[0])>1e-6){run.stops.push_back(L"TK-O");break;}
+                seen.insert(next);TeeStep t={next,port,0};
+                if(branch||r.type==tvsTee::Branch){run.tees.push_back(t);break;}   // ogranak / one side of TK-O: stops here
+                e.close();
+                ACHAR kw[32];
+                if(!ask(L"\nT komad na glavnom kanalu [Nastavi iza T komada/Prelaz iza T komada/Stani] <Nastavi>: ",L"Nastavi Prelaz Stani",kw,L"Nastavi")||_wcsicmp(kw,L"Stani")==0){
+                    run.stops.push_back(L"T komad (Stani)");break;}
+                t.mode=_wcsicmp(kw,L"Prelaz")==0?2:1;run.tees.push_back(t);
+                if(t.mode==2)break;
+                prev=next;at=n.ports[port==0?1:0];continue;               // on through the other main side
+            }
+#ifdef TVS_OFFSET_INTEGRATION
+            if(tvsOffsetData::marked(e.object())&&!tvsBypassData::marked(e.object())){
+                int found=-1;bool atA=true;
+                for(size_t k=0;k<etazes.size();++k){
+                    if(etazes[k].a==n.id&&nearXY(tvsMove::point(etazes[k].maA),at,tol)){found=static_cast<int>(k);atA=true;break;}
+                    if(etazes[k].b==n.id&&nearXY(tvsMove::point(etazes[k].maB),at,tol)){found=static_cast<int>(k);atA=false;break;}}
+                if(found<0){run.stops.push_back(L"etaž");break;}
+                const int pi=indexOf(etazes[found].p),other=indexOf(atA?etazes[found].b:etazes[found].a);
+                if(pi<0||other<0||!same(nodes[pi].a,nodes[pi].b,nodes[pi].round)){run.stops.push_back(L"etaž druge dimenzije");break;}
+                e.close();
+                ACHAR kw[32];
+                if(!ask(L"\nDionica prolazi kroz etaž: preračunati ga za novu dimenziju? [Da/Ne] <Da>: ",L"Da Ne",kw,L"Da")||_wcsicmp(kw,L"Ne")==0){
+                    run.stops.push_back(L"etaž (nije preračunat)");break;}
+                seen.insert(next);seen.insert(pi);seen.insert(other);EtazStep st={found,atA};run.etazes.push_back(st);
+                prev=other;at=tvsMove::point(atA?etazes[found].maB:etazes[found].maA);continue;
+            }
+#endif
+            run.stops.push_back(boundary(e.object()));break;
         }
     }
 }
+#ifdef TVS_OFFSET_INTEGRATION
+// Plan of an etaz with a new section (same elevations, angle and inner radius; the first
+// elbow keeps its middle): new outer ports.
+inline bool etazPlan(const tvsOffsetRefit::Assembly& s,double A,double B,double f,tvsOffset::Result& g,tvsOffsetAdapter::Result& d){
+    AcDbObjectPointer<TVS_TAP> a(s.a,AcDb::kForRead);AcDbObjectPointer<TVS_Pipe> p(s.p,AcDb::kForRead);
+    if(a.openStatus()!=Acad::eOk||p.openStatus()!=Acad::eOk)return false;
+    const bool round=p->ThisRound;const double bend=round?A:B;
+    const tvsOffset::Input in((s.elevB-s.elevA)*f,A*f,bend*f,a->get_radius()*f,a->Swectangle,0);
+    g=tvsOffset::solve(in);if(!g.hasGeometry())return false;
+    const AcGeVector3d axis=p->LastPoint-p->FirstPoint;if(axis.length()<=0)return false;
+    const AcGePoint3d m=tvsOffsetRefit::rectMiddle(a.object());
+    tvsOffsetAdapter::Placement place(tvsOffset::WorldPoint(m.x,m.y,m.z),std::atan2(axis.y,axis.x),f,s.elevA*f);
+    d=tvsOffsetAdapter::adapt(in,g,place);return d.ready();
+}
+// Rebuild the etaz with the new section, as tvsOffsetRefit::refit (one transaction, new
+// assembly record, validated afterwards). The ducts at its ends are moved by the caller.
+inline bool etazResize(const tvsOffsetRefit::Assembly& s,double A,double B,double f){
+    tvsOffset::Result g;tvsOffsetAdapter::Result d;if(!etazPlan(s,A,B,f,g,d))return false;
+    AcDbDatabase* db=s.a.database();if(!db)return false;AcDbObjectId newA;bool ok=false;
+    {
+        tvsOffsetProof::BuildTransaction tx(db);if(!tx.space)return false;
+        tvsOffsetData::WriteScope scope;
+        AcDbObject *oa=NULL,*op=NULL,*ob=NULL;
+        if(actrTransactionManager->getObject(oa,s.a,AcDb::kForWrite)!=Acad::eOk||actrTransactionManager->getObject(op,s.p,AcDb::kForWrite)!=Acad::eOk
+            ||actrTransactionManager->getObject(ob,s.b,AcDb::kForWrite)!=Acad::eOk)return false;
+        TVS_TAP* a=TVS_TAP::cast(oa);TVS_TAP* b=TVS_TAP::cast(ob);TVS_Pipe* p=TVS_Pipe::cast(op);if(!a||!b||!p)return false;
+        tvsOffsetService::Snapshot snap;snap.db=db;snap.physical.factor=f;snap.physical.a=A;
+        snap.round=p->ThisRound;snap.physical.b=p->ThisRound?A:B;snap.typeRoundTap=a->TypeRoundTap;
+        AcDbEntity* old[3]={a,p,b};AcDbObjectId ids[3];AcDbEntity* made[3]={NULL,NULL,NULL};
+        for(int j=0;j<2;++j){
+            std::unique_ptr<TVS_TAP> tap=tvsOffsetService::makeElbow(p,snap,d.elbows[j]);if(!tap)return false;
+            TVS_TAP* raw=tap.release();if(!tx.append(raw,ids[j==0?0:2]))return false;made[j==0?0:2]=raw;
+        }
+        std::unique_ptr<TVS_Pipe> slope=tvsOffsetService::makePipe(p,snap,d.middle.first,d.middle.last,(d.middle.firstElevationMm+d.middle.lastElevationMm)/2/f);
+        if(!slope)return false;{TVS_Pipe* raw=slope.release();if(!tx.append(raw,ids[1]))return false;made[1]=raw;}
+        const CString guid=tvsOffsetData::newGuid();if(guid.IsEmpty())return false;
+        for(int j=0;j<3;++j){
+            tvsOffsetData::Record r;r.guid=guid;r.role=j;for(int k=0;k<3;++k)r.members[k]=ids[k];
+            r.rise=j==1?g.axis[2].z-g.axis[1].z:0;
+            if(tvsOffsetData::write(made[j],r)!=Acad::eOk)return false;
+            if(resbuf* x=old[j]->xData(NULL)){made[j]->setXData(x);acutRelRb(x);}
+        }
+        for(int j=0;j<3;++j)if(old[j]->erase()!=Acad::eOk)return false;
+        if(!tx.commit())return false;
+        newA=ids[0];ok=true;
+    }
+    if(ok){AcDbObjectPointer<TVS_TAP> check(newA,AcDb::kForRead);
+        if(check.openStatus()==Acad::eOk){const tvsOffsetData::Status st=tvsOffsetData::validate(check.object());
+            if(st!=tvsOffsetData::Valid)acutPrintf(L"\nUPOZORENJE: provjera novog etaža: %ls.",tvsOffsetData::statusText(st));}}
+    return ok;
+}
+#endif
+// TVS transition right behind a T komad: the duct `ductId` (end `nearIsFirst` on the T komad
+// port `at`) is shortened by the transition length; prelaz new size (A x B) -> its own size.
+inline void prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGePoint3d& at,double A,double B,double f){
+    AcGePoint3d N,E;double width=0,height=0,elev=0;bool oneD=false,round=false;
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return;
+     N=nearIsFirst?d->FirstPoint:d->LastPoint;E=nearIsFirst?d->LastPoint:d->FirstPoint;width=d->SizeA;height=d->SizeB;elev=d->Elev;oneD=d->This1D;round=d->ThisRound;}
+    AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length(),lt=tvsTeeFit::transitionMm()/f;
+    if(length<lt+50.0/f){acutPrintf(L"\nIza T komada: kanal je prekratak za prelaz %.0f mm; prilagodite ručno.",tvsTeeFit::transitionMm());return;}
+    dir.normalize();const AcGePoint3d start(at.x,at.y,N.z),end=start+dir*lt;
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
+     if((nearIsFirst?d->put_FirstPoint(end):d->put_Lastpoint(end))!=Acad::eOk)return;d->recordGraphicsModified();}
+    double a1=A,b1=round?0:B,a2=width,b2=round?0:height,len=lt;AcGeVector3d v=dir*lt;AcGePoint3d p0=start;
+    TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,p0,round,round,1,oneD);
+    if(t&&!t->objectId().isNull()){
+        AcDbObjectPointer<TVS_TRANS> o(t->objectId(),AcDb::kForWrite);
+        if(o.openStatus()==Acad::eOk){
+            AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()==Acad::eOk)o->setPropertiesFrom(d.object());
+            o->put_Elevation(elev);o->recordGraphicsModified();}
+        acutPrintf(L"\nIza T komada umetnut prelaz na staru dimenziju, dužine %.0f mm.",tvsTeeFit::transitionMm());
+    }
+}
 // Applies the new size of duct `start` to the run. false: nothing changed (reason printed).
-inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run& run,double tol,std::vector<AcDbObjectId>& resized){
+inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run& run,const Etazes& etazes,double tol,std::vector<AcDbObjectId>& resized){
     double A=0,B=0;bool round=false;
     {AcDbObjectPointer<TVS_Pipe> p(nodes[start].id,AcDb::kForRead);if(p.openStatus()!=Acad::eOk)return false;A=p->SizeA;B=p->SizeB;round=p->ThisRound;}
-    std::vector<std::pair<tvsMove::Point,tvsMove::Point> > moves;   // elbow port: old -> new
+    const double f=tvsUnits::factor(nodes[start].id.database());
+    std::vector<std::pair<tvsMove::Point,tvsMove::Point> > moves;   // port: old -> new
     for(size_t k=0;k<run.elbows.size();++k){const tvsMove::Node& n=nodes[run.elbows[k]];
         AcDbObjectPointer<TVS_TAP> t(n.id,AcDb::kForRead);tvsMove::Point np[2];
         if(t.openStatus()!=Acad::eOk||!elbowPortsFor(t.object(),A,np)){acutPrintf(L"\nDionica nije promijenjena: koljeno se ne može preračunati.");return false;}
         for(int m=0;m<2;++m)moves.push_back(std::make_pair(n.ports[m],np[m]));
     }
-    std::vector<int> ducts=run.ducts;ducts.push_back(start);
-    std::vector<std::pair<tvsMove::Point,tvsMove::Point> > ends(ducts.size());
-    for(size_t k=0;k<ducts.size();++k){const tvsMove::Node& n=nodes[ducts[k]];tvsMove::Point e[2]={n.ports[0],n.ports[1]};
-        for(int j=0;j<2;++j)for(size_t m=0;m<moves.size();++m)if(nearXY(e[j],moves[m].first,tol)){e[j].x=moves[m].second.x;e[j].y=moves[m].second.y;break;}
-        const tvsMove::Point v=n.ports[1]-n.ports[0],w=e[1]-e[0];
-        if(std::hypot(w.x,w.y)<10*tol||v.x*w.x+v.y*w.y<=0){acutPrintf(L"\nDionica nije promijenjena: kanal bi sa novim koljenima bio prekratak.");return false;}
-        ends[k]=std::make_pair(e[0],e[1]);
+#ifdef TVS_OFFSET_INTEGRATION
+    for(size_t k=0;k<run.etazes.size();++k){const tvsOffsetRefit::Assembly& s=etazes[run.etazes[k].index];
+        tvsOffset::Result g;tvsOffsetAdapter::Result d;
+        if(!etazPlan(s,A,B,f,g,d)){
+            acutPrintf(L"\nDionica nije promijenjena: etaž sa novom dimenzijom nije moguć (razlika kota premala za dva koljena?).");return false;}
+        moves.push_back(std::make_pair(tvsMove::point(s.maA),tvsMove::Point(d.incomingLast.x,d.incomingLast.y,d.incomingLast.z)));
+        moves.push_back(std::make_pair(tvsMove::point(s.maB),tvsMove::Point(d.outgoingFirst.x,d.outgoingFirst.y,d.outgoingFirst.z)));
     }
+#endif
+    // T komadi: new sizes on a copy of the record, ports before / after
+    struct TeeChange {int node;tvsTeeFit::Ports before,after;};std::vector<TeeChange> tees;
+    for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];
+        AcDbObjectPointer<TVS_WYE> w(nodes[t.node].id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)return false;
+        TeeChange c;c.node=t.node;c.before=tvsTeeFit::ports(w.object());if(!c.before.ok)return false;tees.push_back(c);}
+    // ducts whose end is on a moving port (in the run or not) + the run ducts
+    std::vector<int> ducts=run.ducts;ducts.push_back(start);
+    std::set<int> inRun(ducts.begin(),ducts.end());
+    for(size_t k=0;k<nodes.size();++k){if(nodes[k].kind!=1||inRun.count(static_cast<int>(k)))continue;
+        for(size_t m=0;m<moves.size();++m)for(int j=0;j<2&&j<static_cast<int>(nodes[k].ports.size());++j)
+            if(nearXY(nodes[k].ports[j],moves[m].first,tol)&&std::find(ducts.begin(),ducts.end(),static_cast<int>(k))==ducts.end())ducts.push_back(static_cast<int>(k));}
+    auto newEnds=[&](int d,std::pair<tvsMove::Point,tvsMove::Point>& out){const tvsMove::Node& n=nodes[d];tvsMove::Point e[2]={n.ports[0],n.ports[1]};
+        for(int j=0;j<2;++j)for(size_t m=0;m<moves.size();++m)if(nearXY(e[j],moves[m].first,tol)){e[j].x=moves[m].second.x;e[j].y=moves[m].second.y;break;}
+        const tvsMove::Point v=n.ports[1]-n.ports[0],w=e[1]-e[0];out=std::make_pair(e[0],e[1]);
+        return std::hypot(w.x,w.y)>=10*tol&&v.x*w.x+v.y*w.y>0;};
+    std::vector<std::pair<tvsMove::Point,tvsMove::Point> > ends(ducts.size());
+    for(size_t k=0;k<ducts.size();++k)if(!newEnds(ducts[k],ends[k])){acutPrintf(L"\nDionica nije promijenjena: kanal bi sa novim koljenima / etažom bio prekratak.");return false;}
+    // write: etazi, elbows, T komadi, ducts
+#ifdef TVS_OFFSET_INTEGRATION
+    for(size_t k=0;k<run.etazes.size();++k)if(!etazResize(etazes[run.etazes[k].index],A,B,f)){acutPrintf(L"\nEtaž nije preračunat; dionica je promijenjena samo do njega.");return false;}
+#endif
     for(size_t k=0;k<run.elbows.size();++k){
         AcDbObjectPointer<TVS_TAP> t(nodes[run.elbows[k]].id,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
         t->put_SizeA(A);if(!round)t->put_SizeB(B);t->recordGraphicsModified();
     }
+    for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];
+        AcDbObjectPointer<TVS_WYE> w(nodes[t.node].id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)continue;
+        tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
+        w->assertWriteEnabled();   // before the fields change (UNDO)
+        if(t.port==2){w->SizeAotv=A;w->SizeBotv=round?0:B;
+            if(typed&&r.type==tvsTee::Tap){r.l=tvsTeeCommand::tapLength(A,f);w->LengthPl=r.l;}
+            else if(typed&&r.type==tvsTee::Branch)w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(A),A);}
+        else if(typed&&r.type==tvsTee::Branch){
+            if(t.port==0){if(!(r.second>0))r.second=w->SizeApr;w->SizeApr=A;w->SizeBpr=round?0:B;}   // C keeps its width
+            else r.second=A;}
+        else{w->SizeApr=A;w->SizeBpr=round?0:B;}
+        if(typed)tvsTeeData::write(w.object(),r);
+        w->recordGraphicsModified();
+        tees[k].after=tvsTeeFit::ports(w.object());
+    }
+    // T komad ports that moved: ducts on them follow (before the run ducts are written)
+    for(size_t k=0;k<tees.size();++k)if(tees[k].after.ok)for(int m=0;m<3;++m){
+        const tvsMove::Point from=tvsMove::point(tees[k].before.p[m]),to=tvsMove::point(tees[k].after.p[m]);
+        if(std::hypot(from.x-to.x,from.y-to.y)<=1e-9)continue;
+        for(size_t j=0;j<ducts.size();++j){std::pair<tvsMove::Point,tvsMove::Point>& e=ends[j];
+            if(nearXY(e.first,from,tol))e.first=tvsMove::Point(to.x,to.y,e.first.z);
+            if(nearXY(e.second,from,tol))e.second=tvsMove::Point(to.x,to.y,e.second.z);}
+        for(size_t q=0;q<nodes.size();++q){if(nodes[q].kind!=1||std::find(ducts.begin(),ducts.end(),static_cast<int>(q))!=ducts.end())continue;
+            for(int j=0;j<2&&j<static_cast<int>(nodes[q].ports.size());++j)if(nearXY(nodes[q].ports[j],from,tol)){
+                AcDbObjectPointer<TVS_Pipe> p(nodes[q].id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))continue;
+                AcGePoint3d at=j==0?p->FirstPoint:p->LastPoint;at.x=to.x;at.y=to.y;
+                if(j==0)p->put_FirstPoint(at);else p->put_Lastpoint(at);p->recordGraphicsModified();}}
+    }
     for(size_t k=0;k<ducts.size();++k){
-        AcDbObjectPointer<TVS_Pipe> p(nodes[ducts[k]].id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk)continue;
+        AcDbObjectPointer<TVS_Pipe> p(nodes[ducts[k]].id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))continue;
         p->put_FirstPoint(AcGePoint3d(ends[k].first.x,ends[k].first.y,p->FirstPoint.z));
         p->put_Lastpoint(AcGePoint3d(ends[k].second.x,ends[k].second.y,p->LastPoint.z));
-        if(ducts[k]!=start){p->put_SizeA(A);p->put_SizeB(B);resized.push_back(nodes[ducts[k]].id);}
+        if(inRun.count(ducts[k])&&ducts[k]!=start){p->put_SizeA(A);p->put_SizeB(B);resized.push_back(nodes[ducts[k]].id);}
         p->recordGraphicsModified();
+    }
+    // prelaz back to the old size behind a T komad (option Prelaz)
+    for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];if(t.mode!=2||!tees[k].after.ok)continue;
+        const int other=t.port==0?1:0;const AcGePoint3d at=tees[k].after.p[other];
+        for(size_t q=0;q<nodes.size();++q){if(nodes[q].kind!=1)continue;
+            AcDbObjectPointer<TVS_Pipe> p(nodes[q].id,AcDb::kForRead);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))continue;
+            const bool first=tvsTeeFit::planDistance(p->FirstPoint,at)<=tol,last=tvsTeeFit::planDistance(p->LastPoint,at)<=tol;
+            if(!first&&!last)continue;p.close();prelazBehind(nodes[q].id,first,at,A,B,f);break;}
     }
     return true;
 }
@@ -203,25 +396,30 @@ inline void run(){
     std::vector<std::pair<AcDbObjectId,int> > queue(work.begin(),work.end());std::set<AcDbObjectId> done;
     {   // whole run up to the next prelaz: ask once for all edited ducts
         std::map<AcDbObjectId,Sizes> old;old.swap(previous());
-        std::vector<std::pair<int,Run> > runs;std::set<int> seen;int elbows=0,others=0;std::vector<CString> stops;
+        std::vector<std::pair<int,Run> > runs;std::set<int> seen;int elbows=0,others=0,tees=0,etazCount=0;std::vector<CString> stops;
+        Etazes etazes;
+#ifdef TVS_OFFSET_INTEGRATION
+        tvsOffsetRefit::assemblies(db,etazes);
+#endif
         for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w){
             std::map<AcDbObjectId,Sizes>::const_iterator o=old.find(w->first);const int i=index(w->first);
             if(o==old.end()||i<0||nodes[i].kind!=1||nodes[i].ports.size()!=2||seen.count(i))continue;
-            seen.insert(i);Run r;walk(nodes,i,o->second,tol,r,seen);
+            seen.insert(i);Run r;walk(nodes,i,o->second,tol,etazes,r,seen);
             for(size_t k=0;k<r.stops.size();++k)if(std::find(stops.begin(),stops.end(),r.stops[k])==stops.end())stops.push_back(r.stops[k]);
-            if(r.elbows.empty()&&r.ducts.empty())continue;
-            elbows+=static_cast<int>(r.elbows.size());others+=static_cast<int>(r.ducts.size());runs.push_back(std::make_pair(i,r));
+            if(r.elbows.empty()&&r.ducts.empty()&&r.tees.empty()&&r.etazes.empty())continue;
+            elbows+=static_cast<int>(r.elbows.size());others+=static_cast<int>(r.ducts.size());
+            tees+=static_cast<int>(r.tees.size());etazCount+=static_cast<int>(r.etazes.size());runs.push_back(std::make_pair(i,r));
         }
         if(!runs.empty()){
             if(!stops.empty()){CString list;for(size_t k=0;k<stops.size();++k){if(k)list+=L", ";list+=stops[k];}
-                acutPrintf(L"\nDionica staje na: %ls (faza 1: ti elementi se ne mijenjaju).",list.GetString());}
-            wchar_t prompt[200];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d)? [Da/Ne] <Da>: ",elbows,others);
+                acutPrintf(L"\nDionica staje na: %ls (ti elementi se ne mijenjaju).",list.GetString());}
+            wchar_t prompt[260];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d, T komada %d, etaža %d)? [Da/Ne] <Da>: ",elbows,others,tees,etazCount);
             acedInitGet(0,L"Da Ne");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw);
             if(rc==RTNONE||(rc==RTNORM&&_wcsicmp(kw,L"Da")==0)){
                 int changed=0;
                 for(size_t k=0;k<runs.size();++k){std::vector<AcDbObjectId> resized;
-                    if(!applyRun(nodes,runs[k].first,runs[k].second,tol,resized))continue;
-                    changed+=static_cast<int>(runs[k].second.elbows.size()+resized.size());
+                    if(!applyRun(nodes,runs[k].first,runs[k].second,etazes,tol,resized))continue;
+                    changed+=static_cast<int>(runs[k].second.elbows.size()+runs[k].second.tees.size()+runs[k].second.etazes.size()+resized.size());
                     for(size_t j=0;j<resized.size();++j)if(done.insert(resized[j]).second)queue.push_back(std::make_pair(resized[j],3));}
                 if(changed)acutPrintf(L"\nDionica promijenjena: elemenata %d.",changed);
             }
