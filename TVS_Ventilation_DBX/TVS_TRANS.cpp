@@ -987,6 +987,8 @@ Acad::ErrorStatus TVS_TRANS::subTransformBy(const AcGeMatrix3d & xform)
 	FirstPoint.transformBy(xform);
 	LastPoint.transformBy(xform);
 	VectTr.transformBy(xform);
+	// MIRROR: a prelaz flush with one side keeps that side flush (types 2 and 3 swap sides).
+	if (xform.det() < 0) { if (TransType == 2) TransType = 3; else if (TransType == 3) TransType = 2; }
 	return (Acad::eOk);
 }
 
