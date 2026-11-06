@@ -664,6 +664,18 @@ public:
 			if (!pPipe2->ThisRound && pPipe2->SizeB > 0 && (pPipe1->ThisRound || pPipe1->SizeB > 0)
 				&& !tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor(), pPipe1->ThisRound))
 				return false;
+			// stucna with a round branch: the branch axis must be at the axis elevation of the main (Elev = axis)
+			if (teeType == tvsTee::Tap && pPipe1->ThisRound && !pPipe2->ThisRound
+				&& std::fabs(pPipe1->Elev - pPipe2->Elev) * tvsUnits::factor() > 0.1)
+			{
+				const double f = tvsUnits::factor();
+				wchar_t text[400];
+				swprintf_s(text, L"Okrugli ogranak nije na koti ose pravougaonog kanala.\n\n"
+					L"Osa pravougaonog kanala: %.0f mm\nOsa okruglog kanala: %.0f mm\n\n"
+					L"Postavite okrugli kanal na kotu ose pravougaonog kanala (Elev). Spoj nije napravljen.", pPipe2->Elev * f, pPipe1->Elev * f);
+				acedAlert(text);
+				return false;
+			}
 
 			AcGePoint3d midp, point1, point2, intersectpoint;
 

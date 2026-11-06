@@ -320,6 +320,27 @@ private:
 public:
     StretchHighlight(){}
 };
+// Round branch on a rectangular T komad / stucna: both Elev are axis elevations and must be equal.
+// Shows a dialog when the refused move is caused by such a branch at another elevation.
+inline void roundBranchAlert(const std::vector<Node>& nodes,int problem,tvsMoveNetwork::Error error,double tol){
+    if(error!=tvsMoveNetwork::SectionMismatch||problem<0)return;
+    for(size_t w=0;w<nodes.size();++w){
+        const Node& t=nodes[w];
+        if(t.ports.size()!=3||t.sections.size()!=3||t.sections[0].round||!t.sections[2].round)continue;
+        for(size_t k=0;k<nodes.size();++k){
+            const Node& p=nodes[k];if(p.kind!=1||!p.round)continue;
+            bool joined=false;for(size_t j=0;j<p.ports.size();++j)if(tvsMoveGeometry::pointsNear(p.ports[j],t.ports[2],tol))joined=true;
+            if(!joined||std::fabs(p.elevation-t.elevation)<=tol)continue;
+            if(problem!=static_cast<int>(w)&&problem!=static_cast<int>(k))continue;
+            const double f=tvsUnits::factor(acdbHostApplicationServices()->workingDatabase());
+            wchar_t text[400];
+            swprintf_s(text,L"Okrugli ogranak nije na koti ose pravougaonog kanala.\n\n"
+                L"Osa pravougaonog kanala (T komad): %.0f mm\nOsa okruglog kanala: %.0f mm\n\n"
+                L"Postavite okrugli kanal na kotu ose pravougaonog kanala (Elev) i ponovite komandu.",t.elevation*f,p.elevation*f);
+            acedAlert(text);return;
+        }
+    }
+}
 inline void stretchProblem(const std::vector<Node>& nodes,int index,const ACHAR* message,const ACHAR* command=L"TVS_STRETCH"){
     acutPrintf(L"\n%s: %s",command,message);
     if(index<0||static_cast<size_t>(index)>=nodes.size())return;
@@ -463,7 +484,7 @@ inline bool moveDestination(const std::vector<Node>& nodes,const std::vector<tvs
     {MoveJig jig(nodes,bodies,selected,origin,minimum,tol);if(jig.drag()!=AcEdJig::kNormal)return false;
         AcGePoint3d target=jig.target();destination[0]=target.x;destination[1]=target.y;destination[2]=target.z;
         valid=jig.valid();problem=jig.result.problem;error=jig.result.error;}
-    if(!valid){stretchProblem(nodes,problem,networkError(error),L"TVS_MOVE");return false;}
+    if(!valid){roundBranchAlert(nodes,problem,error,tol);stretchProblem(nodes,problem,networkError(error),L"TVS_MOVE");return false;}
     return true;
 }
 inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
@@ -518,7 +539,7 @@ inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
     if(!tvsMoveGeometry::valid(delta)||delta.length()<=tol){acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja.");return;}
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
-        acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
+        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
         acutPrintf(L"\nTVS_MOVE: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
@@ -775,7 +796,7 @@ inline void executeStretch(){
     selected.clear();
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::planSelection(bodies,masks,delta,minimum,tol,result)){
-        stretchProblem(nodes,result.problem,networkError(result.error));return;}
+        roundBranchAlert(nodes,result.problem,result.error,tol);stretchProblem(nodes,result.problem,networkError(result.error));return;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
         acutPrintf(L"\nTVS_STRETCH: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
