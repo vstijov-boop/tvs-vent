@@ -1,5 +1,6 @@
 """TVS_PRESJEK (P1): section line cuts of the TVS network (geometry/Section.h) + wiring."""
 import pathlib,subprocess,tempfile,unittest
+from entry_source import entry_source
 from bypass_compiler import compile_cpp,executable
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 CPP=r"""
@@ -114,7 +115,7 @@ class Section(unittest.TestCase):
    cpp=pathlib.Path(f)/'s.cpp';cpp.write_text(CPP%(ROOT/'geometry/Section.h').as_posix())
    target=pathlib.Path(f)/'s';compile_cpp(cpp,target);subprocess.run([str(executable(target))],check=True)
  def test_contracts(self):
-  e=(ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+  e=entry_source()
   self.assertIn('Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL',e);self.assertIn('tvsSectionCmd::run();',e)
   s=(ROOT/'TVS_Ventilation_ARX/SectionCommand.h').read_text(encoding='utf-8-sig')
   self.assertIn('const int n=build(btr.object(),p);refreshReferences(btr.object());',s,'Osvjezi rebuilds the block from stored parameters')

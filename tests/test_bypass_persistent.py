@@ -2,6 +2,7 @@
 This is not an AutoCAD runtime/filing/Undo test.
 """
 import pathlib, subprocess, tempfile, unittest
+from entry_source import entry_source
 from test_offset_service import function
 from bypass_compiler import compile_cpp, executable
 ROOT=pathlib.Path(__file__).resolve().parents[1]
@@ -197,7 +198,7 @@ int main(){
             target=pathlib.Path(folder)/'persistent';compile_cpp(cpp,target)
             subprocess.run([str(executable(target))],check=True)
     def test_both_drawing_bypass_continuations(self):
-        text=(ROOT/'TVS_Ventilation_ARX/acrxEntryPoint.cpp').read_text(encoding='utf-8-sig')
+        text=entry_source()
         needle='if(tvsBypassDuringDrawing(pipi->objectId(),result,tvsBypassRadiusSettings()))'
         callers=[]
         while needle in text:

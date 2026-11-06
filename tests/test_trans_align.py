@@ -1,5 +1,6 @@
 """Poravnanje prelaza po visini: record, end offset, settings, Properties, dialog, drawing (contracts + math)."""
 import pathlib,subprocess,tempfile,unittest
+from entry_source import entry_source
 from bypass_compiler import compile_cpp,executable
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def text(p):return (ROOT/p).read_text(encoding='utf-8-sig',errors='replace')
@@ -21,7 +22,7 @@ class TransAlign(unittest.TestCase):
   self.assertIn('Koja strana ostaje [Pocetak/Kraj] <Pocetak>: ',c)
   self.assertIn('if(!tvsElevationShift::side(db,work[i].id,keepEnd?0:1,tol,ids,loop,seed))continue;',c)
   self.assertIn('acDocManager->sendStringToExecute(doc,L"_TVS_PRELAZ_KOTA\\n",false,true,false);',c)
-  e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
+  e=entry_source()
   self.assertIn('Ventilation_ARX, TVS_PRELAZ_KOTA, TVS_PRELAZ_KOTA, ACRX_CMD_MODAL',e)
   self.assertIn('globalElevMid = axisBefore + tvsTransAlign::endOffset(align, pSizeAp1, pSizeBp1, pSizeAp2, pSizeBp2);',e,'drawing continues at the shifted axis')
   self.assertIn('if (pTransType == 2) pFirstPoint += right * s;',e,'next duct starts at the side-shifted outlet')

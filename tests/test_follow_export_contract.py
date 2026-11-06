@@ -1,10 +1,11 @@
 """Prelaz/kanal dimenzije na spoju (SizeFollow.h, TVS_DIM_PRATI) i izvoz bez TVS (ExportCommand.h, TVS_IZVOZ)."""
 import pathlib,unittest,zipfile
+from entry_source import entry_source
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def text(p):return (ROOT/p).read_text(encoding='utf-8-sig')
 class FollowExport(unittest.TestCase):
  def test_wiring(self):
-  e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
+  e=entry_source()
   for c in ('TVS_DIM_PRATI','TVS_IZVOZ'):self.assertIn('Ventilation_ARX, %s, %s, ACRX_CMD_MODAL'%(c,c),e)
   self.assertIn('tvsSizeFollow::start();',e);self.assertIn('tvsSizeFollow::stop();',e)
   self.assertIn('tvsSizeFollow::attach(acdbHostApplicationServices()->workingDatabase());',e)
