@@ -15,6 +15,7 @@
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
 #include "BypassAssemblyData.h"
+#include "../geometry/RoundElbow.h"
 #endif
 
 namespace tvsMove {
@@ -665,41 +666,61 @@ inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwor
 #endif
 }
 // TVS_BYPASS: the whole obilazak (members[0..6]: elbow, slope, elbow, horizontal piece, elbow, slope, elbow)
-// is one rigid body, as an etaz is. Its ports are the inlet/outlet duct ends at the two end elbows
-// (validated to coincide with their horizontal ports). The elbows are vertical, so describe() leaves
-// them kind 0; they are recognised from the assembly data. An obilazak whose data does not validate
-// keeps its members as separate elements, which the planner refuses to move.
+// is one rigid body, as an etaz is. Its ports are the ends of the inlet/outlet ducts at the two end
+// elbows. The elbows are vertical, so describe() leaves them kind 0; the obilazak is recognised from
+// its assembly data. Only the record and member links are required (not the full geometry check of
+// TVS_BYPASS_DETALJ: a changed duct beyond the inlet/outlet does not matter for a rigid move), plus
+// the inlet/outlet duct actually touching its end elbow. Otherwise the members stay separate elements,
+// which the planner refuses to move, and the reason is printed once.
+#ifdef TVS_OFFSET_INTEGRATION
+// Plan position of the horizontal face of a vertical TVS elbow (same formula as tvsBypassData::validate).
+inline bool horizontalPort(const AcDbObjectId& id,Point& port){
+    AcDbObjectPointer<TVS_TAP> p(id,AcDb::kForRead);if(p.openStatus()!=Acad::eOk)return false;
+    if(p->ThisRound){tvsRoundElbow::P ma,mc;
+        tvsRoundElbow::ports(tvsRoundElbow::P(p->MiddlePoint.x,p->MiddlePoint.y),p->Startvector.x,p->Startvector.y,p->Swectangle,p->get_radius()+p->SizeA/2,ma,mc);
+        port=Point(ma.x,ma.y,p->MiddlePoint.z);return true;}
+    const AcGePoint3d q=p->MiddlePoint-AcGeVector3d(-p->Startvector.y,p->Startvector.x,0)*((p->get_radius()+p->SizeB/2)*std::sin(p->Swectangle));
+    port=point(q);return true;
+}
+#endif
 inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                          std::vector<std::vector<AcDbObjectId> >& members,double tol){
 #ifdef TVS_OFFSET_INTEGRATION
-    (void)tol;
     auto find=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
+    auto flat=[&](const Point& u,const Point& v){return std::hypot(u.x-v.x,u.y-v.y);};
     bool reported=false;
+    auto report=[&](const CString& why){if(!reported){reported=true;
+        acutPrintf(L"\nTVS: obilazak se ne može pomjeriti ovom komandom: %s. Koristite AutoCAD MOVE za cijeli sklop.",why.GetString());}};
+    const double factor=tol>0?0.1/tol:1;   // tol = 0.1 mm in drawing units
     for(size_t i=0;i<nodes.size();++i){
         if(!members[i].empty())continue;
         tvsBypassData::Record r;tvsOffsetData::Status st=tvsOffsetData::Legacy;
         {AcDbObjectPointer<TVS_TAP> a(nodes[i].id,AcDb::kForRead);
          if(a.openStatus()!=Acad::eOk||!tvsBypassData::marked(a.object()))continue;
-         st=tvsBypassData::assembly(a.object(),r);}
-        if(st!=tvsOffsetData::Valid){
-            if(!reported){reported=true;
-                acutPrintf(L"\nTVS: obilazak nema ispravne podatke (%s); ova komanda ga ne pomjera. Koristite AutoCAD MOVE za cijeli sklop.",tvsOffsetData::statusText(st));}
-            continue;}
+         st=tvsBypassData::assembly(a.object(),r,false);}
+        if(st!=tvsOffsetData::Valid){CString why;why.Format(L"podaci sklopa nisu ispravni (%s)",tvsOffsetData::statusText(st));report(why);continue;}
         if(r.members[0]!=nodes[i].id)continue;   // one body per obilazak, kept on its first elbow
         int idx[7];bool ok=true;
         for(int m=0;m<7;++m){idx[m]=find(r.members[m]);if(idx[m]<0||!members[idx[m]].empty())ok=false;}
-        if(!ok)continue;
-        AcGePoint3d q[2];AcGeVector3d v[2];tvsMoveNetwork::Section section[2];
-        {AcDbObjectPointer<TVS_Pipe> in(r.inlet,AcDb::kForRead),out(r.outlet,AcDb::kForRead);
-         if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk)continue;
-         q[0]=r.reverse?in->FirstPoint:in->LastPoint;q[1]=r.reverse?out->LastPoint:out->FirstPoint;
-         v[0]=in->LastPoint-in->FirstPoint;v[1]=out->LastPoint-out->FirstPoint;
-         section[0]=tvsMoveNetwork::Section(in->SizeA,in->SizeB,in->ThisRound,in->Elev);
-         section[1]=tvsMoveNetwork::Section(out->SizeA,out->SizeB,out->ThisRound,out->Elev);}
+        if(!ok){report(L"članovi obilaska nisu u trenutnom prostoru");continue;}
+        const int elbows[2]={idx[0],idx[6]};const AcDbObjectId ducts[2]={r.inlet,r.outlet};
+        // the inlet ends at the obilazak with LastPoint (FirstPoint when reversed), the outlet starts there
+        const int ends[2]={r.reverse?0:1,r.reverse?1:0};
         tvsMoveNetwork::Body body;body.kind=tvsMoveNetwork::Rigid;
-        for(int e=0;e<2;++e){Point axis;
-            if(!tvsMoveGeometry::unit(Point(v[e].x,v[e].y,0),axis)){ok=false;break;}
-            body.ports.push_back(point(q[e]));body.axes.push_back(axis);body.sections.push_back(section[e]);}
+        for(int e=0;e<2&&ok;++e){
+            const int d=find(ducts[e]);
+            if(d<0||nodes[d].kind!=1||nodes[d].ports.size()!=2){
+                report(e?L"izlazni kanal obilaska nije prava dionica u ovom prostoru":L"ulazni kanal obilaska nije prava dionica u ovom prostoru");ok=false;break;}
+            const Point q=nodes[d].ports[ends[e]];
+            double gap=-1;std::vector<Point> faces=nodes[elbows[e]].ports;Point face;
+            if(horizontalPort(nodes[elbows[e]].id,face))faces.push_back(face);
+            for(size_t p=0;p<faces.size();++p){const double g=flat(q,faces[p]);if(gap<0||g<gap)gap=g;}
+            if(gap<0||gap>10*tol){CString why;
+                why.Format(L"%s kanal nije spojen na koljeno obilaska (razmak %.1f mm; obilazak pomjeren bez kanala?)",e?L"izlazni":L"ulazni",gap*factor);
+                report(why);ok=false;break;}
+            Point axis;if(!tvsMoveGeometry::unit(Point(nodes[d].ports[1].x-nodes[d].ports[0].x,nodes[d].ports[1].y-nodes[d].ports[0].y,0),axis)){ok=false;break;}
+            body.ports.push_back(q);body.axes.push_back(axis);body.sections.push_back(nodes[d].sections[ends[e]]);
+        }
         if(!ok)continue;
         bodies[idx[0]]=body;
         for(int m=1;m<7;++m)bodies[idx[m]]=tvsMoveNetwork::Body();

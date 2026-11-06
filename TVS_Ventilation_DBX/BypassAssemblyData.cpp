@@ -169,8 +169,8 @@ Status validate(const AcDbObject* object,bool geometry){
     }
     return Valid;
 }
-Status assembly(const AcDbObject* member,Record& record){
-    const Status s=validate(member,true);if(s!=Valid)return s;
+Status assembly(const AcDbObject* member,Record& record,bool geometry){
+    const Status s=validate(member,geometry);if(s!=Valid)return s;
     AcDbObjectId parent;int role=-1;if(link(member,parent,role)!=Valid)return Corrupt;
     return read(parent,record);
 }
