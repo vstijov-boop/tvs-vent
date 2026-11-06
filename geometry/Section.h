@@ -16,8 +16,9 @@ inline double cross(const P& a,const P& b){return a.x*b.y-a.y*b.x;}
 // taper: prelaz (height and axis change along it, end faces vertical).
 // dir: plan direction of the duct when it differs from a->b (prelaz uz jednu ivicu: its axis is
 // skewed, its faces are square to the duct direction); (0,0) = a->b.
-struct Member {P a,b,dir;double A1,B1,A2,B2;bool round;double z,za,zb;bool sloped,bend,levelA,taper;int tag;
-    Member():A1(0),B1(0),A2(0),B2(0),round(false),z(0),za(0),zb(0),sloped(false),bend(false),levelA(true),taper(false),tag(0){}
+// kind: TVS element kind of the member (tvsMove::Node::kind: 1 duct, 2 plan elbow, 3 prelaz, 4 T komad, 0 other).
+struct Member {P a,b,dir;double A1,B1,A2,B2;bool round;double z,za,zb;bool sloped,bend,levelA,taper;int tag,kind;
+    Member():A1(0),B1(0),A2(0),B2(0),round(false),z(0),za(0),zb(0),sloped(false),bend(false),levelA(true),taper(false),tag(0),kind(0){}
     double zAt(double u)const{return sloped?za+(zb-za)*u:z;}
     double planLength()const{return std::sqrt((b.x-a.x)*(b.x-a.x)+(b.y-a.y)*(b.y-a.y));}
     bool vertical(double tol)const{return planLength()<=tol&&sloped&&std::fabs(zb-za)>tol;}};
