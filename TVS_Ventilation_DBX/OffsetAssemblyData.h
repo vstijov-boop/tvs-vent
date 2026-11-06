@@ -25,6 +25,8 @@ DLLIMPEXP void clearClonePermits();
 DLLIMPEXP unsigned long revision();
 DLLIMPEXP bool allowTransform(const AcDbObject* object,const AcGeMatrix3d& matrix);
 DLLIMPEXP Acad::ErrorStatus remapClones(AcDbIdMapping& map);
+// Removes the database reactor of the duplicate-identity index (DBX unload).
+DLLIMPEXP void releaseCache();
 DLLIMPEXP const ACHAR* statusText(Status status);
 // Internal construction scope is process-local, never serialized.
 class DLLIMPEXP WriteScope {public:WriteScope();~WriteScope();private:WriteScope(const WriteScope&);WriteScope& operator=(const WriteScope&);};
