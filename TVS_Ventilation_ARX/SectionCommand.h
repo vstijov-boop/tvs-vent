@@ -21,6 +21,8 @@
 #include <vector>
 #include <string>
 #include <cwchar>
+// TVS_PRESJEK -> Uzduzni (faza P2): ProfileCommand.h, included at the end of this file.
+namespace tvsProfileCmd {inline void run();inline bool rebuild(AcDbBlockTableRecord* btr);}
 namespace tvsSectionCmd {
 // depth: zone behind the section plane (drawing units, 0 = cut elements only);
 // hidden: 0 = parts covered by nearer elements are left out, 1 = drawn dashed.
@@ -49,7 +51,8 @@ inline AcDbObjectId textStyle(AcDbDatabase* db){
 // TVS network as plan members (see geometry/Section.h). Sloped piece of a Z prelaz / obilazak:
 // axis z at its ends from the assembly record (rise). Vertical elbows (Gore / Nadolje): one
 // member between their ports, end elevations taken from the elements they join.
-inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
+// ids (optional): object id of every element, ids[tag - 1].
+inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out,std::vector<AcDbObjectId>* ids=NULL){
     AcDbObjectPointer<AcDbBlockTableRecord> space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
     const double f=tvsUnits::factor(db),tol=2.0/f;
@@ -58,10 +61,10 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out){
         AcDbEntity* e=NULL;if(it->getEntity(e,AcDb::kForRead)!=Acad::eOk)continue;
         tvsMove::Node n;
         if(TVS_Entity::cast(e)&&tvsMove::describe(e,n)&&n.ports.size()==n.sections.size()&&n.ports.size()>=2){
-            ++tag;
+            ++tag;if(ids)ids->push_back(e->objectId());
             auto add=[&](const tvsMove::Point& a,const tvsMove::Point& b,const tvsMoveNetwork::Section& sa,const tvsMoveNetwork::Section& sb){
                 tvsSection::Member m;m.a=tvsSection::P(a.x,a.y);m.b=tvsSection::P(b.x,b.y);
-                m.A1=sa.a;m.B1=sa.b;m.A2=sb.a;m.B2=sb.b;m.round=sa.round;m.z=m.za=m.zb=n.elevation;m.tag=tag;out.push_back(m);};
+                m.A1=sa.a;m.B1=sa.b;m.A2=sb.a;m.B2=sb.b;m.round=sa.round;m.z=m.za=m.zb=n.elevation;m.tag=tag;m.kind=n.kind;out.push_back(m);};
             TVS_TAP* tap=TVS_TAP::cast(e);
             if(TVS_TRANS* tr=TVS_TRANS::cast(e)){   // prelaz: axis and height change along it
                 add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);tvsSection::Member& m=out.back();m.taper=true;
@@ -302,7 +305,7 @@ inline void refresh(){
     AcDbObjectPointer<AcDbBlockReference> ref(id,AcDb::kForRead);if(ref.openStatus()!=Acad::eOk){acutPrintf(L"\nIzabrani objekat nije TVS presjek.");return;}
     const AcDbObjectId btrId=ref->blockTableRecord();ref.close();
     AcDbObjectPointer<AcDbBlockTableRecord> btr(btrId,AcDb::kForWrite);if(btr.openStatus()!=Acad::eOk)return;
-    Params p;if(!load(btr.object(),p)){acutPrintf(L"\nIzabrani blok nije TVS presjek.");return;}
+    Params p;if(!load(btr.object(),p)){if(!tvsProfileCmd::rebuild(btr.object()))acutPrintf(L"\nIzabrani blok nije TVS presjek.");return;}
     const int n=build(btr.object(),p);refreshReferences(btr.object());
     acutPrintf(L"\nPresjek %ls-%ls osvjezen: presjecenih elemenata %d.",p.letter.c_str(),p.letter.c_str(),n);
 }
@@ -339,9 +342,11 @@ inline void run(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db);
     ads_point a,b;
-    acedInitGet(0,L"Osvjezi");
-    int rc=acedGetPoint(NULL,L"\nPrva tacka linije presjeka ili [Osvjezi]: ",a);
-    if(rc==RTKWORD){refresh();return;}if(rc!=RTNORM)return;
+    acedInitGet(0,L"Osvjezi Uzduzni");
+    int rc=acedGetPoint(NULL,L"\nPrva tacka linije presjeka ili [Osvjezi/Uzduzni]: ",a);
+    if(rc==RTKWORD){ACHAR kw[32]=L"";acedGetInput(kw);
+        if(_wcsicmp(kw,L"Uzduzni")==0)tvsProfileCmd::run();else refresh();return;}
+    if(rc!=RTNORM)return;
     if(acedGetPoint(a,L"\nDruga tacka linije presjeka: ",b)!=RTNORM)return;
     Params p;
     {   // UCS -> WCS
@@ -391,3 +396,4 @@ inline void run(){
     planMarks(db,p);
 }
 }
+#include "ProfileCommand.h"
