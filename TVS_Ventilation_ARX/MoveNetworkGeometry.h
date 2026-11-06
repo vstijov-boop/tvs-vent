@@ -8,9 +8,11 @@ namespace tvsMoveNetwork {
 using std::size_t;
 using tvsMoveGeometry::Point;
 enum Kind { Blocked, Pipe, Rigid };
+// anyElevation: the port takes the elevation of the duct on it (round branch on a rectangular
+// T komad / stucna: the branch has its own Elev within the main duct height).
 struct Section {
-    double a,b,elevation;bool round;
-    Section(double pa=0,double pb=0,bool pr=false,double pe=0):a(pa),b(pb),elevation(pe),round(pr){}
+    double a,b,elevation;bool round,anyElevation;
+    Section(double pa=0,double pb=0,bool pr=false,double pe=0):a(pa),b(pb),elevation(pe),round(pr),anyElevation(false){}
 };
 struct Body {Kind kind;std::vector<Point> ports,axes,junctions;std::vector<Section> sections;Body():kind(Blocked){}};
 struct Contact {int body,port,count;Contact():body(-1),port(-1),count(0){}};
@@ -29,7 +31,7 @@ inline bool compatible(const Section& a,const Section& b,double tol){
     return a.round==b.round && tvsMoveGeometry::finite(a.a)&&tvsMoveGeometry::finite(b.a)
         &&a.a>0&&b.a>0&&(a.round||(a.b>0&&b.b>0))
         &&std::fabs(a.a-b.a)<=tol&&(a.round||std::fabs(a.b-b.b)<=tol)
-        &&std::fabs(a.elevation-b.elevation)<=tol;
+        &&(a.anyElevation||b.anyElevation||std::fabs(a.elevation-b.elevation)<=tol);
 }
 inline bool interior(const Point& q,const Point& a,const Point& b,double tol){
     return tvsMoveGeometry::onSegment(q,a,b,tol)
