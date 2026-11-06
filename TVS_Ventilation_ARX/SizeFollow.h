@@ -153,8 +153,8 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
             const bool duct=plainDuct(e.object())&&n.kind==1,elbow=plainElbow(e.object())&&n.kind==2;
             if((duct||elbow)&&same(n)&&n.ports.size()==2){
                 seen.insert(next);(duct?run.ducts:run.elbows).push_back(next);
-                const int far=std::hypot(n.ports[0].x-at.x,n.ports[0].y-at.y)>std::hypot(n.ports[1].x-at.x,n.ports[1].y-at.y)?0:1;
-                prev=next;at=n.ports[far];continue;
+                const int farPort=std::hypot(n.ports[0].x-at.x,n.ports[0].y-at.y)>std::hypot(n.ports[1].x-at.x,n.ports[1].y-at.y)?0:1;
+                prev=next;at=n.ports[farPort];continue;
             }
             run.stops.push_back(duct||elbow?CString(L"element druge dimenzije"):boundary(e.object()));break;
         }
