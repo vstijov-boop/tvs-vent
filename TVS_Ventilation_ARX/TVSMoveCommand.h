@@ -703,23 +703,30 @@ inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwo
         int idx[7];bool ok=true;
         for(int m=0;m<7;++m){idx[m]=find(r.members[m]);if(idx[m]<0||!members[idx[m]].empty())ok=false;}
         if(!ok){report(L"članovi obilaska nisu u trenutnom prostoru");continue;}
-        const int elbows[2]={idx[0],idx[6]};const AcDbObjectId ducts[2]={r.inlet,r.outlet};
-        // the inlet ends at the obilazak with LastPoint (FirstPoint when reversed), the outlet starts there
-        const int ends[2]={r.reverse?0:1,r.reverse?1:0};
+        // Ports: the duct end that actually touches the horizontal face of each end elbow (the
+        // recorded inlet/outlet may have been redrawn or split since the obilazak was drawn).
+        const int elbows[2]={idx[0],idx[6]};
         tvsMoveNetwork::Body body;body.kind=tvsMoveNetwork::Rigid;
         for(int e=0;e<2&&ok;++e){
-            const int d=find(ducts[e]);
-            if(d<0||nodes[d].kind!=1||nodes[d].ports.size()!=2){
-                report(e?L"izlazni kanal obilaska nije prava dionica u ovom prostoru":L"ulazni kanal obilaska nije prava dionica u ovom prostoru");ok=false;break;}
-            const Point q=nodes[d].ports[ends[e]];
-            double gap=-1;std::vector<Point> faces=nodes[elbows[e]].ports;Point face;
-            if(horizontalPort(nodes[elbows[e]].id,face))faces.push_back(face);
-            for(size_t p=0;p<faces.size();++p){const double g=flat(q,faces[p]);if(gap<0||g<gap)gap=g;}
-            if(gap<0||gap>10*tol){CString why;
-                why.Format(L"%s kanal nije spojen na koljeno obilaska (razmak %.1f mm; obilazak pomjeren bez kanala?)",e?L"izlazni":L"ulazni",gap*factor);
+            std::vector<Point> faces;Point face;   // horizontal face only; the sloped face belongs to the obilazak
+            if(horizontalPort(nodes[elbows[e]].id,face))faces.push_back(face);else faces=nodes[elbows[e]].ports;
+            int duct=-1,end=-1,count=0;double nearest=-1;
+            for(size_t k=0;k<nodes.size();++k){
+                if(nodes[k].kind!=1||nodes[k].ports.size()!=2)continue;
+                bool member=false;for(int m=0;m<7;++m)if(static_cast<int>(k)==idx[m])member=true;
+                if(member)continue;
+                for(int j=0;j<2;++j){double g=-1;
+                    for(size_t f=0;f<faces.size();++f){const double d=flat(nodes[k].ports[j],faces[f]);if(g<0||d<g)g=d;}
+                    if(nearest<0||g<nearest)nearest=g;
+                    if(g>=0&&g<=10*tol){++count;duct=static_cast<int>(k);end=j;}
+                }
+            }
+            if(count!=1){CString why;
+                if(count>1)why.Format(L"na %s koljeno obilaska vezano je više kanala",e?L"izlazno":L"ulazno");
+                else why.Format(L"na %s koljeno obilaska nije spojen kanal (najbliži kraj kanala %.1f mm)",e?L"izlazno":L"ulazno",nearest*factor);
                 report(why);ok=false;break;}
-            Point axis;if(!tvsMoveGeometry::unit(Point(nodes[d].ports[1].x-nodes[d].ports[0].x,nodes[d].ports[1].y-nodes[d].ports[0].y,0),axis)){ok=false;break;}
-            body.ports.push_back(q);body.axes.push_back(axis);body.sections.push_back(nodes[d].sections[ends[e]]);
+            Point axis;if(!tvsMoveGeometry::unit(Point(nodes[duct].ports[1].x-nodes[duct].ports[0].x,nodes[duct].ports[1].y-nodes[duct].ports[0].y,0),axis)){ok=false;break;}
+            body.ports.push_back(nodes[duct].ports[end]);body.axes.push_back(axis);body.sections.push_back(nodes[duct].sections[end]);
         }
         if(!ok)continue;
         bodies[idx[0]]=body;
