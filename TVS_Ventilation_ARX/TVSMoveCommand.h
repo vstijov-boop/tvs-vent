@@ -256,10 +256,10 @@ inline const ACHAR* networkError(tvsMoveNetwork::Error e){
     switch(e){
     case tvsMoveNetwork::Ambiguous:return L"Priključak ima više mogućih veza.";
     case tvsMoveNetwork::Unsupported:return L"Veza vodi do nepodržanog elementa ili izbor razdvaja povezane priključke.";
-    case tvsMoveNetwork::UnsupportedBody:return L"Izabrani element nema očekivan oblik za pomjeranje (dijagnostika).";
-    case tvsMoveNetwork::PartialRigid:return L"Okvir mora obuhvatiti cijeli obilazak ili etaž, ne samo dio (dijagnostika).";
-    case tvsMoveNetwork::BlockedNeighbour:return L"Susjedni element na spoju nije podržan, npr. prelaz ili fiting (dijagnostika).";
-    case tvsMoveNetwork::MaskMismatch:return L"Okvir ne obuhvata isti kraj na spoju kanala i koljena (presijecite kanal tačno na spoju).";
+    case tvsMoveNetwork::UnsupportedBody:return L"Element nije podržan za pomjeranje (npr. fiting van osnove ili obilazak bez ispravnih podataka).";
+    case tvsMoveNetwork::PartialRigid:return L"Okvir presijeca fiting, etaž ili obilazak. Obuhvatite ga cijelog ili izostavite.";
+    case tvsMoveNetwork::BlockedNeighbour:return L"Na spoju je element koji se ne može pomjerati (npr. fiting van osnove).";
+    case tvsMoveNetwork::MaskMismatch:return L"Izbor razdvaja povezane priključke: okvir obuhvata samo jedan od dva elementa na istom spoju.";
     case tvsMoveNetwork::SectionMismatch:return L"Presjeci ili elevacije na spoju ne odgovaraju.";
     case tvsMoveNetwork::NotTangent:return L"Ose nisu usklađene na priključku.";
     case tvsMoveNetwork::NonPlanar:return L"Mreža nije u zajedničkoj ravni osnove.";
@@ -271,13 +271,14 @@ inline const ACHAR* networkError(tvsMoveNetwork::Error e){
     default:return L"Nije moguće izračunati povezano pomjeranje.";
     }
 }
+// carried[j]: node j is a member of a moved etaz/obilazak (moves rigidly by delta).
 inline bool networkLabels(Transaction& tx,const std::vector<Node>& nodes,const AcDbObjectIdArray& labels,
-                          const tvsMoveNetwork::Result& result,const Point& delta){
+                          const tvsMoveNetwork::Result& result,const Point& delta,const std::vector<char>* carried=NULL){
     MleaderController controller;
     for(int i=0;i<labels.length();++i){
         AcDbObjectId target;if(!controller.getObjectId(labels[i],target))continue;
         int index=-1;
-        for(size_t j=0;j<nodes.size();++j)if(nodes[j].id==target&&result.masks[j]){index=static_cast<int>(j);break;}
+        for(size_t j=0;j<nodes.size();++j)if(nodes[j].id==target&&(result.masks[j]||(carried&&(*carried)[j]))){index=static_cast<int>(j);break;}
         if(index<0)continue;
         CString format,text;
         if(!controller.getFormat(labels[i],format)||!controller.getStringMessage(target,format,text))return false;
@@ -289,7 +290,7 @@ inline bool networkLabels(Transaction& tx,const std::vector<Node>& nodes,const A
         for(int j=0;j<lines.length();++j){
             AcGePoint3d old;if(leader->getFirstVertex(lines[j],old)!=Acad::eOk)return false;
             Point updated=point(old)+delta;
-            if(nodes[index].kind==1){
+            if(nodes[index].kind==1&&!(carried&&(*carried)[index])){
                 Point v=nodes[index].ports[1]-nodes[index].ports[0];
                 double fraction=(point(old)-nodes[index].ports[0]).dot(v)/v.dot(v);
                 if(fraction<0)fraction=0;
@@ -367,7 +368,7 @@ public:
     StretchJig(const std::vector<Node>& n,const std::vector<tvsMoveNetwork::Body>& b,
         const std::vector<int>& m,const AcGePoint3d& origin,double minLength,double tolerance)
         :preview(n,m),bodies(b),masks(m),base(origin),last(origin),minimum(minLength),tol(tolerance),sampled(false){
-        setDispPrompt(L"\nNova pozicija (zeleno: dozvoljeno, crveno: problem; Esc: odustani): ");
+        setDispPrompt(L"\nNova pozicija (zeleno: dozvoljeno, žuto: nije dozvoljeno, crveno: problematičan element; Esc: odustani): ");
         setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode|kNullResponseAccepted));
     }
     virtual AcDbEntity* entity()const{return const_cast<StretchPreview*>(&preview);}
@@ -394,15 +395,11 @@ class MoveJig : public AcEdJig {
     int ids[5],neighborPorts[2];Point attached[2],fixed[2];bool simple;
 public:
     tvsMoveNetwork::Result result;
-    MoveJig(const std::vector<Node>& n,int chosen,const Point& base,double minLength,double tolerance)
-        :nodes(n),selected(chosen),masks(n.size(),0),preview(n,masks),origin(base),last(acad(base)),
+    MoveJig(const std::vector<Node>& n,const std::vector<tvsMoveNetwork::Body>& fused,int chosen,const Point& base,double minLength,double tolerance)
+        :nodes(n),selected(chosen),bodies(fused),masks(n.size(),0),preview(n,masks),origin(base),last(acad(base)),
         minimum(minLength),tol(tolerance),sampled(false),simple(simpleChain(n,chosen,tolerance)){
         Point axis;tvsMoveGeometry::unit(n[chosen].ports[1]-n[chosen].ports[0],axis);normal=Point(-axis.y,axis.x,0);
         ids[0]=selected;
-        for(size_t i=0;i<n.size();++i){tvsMoveNetwork::Body body;
-            body.ports=n[i].ports;body.axes=n[i].axes;body.sections=n[i].sections;
-            body.kind=n[i].kind==1?tvsMoveNetwork::Pipe:n[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
-            if(n[i].kind==4)body.junctions.push_back(n[i].middle);bodies.push_back(body);}
         if(simple)for(int k=0;k<2;++k){Contact elbow,neighbor;
             uniqueContact(n,selected,k,tol,elbow);uniqueContact(n,elbow.node,1-elbow.port,tol,neighbor);
             ids[k+1]=elbow.node;ids[k+3]=neighbor.node;neighborPorts[k]=neighbor.port;
@@ -448,7 +445,7 @@ public:
     AcGePoint3d target()const{return last;}
     bool valid()const{return preview.allowed;}
 };
-inline bool moveDestination(const std::vector<Node>& nodes,int selected,const ads_point picked,
+inline bool moveDestination(const std::vector<Node>& nodes,const std::vector<tvsMoveNetwork::Body>& bodies,int selected,const ads_point picked,
                             Point& origin,ads_point destination,double minimum,double tol){
     StretchHighlight chosen;chosen.add(nodes[selected].id);
     Point ends[2]={nodes[selected].ports[0],nodes[selected].ports[1]},cursor(picked[0],picked[1],picked[2]);
@@ -462,7 +459,7 @@ inline bool moveDestination(const std::vector<Node>& nodes,int selected,const ad
     if(!tvsMoveGeometry::referencePoint(ends,cursor,nodes[selected].a,reference,origin))return false;
     chosen.clear();
     int problem=-1;tvsMoveNetwork::Error error=tvsMoveNetwork::Invalid;bool valid=false;
-    {MoveJig jig(nodes,selected,origin,minimum,tol);if(jig.drag()!=AcEdJig::kNormal)return false;
+    {MoveJig jig(nodes,bodies,selected,origin,minimum,tol);if(jig.drag()!=AcEdJig::kNormal)return false;
         AcGePoint3d target=jig.target();destination[0]=target.x;destination[1]=target.y;destination[2]=target.z;
         valid=jig.valid();problem=jig.result.problem;error=jig.result.error;}
     if(!valid){stretchProblem(nodes,problem,networkError(error),L"TVS_MOVE");return false;}
@@ -485,6 +482,12 @@ inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork:
     fuseOffsets(nodes,bodies,members,tol);
     fuseBypasses(nodes,bodies,members,tol);
 }
+inline std::vector<char> carriedBy(const std::vector<Node>& nodes,const std::vector<std::vector<AcDbObjectId> >& members,const std::vector<int>& masks){
+    std::vector<char> carried(nodes.size(),0);
+    for(size_t i=0;i<nodes.size()&&i<masks.size();++i)if(masks[i]&&!members[i].empty())
+        for(size_t k=0;k<members[i].size();++k)for(size_t j=0;j<nodes.size();++j)if(nodes[j].id==members[i][k])carried[j]=1;
+    return carried;
+}
 inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatrix3d& translation){
 #ifdef TVS_OFFSET_INTEGRATION
     tvsOffsetData::WriteScope scope;
@@ -502,17 +505,16 @@ inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatri
 #endif
 }
 inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
+                           const std::vector<tvsMoveNetwork::Body>& bodies,const std::vector<std::vector<AcDbObjectId> >& members,
                            int selected,const ads_point picked,double factor,double tol,double minimum){
+    if(bodies[selected].kind!=tvsMoveNetwork::Pipe){acutPrintf(L"\nTVS_MOVE: kanal je dio etaža ili obilaska; izaberite pravu dionicu van njih.");return;}
     Point origin;ads_point destination;
-    if(!moveDestination(nodes,selected,picked,origin,destination,minimum,tol))return;
+    if(!moveDestination(nodes,bodies,selected,picked,origin,destination,minimum,tol))return;
     Point axis;
     if(!tvsMoveGeometry::unit(nodes[selected].ports[1]-nodes[selected].ports[0],axis))return;
     Point normal(-axis.y,axis.x,0),target(destination[0],destination[1],destination[2]);
     Point delta=normal*((target-origin).dot(normal));
     if(!tvsMoveGeometry::valid(delta)||delta.length()<=tol){acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja.");return;}
-    std::vector<tvsMoveNetwork::Body> bodies;std::vector<std::vector<AcDbObjectId> > members;
-    bodiesFor(nodes,bodies,members,tol);
-    if(bodies[selected].ports.empty()){acutPrintf(L"\nTVS_MOVE: kanal je dio etaža; izaberite pravu dionicu van etaža i obilaska.");return;}
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
         acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
@@ -538,7 +540,8 @@ inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
             acutPrintf(L"\nTVS_MOVE: fiting nije moguće pomjeriti. Izmjena je poništena.");return;}
         entities[i]->recordGraphicsModified();
     }
-    if(!networkLabels(tx,nodes,currentLabels,result,delta)){
+    const std::vector<char> carried=carriedBy(nodes,members,result.masks);
+    if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
         acutPrintf(L"\nTVS_MOVE: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
     if(!tx.commit())return;
     acutPrintf(L"\nTVS_MOVE: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",result.changed,stretched,delta.length()*factor);
@@ -555,12 +558,11 @@ inline void execute(){
     int center=-1;for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==selected)center=static_cast<int>(i);
     if(center<0||nodes[center].kind!=1){acutPrintf(L"\nTVS_MOVE: izaberite kruti TVS kanal u trenutnom prostoru.");return;}
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
-    // Etaz in the drawing: the network path fuses it into one rigid body (same as TVS_STRETCH).
-    std::vector<tvsMoveNetwork::Body> probe;std::vector<std::vector<AcDbObjectId> > probeMembers;
-    bodiesFor(nodes,probe,probeMembers,tol);
-    bool etaz=false;for(size_t i=0;i<probeMembers.size();++i)if(!probeMembers[i].empty())etaz=true;
-    if(etaz||!simpleChain(nodes,center,tol)){
-        executeNetwork(db,nodes,center,picked,factor,tol,minimum);return;
+    // Network bodies: an etaz or obilazak is one rigid body (same as TVS_STRETCH).
+    std::vector<tvsMoveNetwork::Body> bodies;std::vector<std::vector<AcDbObjectId> > members;
+    bodiesFor(nodes,bodies,members,tol);
+    if(!simpleChain(nodes,center,tol)){
+        executeNetwork(db,nodes,bodies,members,center,picked,factor,tol,minimum);return;
     }
     const Node& main=nodes[center];Contact elbows[2],neighbors[2];int neighborPorts[2];
     Point attached[2],fixed[2];
@@ -587,7 +589,7 @@ inline void execute(){
     const int pipes[3]={center,neighbors[0].node,neighbors[1].node};
     if(sideBranches(nodes,pipes,tol)){acutPrintf(L"\nTVS_MOVE: postoji bočni priključak; ovaj korak podržava samo niz od pet elemenata.");return;}
     Point ends[2]={main.ports[0],main.ports[1]},origin;ads_point destination;
-    if(!moveDestination(nodes,center,picked,origin,destination,minimum,tol))return;
+    if(!moveDestination(nodes,bodies,center,picked,origin,destination,minimum,tol))return;
     tvsMoveGeometry::Plan plan;
     if(!tvsMoveGeometry::plan(ends,attached,fixed,origin,Point(destination[0],destination[1],destination[2]),minimum,tol,plan)){
         acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja ili bi nastala prekratka/obrnuta dionica ili nepodržana 3D geometrija.");return;}
@@ -662,48 +664,43 @@ inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwor
     (void)nodes;(void)bodies;(void)tol;
 #endif
 }
-// TVS_BYPASS: the whole obilazak (members[0..6]: two etazes and the piece between them) is one rigid
-// body with the outer ports of its two end elbows, so it moves whole, as an etaz does. A member that is
-// not part of a valid, complete obilazak keeps its old behaviour; the reason is printed.
+// TVS_BYPASS: the whole obilazak (members[0..6]: elbow, slope, elbow, horizontal piece, elbow, slope, elbow)
+// is one rigid body, as an etaz is. Its ports are the inlet/outlet duct ends at the two end elbows
+// (validated to coincide with their horizontal ports). The elbows are vertical, so describe() leaves
+// them kind 0; they are recognised from the assembly data. An obilazak whose data does not validate
+// keeps its members as separate elements, which the planner refuses to move.
 inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                          std::vector<std::vector<AcDbObjectId> >& members,double tol){
 #ifdef TVS_OFFSET_INTEGRATION
+    (void)tol;
     auto find=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
-    auto flat=[&](const Point& u,const Point& v){return std::hypot(u.x-v.x,u.y-v.y);};
-    auto note=[&](const ACHAR* why){acutPrintf(L"\nObilazak nije spojen: %s.",why);};
+    bool reported=false;
     for(size_t i=0;i<nodes.size();++i){
-        if(nodes[i].kind!=2||nodes[i].ports.size()!=2||!members[i].empty())continue;
-        tvsBypassData::Record r;tvsOffsetData::Status st=tvsOffsetData::Corrupt;bool marked=false;
-        {AcDbObjectPointer<AcDbObject> o(nodes[i].id,AcDb::kForRead);if(o.openStatus()!=Acad::eOk)continue;
-         marked=tvsBypassData::marked(o.object());
-         if(marked)st=tvsBypassData::assembly(o.object(),r);}
-        if(!marked)continue;
-        if(st!=tvsOffsetData::Valid){acutPrintf(L"\nObilazak nije prepoznat (status %d).",static_cast<int>(st));continue;}
-        if(r.members[0]!=nodes[i].id)continue;
+        if(!members[i].empty())continue;
+        tvsBypassData::Record r;tvsOffsetData::Status st=tvsOffsetData::Legacy;
+        {AcDbObjectPointer<TVS_TAP> a(nodes[i].id,AcDb::kForRead);
+         if(a.openStatus()!=Acad::eOk||!tvsBypassData::marked(a.object()))continue;
+         st=tvsBypassData::assembly(a.object(),r);}
+        if(st!=tvsOffsetData::Valid){
+            if(!reported){reported=true;
+                acutPrintf(L"\nTVS: obilazak nema ispravne podatke (%s); ova komanda ga ne pomjera. Koristite AutoCAD MOVE za cijeli sklop.",tvsOffsetData::statusText(st));}
+            continue;}
+        if(r.members[0]!=nodes[i].id)continue;   // one body per obilazak, kept on its first elbow
         int idx[7];bool ok=true;
-        for(int m=0;m<7;++m){idx[m]=find(r.members[m]);if(idx[m]<0)ok=false;}
-        if(!ok){note(L"član obilaska nije u izboru");continue;}
-        const int elbow[2]={idx[0],idx[6]},slope[2]={idx[1],idx[5]};
-        Point q[2];
-        for(int e=0;e<2&&ok;++e){
-            const Node& n=nodes[elbow[e]];const Node& s=nodes[slope[e]];
-            if(n.kind!=2||n.ports.size()!=2||s.kind!=1||s.ports.size()!=2){ok=false;break;}
-            // outer port: the one away from the sloped piece
-            const double d0=(std::min)(flat(n.ports[0],s.ports[0]),flat(n.ports[0],s.ports[1])),d1=(std::min)(flat(n.ports[1],s.ports[0]),flat(n.ports[1],s.ports[1]));
-            Point p=d0>d1?n.ports[0]:n.ports[1];
-            for(size_t k=0;k<nodes.size();++k)if(nodes[k].kind==1)for(size_t j=0;j<nodes[k].ports.size();++j)
-                if(flat(nodes[k].ports[j],p)<=tol)p.z=nodes[k].ports[j].z;   // same plane as the duct it joins
-            q[e]=p;
-        }
-        if(!ok){note(L"koljeno ili kanal uz koljeno nema očekivani oblik");continue;}
-        double sizeA=0,sizeB=0,elevA=0,elevB=0;bool round=false;
-        {AcDbObjectPointer<TVS_TAP> a(nodes[idx[0]].id,AcDb::kForRead);if(a.openStatus()!=Acad::eOk){note(L"prvo koljeno nije dostupno");continue;}
-         elevA=a->Elev;sizeA=a->SizeA;sizeB=a->SizeB;round=a->ThisRound;}
-        {AcDbObjectPointer<TVS_TAP> b(nodes[idx[6]].id,AcDb::kForRead);if(b.openStatus()!=Acad::eOk){note(L"drugo koljeno nije dostupno");continue;}elevB=b->Elev;}
-        Point axis;if(!tvsMoveGeometry::unit(Point(q[1].x-q[0].x,q[1].y-q[0].y,0),axis)){note(L"osa obilaska nije definisana");continue;}
+        for(int m=0;m<7;++m){idx[m]=find(r.members[m]);if(idx[m]<0||!members[idx[m]].empty())ok=false;}
+        if(!ok)continue;
+        AcGePoint3d q[2];AcGeVector3d v[2];tvsMoveNetwork::Section section[2];
+        {AcDbObjectPointer<TVS_Pipe> in(r.inlet,AcDb::kForRead),out(r.outlet,AcDb::kForRead);
+         if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk)continue;
+         q[0]=r.reverse?in->FirstPoint:in->LastPoint;q[1]=r.reverse?out->LastPoint:out->FirstPoint;
+         v[0]=in->LastPoint-in->FirstPoint;v[1]=out->LastPoint-out->FirstPoint;
+         section[0]=tvsMoveNetwork::Section(in->SizeA,in->SizeB,in->ThisRound,in->Elev);
+         section[1]=tvsMoveNetwork::Section(out->SizeA,out->SizeB,out->ThisRound,out->Elev);}
         tvsMoveNetwork::Body body;body.kind=tvsMoveNetwork::Rigid;
-        body.ports.push_back(q[0]);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(sizeA,round?0:sizeB,round,elevA));
-        body.ports.push_back(q[1]);body.axes.push_back(axis);body.sections.push_back(tvsMoveNetwork::Section(sizeA,round?0:sizeB,round,elevB));
+        for(int e=0;e<2;++e){Point axis;
+            if(!tvsMoveGeometry::unit(Point(v[e].x,v[e].y,0),axis)){ok=false;break;}
+            body.ports.push_back(point(q[e]));body.axes.push_back(axis);body.sections.push_back(section[e]);}
+        if(!ok)continue;
         bodies[idx[0]]=body;
         for(int m=1;m<7;++m)bodies[idx[m]]=tvsMoveNetwork::Body();
         members[idx[0]].assign(r.members,r.members+7);
@@ -721,12 +718,7 @@ inline void executeStretch(){
     std::vector<Node> nodes;AcDbObjectIdArray labels;
     if(!snapshot(db,nodes,labels))return;
     std::vector<tvsMoveNetwork::Body> bodies;std::vector<int> masks;
-    for(size_t i=0;i<nodes.size();++i){
-        tvsMoveNetwork::Body b;b.ports=nodes[i].ports;b.axes=nodes[i].axes;b.sections=nodes[i].sections;
-        b.kind=nodes[i].kind==1?tvsMoveNetwork::Pipe:nodes[i].kind>=2?tvsMoveNetwork::Rigid:tvsMoveNetwork::Blocked;
-        if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
-        bodies.push_back(b);}
-    std::vector<std::vector<AcDbObjectId> > members;fuseOffsets(nodes,bodies,members,tol);fuseBypasses(nodes,bodies,members,tol);
+    std::vector<std::vector<AcDbObjectId> > members;bodiesFor(nodes,bodies,members,tol);
     for(size_t i=0;i<nodes.size();++i){
         const tvsMoveNetwork::Body& b=bodies[i];int mask=0;
         for(size_t j=0;j<b.ports.size();++j){
@@ -737,7 +729,9 @@ inline void executeStretch(){
                 mask|=1<<static_cast<int>(j);
         }
         if(mask&&b.kind!=tvsMoveNetwork::Pipe&&mask!=(1<<static_cast<int>(b.ports.size()))-1){
-            stretchProblem(nodes,static_cast<int>(i),members[i].empty()?L"Okvir presijeca fiting. Obuhvatite sve njegove priključke ili ga izostavite.":L"Okvir presijeca etaž. Obuhvatite cijeli etaž ili ga izostavite.");return;}
+            stretchProblem(nodes,static_cast<int>(i),members[i].empty()?L"Okvir presijeca fiting. Obuhvatite sve njegove priključke ili ga izostavite."
+                :members[i].size()==7?L"Okvir presijeca obilazak. Obuhvatite cijeli obilazak ili ga izostavite."
+                :L"Okvir presijeca etaž. Obuhvatite cijeli etaž ili ga izostavite.");return;}
         masks.push_back(mask);
     }
     bool any=false;for(size_t i=0;i<masks.size();++i)if(masks[i])any=true;
@@ -761,7 +755,7 @@ inline void executeStretch(){
     std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
     AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
     for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
-        if(!members[i].empty()){   // etaz: all three members move together
+        if(!members[i].empty()){   // etaz/obilazak: all members move together
 #ifdef TVS_OFFSET_INTEGRATION
             tvsOffsetData::WriteScope scope;
             for(size_t k=0;k<members[i].size();++k){AcDbObject* o=NULL;
@@ -788,7 +782,8 @@ inline void executeStretch(){
             acutPrintf(L"\nTVS_STRETCH: fiting nije moguće pomjeriti. Izmjena je poništena.");return;}
         entities[i]->recordGraphicsModified();
     }
-    if(!networkLabels(tx,nodes,currentLabels,result,delta)){
+    const std::vector<char> carried=carriedBy(nodes,members,result.masks);
+    if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
         acutPrintf(L"\nTVS_STRETCH: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
     if(!tx.commit())return;
     acutPrintf(L"\nTVS_STRETCH: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",result.changed,stretched,delta.length()*factor);
