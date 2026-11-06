@@ -17,7 +17,7 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–6 su urađene i na masteru; u 7
 7. **Odloženo iz ranijih faza** – uzdužni presjek P2 *(urađeno, potvrđeno 6. 11.: TVS_PRESJEK → Uzduzni)*, detalji koljena u presjeku, koljeno direktno na grani T komada, finese nastavka crtanja poslije T komada.
 8. **Okrugla štucna** (konusna / 45° na okruglom kanalu).
 9. **ASHRAE oznaka fitinga** (SR5-3 štucna, CR3-x koljeno, SR4-x prelaz …) u specifikaciji i izvozu – osnova za proračun pada pritiska (KanCalc).
-10. **Podešavanja na jednom mjestu** – `Settings.h` statičke promjenljive (kopija po .cpp fajlu) u jedan zajednički objekat.
-11. **Brzina na velikim crtežima** – jedan indeks elemenata (položaj, kote) umjesto prolaska kroz cijeli Model prostor u TVS_STRETCH, presjeku i provjeri etaža.
-12. **Razbijanje `acrxEntryPoint.cpp`** (~4300 linija) – komande u zasebne fajlove.
+10. *(urađeno 6. 11., u testiranju)* **Podešavanja na jednom mjestu** – `Settings.h` statičke promjenljive (kopija po .cpp fajlu) u jedan zajednički objekat.
+11. *(urađeno 6. 11., u testiranju: indeks identiteta etaža sa reaktorom baze; trasa P2 kroz mrežu ćelija)* **Brzina na velikim crtežima** – jedan indeks elemenata (položaj, kote) umjesto prolaska kroz cijeli Model prostor u TVS_STRETCH, presjeku i provjeri etaža.
+12. *(urađeno 6. 11., u testiranju: komande u `TVS_Ventilation_ARX/commands/*.inl`)* **Razbijanje `acrxEntryPoint.cpp`** (~4300 linija) – komande u zasebne fajlove.
 13. **Instalacioni paket** – build pravi gotov `TVS.bundle` (PackageContents.xml, verzija, Resources\TVS_Oznake.dwg).
