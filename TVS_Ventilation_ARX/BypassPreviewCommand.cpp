@@ -488,6 +488,76 @@ static bool runBypass(const AcDbObjectId& active,bool permanent,TVSBypassOutput*
   }
  }catch(...){acutPrintf(L"\nBYPASS prekinut. Nepotvrdjena transakcija/grafika je uklonjena.");return false;}
 }
+// Plan 14, phase 3: the obilazak of `member` for the new size its inlet / outlet ducts already
+// have. The original straight route (fixed end .. far end, as before the cut) and the obstacle
+// at its current place go into the TVS_BYPASS dialog, prefilled with the obilazak's own angle,
+// side, clearance, insulation and reserve. Prihvati: the old members are erased, inlet and
+// outlet joined back into the straight duct and the new obilazak written exactly as TVS_BYPASS
+// writes it. `outlet` = the new outlet duct. false = nothing changed (or the reason printed).
+bool tvsBypassResize(const AcDbObjectId& member,const TVSBypassRadius& radius,AcDbObjectId& outlet){
+#ifndef TVS_OFFSET_INTEGRATION
+ (void)member;(void)radius;(void)outlet;return false;
+#else
+ try{
+  AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db||!db->tilemode())return false;
+  tvsBypassData::Record r;
+  {AcDbObjectPointer<AcDbObject> m(member,AcDb::kForRead);if(m.openStatus()!=Acad::eOk)return false;
+   const tvsOffsetData::Status st=tvsBypassData::assembly(m.object(),r,false);
+   if(st!=tvsOffsetData::Valid){acutPrintf(L"\nObilazak: podaci sklopa nisu ispravni (%ls).",tvsOffsetData::statusText(st));return false;}}
+  const double f=tvsUnits::factor(db);
+  Snapshot s;tvsBypassUx::Memory memory;
+  {AcDbObjectPointer<TVS_Pipe> in(r.inlet,AcDb::kForRead),out(r.outlet,AcDb::kForRead),h(r.members[3],AcDb::kForRead);
+   AcDbObjectPointer<TVS_TAP> elbow(r.members[0],AcDb::kForRead);
+   if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk||h.openStatus()!=Acad::eOk||elbow.openStatus()!=Acad::eOk){acutPrintf(L"\nObilazak: ulaz, izlaz ili član sklopa nije dostupan.");return false;}
+   const AcGePoint3d first=r.reverse?out->FirstPoint:in->FirstPoint,last=r.reverse?in->LastPoint:out->LastPoint;
+   s.route.first=Point(first.x,first.y,first.z);s.route.last=Point(last.x,last.y,last.z);
+   s.route.a=in->SizeA;s.route.b=in->SizeB;s.route.elevation=in->get_Elevation();s.route.rigid=s.route.ordinary=true;s.route.rectangular=!in->ThisRound;
+   AcDbObjectPointer<TVS_Pipe> obstacle(r.obstacle,AcDb::kForRead);
+   if(obstacle.openStatus()!=Acad::eOk){acutPrintf(L"\nObilazak: prepreka nije dostupna; obilazak nije preračunat.");return false;}
+   s.obstacle.first=Point(obstacle->FirstPoint.x,obstacle->FirstPoint.y,obstacle->FirstPoint.z);s.obstacle.last=Point(obstacle->LastPoint.x,obstacle->LastPoint.y,obstacle->FirstPoint.z);
+   s.obstacle.elevation=obstacle->Elev;s.obstacle.a=obstacle->SizeA;s.obstacle.b=obstacle->SizeB;s.obstacle.rigid=s.obstacle.ordinary=true;s.obstacle.rectangular=!obstacle->ThisRound;
+   // the dialog starts from this obilazak's own design settings
+   Options defaults;for(int j=0;j<FieldCount;++j)memory.values[j]=number(defaults.*fields[j]);
+   memory.values[3]=number(r.policy[0]);memory.values[1]=number(r.policy[1]);memory.values[2]=number(r.policy[2]);memory.values[4]=number(r.policy[3]);
+   const double degrees=elbow->Swectangle*180/tvsOffset::pi();memory.angle=std::fabs(degrees-30)<1e-6?0:std::fabs(degrees-60)<1e-6?2:1;
+   memory.side=h->Elev>in->Elev?1:0;memory.valid=true;}
+  tvsBypassUx::RadiusSetting radiusSetting;radiusSetting.mode=radius.mode;radiusSetting.k=radius.k;radiusSetting.constantDrawing=radius.constant;
+  if(!s.route.rectangular){
+   if(radius.roundMode==RadiusTypeRound_RadiusSpecific){acutPrintf(L"\nObilazak: kružna koljena u TVS_SETTINGS su u specifičnom režimu; obilazak nije preračunat.");return false;}
+   radiusSetting.mode=radius.roundMode==RadiusTypeRound_RadiusConstant?tvsBypassUx::RadiusConstant:radius.roundMode==RadiusTypeRound_RadiusVariable?tvsBypassUx::RadiusVariable:0;}
+  acutPrintf(L"\nObilazak za novu dimenziju: provjerite prolaz u dijalogu i prihvatite (Odustani: obilazak ostaje star).");
+  Dialog dialog(s,r.reverse,f,true,memory,radiusSetting,true);dialog.unitFromRecord=true;HWND owner=acedGetAcadFrame()->GetSafeHwnd();
+  for(;;){INT_PTR action=dialog.show(owner);
+   if(action==701){
+    const bool canAccept=dialog.canAccept;tvsBypassUx::PreviewChoice choice=tvsBypassUx::Cancel;
+    {Transient preview;if(!preview.show(dialog.view,dialog.allEdges,dialog.showAxes))return false;
+     acedInitGet(0,canAccept?L"Prihvati Dijalog Odustani":L"Dijalog Odustani");ACHAR answer[64]=L"";
+     const int status=acedGetKword(canAccept?L"\nPregled [Prihvati/Dijalog/Odustani] <Dijalog>: ":L"\nPregled [Dijalog/Odustani] <Dijalog>: ",answer);
+     preview.clear();choice=tvsBypassUx::previewChoice(status==RTNORM,status==RTNONE,answer,canAccept);}
+    if(choice==tvsBypassUx::Cancel)return false;
+    if(choice==tvsBypassUx::BackToDialog)continue;
+    action=704;
+   }
+   if(action==703){if(dialog.view.ready&&dialog.engine.ready())tvsSideDetail::insert(db,dialog.view,dialog.options,r.inlet,r.obstacle);continue;}
+   if(action!=704||!dialog.view.ready||!dialog.engine.ready())return false;
+   // Prihvati: old members out, inlet + outlet back into the straight route duct.
+   {tvsOffsetData::WriteScope scope;
+    for(int j=0;j<7;++j){AcDbObjectPointer<AcDbEntity> e(r.members[j],AcDb::kForWrite);
+     if(e.openStatus()!=Acad::eOk||e->erase()!=Acad::eOk){acutPrintf(L"\nObilazak: član sklopa nije obrisan; ništa nije promijenjeno do ovog koraka.");return false;}}
+    AcDbObjectPointer<TVS_Pipe> in(r.inlet,AcDb::kForWrite),out(r.outlet,AcDb::kForWrite);if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk)return false;
+    if(r.reverse)in->put_FirstPoint(out->FirstPoint);else in->put_Lastpoint(out->LastPoint);
+    in->recordGraphicsModified();out->erase();}
+   tvsBypassService::Snapshot native;tvsBypassService::Commit result;
+   if(!tvsBypassService::capture(r.inlet,r.obstacle,r.reverse,native,radius.typeRoundTap)||!tvsBypassService::current(native)
+      ||!tvsBypassService::write(native,dialog.view,dialog.options,result)){
+    acutPrintf(L"\nObilazak: stari je uklonjen i trasa je ponovo prava, ali novi nije upisan (razlog iznad). Pokrenite TVS_BYPASS na tom kanalu.");return false;}
+   outlet=result.output;
+   acutPrintf(L"\nObilazak preračunat za novu dimenziju.");
+   return true;
+  }
+ }catch(...){acutPrintf(L"\nObilazak: prekinuto. Nepotvrđena transakcija/grafika je uklonjena.");return false;}
+#endif
+}
 void tvsBypassPreviewCommand(const TVSBypassRadius& radius){runBypass(AcDbObjectId::kNull,false,NULL,radius);}
 void tvsBypassCommand(const TVSBypassRadius& radius){runBypass(AcDbObjectId::kNull,true,NULL,radius);}
 bool tvsBypassDuringDrawing(const AcDbObjectId& route,TVSBypassOutput& result,const TVSBypassRadius& radius){return runBypass(route,true,&result,radius);}

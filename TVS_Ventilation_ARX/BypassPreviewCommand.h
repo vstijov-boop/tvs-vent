@@ -14,4 +14,6 @@ class TVS_Pipe;
 // the drawing loop still carries (same pattern as TVS_Pipe::add_new).
 struct TVSBypassOutput {AcDbObjectId id;TVS_Pipe* pipe;double elevation,angle;TVSBypassOutput():pipe(NULL),elevation(0),angle(0){}};
 bool tvsBypassDuringDrawing(const AcDbObjectId& route,TVSBypassOutput& result,const TVSBypassRadius& radius);
+// Plan 14 phase 3: rebuild the obilazak of `member` for the new size of its inlet/outlet (dialog).
+bool tvsBypassResize(const AcDbObjectId& member,const TVSBypassRadius& radius,AcDbObjectId& outlet);
 #endif

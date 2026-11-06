@@ -101,7 +101,7 @@
 //----- ObjectARX EntryPoint
 
 #ifdef TVS_BYPASS_PREVIEW
-// Settings.h globals are per translation unit; the live radius mode is this file's copy.
+// Live radius mode from the shared Settings.h globals (Settings.cpp).
 static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.roundMode=globalRadiusTypeRound;r.typeRoundTap=globalTypeRoundTap;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
 static void tvsBypassCommandEntry(){tvsBypassCommand(tvsBypassRadiusSettings());}
 static void tvsBypassPreviewCommandEntry(){tvsBypassPreviewCommand(tvsBypassRadiusSettings());}

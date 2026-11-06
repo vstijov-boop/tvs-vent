@@ -17,6 +17,11 @@
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
+#if defined(TVS_OFFSET_INTEGRATION)&&defined(TVS_BYPASS_PREVIEW)
+#define TVS_SIZE_BYPASS 1
+#include "BypassPreviewCommand.h"
+#include "Settings.h"
+#endif
 #include "acdocman.h"
 #include "aced.h"
 #include <algorithm>
@@ -132,7 +137,8 @@ inline bool elbowPortsFor(const TVS_TAP* p,double A,tvsMove::Point out[2]){
 struct TeeStep {int node,port,mode;};
 // Etaz on the run (index into the etaz list, entered at its first elbow side).
 struct EtazStep {int index;bool atA;};
-struct Run {std::vector<int> elbows,ducts;std::vector<TeeStep> tees;std::vector<EtazStep> etazes;std::vector<CString> stops;};
+// Obilazak on the run: its first member (the TVS_BYPASS dialog rebuilds it at the end).
+struct Run {std::vector<int> elbows,ducts;std::vector<TeeStep> tees;std::vector<EtazStep> etazes;std::vector<AcDbObjectId> bypasses;std::vector<CString> stops;};
 #ifdef TVS_OFFSET_INTEGRATION
 typedef std::vector<tvsOffsetRefit::Assembly> Etazes;
 #else
@@ -200,6 +206,26 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
                 if(t.mode==2)break;
                 prev=next;at=n.ports[port==0?1:0];continue;               // on through the other main side
             }
+#ifdef TVS_SIZE_BYPASS
+            if(tvsBypassData::marked(e.object())){
+                tvsBypassData::Record r;
+                if(tvsBypassData::assembly(e.object(),r,false)!=tvsOffsetData::Valid||(n.id!=r.members[0]&&n.id!=r.members[6])){run.stops.push_back(L"obilazak");break;}
+                const bool atFirst=n.id==r.members[0];
+                const int h=indexOf(r.members[3]),other=indexOf(atFirst?r.members[6]:r.members[0]);
+                AcGePoint3d next3;
+                {AcDbObjectPointer<TVS_Pipe> q(atFirst?r.outlet:r.inlet,AcDb::kForRead);if(q.openStatus()!=Acad::eOk||h<0||other<0){run.stops.push_back(L"obilazak");break;}
+                 // the duct end at the obilazak on the other side
+                 next3=atFirst?(r.reverse?q->LastPoint:q->FirstPoint):(r.reverse?q->FirstPoint:q->LastPoint);}
+                if(!same(nodes[h].a,nodes[h].b,nodes[h].round)){run.stops.push_back(L"obilazak druge dimenzije");break;}
+                e.close();
+                ACHAR kw[32];
+                if(!ask(L"\nDionica prolazi kroz obilazak: preračunati ga za novu dimenziju (otvara se dijalog obilaska)? [Da/Ne] <Da>: ",L"Da Ne",kw,L"Da")||_wcsicmp(kw,L"Ne")==0){
+                    run.stops.push_back(L"obilazak (nije preračunat)");break;}
+                for(int m=0;m<7;++m){const int x=indexOf(r.members[m]);if(x>=0)seen.insert(x);}
+                run.bypasses.push_back(r.members[0]);
+                prev=other;at=tvsMove::point(next3);continue;
+            }
+#endif
 #ifdef TVS_OFFSET_INTEGRATION
             if(tvsOffsetData::marked(e.object())&&!tvsBypassData::marked(e.object())){
                 int found=-1;bool atA=true;
@@ -374,6 +400,16 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         if(inRun.count(ducts[k])&&ducts[k]!=start){p->put_SizeA(A);p->put_SizeB(B);resized.push_back(nodes[ducts[k]].id);}
         p->recordGraphicsModified();
     }
+#ifdef TVS_SIZE_BYPASS
+    // obilasci last: the TVS_BYPASS dialog with the new size on the (already resized) inlet/outlet
+    for(size_t k=0;k<run.bypasses.size();++k){
+        TVSBypassRadius radius;radius.mode=globalRadiusTypeRect;radius.roundMode=globalRadiusTypeRound;radius.typeRoundTap=globalTypeRoundTap;
+        radius.k=globalTapRadiusVariableParameter;radius.constant=globalTapRadiusConst;
+        AcDbObjectId outlet;
+        if(tvsBypassResize(run.bypasses[k],radius,outlet)){if(!outlet.isNull())resized.push_back(outlet);}
+        else acutPrintf(L"\nObilazak nije preračunat: kanali uz njega imaju novu dimenziju, a obilazak staru – uskladite ga (TVS_BYPASS) ili vratite izmjenu (U).");
+    }
+#endif
     // prelaz back to the old size behind a T komad (option Prelaz)
     for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];if(t.mode!=2||!tees[k].after.ok)continue;
         const int other=t.port==0?1:0;const AcGePoint3d at=tees[k].after.p[other];
@@ -396,7 +432,7 @@ inline void run(){
     std::vector<std::pair<AcDbObjectId,int> > queue(work.begin(),work.end());std::set<AcDbObjectId> done;
     {   // whole run up to the next prelaz: ask once for all edited ducts
         std::map<AcDbObjectId,Sizes> old;old.swap(previous());
-        std::vector<std::pair<int,Run> > runs;std::set<int> seen;int elbows=0,others=0,tees=0,etazCount=0;std::vector<CString> stops;
+        std::vector<std::pair<int,Run> > runs;std::set<int> seen;int elbows=0,others=0,tees=0,etazCount=0,bypassCount=0;std::vector<CString> stops;
         Etazes etazes;
 #ifdef TVS_OFFSET_INTEGRATION
         tvsOffsetRefit::assemblies(db,etazes);
@@ -406,14 +442,14 @@ inline void run(){
             if(o==old.end()||i<0||nodes[i].kind!=1||nodes[i].ports.size()!=2||seen.count(i))continue;
             seen.insert(i);Run r;walk(nodes,i,o->second,tol,etazes,r,seen);
             for(size_t k=0;k<r.stops.size();++k)if(std::find(stops.begin(),stops.end(),r.stops[k])==stops.end())stops.push_back(r.stops[k]);
-            if(r.elbows.empty()&&r.ducts.empty()&&r.tees.empty()&&r.etazes.empty())continue;
+            if(r.elbows.empty()&&r.ducts.empty()&&r.tees.empty()&&r.etazes.empty()&&r.bypasses.empty())continue;
             elbows+=static_cast<int>(r.elbows.size());others+=static_cast<int>(r.ducts.size());
-            tees+=static_cast<int>(r.tees.size());etazCount+=static_cast<int>(r.etazes.size());runs.push_back(std::make_pair(i,r));
+            tees+=static_cast<int>(r.tees.size());etazCount+=static_cast<int>(r.etazes.size());bypassCount+=static_cast<int>(r.bypasses.size());runs.push_back(std::make_pair(i,r));
         }
         if(!runs.empty()){
             if(!stops.empty()){CString list;for(size_t k=0;k<stops.size();++k){if(k)list+=L", ";list+=stops[k];}
                 acutPrintf(L"\nDionica staje na: %ls (ti elementi se ne mijenjaju).",list.GetString());}
-            wchar_t prompt[260];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d, T komada %d, etaža %d)? [Da/Ne] <Da>: ",elbows,others,tees,etazCount);
+            wchar_t prompt[260];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d, T komada %d, etaža %d, obilazaka %d)? [Da/Ne] <Da>: ",elbows,others,tees,etazCount,bypassCount);
             acedInitGet(0,L"Da Ne");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw);
             if(rc==RTNONE||(rc==RTNORM&&_wcsicmp(kw,L"Da")==0)){
                 int changed=0;
