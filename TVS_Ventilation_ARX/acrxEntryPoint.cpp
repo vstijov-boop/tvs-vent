@@ -660,8 +660,9 @@ public:
 		{
 			int teeType = tvsTee::Straight; double teeSecond = 0;
 			const AcGeVector3d mainFlow = p4 - p3;   // main duct as drawn = air flow (stucna entry upstream)
-			if (!pPipe1->ThisRound && !pPipe2->ThisRound && pPipe1->SizeB > 0 && pPipe2->SizeB > 0
-				&& !tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor()))
+			// rectangular main: TK-O / TK-G / stucna for a rectangular branch, stucna for a round one
+			if (!pPipe2->ThisRound && pPipe2->SizeB > 0 && (pPipe1->ThisRound || pPipe1->SizeB > 0)
+				&& !tvsTeeCommand::askType(teeType, teeSecond, pPipe2->SizeA, pPipe1->SizeA, tvsUnits::factor(), pPipe1->ThisRound))
 				return false;
 
 			AcGePoint3d midp, point1, point2, intersectpoint;
