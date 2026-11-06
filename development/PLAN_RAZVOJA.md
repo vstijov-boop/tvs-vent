@@ -1,6 +1,6 @@
 # TVS_VENT – plan razvoja
 
-Redoslijed po dogovoru (5. 11. 2026). Stavke 1–5 su urađene i na masteru; sljedeća je 6.
+Redoslijed po dogovoru (5. 11. 2026). Stavke 1–6 su urađene (6 čeka spajanje na master); sljedeća je 7.
 
 ## Urađeno
 1. **Prelaz prati dimenzije susjednih kanala** – promjena ulaznog kanala mijenja prvu dimenziju prelaza, izlaznog drugu; promjena dimenzije prelaza mijenja samo kanal na tom kraju.
@@ -13,7 +13,7 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–5 su urađene i na masteru; slj
 ## Sljedeće (redom)
 4. *(urađeno, potvrđeno 5. 11.)* **Promjena kote tokom crtanja → etaž** – kad se u dijalogu dimenzija tokom TVS_DRAW/TVS_PIPE promijeni kota, ponuditi „Umetnuti etaž? [Da/Ne]“ (isti put kao opcija Z: tvsOffsetIntegration); ako se mijenja i dimenzija, prvo etaž na postojećoj dimenziji, pa prelaz.
 5. *(urađeno, potvrđeno 5. 11.; otvara se i iz dijaloga dimenzija tokom crtanja)* **Prošireni dijalog promjene kote (Z)** – postojeće stanje: vrh / osa / dno kanala (samo prikaz); novo stanje: izbor reference (Vrh/Osa/Dno) i vrijednost (npr. vrh 2950 → 2750); ugao (30/45/60°); odmah prikaz razlike kota, kosog dijela, dužine u osnovi i da li je izvodljivo (premala razlika za dva koljena); skica kao kod prelaza.
-6. *(u testiranju na razvoj-tkomad)* **Etaž u TVS_MOVE i obilazak (TVS_BYPASS)** – isto ponašanje kao TVS_STRETCH i prilagođavanje kote.
+6. *(urađeno, potvrđeno 6. 11.)* **Etaž u TVS_MOVE i obilazak (TVS_BYPASS)** – isto ponašanje kao TVS_STRETCH i prilagođavanje kote.
 7. **Odloženo iz ranijih faza** – podužni presjek P2, detalji koljena u presjeku, koljeno direktno na grani T komada, finese nastavka crtanja poslije T komada.
 8. **Okrugla štucna** (konusna / 45° na okruglom kanalu).
 9. **ASHRAE oznaka fitinga** (SR5-3 štucna, CR3-x koljeno, SR4-x prelaz …) u specifikaciji i izvozu – osnova za proračun pada pritiska (KanCalc).
