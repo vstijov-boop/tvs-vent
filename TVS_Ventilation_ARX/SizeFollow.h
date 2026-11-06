@@ -407,7 +407,8 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         radius.k=globalTapRadiusVariableParameter;radius.constant=globalTapRadiusConst;
         AcDbObjectId outlet;
         if(tvsBypassResize(run.bypasses[k],radius,outlet)){if(!outlet.isNull())resized.push_back(outlet);}
-        else acutPrintf(L"\nObilazak nije preračunat: kanali uz njega imaju novu dimenziju, a obilazak staru – uskladite ga (TVS_BYPASS) ili vratite izmjenu (U).");
+        else{bool stays=false;{AcDbObjectPointer<AcDbObject> m(run.bypasses[k],AcDb::kForRead);stays=m.openStatus()==Acad::eOk;}
+            if(stays)acutPrintf(L"\nObilazak nije preračunat: kanali uz njega imaju novu dimenziju, a obilazak staru – uskladite ga (TVS_BYPASS) ili vratite izmjenu (U).");}
     }
 #endif
     // prelaz back to the old size behind a T komad (option Prelaz)
