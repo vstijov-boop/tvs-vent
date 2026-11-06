@@ -544,6 +544,13 @@ bool tvsBypassResize(const AcDbObjectId& member,const TVSBypassRadius& radius,Ac
    {tvsOffsetData::WriteScope scope;
     for(int j=0;j<7;++j){AcDbObjectPointer<AcDbEntity> e(r.members[j],AcDb::kForWrite);
      if(e.openStatus()!=Acad::eOk||e->erase()!=Acad::eOk){acutPrintf(L"\nObilazak: član sklopa nije obrisan; ništa nije promijenjeno do ovog koraka.");return false;}}
+    // the parent record (NOD TVS_BYPASS_<guid>) goes too: it still names the inlet, so TVS_BYPASS
+    // would refuse the joined duct as the boundary of an existing obilazak
+    {AcDbDictionary* nod=NULL;
+     if(db->getNamedObjectsDictionary(nod,AcDb::kForWrite)==Acad::eOk){
+      const CString key=L"TVS_BYPASS_"+r.guid;AcDbObjectId parent;
+      if(nod->remove(key.GetString(),parent)==Acad::eOk){AcDbObjectPointer<AcDbObject> x(parent,AcDb::kForWrite);if(x.openStatus()==Acad::eOk)x->erase();}
+      nod->close();}}
     AcDbObjectPointer<TVS_Pipe> in(r.inlet,AcDb::kForWrite),out(r.outlet,AcDb::kForWrite);if(in.openStatus()!=Acad::eOk||out.openStatus()!=Acad::eOk)return false;
     if(r.reverse)in->put_FirstPoint(out->FirstPoint);else in->put_Lastpoint(out->LastPoint);
     in->recordGraphicsModified();out->erase();}
