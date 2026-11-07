@@ -58,6 +58,8 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 
 - **TVS_LEAD_Recalculate:** ako su objekti već izabrani – ažurira njih; inače „TVS oznake za ažuriranje [Sve/Izbor] <Izbor>“: **Sve** = sve MLeader oznake u crtežu, **Izbor** = običan izbor (klik, prozor, crossing; ostali objekti se preskaču). Na kraju: „Ažurirano TVS oznaka: N; nije ažurirano: M (element obrisan ili oznaka na zaključanom sloju)“.
 
+- **Automatsko ažuriranje oznaka:** poslije izmjene TVS elementa (Properties, Svojstva, TVS_STRETCH, TVS_MOVE, MOVE, MIRROR, grip, dimenzija dionice) tekst njegovih TVS oznaka u trenutnom prostoru se sam ažurira (TVS_DIM_PRATI). **TVS_LEAD_AUTO [Uklj/Isklj]** – uključi / isključi (pamti se u AutoCAD profilu; zadano Uklj). Pod LISP-om / skriptom oznake se ažuriraju poslije sljedeće obične komande.
+
 ## Odloženo
 - Koljeno direktno na priključku grane T komada.
 - Detalji koljena u presjeku (kao TVS koljena gore/dolje).

@@ -14,6 +14,7 @@
 #include "TVSMoveCommand.h"
 #include "TransAlignCommand.h"
 #include "TeeCommand.h"
+#include "MleaderController.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
@@ -36,6 +37,10 @@ inline std::map<AcDbObjectId,Sizes>& opened(){static std::map<AcDbObjectId,Sizes
 // changed element -> ends whose size changed (bit 0 = first, bit 1 = second; ducts: 3)
 inline std::map<AcDbObjectId,int>& pending(){static std::map<AcDbObjectId,int> m;return m;}
 inline bool& posted(){static bool b=false;return b;}
+// TVS elements modified in the command (any command, Properties, grips): their TVS labels get
+// their text again in TVS_DIM_PRATI (plan 15; TVS_LEAD_AUTO turns it off).
+inline std::set<AcDbObjectId>& touched(){static std::set<AcDbObjectId> s;return s;}
+inline bool autoLabels(){ACHAR v[16]=L"";return !(acedGetEnv(L"TVS_LEAD_AUTO",v,16)==RTNORM&&!_wcsicmp(v,L"0"));}
 // size of a user-edited duct before the edit (whole run: elements of that size follow)
 inline std::map<AcDbObjectId,Sizes>& previous(){static std::map<AcDbObjectId,Sizes> m;return m;}
 inline bool plainDuct(const AcDbObject* o){
@@ -58,7 +63,9 @@ inline bool userEdit(){
     return c.IsEmpty()||!c.CompareNoCase(L"TVS_CHANGE")||!c.CompareNoCase(L"DBLCLKEDIT")||!c.CompareNoCase(L"PROPERTIES");
 }
 inline void post(){
-    if(posted()||pending().empty())return;
+    if(posted()||(pending().empty()&&(touched().empty()||!autoLabels())))return;
+    if(pending().empty()){   // labels only: not into a running LISP / script (their input stream); later
+        resbuf rb={};if(acedGetVar(L"CMDACTIVE",&rb)==RTNORM&&rb.restype==RTSHORT&&(rb.resval.rint&(4|32)))return;}
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc)return;
     posted()=true;acDocManager->sendStringToExecute(doc,L"_TVS_DIM_PRATI\n",false,true,false);
 }
@@ -68,6 +75,8 @@ public:
         if(applying()||o->isUndoing())return;Sizes s;if(sizes(o,s))opened()[o->objectId()]=s;
     }
     virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){
+        if(!o->isUndoing()&&TVS_Entity::cast(o)){touched().insert(o->objectId());
+            if(!applying()){AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(doc&&doc->isQuiescent())post();}}
         std::map<AcDbObjectId,Sizes>::iterator it=opened().find(o->objectId());if(it==opened().end())return;
         const Sizes was=it->second;opened().erase(it);
         if(applying()||o->isUndoing()||!userEdit())return;
@@ -89,7 +98,7 @@ public:
     virtual void commandWillStart(const ACHAR* c){command()=c?c:L"";}
     virtual void commandEnded(const ACHAR* c){
         command().Empty();
-        if(c&&(!_wcsicmp(c,L"U")||!_wcsicmp(c,L"UNDO")||!_wcsicmp(c,L"REDO")||!_wcsicmp(c,L"MREDO"))){pending().clear();previous().clear();return;}
+        if(c&&(!_wcsicmp(c,L"U")||!_wcsicmp(c,L"UNDO")||!_wcsicmp(c,L"REDO")||!_wcsicmp(c,L"MREDO"))){pending().clear();previous().clear();touched().clear();return;}
         if(c&&_wcsicmp(c,L"TVS_DIM_PRATI"))post();
     }
     virtual void commandCancelled(const ACHAR*){command().Empty();}
@@ -421,10 +430,29 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
     }
     return true;
 }
+// TVS labels of the touched elements (current space) get their text again. Returns the count.
+inline int refreshLabels(AcDbDatabase* db){
+    std::set<AcDbObjectId> ids;ids.swap(touched());
+    if(!db||ids.empty()||!autoLabels())return 0;
+    std::vector<AcDbObjectId> labels;MleaderController ml;
+    {AcDbObjectPointer<AcDbBlockTableRecord> space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return 0;
+     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return 0;
+     for(;!it->done();it->step()){AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk||id.objectClass()!=AcDbMLeader::desc())continue;
+         AcDbObjectId element;if(ml.getObjectId(id,element)&&ids.count(element))labels.push_back(id);}
+     delete it;}
+    int n=0;for(size_t k=0;k<labels.size();++k)if(ml.recalculateMleader(labels[k]))++n;
+    return n;
+}
+inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work);
 inline void run(){
     posted()=false;
     std::map<AcDbObjectId,int> work;work.swap(pending());
-    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db||work.empty())return;
+    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
+    if(db&&!work.empty())settle(db,work);
+    if(db)refreshLabels(db);   // after the sizes: their own changes are in the set too
+    touched().clear();
+}
+inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
     const double f=tvsUnits::factor(db),tol=1.0/f;
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;if(!tvsMove::snapshot(db,nodes,labels))return;
     auto index=[&](const AcDbObjectId& id){for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==id)return static_cast<int>(i);return -1;};
