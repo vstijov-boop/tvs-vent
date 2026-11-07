@@ -41,13 +41,13 @@ inline void draw(AcGiWorldDraw* mode,AcDbDatabase* db,const AcGePoint3d& at,AcGe
     AcGiTextStyle style;style.setFileName(L"txt.shx");style.setTextSize(h);style.loadStyleRec();
     wchar_t text[3][48];
     swprintf_s(text[0],L"gi:%.0f",(elev+half)*f);swprintf_s(text[1],L"os:%.0f",elev*f);swprintf_s(text[2],L"di:%.0f",(elev-half)*f);
-    AcGiSubEntityTraits& traits=mode->subEntityTraits();const Adesk::UInt16 old=traits.color();traits.setColor(8);
+    AcGiSubEntityTraits& traits=mode->subEntityTraits();const Adesk::UInt16 old=traits.color();const AcDb::LineWeight oldLw=traits.lineWeight();traits.setColor(8);traits.setLineWeight(AcDb::kLnWt009);   // always thin
     for(int k=0;k<3;++k){
         const AcGePoint2d ext=style.extents(text[k],Adesk::kFalse,-1,Adesk::kFalse);
         const AcGePoint3d c=at+up*(step*(1-k));
         AcGePoint3d p=c-dir*(ext.x/2)-up*(h/2);p.z=at.z;
         mode->geometry().text(p,AcGeVector3d::kZAxis,dir,text[k],-1,Adesk::kFalse,style);
     }
-    traits.setColor(old);
+    traits.setLineWeight(oldLw);traits.setColor(old);
 }
 }
