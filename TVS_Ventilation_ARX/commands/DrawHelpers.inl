@@ -46,6 +46,10 @@
 		dg.WipeoutLength = globalWipeoutLength;
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
 		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
+		{ ACHAR v[16] = L""; dg.LeadAuto = (acedGetEnv(L"TVS_LEAD_AUTO", v, 16) == RTNORM && !_wcsicmp(v, L"0")) ? FALSE : TRUE; }
+		AcDbDatabase* capDb = acdbHostApplicationServices()->workingDatabase();
+		const bool capWas = capDb && tvsDuctCaption::enabled(capDb);
+		dg.DuctCaption = capWas ? TRUE : FALSE;
 		dg.TransVert = tvsTransAlignCmd::defaultAlign();
 		dg.TransPlan = ftTransType;
 
@@ -79,6 +83,11 @@
 		globalWipeoutLength = dg.WipeoutLength;
 
 		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
+		acedSetEnv(L"TVS_LEAD_AUTO", dg.LeadAuto == TRUE ? L"1" : L"0");   // isto kao TVS_LEAD_AUTO
+		if (capDb && (dg.DuctCaption == TRUE) != capWas && tvsDuctCaption::set(capDb, dg.DuctCaption == TRUE)) {   // isto kao TVS_NATPIS
+			AcApDocument* capDoc = acDocManager ? acDocManager->curDocument() : NULL;
+			if (capDoc) acDocManager->sendStringToExecute(capDoc, L"_.REGENALL\n", false, true, false);
+		}
 		tvsTransAlignCmd::setDefault(dg.TransVert);              // poravnanje novih prelaza
 		if (dg.TransPlan >= 1 && dg.TransPlan <= 3) { ftTransType = dg.TransPlan; tvsTransAlignCmd::storePlan(ftTransType); }   // tip u tlocrtu
 		if (dg.DuctFlex == TRUE) { globalDuctType = DuctTypeFlex; globSizeB = 0; }

@@ -56,6 +56,14 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 
 - **MIRROR fitinga:** koljena u osnovi i prelazi poravnati uz jednu stranu se ispravno preslikavaju (koljeno obrne luk, prelaz zamijeni stranu); T komadi i kanali kao i do sada. Etaž i obilazak se i dalje ne mogu preslikati (poruka) – samo pomjeriti / rotirati.
 
+- **TVS_LEAD_Recalculate:** ako su objekti već izabrani – ažurira njih; inače „TVS oznake za ažuriranje [Sve/Izbor] <Izbor>“: **Sve** = sve MLeader oznake u crtežu, **Izbor** = običan izbor (klik, prozor, crossing; ostali objekti se preskaču). Na kraju: „Ažurirano TVS oznaka: N; nije ažurirano: M (element obrisan ili oznaka na zaključanom sloju)“.
+
+- **Automatsko ažuriranje oznaka:** poslije izmjene TVS elementa (Properties, Svojstva, TVS_STRETCH, TVS_MOVE, MOVE, MIRROR, grip, dimenzija dionice) tekst njegovih TVS oznaka u trenutnom prostoru se sam ažurira (TVS_DIM_PRATI). **TVS_LEAD_AUTO [Uklj/Isklj]** – uključi / isključi (pamti se u AutoCAD profilu; zadano Uklj). Pod LISP-om / skriptom oznake se ažuriraju poslije sljedeće obične komande.
+
+- **TVS_NATPIS** (nova ikona uz TVS_KOTE): uključuje / isključuje u crtežu natpis na kanalima `400x200/1500/5.21` (dimenzija / protok m³/h / brzina m/s; okrugli `Ø250/…`; bez protoka samo dimenzija). romans.shx, faktor širine 0,7, visina 30 mm (preračun za druge jedinice), boja 8, iznad sredine kanala, čita se odozdo / s desna. Nikad se ne štampa. Natpis (i kote TVS_KOTE) je uvijek tanak (0,09 mm), bez obzira na debljinu lejera. Oblačić na kanalu: prvi red kote, drugi red dimenzija (uvijek), protok i brzina (kad ima protoka).
+- **TVS_SETTINGS**: nove kvačice „Automatsko ažuriranje TVS oznaka” (= TVS_LEAD_AUTO, pamti se u AutoCAD-u) i „Natpis kanala” (= TVS_NATPIS, po crtežu, REGENALL pri promjeni). Komande ostaju. Dijalog je nešto viši.
+- **KGTEZ:** u dijalogu polje „Razmjera crteza 1:“ (zadano 50 ili zadnja razmjera u crtežu) – razmjera se više ne pita u komandnoj liniji.
+
 ## Odloženo
 - Koljeno direktno na priključku grane T komada.
 - Detalji koljena u presjeku (kao TVS koljena gore/dolje).
