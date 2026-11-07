@@ -54,8 +54,9 @@ inline void draw(AcGiWorldDraw* mode,AcDbDatabase* db,const AcGePoint3d& first,c
     const AcGePoint2d ext=style.extents(caption,Adesk::kFalse,-1,Adesk::kFalse);
     const AcGePoint3d mid=first+(last-first)/2;
     AcGePoint3d p=mid+up*(a/2+0.5*h)-dir*(ext.x/2);p.z=mid.z;   // just outside the duct edge
-    AcGiSubEntityTraits& traits=mode->subEntityTraits();const Adesk::UInt16 old=traits.color();traits.setColor(8);
+    AcGiSubEntityTraits& traits=mode->subEntityTraits();const Adesk::UInt16 old=traits.color();const AcDb::LineWeight oldLw=traits.lineWeight();
+    traits.setColor(8);traits.setLineWeight(AcDb::kLnWt009);   // always thin, not the duct layer's lineweight
     mode->geometry().text(p,AcGeVector3d::kZAxis,dir,caption,-1,Adesk::kFalse,style);
-    traits.setColor(old);
+    traits.setLineWeight(oldLw);traits.setColor(old);
 }
 }

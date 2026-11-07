@@ -42,9 +42,12 @@ public:
                 e->close();output.setAdditionalTooltipString(text);return Acad::eOk;}
             if(t){const double f=tvsUnits::factor(e),half=(t->SizeB>0?t->SizeB:t->SizeA)/2;
                 swprintf_s(text,L"TVS kote: gi %.0f / os %.0f / di %.0f mm",(t->Elev+half)*f,t->Elev*f,(t->Elev-half)*f);
-                if(TVS_Pipe* p=TVS_Pipe::cast(e)){if(p->Flow>0){   // duct: flow and velocity (TVS_NATPIS)
-                    const size_t used=wcslen(text);
-                    swprintf_s(text+used,260-used,L", protok %.0f m3/h, brzina %.2f m/s",p->Flow,tvsDuctCaption::velocity(p->Flow,p->SizeA*f,p->SizeB*f,p->ThisRound));}}
+                if(TVS_Pipe* p=TVS_Pipe::cast(e)){   // duct, second line: size, flow, velocity (as TVS_NATPIS)
+                    size_t used=wcslen(text);
+                    if(p->ThisRound)swprintf_s(text+used,260-used,L"\nKanal \u00D8%.0f mm",p->SizeA*f);
+                    else swprintf_s(text+used,260-used,L"\nKanal %.0fx%.0f mm",p->SizeA*f,p->SizeB*f);
+                    used=wcslen(text);
+                    if(p->Flow>0)swprintf_s(text+used,260-used,L", protok %.0f m3/h, brzina %.2f m/s",p->Flow,tvsDuctCaption::velocity(p->Flow,p->SizeA*f,p->SizeB*f,p->ThisRound));}
                 e->close();output.setAdditionalTooltipString(text);return Acad::eOk;}
             e->close();
         }
