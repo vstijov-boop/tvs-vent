@@ -73,7 +73,7 @@ END_MESSAGE_MAP()
 
 //-----------------------------------------------------------------------------
 dgPipeSize::dgPipeSize(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : CAdUiBaseDialog(dgPipeSize::IDD, pParent, hInstance), SizeA(0)
-, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), TransVert(0), TransPlan(1)
+, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), LeadAuto(TRUE), DuctCaption(FALSE), TransVert(0), TransPlan(1)
 {
 }
 
@@ -162,6 +162,8 @@ void dgPipeSize::DoDataExchange(CDataExchange *pDX) {
 	DDX_Control(pDX, IDC_DuctFlex, fDuctFlex);
 	DDX_Check(pDX, IDC_DuctFlex, DuctFlex);
 	DDX_Check(pDX, IDC_LevelTooltip, LevelTooltip);
+	DDX_Check(pDX, IDC_LeadAuto, LeadAuto);
+	DDX_Check(pDX, IDC_DuctCaption, DuctCaption);
 	//DDX_Check(pDX, IDC_TapUp, TapUp);
 	//DDX_Check(pDX, IDC_TapMid, TapMid);
 	//DDX_Check(pDX, IDC_TapDown, TapDown);

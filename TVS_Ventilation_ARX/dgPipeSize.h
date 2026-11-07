@@ -86,6 +86,8 @@
 #define IDC_LevelTooltip 1043
 #define IDC_TransVert 1044
 #define IDC_TransPlan 1046
+#define IDC_LeadAuto 1048
+#define IDC_DuctCaption 1049
 //-----------------------------------------------------------------------------
 class dgPipeSize : public CAdUiBaseDialog {
 	DECLARE_DYNAMIC(dgPipeSize)
@@ -216,6 +218,8 @@ public:
 
 	CButton fDuctFlex;
 	BOOL DuctFlex;
+	BOOL LeadAuto;      // TVS_SETTINGS: TVS_LEAD_AUTO (env)
+	BOOL DuctCaption;   // TVS_SETTINGS: TVS_NATPIS (crtez)
 	BOOL LevelTooltip;   // TVS_SETTINGS: oblacic sa kotama (LevelTooltip.h)
 	int TransVert;       // TVS_SETTINGS: poravnanje novih prelaza po visini (TransAlignData.h)
 	int TransPlan;       // TVS_SETTINGS: tip novih prelaza u tlocrtu, TransType 1..3
