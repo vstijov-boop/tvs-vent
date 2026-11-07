@@ -27,6 +27,7 @@
 (setq *tvs-sys*  "")         ; naziv sistema (opcionalno)
 (setq *tvs-tab*  T)          ; T = napravi tabelu u AutoCAD-u
 (setq *tvs-xls*  nil)        ; T = izvezi u Excel
+(setq *tvs-scale* nil)       ; razmjera crteza iz dijaloga (nil = pita u komandnoj liniji)
 
 ;; Debljina lima (mm) prema vecoj stranici presjeka (mm) - PRIMJER, zamijeni svojom tablicom
 (defun tvs-debljina (mx)
@@ -69,10 +70,13 @@
   (/ (* paper-height scale) mm-per-unit))
 (defun tvs-prompt-table-height ( / previous scale units height)
   (setq previous (tvs-table-scale-default))
-  (initget 6)
-  (setq scale (getreal (strcat "\nRazmjera tabele 1:<" (rtos previous 2 2)
-                              "> (50 za 1:50, 1 za 1:1): ")))
-  (if (null scale) (setq scale previous))
+  (if (and (numberp *tvs-scale*) (> *tvs-scale* 0.0))
+    (setq scale *tvs-scale*)          ; iz dijaloga KGTEZ
+    (progn
+      (initget 6)
+      (setq scale (getreal (strcat "\nRazmjera tabele 1:<" (rtos previous 2 2)
+                                  "> (50 za 1:50, 1 za 1:1): ")))
+      (if (null scale) (setq scale previous))))
   (setq units (if (= (getvar "CVPORT") 1) 1.0 *tvs-mm-per-unit*)
         height (tvs-table-text-height *tvs-th* scale units))
   (tvs-save-table-scale scale)
@@ -91,16 +95,20 @@
         (T "")))
 
 ;; ---- DIJALOG --------------------------------------------------------
-(defun tvs-dlg-validate ( / r h)
-  (setq r (distof (vl-string-subst "." "," (get_tile "rez")))
-        h (distof (vl-string-subst "." "," (get_tile "th"))))
+(defun tvs-dlg-validate ( / r h sc)
+  (setq r  (distof (vl-string-subst "." "," (get_tile "rez")))
+        h  (distof (vl-string-subst "." "," (get_tile "th")))
+        sc (distof (vl-string-subst "." "," (get_tile "sc"))))
   (cond
     ((or (null r) (< r 0.0))
      (set_tile "error" "Rezerva mora biti broj >= 0.") (mode_tile "rez" 2) nil)
     ((or (null h) (<= h 0.0))
      (set_tile "error" "Visina slova mora biti broj > 0.") (mode_tile "th" 2) nil)
+    ((or (null sc) (<= sc 0.0))
+     (set_tile "error" "Razmjera mora biti broj > 0 (50 za 1:50).") (mode_tile "sc" 2) nil)
     (T
-     (setq *tvs-rez*  r
+     (setq *tvs-scale* sc
+           *tvs-rez*  r
            *tvs-th*   h
            *tvs-deb2* (= (get_tile "deb2") "1")
            *tvs-tab*  (= (get_tile "tab") "1")
@@ -117,6 +125,7 @@
                "  : edit_box { key = \"sys\"; label = \"Sistem (opcionalno):\"; edit_width = 26; }"
                "  : edit_box { key = \"rez\"; label = \"Rezerva na tezinu [%]:\"; edit_width = 8; }"
                "  : edit_box { key = \"th\";  label = \"Visina slova na papiru (mm):\"; edit_width = 8; }"
+               "  : edit_box { key = \"sc\";  label = \"Razmjera crteza 1:\"; edit_width = 8; }"
                "  : toggle   { key = \"deb2\"; label = \"Svi kanali i fitinzi debljine 2 mm\"; }"
                "  : boxed_column { label = \"Izlaz\";"
                "    : toggle { key = \"tab\"; label = \"Tabela u AutoCAD-u\"; }"
@@ -133,6 +142,7 @@
       (set_tile "sys"  "")
       (set_tile "rez"  (tvs-fmt *tvs-rez*))
       (set_tile "th"   (tvs-fmt *tvs-th*))
+      (set_tile "sc"   (tvs-fmt (tvs-table-scale-default)))
       (set_tile "deb2" (if *tvs-deb2* "1" "0"))
       (set_tile "tab"  (if *tvs-tab* "1" "0"))
       (set_tile "xls"  (if *tvs-xls* "1" "0"))

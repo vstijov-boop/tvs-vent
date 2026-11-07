@@ -50,6 +50,12 @@
         syncTVSGlobalUnits();
         tvsTransAlignCmd::run();
     }
+    // TVS_NATPIS: on-screen duct captions size / flow / velocity on/off (DuctCaption.h, never plotted).
+    static void Ventilation_ARXTVS_NATPIS(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        tvsLevelTooltip::toggleCaptions();
+    }
     // TVS_KOTE: on-screen elevation labels on/off (LevelLabels.h, not plotted).
     static void Ventilation_ARXTVS_KOTE(void)
     {
