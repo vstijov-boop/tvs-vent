@@ -370,9 +370,8 @@
 
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
-
-
-
+		// one T komad: the TVS_TK_TIP dialog (TeeTypeDialog.h) instead of the general Svojstva dialog
+		if (tvsTeeDialog::forSelection(sset, IDD_TEETYPE)) { acedSSFree(sset); return; }
 
 		Change(sset);
 
