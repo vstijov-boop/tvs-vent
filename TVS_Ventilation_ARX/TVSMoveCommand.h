@@ -526,6 +526,42 @@ inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatri
     (void)ids;(void)translation;return false;
 #endif
 }
+// Shared by TVS_MOVE and TVS_ALIGN: plan and apply one bounded network translation (one transaction).
+inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
+                         const std::vector<tvsMoveNetwork::Body>& bodies,const std::vector<std::vector<AcDbObjectId> >& members,
+                         int selected,const Point& delta,double factor,double tol,double minimum,const ACHAR* command){
+    tvsMoveNetwork::Result result;
+    if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
+        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\n%ls: %s",command,networkError(result.error));return false;}
+    std::vector<Node> current;AcDbObjectIdArray currentLabels;
+    if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
+        acutPrintf(L"\n%ls: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.",command);return false;}
+    Transaction tx;if(!tx.good())return false;
+    std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
+    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
+    for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
+        if(!members[i].empty()){if(!moveEtazMembers(members[i],translation))return false;continue;}
+        entities[i]=tx.write(nodes[i].id);
+        if(!entities[i]){acutPrintf(L"\n%ls: povezani element je zaključan ili nedostupan. Izmjena je poništena.",command);return false;}
+    }
+    int stretched=0;
+    for(size_t i=0;i<nodes.size();++i)if(entities[i]){
+        if(nodes[i].kind==1){
+            TVS_Pipe* pipe=TVS_Pipe::cast(entities[i]);
+            if(!pipe||pipe->put_FirstPoint(acad(result.ports[i][0]))!=Acad::eOk
+                ||pipe->put_Lastpoint(acad(result.ports[i][1]))!=Acad::eOk)return false;
+            if(result.masks[i]!=3)++stretched;
+        }else if(entities[i]->transformBy(translation)!=Acad::eOk){
+            acutPrintf(L"\n%ls: fiting nije moguće pomjeriti. Izmjena je poništena.",command);return false;}
+        entities[i]->recordGraphicsModified();
+    }
+    const std::vector<char> carried=carriedBy(nodes,members,result.masks);
+    if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
+        acutPrintf(L"\n%ls: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.",command);return false;}
+    if(!tx.commit())return false;
+    acutPrintf(L"\n%ls: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",command,result.changed,stretched,delta.length()*factor);
+    return true;
+}
 inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
                            const std::vector<tvsMoveNetwork::Body>& bodies,const std::vector<std::vector<AcDbObjectId> >& members,
                            int selected,const ads_point picked,double factor,double tol,double minimum){
@@ -537,38 +573,8 @@ inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
     Point normal(-axis.y,axis.x,0),target(destination[0],destination[1],destination[2]);
     Point delta=normal*((target-origin).dot(normal));
     if(!tvsMoveGeometry::valid(delta)||delta.length()<=tol){acutPrintf(L"\nTVS_MOVE: nema bočnog pomjeranja.");return;}
-    tvsMoveNetwork::Result result;
-    if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
-        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\nTVS_MOVE: %s",networkError(result.error));return;}
-    std::vector<Node> current;AcDbObjectIdArray currentLabels;
-    if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
-        acutPrintf(L"\nTVS_MOVE: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
-    Transaction tx;if(!tx.good())return;
-    std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
-    AcGeMatrix3d translation;translation.setToTranslation(AcGeVector3d(delta.x,delta.y,delta.z));
-    for(size_t i=0;i<nodes.size();++i)if(result.masks[i]){
-        if(!members[i].empty()){if(!moveEtazMembers(members[i],translation))return;continue;}
-        entities[i]=tx.write(nodes[i].id);
-        if(!entities[i]){acutPrintf(L"\nTVS_MOVE: povezani element je zaključan ili nedostupan. Izmjena je poništena.");return;}
-    }
-    int stretched=0;
-    for(size_t i=0;i<nodes.size();++i)if(entities[i]){
-        if(nodes[i].kind==1){
-            TVS_Pipe* pipe=TVS_Pipe::cast(entities[i]);
-            if(!pipe||pipe->put_FirstPoint(acad(result.ports[i][0]))!=Acad::eOk
-                ||pipe->put_Lastpoint(acad(result.ports[i][1]))!=Acad::eOk)return;
-            if(result.masks[i]!=3)++stretched;
-        }else if(entities[i]->transformBy(translation)!=Acad::eOk){
-            acutPrintf(L"\nTVS_MOVE: fiting nije moguće pomjeriti. Izmjena je poništena.");return;}
-        entities[i]->recordGraphicsModified();
-    }
-    const std::vector<char> carried=carriedBy(nodes,members,result.masks);
-    if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
-        acutPrintf(L"\nTVS_MOVE: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
-    if(!tx.commit())return;
-    acutPrintf(L"\nTVS_MOVE: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",result.changed,stretched,delta.length()*factor);
+    applyNetwork(db,nodes,bodies,members,selected,delta,factor,tol,minimum,L"TVS_MOVE");
 }
-
 inline void execute(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
     if(!db)return;

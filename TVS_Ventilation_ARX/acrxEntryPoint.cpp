@@ -29,6 +29,7 @@
 #include "Func.h"
 #include "CoordinateInput.h"
 #include "TVSMoveCommand.h"
+#include "AlignCommand.h"
 #ifdef TVS_OFFSET_PROOF
 #include "TVSTestOffset.h"
 #endif
@@ -378,6 +379,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddProp
 
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MOVE, TVS_MOVE, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_ALIGN, TVS_ALIGN, ACRX_CMD_MODAL, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_TRANSPARENT, NULL)

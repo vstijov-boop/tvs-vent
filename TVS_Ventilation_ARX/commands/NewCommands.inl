@@ -99,4 +99,11 @@
         syncTVSGlobalUnits();
         tvsMove::execute();
     }
+    // TVS_ALIGN: one-off alignment to a LINE / polyline segment / XLINE / RAY (AlignCommand.h).
+    static void Ventilation_ARXTVS_ALIGN(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsAlignCmd::execute();
+    }
 
