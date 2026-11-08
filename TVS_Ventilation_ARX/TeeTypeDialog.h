@@ -14,6 +14,7 @@
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "../TVS_Ventilation_DBX/TVS_TAP.h"
 #include "../geometry/RoundElbow.h"
+#include "../geometry/TeeSketch.h"
 #include "ElbowDirection.h"
 #include "Settings.h"
 #include "adui.h"
@@ -59,9 +60,10 @@ inline bool farEndFree(const TVS_WYE* w,const AcDbObjectId& ductId,int nearEnd,d
 class Dialog : public CAdUiBaseDialog {
 public:
     enum {IdType=1301,IdFlip=1302,IdTabB=1304,IdTabC=1305,IdTeeShape=1306,IdTeeA=1307,IdTeeB=1308,IdTeeALabel=1319,IdTeeBLabel=1320,
-          IdElbow=1321,IdTurn=1322,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
+          IdElbow=1321,IdTurn=1322,IdTurnLabel=1325,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
     Source src;int choice;bool flipped;Side side[2];int current;bool loading,valid;CString problem;
+    CFont bold,title;CBrush back,white,band;
     Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false){}
 
     // ---------------------------------------------------------------- model
@@ -110,44 +112,51 @@ public:
     static bool number(CWnd* w,double& v){
         if(!w)return false;CString t;w->GetWindowText(t);t.Trim();t.Replace(L',',L'.');if(t.IsEmpty())return false;
         wchar_t* end=NULL;v=wcstod(t,&end);return end&&!*end&&v>0&&v<1e7;}
-    void setNumber(int id,double mm){CString t;t.Format(L"%.0f",mm);SetDlgItemText(id,t);}
+    bool focused(int id)const{const CWnd* w=GetDlgItem(id);return w&&::GetFocus()==w->m_hWnd;}
+    void setNumber(int id,double mm){if(focused(id))return;CString t;t.Format(L"%.0f",mm);SetDlgItemText(id,t);}   // never under the cursor
+    void setText(int id,const wchar_t* t){if(focused(id))return;SetDlgItemText(id,t);}
     void enable(int id,bool on){if(CWnd* w=GetDlgItem(id))w->EnableWindow(on?TRUE:FALSE);}
     void show(int id,bool on){if(CWnd* w=GetDlgItem(id))w->ShowWindow(on?SW_SHOW:SW_HIDE);}
     int sel(int id)const{const CComboBox* c=static_cast<const CComboBox*>(GetDlgItem(id));return c?c->GetCurSel():-1;}
-    void setSel(int id,int i){if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(id)))c->SetCurSel(i);}
+    void setSel(int id,int i){if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(id)))if(c->GetCurSel()!=i)c->SetCurSel(i);}
     static int elbowIndex(int deg){return deg==30?1:deg==45?2:deg==60?3:deg==90?4:0;}
     static int elbowDeg(int index){static const int d[5]={0,30,45,60,90};return index>=0&&index<5?d[index]:0;}
-    void load(){
-        loading=true;const Side& d=side[current];const double f=src.f;
-        SetDlgItemText(IdTabC,tabName(1));show(IdTabC,side[1].used);CheckRadioButton(IdTabB,IdTabC,current==0?IdTabB:IdTabC);
-        setSel(IdTeeShape,d.tee.round?1:0);enable(IdTeeShape,d.shapeFree&&rectTee());
-        SetDlgItemText(IdTeeALabel,d.tee.round?L"Ø [mm]":L"A [mm]");setNumber(IdTeeA,d.tee.a*f);
-        if(d.tee.round)SetDlgItemText(IdTeeB,L"");else setNumber(IdTeeB,d.tee.b*f);
+    // shape-dependent fields: B only for rectangular, Ø label for round (as the mockup)
+    void shapes(){
+        const Side& d=side[current];
+        SetDlgItemText(IdTeeALabel,d.tee.round?L"Ø [mm]":L"A [mm]");show(IdTeeB,!d.tee.round);show(IdTeeBLabel,!d.tee.round);
         enable(IdTeeB,!d.tee.round&&!d.lockB);
+        SetDlgItemText(IdDuctALabel,d.duct.round?L"Ø [mm]":L"A [mm]");show(IdDuctB,!d.duct.round);show(IdDuctBLabel,!d.duct.round);
+        enable(IdDuctB,d.neighbour==1&&!d.duct.round);
+    }
+    void load(){   // the whole side into the fields (tab, type, Okreni)
+        loading=true;const Side& d=side[current];const double f=src.f;
+        SetDlgItemText(IdTabC,tabName(1));show(IdTabC,side[1].used);
+        if(CWnd* t=GetDlgItem(IdTabB))t->Invalidate();if(CWnd* t=GetDlgItem(IdTabC))t->Invalidate();
+        setSel(IdTeeShape,d.tee.round?1:0);enable(IdTeeShape,d.shapeFree&&rectTee());
+        SetDlgItemText(IdTeeA,L"");setNumber(IdTeeA,d.tee.a*f);
+        if(!d.tee.round)setNumber(IdTeeB,d.tee.b*f);
         setSel(IdElbow,elbowIndex(d.elbow));setSel(IdTurn,d.turn);
         const bool duct=d.neighbour==1;
         setSel(IdDuctShape,d.duct.round?1:0);enable(IdDuctShape,duct);enable(IdDuctA,duct);
-        SetDlgItemText(IdDuctALabel,d.duct.round?L"Ø [mm]":L"A [mm]");
-        if(hasDuct(d)){setNumber(IdDuctA,d.duct.a*f);if(d.duct.round)SetDlgItemText(IdDuctB,L"");else setNumber(IdDuctB,d.duct.b*f);}
+        if(hasDuct(d)){setNumber(IdDuctA,d.duct.a*f);if(!d.duct.round)setNumber(IdDuctB,d.duct.b*f);}
         else{SetDlgItemText(IdDuctA,L"");SetDlgItemText(IdDuctB,L"");}
-        enable(IdDuctB,duct&&!d.duct.round);
         setSel(IdOrder,d.order);
-        loading=false;refresh();
+        if(needsPrelaz(d))setNumber(IdLength,prelazMm(d));else SetDlgItemText(IdLength,L"");
+        shapes();loading=false;refresh();
     }
-    void readFields(){
+    void readFields(){   // fields -> side[current]; nothing is written back into the field being typed
         Side& d=side[current];const double f=src.f;double v=0;
         if(d.shapeFree&&rectTee()){const bool round=sel(IdTeeShape)==1;
             if(round!=d.tee.round){d.tee.round=round;d.tee.b=round?0:(src.Botv>0?src.Botv:d.tee.a);
-                loading=true;SetDlgItemText(IdTeeALabel,round?L"Ø [mm]":L"A [mm]");if(round)SetDlgItemText(IdTeeB,L"");else setNumber(IdTeeB,d.tee.b*f);
-                enable(IdTeeB,!round&&!d.lockB);loading=false;}}
+                loading=true;if(!round)setNumber(IdTeeB,d.tee.b*f);shapes();loading=false;}}
         if(number(GetDlgItem(IdTeeA),v))d.tee.a=v/f;
         if(!d.tee.round&&!d.lockB&&number(GetDlgItem(IdTeeB),v))d.tee.b=v/f;
         d.elbow=elbowDeg(sel(IdElbow));if(sel(IdTurn)>=0)d.turn=sel(IdTurn);if(sel(IdOrder)>=0)d.order=sel(IdOrder);
         if(d.neighbour==1){
             const bool round=sel(IdDuctShape)==1;
             if(round!=d.duct.round){d.duct.round=round;d.duct.b=round?0:(d.ductWas.b>0?d.ductWas.b:d.tee.b);
-                loading=true;SetDlgItemText(IdDuctALabel,round?L"Ø [mm]":L"A [mm]");
-                if(round)SetDlgItemText(IdDuctB,L"");else setNumber(IdDuctB,d.duct.b*f);enable(IdDuctB,!round);loading=false;}
+                loading=true;if(!round)setNumber(IdDuctB,d.duct.b*f);shapes();loading=false;}
             if(number(GetDlgItem(IdDuctA),v))d.duct.a=v/f;
             if(!d.duct.round&&number(GetDlgItem(IdDuctB),v))d.duct.b=v/f;
         }
@@ -168,17 +177,16 @@ public:
             why.Format(L"Gaćasti T komad nije moguć: ogranci su preuski za ulaz %.0f mm.",src.Aotv*f);return false;}
         return true;
     }
-    void refresh(){
+    void refresh(){   // derived values, enable state, description, status, sketch
         const double f=src.f;valid=check(problem);
         const Side& d=side[current];const bool prelaz=needsPrelaz(d);
         loading=true;
-        if(prelaz)setNumber(IdLength,prelazMm(d));else SetDlgItemText(IdLength,L"");
-        enable(IdLength,prelaz&&!spiro(d));
-        enable(IdTurn,d.elbow!=0);enable(IdOrder,prelaz&&d.elbow!=0);
+        if(prelaz){if(spiro(d)||!focused(IdLength))setNumber(IdLength,prelazMm(d));}else setText(IdLength,L"");
+        enable(IdLength,prelaz&&!spiro(d));enable(IdTurn,d.elbow!=0);enable(IdOrder,prelaz&&d.elbow!=0);
+        SetDlgItemText(IdTurnLabel,d.turn>=Up?L"Smjer (vertikalno)":L"Smjer u osnovi");
         loading=false;
-        // description like the mockup: "Ogranak B -> Koljeno 90 -> Prelaz -> Kanal 200"
-        CString text=tabName(current);text+=L" → ";
-        wchar_t a[32],b[32];tvsTeePort::sizeText(a,32,d.tee,f);
+        CString text=tabName(current);
+        wchar_t a[32],b[32]=L"";tvsTeePort::sizeText(a,32,d.tee,f);
         CString elbow;if(d.elbow){static const wchar_t* turns[4]={L"desno",L"lijevo",L"gore",L"dolje"};elbow.Format(L"Koljeno %d° %ls",d.elbow,turns[d.turn]);}
         std::vector<CString> parts;
         if(prelaz&&d.order==1)parts.push_back(L"Prelaz");
@@ -186,22 +194,24 @@ public:
         if(prelaz&&d.order==0)parts.push_back(L"Prelaz");
         if(hasDuct(d)){tvsTeePort::sizeText(b,32,d.duct,f);CString k;k.Format(L"Kanal %ls",b);parts.push_back(k);}
         else if(!d.elbow)parts.push_back(L"slobodan priključak");
-        for(size_t i=0;i<parts.size();++i){if(i)text+=L" → ";text+=parts[i];}
+        for(size_t i=0;i<parts.size();++i){text+=L" → ";text+=parts[i];}
         SetDlgItemText(IdDescription,text);
-        CString sizes=a;if(prelaz){sizes+=L" → ";sizes+=b;}sizes+=L" mm";
+        CString sizes;CString ins;{wchar_t t[32];tvsTeePort::sizeText(t,32,inlet(),f);ins=t;}
+        sizes.Format(L"%ls%ls%ls mm",a,prelaz?L" → ":L"",prelaz?b:L"");
         if(prelaz){CString l;l.Format(L"  ·  L = %.0f mm%ls",prelazMm(d),spiro(d)?L" (SOKO)":L"");sizes+=l;}
+        sizes+=L"\nUlaz "+ins+L" mm";if(choice==Branch||choice==Pants)sizes+=L" (visina svih)";
         SetDlgItemText(IdSizes,sizes);
-        CString status;
-        if(!valid)status=problem;
-        else if(d.neighbour==3)status=L"Na priključku nije kanal ni prelaz - uskladite ga ručno.";
-        else status=L"Pregled prije upisa u DWG";
-        SetDlgItemText(IdStatus,status);enable(IDOK,valid);
+        CString status=!valid?problem:d.neighbour==3?CString(L"Na priključku nije kanal ni prelaz - uskladite ga ručno."):CString(L"Pregled prije upisa u DWG");
+        SetDlgItemText(IdStatus,status);enable(IDOK,valid);if(CWnd* w=GetDlgItem(IDOK))w->Invalidate();
         if(CWnd* w=GetDlgItem(IdSketch))w->Invalidate(FALSE);
     }
 
     // ---------------------------------------------------------------- MFC
     virtual BOOL OnInitDialog(){
         CAdUiBaseDialog::OnInitDialog();
+        LOGFONT lf={};if(CFont* f=GetFont())f->GetLogFont(&lf);
+        lf.lfWeight=FW_SEMIBOLD;bold.CreateFontIndirect(&lf);lf.lfHeight=lf.lfHeight*13/10;title.CreateFontIndirect(&lf);
+        back.CreateSolidBrush(RGB(244,245,247));white.CreateSolidBrush(RGB(255,255,255));band.CreateSolidBrush(RGB(231,236,242));
         auto fill=[&](int id,std::initializer_list<const wchar_t*> items){if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(id)))for(const wchar_t* s:items)c->AddString(s);};
         fill(IdType,{L"TK-O  ·  T komad sa ogrankom",L"TK-G  ·  T komad sa dva ogranka",L"Štucna  ·  bočni priključak",L"TK0  ·  T komad"});
         fill(IdTeeShape,{L"Pravougaoni",L"Okrugli"});fill(IdDuctShape,{L"Pravougaoni",L"Okrugli"});
@@ -219,95 +229,102 @@ public:
                 load();return TRUE;}
             if((id==IdTabB||id==IdTabC)&&code==BN_CLICKED){const int want=id==IdTabB?0:1;
                 if(want!=current&&side[want].used){readFields();current=want;load();}return TRUE;}
-            if(((id==IdTeeA||id==IdTeeB||id==IdDuctA||id==IdDuctB||id==IdLength)&&code==EN_CHANGE)
-                ||((id==IdTeeShape||id==IdDuctShape||id==IdElbow||id==IdTurn||id==IdOrder)&&code==CBN_SELCHANGE)){readFields();refresh();return TRUE;}
+            if((id==IdTeeA||id==IdTeeB||id==IdDuctA||id==IdDuctB||id==IdLength)&&code==EN_CHANGE){readFields();refresh();return TRUE;}
+            if((id==IdTeeA||id==IdTeeB||id==IdDuctA||id==IdDuctB||id==IdLength)&&code==EN_KILLFOCUS){readFields();
+                const Side& d=side[current];const double f=src.f;loading=true;   // tidy the value once the field is left
+                if(id==IdTeeA)setNumber(id,d.tee.a*f);else if(id==IdTeeB&&!d.tee.round)setNumber(id,d.tee.b*f);
+                else if(id==IdDuctA&&hasDuct(d))setNumber(id,d.duct.a*f);else if(id==IdDuctB&&hasDuct(d)&&!d.duct.round)setNumber(id,d.duct.b*f);
+                loading=false;refresh();return TRUE;}
+            if((id==IdTeeShape||id==IdDuctShape||id==IdElbow||id==IdTurn||id==IdOrder)&&code==CBN_SELCHANGE){readFields();refresh();return TRUE;}
         }
         return CAdUiBaseDialog::OnCommand(wp,lp);
     }
     virtual void OnOK(){readFields();refresh();if(!valid)return;CAdUiBaseDialog::OnOK();}
+    // dialog units -> pixels
+    CRect du(int x,int y,int w,int h){CRect r(x,y,x+w,y+h);MapDialogRect(&r);return r;}
+    void legendBox(CDC* dc,int x,int y,int w,int h,const wchar_t* text){   // fieldset of the mockup
+        CRect r=du(x,y,w,h);CPen p(PS_SOLID,1,RGB(213,223,236));CPen* op=dc->SelectObject(&p);CBrush* ob=static_cast<CBrush*>(dc->SelectStockObject(NULL_BRUSH));
+        dc->Rectangle(r);dc->SelectObject(op);dc->SelectObject(ob);
+        CFont* of=dc->SelectObject(&bold);CSize s=dc->GetTextExtent(text);const CRect t(r.left+8,r.top-s.cy/2,r.left+14+s.cx,r.top+s.cy/2+1);
+        dc->FillSolidRect(t,RGB(244,245,247));dc->SetTextColor(RGB(0,52,89));dc->SetBkMode(TRANSPARENT);dc->TextOut(t.left+3,t.top,text);dc->SelectObject(of);
+    }
+    void hline(CDC* dc,int x,int y,int w,COLORREF c){CRect r=du(x,y,w,0);dc->FillSolidRect(r.left,r.top,r.Width(),1,c);}
+    void paintBack(CDC* dc){
+        CRect all;GetClientRect(&all);dc->FillSolidRect(all,RGB(244,245,247));
+        const CRect head=du(0,0,400,24),foot=du(0,266,400,30);
+        dc->FillSolidRect(CRect(all.left,all.top,all.right,head.bottom),RGB(231,236,242));dc->FillSolidRect(all.left,head.bottom,all.Width(),1,RGB(173,186,203));
+        dc->FillSolidRect(CRect(all.left,foot.top,all.right,all.bottom),RGB(231,236,242));dc->FillSolidRect(all.left,foot.top,all.Width(),1,RGB(173,186,203));
+        dc->SetBkMode(TRANSPARENT);
+        {CFont* of=dc->SelectObject(&title);dc->SetTextColor(RGB(0,26,45));CRect t=du(10,0,200,24);dc->DrawText(L"Tip T komada",t,DT_LEFT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
+        {CFont* of=dc->SelectObject(GetFont());dc->SetTextColor(RGB(7,53,90));CRect t=du(200,0,190,24);dc->DrawText(L"TVS_TK_TIP",t,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
+        legendBox(dc,10,84,218,46,L"Na T komadu");legendBox(dc,10,134,218,46,L"Odmah iza priključka");legendBox(dc,10,184,218,78,L"Kanal u nastavku");
+        hline(dc,17,224,204,RGB(213,223,236));
+        // preview card
+        CRect card=du(236,62,154,200);dc->FillSolidRect(card,RGB(255,255,255));
+        {CPen p(PS_SOLID,1,RGB(210,222,235));CPen* op=dc->SelectObject(&p);CBrush* ob=static_cast<CBrush*>(dc->SelectStockObject(NULL_BRUSH));dc->Rectangle(card);dc->SelectObject(op);dc->SelectObject(ob);}
+        {CFont* of=dc->SelectObject(&bold);dc->SetTextColor(RGB(0,26,45));CRect t=du(242,62,100,18);dc->DrawText(L"Pregled u osnovi",t,DT_LEFT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
+        {CFont* of=dc->SelectObject(GetFont());dc->SetTextColor(RGB(49,90,128));CRect t=du(330,62,54,18);dc->DrawText(L"Skica",t,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);
+         dc->SetTextColor(RGB(38,117,174));CRect k=du(242,207,146,12);dc->DrawText(L"● Izabrani priključak     – –  Osa kanala",k,DT_LEFT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
+        hline(dc,236,80,154,RGB(210,222,235));hline(dc,236,206,154,RGB(210,222,235));hline(dc,236,220,154,RGB(210,222,235));
+    }
+    void drawButton(LPDRAWITEMSTRUCT it){   // tabs (selected = blue) and the primary U redu, as the mockup
+        CDC* dc=CDC::FromHandle(it->hDC);CRect r(it->rcItem);const int id=static_cast<int>(it->CtlID);
+        const bool disabled=(it->itemState&ODS_DISABLED)!=0,down=(it->itemState&ODS_SELECTED)!=0;
+        COLORREF face=RGB(255,255,255),edge=RGB(173,187,207),text=RGB(6,71,119);
+        if(id==IDOK){face=disabled?RGB(160,180,200):down?RGB(19,78,125):RGB(27,100,156);edge=face;text=RGB(255,255,255);}
+        else if((id==IdTabB&&current==0)||(id==IdTabC&&current==1)){face=RGB(225,239,255);edge=RGB(0,102,178);text=RGB(0,91,164);}
+        else if(down)face=RGB(234,244,253);
+        dc->FillSolidRect(r,face);CPen p(PS_SOLID,1,edge);CPen* op=dc->SelectObject(&p);CBrush* ob=static_cast<CBrush*>(dc->SelectStockObject(NULL_BRUSH));
+        dc->Rectangle(r);dc->SelectObject(op);dc->SelectObject(ob);
+        CString t;GetDlgItem(id)->GetWindowText(t);CFont* of=dc->SelectObject(id==IDOK?&bold:GetFont());
+        dc->SetBkMode(TRANSPARENT);dc->SetTextColor(text);dc->DrawText(t,r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);
+        if(it->itemState&ODS_FOCUS){CRect f(r);f.DeflateRect(3,3);dc->DrawFocusRect(f);}
+    }
     virtual LRESULT WindowProc(UINT msg,WPARAM wp,LPARAM lp){
         if(msg==WM_ACAD_KEEPFOCUS)return TRUE;
-        if(msg==WM_DRAWITEM&&wp==IdSketch){draw(reinterpret_cast<LPDRAWITEMSTRUCT>(lp));return TRUE;}
+        if(msg==WM_ERASEBKGND){paintBack(CDC::FromHandle(reinterpret_cast<HDC>(wp)));return TRUE;}
+        if(msg==WM_DRAWITEM){LPDRAWITEMSTRUCT it=reinterpret_cast<LPDRAWITEMSTRUCT>(lp);
+            if(wp==IdSketch){draw(it);return TRUE;}
+            if(wp==IdTabB||wp==IdTabC||wp==IDOK){drawButton(it);return TRUE;}}
+        if(msg==WM_CTLCOLORSTATIC){HWND h=reinterpret_cast<HWND>(lp);wchar_t cls[16]=L"";::GetClassNameW(h,cls,16);
+            if(!_wcsicmp(cls,L"Static")){HDC dc=reinterpret_cast<HDC>(wp);const int id=::GetDlgCtrlID(h);
+                const bool card=id==IdDescription||id==IdSizes;::SetBkMode(dc,TRANSPARENT);
+                ::SetTextColor(dc,card?RGB(0,26,45):id==IdStatus?(valid?RGB(66,104,137):RGB(197,61,61)):RGB(49,90,128));
+                return reinterpret_cast<LRESULT>((card?white:id==IdStatus?band:back).GetSafeHandle());}}
         return CAdUiBaseDialog::WindowProc(msg,wp,lp);
     }
 
-    // ---------------------------------------------------------------- sketch (mockup, viewBox 300 x 209)
+    // ---------------------------------------------------------------- sketch (geometry/TeeSketch.h)
     void draw(LPDRAWITEMSTRUCT item){
         if(!item)return;CDC* dc=CDC::FromHandle(item->hDC);CRect r(item->rcItem);
         dc->FillSolidRect(r,RGB(255,255,255));
-        const double sc=std::fmin(r.Width()/300.0,r.Height()/209.0),ox=r.left+(r.Width()-300*sc)/2,oy=r.top+(r.Height()-209*sc)/2;
-        auto P=[&](double x,double y){if(flipped)x=300-x;return CPoint(static_cast<int>(ox+x*sc+0.5),static_cast<int>(oy+y*sc+0.5));};
-        auto quad=[&](std::vector<CPoint>& out,double x0,double y0,double cx,double cy,double x1,double y1){
-            for(int i=1;i<=12;++i){const double t=i/12.0,u=1-t;out.push_back(P(u*u*x0+2*u*t*cx+t*t*x1,u*u*y0+2*u*t*cy+t*t*y1));}};
-        auto pen=[&](int w,COLORREF c,int style){LOGBRUSH lb={BS_SOLID,c,0};return ExtCreatePen(PS_GEOMETRIC|style|PS_ENDCAP_FLAT,w<1?1:w,&lb,0,NULL);};
-        const int thin=static_cast<int>(sc+0.5)<1?1:static_cast<int>(sc+0.5);
-        HGDIOBJ oldPen=dc->SelectObject(GetStockObject(NULL_PEN)),oldBrush=dc->SelectObject(GetStockObject(NULL_BRUSH));
-        // T komad body (grey), as in the mockup
-        {std::vector<CPoint> b;b.push_back(P(96,96));b.push_back(P(126,96));quad(b,126,96,140,96,140,79);b.push_back(P(160,79));b.push_back(P(160,86));
-         quad(b,160,86,160,96,178,96);b.push_back(P(178,120));b.push_back(P(96,120));
-         HPEN p=pen(thin,RGB(165,180,198),PS_SOLID);HBRUSH f=CreateSolidBrush(RGB(231,236,242));dc->SelectObject(p);dc->SelectObject(f);
-         dc->Polygon(&b[0],static_cast<int>(b.size()));dc->SelectObject(GetStockObject(NULL_PEN));dc->SelectObject(GetStockObject(NULL_BRUSH));DeleteObject(p);DeleteObject(f);}
-        {HPEN p=pen(thin,RGB(132,155,179),PS_DASH);dc->SelectObject(p);
-         CPoint a=P(96,108),b=P(178,108),c=P(150,108),e=P(150,79);dc->MoveTo(a);dc->LineTo(b);dc->MoveTo(c);dc->LineTo(e);
-         dc->SelectObject(GetStockObject(NULL_PEN));DeleteObject(p);}
-        {HPEN p=pen(thin,RGB(182,196,210),PS_SOLID);dc->SelectObject(p);dc->MoveTo(P(121,96));dc->LineTo(P(121,120));dc->SelectObject(GetStockObject(NULL_PEN));DeleteObject(p);}
-        if(choice==Pants){std::vector<CPoint> q;q.push_back(P(178,108));quad(q,178,108,202,108,202,79);
-            HPEN p=pen(static_cast<int>(20*sc),RGB(189,202,215),PS_SOLID);dc->SelectObject(p);dc->Polyline(&q[0],static_cast<int>(q.size()));dc->SelectObject(GetStockObject(NULL_PEN));DeleteObject(p);}
-        // selected port: elbow, prelaz, duct (mockup draw())
-        const Side& s=side[current];const bool isB=current==0,tr=needsPrelaz(s);
-        const double angle=(s.turn==Up||s.turn==Down)?0:s.elbow*pi()/180,sign=s.turn==Left?-1:1;
-        const double org[2]={isB?150.0:178.0,isB?79.0:108.0},v[2]={isB?0.0:1.0,isB?-1.0:0.0},n[2]={-v[1],v[0]};
-        std::vector<std::pair<double,double> > pts;pts.push_back(std::make_pair(0.0,0.0));
-        const double pre=tr&&s.order==1?30:0,radius=25;
-        if(pre>0)pts.push_back(std::make_pair(pre,0.0));
-        if(angle>0)for(int i=1;i<=20;++i){const double t=angle*i/20;pts.push_back(std::make_pair(pre+radius*std::sin(t),sign*radius*(1-std::cos(t))));}
-        const double dir[2]={std::cos(angle),sign*std::sin(angle)};
-        const size_t coneStart=pts.size()-1;
-        if(tr&&s.order==0){const std::pair<double,double> e=pts.back();pts.push_back(std::make_pair(e.first+dir[0]*30,e.second+dir[1]*30));}
-        const bool vertical=s.elbow&&(s.turn==Up||s.turn==Down);
-        if(hasDuct(s)||!vertical){const std::pair<double,double> e=pts.back();pts.push_back(std::make_pair(e.first+dir[0]*(hasDuct(s)?30:14),e.second+dir[1]*(hasDuct(s)?30:14)));}
-        auto map=[&](double x,double y){return P(org[0]+v[0]*x+n[0]*y,org[1]+v[1]*x+n[1]*y);};
-        auto width=[&](size_t i){if(!tr)return 10.0;if(s.order==1)return i==0?10.0:6.0;return i<=coneStart?10.0:6.0;};
-        std::vector<CPoint> left,right,axis;
-        for(size_t i=0;i<pts.size();++i){
-            const std::pair<double,double> a=pts[i>0?i-1:0],b=pts[i+1<pts.size()?i+1:i];
-            double dx=b.first-a.first,dy=b.second-a.second,l=std::sqrt(dx*dx+dy*dy);if(l<=0)l=1;
-            const double w=width(i);
-            left.push_back(map(pts[i].first-dy/l*w,pts[i].second+dx/l*w));right.push_back(map(pts[i].first+dy/l*w,pts[i].second-dx/l*w));
-            axis.push_back(map(pts[i].first,pts[i].second));
+        tvsTeeSketch::Input in;in.type=choice;in.flipped=flipped;in.selected=current;
+        for(int i=0;i<2;++i){const Side& s=side[i];tvsTeeSketch::Side& t=in.side[i];
+            t.used=s.used;t.hasDuct=hasDuct(s);t.prelaz=needsPrelaz(s);t.elbow=s.elbow;t.turn=s.turn;t.order=s.order;}
+        std::vector<tvsTeeSketch::Prim> p;tvsTeeSketch::build(in,p);double x0,y0,x1,y1;tvsTeeSketch::bounds(p,x0,y0,x1,y1);
+        const double m=10,fit=std::fmin((r.Width()-2*m)/(x1-x0),(r.Height()-2*m)/(y1-y0)),sc=fit>2.2?2.2:fit;
+        const double ox=r.left+(r.Width()-(x1-x0)*sc)/2-x0*sc,oy=r.top+(r.Height()-(y1-y0)*sc)/2-y0*sc;
+        auto P=[&](const tvsTeeSketch::Pt& q){return CPoint(static_cast<int>(ox+q.x*sc+0.5),static_cast<int>(oy+q.y*sc+0.5));};
+        auto rgb=[](unsigned c){return RGB((c>>16)&255,(c>>8)&255,c&255);};
+        CFont* of=dc->SelectObject(GetFont());dc->SetBkMode(TRANSPARENT);
+        for(size_t i=0;i<p.size();++i){const tvsTeeSketch::Prim& q=p[i];
+            if(q.kind==tvsTeeSketch::Text){CFont* f=dc->SelectObject(q.bold?&bold:GetFont());dc->SetTextColor(rgb(q.fill));
+                const CPoint a=P(q.pts[0]);CSize s=dc->GetTextExtent(q.text.c_str());
+                dc->TextOut(q.align==2?a.x-s.cx:q.align==1?a.x-s.cx/2:a.x,a.y-s.cy*3/4,q.text.c_str());dc->SelectObject(f);continue;}
+            const int w=static_cast<int>(q.width*(sc>1?sc:1)+0.5);
+            LOGBRUSH lb={BS_SOLID,rgb(q.stroke),0};DWORD dash[2]={static_cast<DWORD>(4*sc+1),static_cast<DWORD>(4*sc+1)};
+            HPEN pen=q.stroke==tvsTeeSketch::none?static_cast<HPEN>(GetStockObject(NULL_PEN))
+                :ExtCreatePen(PS_GEOMETRIC|(q.dash?PS_USERSTYLE:PS_SOLID)|PS_ENDCAP_FLAT|PS_JOIN_ROUND,w<1?1:w,&lb,q.dash?2:0,q.dash?dash:NULL);
+            HBRUSH brush=q.fill==tvsTeeSketch::none||q.kind==tvsTeeSketch::Polyline?static_cast<HBRUSH>(GetStockObject(NULL_BRUSH)):CreateSolidBrush(rgb(q.fill));
+            HGDIOBJ op=dc->SelectObject(pen),ob=dc->SelectObject(brush);
+            std::vector<CPoint> pts;for(size_t j=0;j<q.pts.size();++j)pts.push_back(P(q.pts[j]));
+            if(q.kind==tvsTeeSketch::Polygon&&pts.size()>2)dc->Polygon(&pts[0],static_cast<int>(pts.size()));
+            else if(q.kind==tvsTeeSketch::Polyline&&pts.size()>1)dc->Polyline(&pts[0],static_cast<int>(pts.size()));
+            else if(q.kind==tvsTeeSketch::Circle&&!pts.empty()){const int rr=static_cast<int>(q.r*(sc>1.4?1.4:sc)+0.5);dc->Ellipse(pts[0].x-rr,pts[0].y-rr,pts[0].x+rr+1,pts[0].y+rr+1);}
+            dc->SelectObject(op);dc->SelectObject(ob);
+            if(q.stroke!=tvsTeeSketch::none)DeleteObject(pen);if(!(q.fill==tvsTeeSketch::none||q.kind==tvsTeeSketch::Polyline))DeleteObject(brush);
         }
-        if(pts.size()>1){
-            std::vector<CPoint> poly(left);for(size_t i=right.size();i-->0;)poly.push_back(right[i]);
-            HPEN p=pen(thin,RGB(8,99,169),PS_SOLID);HBRUSH f=CreateSolidBrush(RGB(227,240,252));dc->SelectObject(p);dc->SelectObject(f);
-            dc->Polygon(&poly[0],static_cast<int>(poly.size()));dc->SelectObject(GetStockObject(NULL_PEN));dc->SelectObject(GetStockObject(NULL_BRUSH));DeleteObject(p);DeleteObject(f);
-            HPEN d=pen(thin,RGB(8,99,169),PS_DASH);dc->SelectObject(d);dc->Polyline(&axis[0],static_cast<int>(axis.size()));dc->SelectObject(GetStockObject(NULL_PEN));DeleteObject(d);
-            HPEN c=pen(thin,RGB(71,136,185),PS_SOLID);dc->SelectObject(c);
-            const size_t marks[3]={1,coneStart,pts.size()-2};
-            for(int m=0;m<3;++m){const size_t i=marks[m];if(i>0&&i<left.size()){dc->MoveTo(left[i]);dc->LineTo(right[i]);}}
-            dc->SelectObject(GetStockObject(NULL_PEN));DeleteObject(c);
-        }
-        if(vertical){   // gore: circle with a dot, dolje: circle with a cross, at the end of the chain
-            const CPoint e=axis.back();const int rr=static_cast<int>(9*sc);
-            HPEN p=pen(thin,RGB(8,99,169),PS_SOLID);HBRUSH f=CreateSolidBrush(RGB(227,240,252));dc->SelectObject(p);dc->SelectObject(f);
-            dc->Ellipse(e.x-rr,e.y-rr,e.x+rr,e.y+rr);
-            if(s.turn==Up){HBRUSH k=CreateSolidBrush(RGB(8,99,169));dc->SelectObject(k);const int q=rr/3+1;dc->Ellipse(e.x-q,e.y-q,e.x+q,e.y+q);dc->SelectObject(f);DeleteObject(k);}
-            else{const int q=static_cast<int>(rr*0.7);dc->MoveTo(e.x-q,e.y-q);dc->LineTo(e.x+q,e.y+q);dc->MoveTo(e.x-q,e.y+q);dc->LineTo(e.x+q,e.y-q);}
-            dc->SelectObject(GetStockObject(NULL_PEN));dc->SelectObject(GetStockObject(NULL_BRUSH));DeleteObject(p);DeleteObject(f);
-        }
-        // port circles
-        {HPEN p=pen(thin,RGB(143,167,189),PS_SOLID);dc->SelectObject(p);
-         HBRUSH on=CreateSolidBrush(RGB(0,104,174)),off=CreateSolidBrush(RGB(231,236,242));
-         const CPoint b=P(150,79),c=P(178,108);const int r3=static_cast<int>(3*sc)+1,r4=static_cast<int>(4*sc)+1;
-         dc->SelectObject(isB?on:off);dc->Ellipse(b.x-r3,b.y-r3,b.x+r3,b.y+r3);
-         if(side[1].used){dc->SelectObject(!isB?on:off);dc->Ellipse(c.x-r4,c.y-r4,c.x+r4,c.y+r4);}
-         dc->SelectObject(GetStockObject(NULL_PEN));dc->SelectObject(GetStockObject(NULL_BRUSH));DeleteObject(p);DeleteObject(on);DeleteObject(off);}
-        // labels
-        CFont* font=GetFont();CFont* oldFont=font?dc->SelectObject(font):NULL;
-        dc->SetBkMode(TRANSPARENT);dc->SetTextColor(RGB(39,84,118));
-        const CPoint lu=P(flipped?183+30:85,86),lb=P(flipped?133+8:162,76),lc=P(flipped?119+8:175,121);
-        dc->TextOut(flipped?lu.x-30:lu.x-6,lu.y,L"Ulaz");dc->TextOut(lb.x,lb.y,L"B");if(side[1].used)dc->TextOut(lc.x,lc.y,L"C");
-        if(oldFont)dc->SelectObject(oldFont);
-        dc->SelectObject(oldPen);dc->SelectObject(oldBrush);
+        dc->SelectObject(of);
     }
 };
 
