@@ -68,6 +68,7 @@
 #include "TransAlignCommand.h"
 #include "SizeFollow.h"
 #include "ExportCommand.h"
+#include "TeeTypeDialog.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"

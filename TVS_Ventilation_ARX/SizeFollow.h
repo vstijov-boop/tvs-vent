@@ -16,6 +16,7 @@
 #include "TeeCommand.h"
 #include "MleaderController.h"
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
+#include "TeePort.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
@@ -203,7 +204,8 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
                 const bool branch=port==2;
                 const double pa=branch?w->SizeAotv:(port==1&&r.type==tvsTee::Branch&&r.second>0?r.second:w->SizeApr);
                 const double pb=branch?w->SizeBotv:w->SizeBpr;const bool pr=branch?w->ThisRoundotv:w->ThisRoundpr;
-                if(r.type==tvsTee::Pants){run.stops.push_back(L"gaćasti T komad (TK-G)");break;}
+                // TK-O / TK-G keep their sizes: the duct on the port gets a prelaz there (TeePort.h, after the run)
+                if(r.type==tvsTee::Pants||r.type==tvsTee::Branch){run.stops.push_back(L"T komad TK-O / TK-G (ostaje; prelaz na priključku)");break;}
                 if(!same(pa,pb,pr)){run.stops.push_back(L"T komad druge dimenzije");break;}
                 if(r.type==tvsTee::Branch&&port==1&&std::fabs(pb-old.b[0])>1e-6){run.stops.push_back(L"TK-O");break;}
                 seen.insert(next);TeeStep t={next,port,0};
@@ -553,6 +555,13 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 }
             }
         }
+    }
+    {   // ducts on a TK-O / TK-G port: the T komad stays, a prelaz is inserted / adjusted at the port
+        std::set<AcDbObjectId> changed(done.begin(),done.end());
+        for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w)changed.insert(w->first);
+        for(std::set<AcDbObjectId>::const_iterator c=changed.begin();c!=changed.end();++c){
+            AcDbObjectPointer<AcDbEntity> e(*c,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!plainDuct(e.object()))continue;
+            e.close();tvsTeePort::afterDuct(db,*c);}
     }
     applying()=false;pending().clear();
     if(ducts||transitions)acutPrintf(L"\nDimenzije na spojevima: prilagodjeno prelaza %d, kanala %d.",transitions,ducts);
