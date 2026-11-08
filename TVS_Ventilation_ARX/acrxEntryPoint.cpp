@@ -65,6 +65,7 @@
 #include "SectionCommand.h"
 #include "LevelTooltip.h"
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
+#include "../TVS_Ventilation_DBX/PortGrips.h"
 #include "TransAlignCommand.h"
 #include "SizeFollow.h"
 #include "ExportCommand.h"

@@ -12,6 +12,12 @@
 		int index;
 		AcDbObjectId id;
 		TVS_Pipe::GetParamsForDraw(id, index);
+		TVS_Pipe::SetParamsForDraw(AcDbObjectId::kNull, 0);   // one grip start only; a plain TVS_Draw starts fresh
+		if (index >= tvsPortGrip::base && index < tvsPortGrip::base + 3)
+		{	// connector grip on a free fitting port (PortGrips.h): the first duct leaves the port along its axis
+			drawFromPort(id, index - tvsPortGrip::base);
+			return;
+		}
 
 
 		ads_point pt1, pt2;
@@ -63,6 +69,39 @@
 		//if(drawStep1(pt1,pt2,pipi)==false)return;
 		//if(drawStep2(pt1,pt2,pipi)==false)return;
 
+	}
+	static void drawFromPort(const AcDbObjectId& id, int k)
+	{
+		tvsPortGrip::Port P[3]; int n = 0; double elev = 0;
+		{
+			AcDbEntity* e = NULL;
+			if (acdbOpenAcDbEntity(e, id, AcDb::kForRead) != Acad::eOk) return;
+			TVS_Entity* t = TVS_Entity::cast(e);
+			if (t) { n = tvsPortGrip::ports(t, P); elev = t->get_Elevation(); InstallGlobalProperty(t); }
+			e->close();
+		}
+		if (k < 0 || k >= n) return;
+		const tvsPortGrip::Port& p = P[k];
+		globSizeA = p.a; globSizeB = p.round ? 0 : p.b; globRound = p.round; globalElevMid = elev; globalElev = elev;
+		ads_point base = { p.p.x, p.p.y, p.p.z }, pick;
+		AcGePoint3d end;
+		for (;;)
+		{
+			const int st = tvsCoordinates::getPoint(base, _T("\nKraj prvog kanala (u pravcu priključka; dužina ili tačka): "), pick);
+			if (st != RTNORM) return;
+			AcGeVector3d v = asPnt3d(pick) - p.p; v.z = 0;
+			const double t = v.dotProduct(p.dir);
+			if (t > 1e-6) { end = p.p + p.dir * t; break; }
+			acutPrintf(_T("\nTačka mora biti ispred priključka (u smjeru nastavka)."));
+		}
+		AcGePoint3d A1 = p.p, A2 = end;
+		TVS_Pipe pipie;
+		TVS_Pipe* pipi = pipie.add_new(A1, A2, globSizeA, globSizeB, false, globRound);
+		AcDbEntity* pEnt = NULL;
+		if (!pipi || acdbOpenAcDbEntity(pEnt, pipi->id(), AcDb::kForWrite) != eOk) { acutPrintf(_T("\nSloj je zaključan")); return; }
+		pipi->close();
+		ads_point pt1 = { A1.x, A1.y, A1.z }, pt2 = { A2.x, A2.y, A2.z };
+		drawStep3(pt1, pt2, pipi);
 	}
 	static bool drawStep1(ads_point &pt1, ads_point &pt2, TVS_Pipe *&pipi)
 	{
