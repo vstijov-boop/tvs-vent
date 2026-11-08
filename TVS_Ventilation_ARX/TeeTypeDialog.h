@@ -227,7 +227,7 @@ public:
             const double hb=half(b.tee.a),hc=half(c.tee.a),top=hi*0.2;
             rect(-hi,-s*2.2,hi,-hi*0.2,grey,light);
             std::vector<CPoint> p;p.push_back(CPoint(X(-hi),Y(-hi*0.2)));p.push_back(CPoint(X(hi),Y(-hi*0.2)));
-            p.push_back(CPoint(X(hi+s*0.9),Y(top+hb-hb)));p.push_back(CPoint(X(hi+s*0.9),Y(top+2*hb)));p.push_back(CPoint(X(0),Y(top+2*std::max(hb,hc))));
+            p.push_back(CPoint(X(hi+s*0.9),Y(top+hb-hb)));p.push_back(CPoint(X(hi+s*0.9),Y(top+2*hb)));p.push_back(CPoint(X(0),Y(top+2*(hb>hc?hb:hc))));
             p.push_back(CPoint(X(-hi-s*0.9),Y(top+2*hc)));p.push_back(CPoint(X(-hi-s*0.9),Y(top)));poly(p,body,fill);
             cont(b,hi+s*0.9,top+hb,1,0,current==0);cont(c,-(hi+s*0.9),top+hc,-1,0,current==1);
             dc->TextOut(X(0)-12,Y(-s*2.2)+2,L"Ulaz");dc->TextOut(X(hi+s*0.9)-4,Y(top+2*hb)-16,L"B");dc->TextOut(X(-hi-s*0.9)-4,Y(top+2*hc)-16,L"C");
