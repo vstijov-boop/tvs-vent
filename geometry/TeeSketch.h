@@ -63,16 +63,16 @@ inline void chain(const Side& s,const Port& p,bool selected,bool flipped,std::ve
     double sign=s.turn==Left?-1:1;if(flipped)sign=-sign;   // the sketch is mirrored, the turn is not
     const Pt v=p.dir,n(-v.y,v.x);
     std::vector<Pt> pts;std::vector<double> w;pts.push_back(Pt(0,0));
-    const bool tr=s.prelaz;const double big=10,small=6,radius=25;
-    double width=big;w.push_back(width);
+    const bool tr=s.prelaz;const double wideW=10,narrowW=6,radius=25;
+    double width=wideW;w.push_back(width);
     if(selected){
-        if(tr&&s.order==1){pts.push_back(Pt(30,0));width=small;w.push_back(width);}
+        if(tr&&s.order==1){pts.push_back(Pt(30,0));width=narrowW;w.push_back(width);}
         if(angle>0){const Pt o=pts.back();
             for(int i=1;i<=20;++i){const double t=angle*i/20;pts.push_back(Pt(o.x+radius*std::sin(t),o.y+sign*radius*(1-std::cos(t))));w.push_back(width);}}
         const Pt d(std::cos(angle),sign*std::sin(angle));
-        if(tr&&s.order==0){const Pt o=pts.back();pts.push_back(Pt(o.x+d.x*30,o.y+d.y*30));width=small;w.push_back(width);}
+        if(tr&&s.order==0){const Pt o=pts.back();pts.push_back(Pt(o.x+d.x*30,o.y+d.y*30));width=narrowW;w.push_back(width);}
         {const Pt o=pts.back();const double L=s.hasDuct?34:vertical?16:12;pts.push_back(Pt(o.x+d.x*L,o.y+d.y*L));w.push_back(width);}
-    }else{pts.push_back(Pt(26,0));w.push_back(tr?small:big);}
+    }else{pts.push_back(Pt(26,0));w.push_back(tr?narrowW:wideW);}
     auto map=[&](const Pt& q){return Pt(p.at.x+v.x*q.x+n.x*q.y,p.at.y+v.y*q.x+n.y*q.y);};
     if(pts.size()>1){
         // prelaz: widths change linearly over the cone (from the point before the narrower width)
@@ -108,7 +108,7 @@ inline void build(const Input& in,std::vector<Prim>& out){
     if(in.flipped)for(size_t i=0;i<out.size();++i){for(size_t j=0;j<out[i].pts.size();++j)out[i].pts[j].x=300-out[i].pts[j].x;
         if(out[i].kind==Text)out[i].align=2-out[i].align;}
 }
-// Bounding box of the drawing (texts as small boxes).
+// Bounding box of the drawing (texts as narrowW boxes).
 inline void bounds(const std::vector<Prim>& p,double& x0,double& y0,double& x1,double& y1){
     x0=y0=1e9;x1=y1=-1e9;
     for(size_t i=0;i<p.size();++i)for(size_t j=0;j<p[i].pts.size();++j){
