@@ -267,7 +267,9 @@ inline void execute(){
     if(in.compute(sideSign,plan,NULL)&&!plan.rotate&&plan.delta.length()<=tol){acutPrintf(L"\nTVS_ALIGN: element je već poravnat.");return;}
     tvsMoveNetwork::Result network;
     if(!in.compute(sideSign,plan,linked?&network:NULL)){
-        acutPrintf(L"\nTVS_ALIGN: %ls",linked?tvsMove::networkError(network.error):L"poravnanje nije moguće.");return;}
+        acutPrintf(L"\nTVS_ALIGN: %ls",linked?tvsMove::networkError(network.error):L"poravnanje nije moguće.");
+        if(linked)tvsMove::sideBranchProblem(nodes,network,L"TVS_ALIGN");
+        return;}
     if(linked)tvsMove::applyNetwork(db,nodes,bodies,members,selected,plan.delta,factor,tol,minimum,L"TVS_ALIGN");
     else applyFree(db,nodes,selected,plan,factor);
 }

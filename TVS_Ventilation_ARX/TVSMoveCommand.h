@@ -341,6 +341,18 @@ inline void roundBranchAlert(const std::vector<Node>& nodes,int problem,tvsMoveN
         }
     }
 }
+// SideBranch: show both elements and say which point lies inside the unsplit pipe.
+inline void sideBranchProblem(const std::vector<Node>& nodes,const tvsMoveNetwork::Result& r,const ACHAR* command){
+    if(r.error!=tvsMoveNetwork::SideBranch||r.problem<0||r.other<0||static_cast<size_t>(r.problem)>=nodes.size()||static_cast<size_t>(r.other)>=nodes.size())return;
+    static const ACHAR* names[]={L"nepodržan element (flex, vertikalno ili 3D koljeno, nepotpun fiting)",L"kanal",L"koljeno",L"prelaz",L"T komad"};
+    const int k=nodes[r.other].kind;const ACHAR* what=(k>=0&&k<=4)?names[k]:names[0];
+    const double f=tvsUnits::factor(acdbHostApplicationServices()->workingDatabase());
+    acutPrintf(L"\n%ls: unutar kanala (istaknut) leži %ls elementa: %ls, tačka X=%.0f Y=%.0f mm.",command,
+        r.junction?L"središte":L"priključak",what,r.where.x*f,r.where.y*f);
+    acutPrintf(L"\nKanal treba podijeliti na tom mjestu (TVS_CUT) ili element spojiti na kraj kanala.");
+    StretchHighlight mark;mark.add(nodes[r.problem].id);mark.add(nodes[r.other].id);
+    ACHAR answer[133]={0};acedGetString(0,L"\nOba elementa su istaknuta. Enter za povratak u crtež: ",answer);
+}
 inline void stretchProblem(const std::vector<Node>& nodes,int index,const ACHAR* message,const ACHAR* command=L"TVS_STRETCH"){
     acutPrintf(L"\n%s: %s",command,message);
     if(index<0||static_cast<size_t>(index)>=nodes.size())return;
@@ -532,7 +544,8 @@ inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
                          int selected,const Point& delta,double factor,double tol,double minimum,const ACHAR* command){
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
-        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\n%ls: %s",command,networkError(result.error));return false;}
+        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\n%ls: %s",command,networkError(result.error));
+        sideBranchProblem(nodes,result,command);return false;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
         acutPrintf(L"\n%ls: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.",command);return false;}
