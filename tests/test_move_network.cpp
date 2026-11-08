@@ -73,5 +73,12 @@ int main(){
     n.push_back(body(Rigid,Point(-1,0),Point(0,0),1));
     for(int i=1;i<300;++i)n.push_back(body(Rigid,Point(i,0),Point(i+1,0),1));
     assert(!plan(n,0,Point(0,1),.01,.001,out));assert(out.error==TooMany);
+    // TVS_ALIGN: a selected fitting (T komad) slides along the run; the two run pipes absorb it.
+    n=fixture();assert(plan(n,2,Point(100,0),1,.1,out));
+    assert(out.masks[2]==7&&out.masks[0]==2&&out.masks[4]==1&&out.masks[9]==3);
+    assert(std::fabs(out.ports[0][1].x-1100)<1e-9&&std::fabs(out.ports[4][0].x-1500)<1e-9&&std::fabs(out.ports[9][1].x-1300)<1e-9);
+    assert(std::fabs(out.ports[0][0].x)<1e-9&&std::fabs(out.ports[4][1].x-2000)<1e-9);   // far ends fixed
+    assert(!plan(n,2,Point(700,0),1,.1,out));                                             // run pipe too short
+    n[2].kind=Blocked;assert(!plan(n,2,Point(100,0),1,.1,out));
     return 0;
 }

@@ -3,8 +3,9 @@
 // pravom segmentu polilinije, XLINE ili RAY. Geometrija: AlignGeometry.h (rotacija za najmanji ugao oko
 // tacke oslonca = tacka izabrane ivice / ose najbliza kliku, zatim pomjeranje samo upravno na referencu).
 //  - slobodan element (kanal, koljeno u osnovi, T komad, prelaz): rotacija + pomjeranje, transformBy;
-//  - povezan kanal paralelan referenci: mreza kao TVS_MOVE (tvsMove::applyNetwork), susjedi se prilagode;
-//  - povezan fiting, neparalelan povezan kanal, etaz / obilazak, flex, 3D: odbijeno uz poruku.
+//  - povezan kanal ili fiting paralelan referenci: mreza kao TVS_MOVE (tvsMove::applyNetwork), susjedni
+//    pravi kanali se produze / skrate (T komad klizi duz kanala, koljeno pomjera dionice);
+//  - neparalelan povezan element, etaz / obilazak, flex, 3D: odbijeno uz poruku.
 // Pregled i upis koriste isti plan; prije upisa crtez se ponovo cita (sameSnapshot); jedna transakcija.
 #include "TVSMoveCommand.h"
 #include "AlignGeometry.h"
@@ -150,9 +151,10 @@ struct Input {
         if(!tvsAlign::plan(ref.anchor,ref.direction,target,offset,sideSign,1e-6,plan))return false;
         if(!linked)return true;
         if(plan.rotate)return false;
-        // Connected pipe: lateral move only, exactly perpendicular to its own axis (TVS_MOVE network).
-        const Node& n=(*nodes)[selected];Point axis;if(!tvsMoveGeometry::unit(n.ports[1]-n.ports[0],axis))return false;
-        const Point normal(-axis.y,axis.x,0);plan.delta=normal*plan.delta.dot(normal);
+        // Connected element: translation only (TVS_MOVE network). A pipe moves exactly perpendicular to its axis.
+        const Node& n=(*nodes)[selected];
+        if(n.kind==1){Point axis;if(!tvsMoveGeometry::unit(n.ports[1]-n.ports[0],axis))return false;
+            const Point normal(-axis.y,axis.x,0);plan.delta=normal*plan.delta.dot(normal);}
         if(!network)return true;
         return tvsMoveNetwork::plan(*bodies,selected,plan.delta,minimum,tol,*network);
     }
@@ -240,10 +242,10 @@ inline void execute(){
     if(inAssembly(n.id)){acutPrintf(L"\nTVS_ALIGN: element je dio etaža ili obilaska; pojedinačno poravnanje još nije podržano.");return;}
     const double factor=tvsUnits::factor(db),tol=0.1/factor,minimum=1.0/factor;
     const bool linked=connected(nodes,selected,tol);
-    if(linked&&n.kind!=1){acutPrintf(L"\nTVS_ALIGN: fiting je povezan sa drugim elementima; poravnanje povezanih fitinga još nije podržano.");return;}
     std::vector<tvsMoveNetwork::Body> bodies;std::vector<std::vector<AcDbObjectId> > members;
     if(linked){tvsMove::bodiesFor(nodes,bodies,members,tol);
-        if(bodies[selected].kind!=tvsMoveNetwork::Pipe){acutPrintf(L"\nTVS_ALIGN: kanal je dio etaža ili obilaska; izaberite pravu dionicu van njih.");return;}}
+        if(bodies[selected].kind!=(n.kind==1?tvsMoveNetwork::Pipe:tvsMoveNetwork::Rigid)||!members[selected].empty()){
+            acutPrintf(L"\nTVS_ALIGN: element je dio etaža ili obilaska; izaberite element van njih.");return;}}
     Input in;in.nodes=&nodes;in.bodies=&bodies;in.selected=selected;in.linked=linked;in.tol=tol;in.minimum=minimum;
     if(!pickReference(n,Point(picked[0],picked[1],picked[2]),in.ref))return;
     Marks marks;marks.line(in.ref.seg[0],in.ref.seg[1],2);
@@ -255,17 +257,17 @@ inline void execute(){
     const int currentSide=tvsAlign::side(in.target,in.ref.anchor,tol,1);
     tvsAlign::Plan plan;
     if(!in.compute(currentSide,plan,NULL)){
-        if(linked&&plan.rotate)acutPrintf(L"\nTVS_ALIGN: povezan kanal nije paralelan sa referencom; povezani kanal se za sada može samo pomjeriti (bez rotacije).");
+        if(linked&&plan.rotate)acutPrintf(L"\nTVS_ALIGN: povezan element nije paralelan sa referencom; povezani elementi se za sada mogu samo pomjeriti (bez rotacije).");
         else acutPrintf(L"\nTVS_ALIGN: poravnanje nije moguće odrediti.");
         return;}
     AlignJig jig(in,currentSide);
     const AcEdJig::DragStatus status=jig.drag();
     if(status!=AcEdJig::kNormal&&status!=AcEdJig::kNull){acutPrintf(L"\nTVS_ALIGN: odustano, ništa nije promijenjeno.");return;}
     const int sideSign=status==AcEdJig::kNull?currentSide:jig.sideSign();
+    if(in.compute(sideSign,plan,NULL)&&!plan.rotate&&plan.delta.length()<=tol){acutPrintf(L"\nTVS_ALIGN: element je već poravnat.");return;}
     tvsMoveNetwork::Result network;
     if(!in.compute(sideSign,plan,linked?&network:NULL)){
         acutPrintf(L"\nTVS_ALIGN: %ls",linked?tvsMove::networkError(network.error):L"poravnanje nije moguće.");return;}
-    if(!plan.rotate&&plan.delta.length()<=tol){acutPrintf(L"\nTVS_ALIGN: element je već poravnat.");return;}
     if(linked)tvsMove::applyNetwork(db,nodes,bodies,members,selected,plan.delta,factor,tol,minimum,L"TVS_ALIGN");
     else applyFree(db,nodes,selected,plan,factor);
 }

@@ -40,7 +40,8 @@ inline bool interior(const Point& q,const Point& a,const Point& b,double tol){
 // Pipes parallel to the translation absorb it by changing length; other pipes carry it on.
 inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta,double minimum,double tol,Result& out){
     out=Result();
-    if(selected<0||static_cast<size_t>(selected)>=bodies.size()||bodies[selected].kind!=Pipe
+    // Selected: a pipe (TVS_MOVE) or a rigid fitting (TVS_ALIGN), never a blocked element.
+    if(selected<0||static_cast<size_t>(selected)>=bodies.size()||bodies[selected].kind==Blocked
         ||!tvsMoveGeometry::finite(minimum)||minimum<=0||!tvsMoveGeometry::finite(tol)||tol<=0)return false;
     Point direction;
     if(!tvsMoveGeometry::unit(delta,direction)||!tvsMoveGeometry::valid(delta)||delta.length()<=tol
