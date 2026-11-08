@@ -50,6 +50,9 @@
 		AcDbDatabase* capDb = acdbHostApplicationServices()->workingDatabase();
 		const bool capWas = capDb && tvsDuctCaption::enabled(capDb);
 		dg.DuctCaption = capWas ? TRUE : FALSE;
+		const tvsSpiro::Settings spiroWas = tvsSpiro::read(capDb);
+		dg.SpiroCatalog = spiroWas.catalog ? TRUE : FALSE; dg.SpiroRG = spiroWas.rg ? TRUE : FALSE;
+		dg.SpiroDashed = spiroWas.dashed ? TRUE : FALSE; dg.SpiroC = spiroWas.cMm;
 		dg.TransVert = tvsTransAlignCmd::defaultAlign();
 		dg.TransPlan = ftTransType;
 
@@ -84,7 +87,13 @@
 
 		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
 		acedSetEnv(L"TVS_LEAD_AUTO", dg.LeadAuto == TRUE ? L"1" : L"0");   // isto kao TVS_LEAD_AUTO
-		if (capDb && (dg.DuctCaption == TRUE) != capWas && tvsDuctCaption::set(capDb, dg.DuctCaption == TRUE)) {   // isto kao TVS_NATPIS
+		bool regen = capDb && (dg.DuctCaption == TRUE) != capWas && tvsDuctCaption::set(capDb, dg.DuctCaption == TRUE);   // isto kao TVS_NATPIS
+		{	// spiro prelazi po katalogu SOKO (po crtezu)
+			tvsSpiro::Settings sp; sp.catalog = dg.SpiroCatalog == TRUE; sp.rg = dg.SpiroRG == TRUE; sp.dashed = dg.SpiroDashed == TRUE; sp.cMm = dg.SpiroC;
+			if (capDb && (sp.catalog != spiroWas.catalog || sp.rg != spiroWas.rg || sp.dashed != spiroWas.dashed || std::fabs(sp.cMm - spiroWas.cMm) > 1e-9)
+				&& tvsSpiro::write(capDb, sp)) regen = true;
+		}
+		if (regen) {
 			AcApDocument* capDoc = acDocManager ? acDocManager->curDocument() : NULL;
 			if (capDoc) acDocManager->sendStringToExecute(capDoc, L"_.REGENALL\n", false, true, false);
 		}
@@ -574,7 +583,7 @@
 	{
 
 		TVS_TRANS* transie;
-		double pLengthTr = globalLengthTr;
+		double pLengthTr = tvsSpiro::drawingLength(NULL, pSizeAp1, pSizeBp1 == 0, pSizeAp2, pSizeBp2 == 0, globalLengthTr, globalDuctType == DuctTypeFlex);   // spiro: po katalogu SOKO
 		AcGeVector3d Vect = AcGeVector3d(pipi->LastPoint.x - pipi->FirstPoint.x,
 			pipi->LastPoint.y - pipi->FirstPoint.y,
 			pipi->LastPoint.z - pipi->FirstPoint.z);

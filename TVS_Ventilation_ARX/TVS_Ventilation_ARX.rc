@@ -87,13 +87,13 @@ END
 // Dialog
 //
 
-IDD_PIPESIZEDIALLOG DIALOGEX 0, 0, 463, 250
+IDD_PIPESIZEDIALLOG DIALOGEX 0, 0, 463, 282
 STYLE DS_SETFONT | DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "TVS — dimenzije u mm"
 FONT 8, "Tahoma", 0, 0, 0x0
 BEGIN
-    DEFPUSHBUTTON   "U redu",IDOK,252,228,64,15
-    PUSHBUTTON      "Otkaži",IDCANCEL,392,228,64,15
+    DEFPUSHBUTTON   "U redu",IDOK,252,262,64,15
+    PUSHBUTTON      "Otkaži",IDCANCEL,392,262,64,15
     LTEXT           "Širina Dpr",10001,23,17,46,12,NOT WS_GROUP
     EDITTEXT        1001,75,17,39,12,ES_AUTOHSCROLL | WS_GROUP
     LTEXT           "Visina Hpr",10002,23,32,46,12,NOT WS_GROUP
@@ -156,6 +156,11 @@ BEGIN
     CONTROL         "Automatsko ažuriranje TVS oznaka",1048,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,252,181,190,10
     CONTROL         "Natpis kanala (dimenzija / protok / brzina)",1049,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,252,194,190,10
     LTEXT "Dimenzije i kote unose se u mm. Jedinice se čuvaju u DWG-u.",-1,14,212,230,11
+    CONTROL         "Spiro prelazi po katalogu SOKO",1051,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,252,207,190,10
+    CONTROL         "Gumena zaptivka (RG / RAG)",1052,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,220,150,10
+    LTEXT           "Ravni dio do sićke, mm",-1,264,234,90,10
+    EDITTEXT        1053,356,232,30,12,ES_AUTOHSCROLL | WS_GROUP
+    CONTROL         "Priključak u kanalu isprekidano",1054,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,247,170,10
 
 END
 

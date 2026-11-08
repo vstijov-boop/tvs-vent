@@ -33,11 +33,12 @@
 			TVS_Pipe* SPipe = pPipe2;
 
 
+			double spiroLt = tvsSpiro::drawingLength(NULL, GPipe->SizeA, GPipe->ThisRound, SPipe->SizeA, SPipe->ThisRound, globalLengthTr, GPipe->getDuctType() == DuctTypeFlex);   // spiro: po katalogu SOKO
 			pTrans = pTrans->add_new(GPipe->SizeA,
 				GPipe->SizeB,
 				SPipe->SizeA,
 				SPipe->SizeB,
-				globalLengthTr,
+				spiroLt,
 				AcGeVector3d(-GPipe->FirstPoint.x + GPipe->LastPoint.x, -GPipe->FirstPoint.y + GPipe->LastPoint.y, -GPipe->FirstPoint.z + GPipe->LastPoint.z).normalize(),
 				GPipe->FirstPoint,
 				GPipe->ThisRound,
@@ -46,7 +47,7 @@
 				GPipe->This1D
 			);
 			if (acdbOpenAcDbEntity(pEnt, pTrans->id(), AcDb::kForWrite) == eOk) {
-				pTrans->put_Length(globalLengthTr);
+				pTrans->put_Length(spiroLt);
 				pTrans->close();
 			}
 			SetGlobalProperty(pTrans);
@@ -54,7 +55,7 @@
 			SetPropertyLikePipe(SPipe, GPipe);
 			AcGePoint3d lastPoint = GPipe->LastPoint;
 
-			point1 = shortlength(midp, point1, globalLengthTr);
+			point1 = shortlength(midp, point1, spiroLt);
 			return true;
 		}
 		if (GroseStatus == TVSEnt2isGrose)
@@ -65,11 +66,12 @@
 			TVS_Pipe* SPipe = pPipe1;
 
 
+			double spiroLt = tvsSpiro::drawingLength(NULL, GPipe->SizeA, GPipe->ThisRound, SPipe->SizeA, SPipe->ThisRound, globalLengthTr, GPipe->getDuctType() == DuctTypeFlex);   // spiro: po katalogu SOKO
 			pTrans = pTrans->add_new(GPipe->SizeA,
 				GPipe->SizeB,
 				SPipe->SizeA,
 				SPipe->SizeB,
-				globalLengthTr,
+				spiroLt,
 				AcGeVector3d(GPipe->FirstPoint.x - GPipe->LastPoint.x, GPipe->FirstPoint.y - GPipe->LastPoint.y, GPipe->FirstPoint.z - GPipe->LastPoint.z).normalize(),
 				GPipe->LastPoint,
 				GPipe->ThisRound,
@@ -78,14 +80,14 @@
 				GPipe->This1D
 			);
 			if (acdbOpenAcDbEntity(pEnt, pTrans->id(), AcDb::kForWrite) == eOk) {
-				pTrans->put_Length(globalLengthTr);
+				pTrans->put_Length(spiroLt);
 				pTrans->close();
 			}
 			SetGlobalProperty(pTrans);
 			SetPropertyLikePipe(SPipe, pTrans);
 			SetPropertyLikePipe(SPipe, GPipe);
 
-			point2 = shortlength(midp, point2, globalLengthTr);
+			point2 = shortlength(midp, point2, spiroLt);
 			return true;
 
 		}

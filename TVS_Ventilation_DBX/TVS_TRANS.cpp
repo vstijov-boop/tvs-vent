@@ -25,6 +25,8 @@
 #include "StdAfx.h"
 #include "LevelLabels.h"
 #include "TransAlignData.h"
+#include "SpiroCatalog.h"
+#include "DrawingUnits.h"
 #include "TVS_TRANS.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
@@ -331,7 +333,53 @@ Adesk::Boolean TVS_TRANS::subWorldDraw (AcGiWorldDraw *mode) {
 
 
 
-	if (This1D==false)
+	AcArray<AcDbEntity*> spiroDashed;   // isprekidani prikljucci spiro prelaza: drawn only, no osnaps
+	bool spiro=false;
+	if (This1D==false && ThisRoundp1==true && ThisRoundp2==true && DuctType!=DuctTypeFlex && std::fabs(SizeAp1-SizeAp2)>1e-9)
+	{	// spiro redukcija po katalogu SOKO (SpiroCatalog.h): ravno c, konus, ravno c; prikljucak isprekidano
+		const tvsSpiro::Settings ss=tvsSpiro::read(database());
+		const double f=tvsUnits::factor(database()),c=ss.cMm/f;
+		AcGeVector3d dir=VectTr;dir.z=0;
+		if (ss.catalog && dir.length()>1e-12 && LengthTr>2*c+1.0/f)
+		{
+			spiro=true;dir.normalize();
+			const AcGeVector3d n(-dir.y,dir.x,0);
+			const double r1=SizeAp1/2,r2=SizeAp2/2;
+			const AcGePoint3d F=FirstPoint,E=LastPoint;
+			Gimme4PipePoints(FirstPoint,LastPoint);
+			const AcGePoint3d o[8]={F+n*r1,F+dir*c+n*r1,E-dir*c+n*r2,E+n*r2,E-n*r2,E-dir*c-n*r2,F+dir*c-n*r1,F-n*r1};
+			AcDbPolyline* outline=new AcDbPolyline;
+			for (int i=0;i<8;i++) outline->addVertexAt(i,AcGePoint2d(o[i].x,o[i].y));
+			outline->setClosed(true);outline->setElevation(F.z);
+			setMainProperty(outline);
+			const double bead=5.0/f;   // sicka: second thin line at each end
+			setThinProperty(new AcDbLine(F+dir*bead+n*r1,F+dir*bead-n*r1));
+			setThinProperty(new AcDbLine(E-dir*bead+n*r2,E-dir*bead-n*r2));
+			AcDbPolyline* axis=new AcDbPolyline;
+			const AcGePoint3d ax[4]={F,F+dir*c,E-dir*c,E};
+			for (int i=0;i<4;i++) axis->addVertexAt(i,AcGePoint2d(ax[i].x,ax[i].y));
+			axis->setElevation(F.z);
+			setCenterProperty(axis);
+			if (ss.dashed)
+			{
+				const double s1=(tvsSpiro::spigot(SizeAp1*f)-ss.cMm)/f,s2=(tvsSpiro::spigot(SizeAp2*f)-ss.cMm)/f;
+				const AcGePoint3d q1[4]={F+n*r1,F-dir*s1+n*r1,F-dir*s1-n*r1,F-n*r1};
+				const AcGePoint3d q2[4]={E+n*r2,E+dir*s2+n*r2,E+dir*s2-n*r2,E-n*r2};
+				for (int side=0;side<2;side++)
+				{
+					if ((side==0?s1:s2)<=1e-9) continue;
+					const AcGePoint3d* q=side==0?q1:q2;
+					AcDbPolyline* pl=new AcDbPolyline;
+					for (int i=0;i<4;i++) pl->addVertexAt(i,AcGePoint2d(q[i].x,q[i].y));
+					pl->setElevation(F.z);
+					pl->setLineWeight(AcDb::LineWeight(15));pl->setLayer(layerId());pl->setColor(color());
+					setAuxLinetype(pl,_T("tvs_hidden"));
+					spiroDashed.append(pl);
+				}
+			}
+		}
+	}
+	if (This1D==false && !spiro)
 	{
 		Gimme4PipePoints(FirstPoint,LastPoint);
 
@@ -392,7 +440,7 @@ Adesk::Boolean TVS_TRANS::subWorldDraw (AcGiWorldDraw *mode) {
 		}
 
 	} 
-	else
+	else if (This1D==true)
 	{
 
 		double  Lx=VectTr.x;
@@ -489,6 +537,11 @@ Adesk::Boolean TVS_TRANS::subWorldDraw (AcGiWorldDraw *mode) {
 	for each (AcDbEntity * var in ListOfEntity)
 	{
 		mode->geometry().draw(var);
+	}
+	for (int i=0;i<spiroDashed.length();i++)
+	{
+		mode->geometry().draw(spiroDashed[i]);
+		delete spiroDashed[i];
 	}
 
 	return Adesk::kTrue;

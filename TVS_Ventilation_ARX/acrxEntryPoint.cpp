@@ -63,6 +63,7 @@
 #include "MatchCommand.h"
 #include "SectionCommand.h"
 #include "LevelTooltip.h"
+#include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "TransAlignCommand.h"
 #include "SizeFollow.h"
 #include "ExportCommand.h"

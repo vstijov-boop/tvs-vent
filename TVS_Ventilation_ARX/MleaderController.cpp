@@ -4,6 +4,9 @@
 #include "TVSPropertyController.h"
 #include "Calculate.h"
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
+#include "../TVS_Ventilation_DBX/TVS_TRANS.h"
+#include "../TVS_Ventilation_DBX/TransAlignData.h"
+#include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include <cfloat>
 
 MleaderController::MleaderController()
@@ -198,6 +201,15 @@ bool MleaderController::GetEntityStringPropertyByName(const AcDbObjectId  &objId
 	}
 	else if (stringTemplate == L"D") {
 		pEnt->getSizeString(stringText);
+		return true;
+	}
+	else if (stringTemplate == L"S") {
+		// Spiro redukcija: sifra po katalogu SOKO (R-400-300, RA / RG / RAG), SpiroCatalog.h.
+		TVS_TRANS* tr = TVS_TRANS::cast(pEnt.operator->());
+		if (!tr || !tvsSpiro::applies(tr->database(), tr->SizeAp1, tr->ThisRoundp1, tr->SizeAp2, tr->ThisRoundp2, tr->getDuctType() == DuctTypeFlex)) return false;
+		const double f = tvsUnits::factor(tr->database());
+		wchar_t sifra[32]; tvsSpiro::code(sifra, 32, tr->SizeAp1 * f, tr->SizeAp2 * f, tvsSpiro::eccentric(tr->TransType, tvsTransAlign::read(tr)), tvsSpiro::read(tr->database()).rg);
+		stringText = sifra;
 		return true;
 	}
     else if (stringTemplate == L"M" || stringTemplate == L"A" || stringTemplate == L"T") {
