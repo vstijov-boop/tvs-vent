@@ -17,17 +17,19 @@
 #include "dbapserv.h"
 #include "DrawingUnits.h"
 #include <cmath>
+#include <chrono>
 #include <cwchar>
 namespace tvsSpiro {
+inline unsigned long long nowMs(){return static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
 struct Settings{bool catalog;bool rg;double cMm;bool dashed;Settings():catalog(true),rg(false),cMm(25),dashed(true){}};
 inline const ACHAR* key(){return L"TVS_SPIRO_V1";}
 // Read cache: every round prelaz asks on every draw; kept 1 s per database, cleared by write().
-struct ReadCache {AcDbDatabase* db;ULONGLONG at;Settings s;ReadCache():db(NULL),at(0){}};
+struct ReadCache {AcDbDatabase* db;unsigned long long at;Settings s;ReadCache():db(NULL),at(0){}};
 inline ReadCache& readCache(){static ReadCache c;return c;}
 inline Settings readNow(AcDbDatabase* db);
 inline Settings read(AcDbDatabase* db){
     if(!db)db=acdbHostApplicationServices()->workingDatabase();
-    ReadCache& c=readCache();const ULONGLONG now=GetTickCount64();
+    ReadCache& c=readCache();const unsigned long long now=nowMs();
     if(db&&c.db==db&&now-c.at<1000)return c.s;
     const Settings s=readNow(db);c.db=db;c.at=now;c.s=s;return s;
 }

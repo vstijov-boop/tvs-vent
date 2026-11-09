@@ -13,10 +13,12 @@
 #include "DrawingUnits.h"
 #include "dbobjptr.h"
 #include <cmath>
+#include <chrono>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 namespace tvsPortGrip {
+inline unsigned long long nowMs(){return static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
 const int base=200;
 struct Port {AcGePoint3d p;AcGeVector3d dir;double a,b;bool round;Port():a(0),b(0),round(false){}};
 inline double plan(const AcGePoint3d& a,const AcGePoint3d& b){return std::hypot(a.x-b.x,a.y-b.y);}
@@ -56,11 +58,11 @@ inline int points(const TVS_Entity* e,AcGePoint3d out[3]){
 }
 // All connection points of the space, on a grid; rebuilt at most every 1.5 s (grips are asked in
 // bursts when fittings are selected, so a selection of many fittings scans the drawing once).
-struct Cache {AcDbObjectId space;ULONGLONG at;double cell;std::unordered_map<long long,std::vector<std::pair<AcDbObjectId,AcGePoint3d> > > grid;Cache():at(0),cell(0){}};
+struct Cache {AcDbObjectId space;unsigned long long at;double cell;std::unordered_map<long long,std::vector<std::pair<AcDbObjectId,AcGePoint3d> > > grid;Cache():at(0),cell(0){}};
 inline Cache& cache(){static Cache c;return c;}
 inline long long cellKey(double x,double y,double cell){const long long i=static_cast<long long>(std::floor(x/cell)),j=static_cast<long long>(std::floor(y/cell));return i*1000003LL+j;}
 inline void rebuild(const AcDbObjectId& spaceId,double tol){
-    Cache& c=cache();const ULONGLONG now=GetTickCount64();
+    Cache& c=cache();const unsigned long long now=nowMs();
     if(c.space==spaceId&&c.cell==tol&&now-c.at<1500)return;
     c.grid.clear();c.space=spaceId;c.cell=tol>0?tol:1;c.at=now;
     AcDbObjectPointer<AcDbBlockTableRecord> space(spaceId,AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
