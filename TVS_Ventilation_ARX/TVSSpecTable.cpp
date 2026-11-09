@@ -204,7 +204,10 @@ void TVSSpecTable::showPropsDlg()
 	dgSpecProperty dlg;
 	dlg.instructionMessage = CTVSInstructionTableProperty;
 	getRowSettings(dlg.specProps);
-	dlg.DoModal();
+	{
+		CAcModuleResourceOverride resourceOverride;
+		if (dlg.DoModal() != IDOK) return;   // Odustani: podešavanja ostaju
+	}
 	setRowSettings(dlg.specProps);
 }
 

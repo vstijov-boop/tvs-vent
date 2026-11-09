@@ -144,8 +144,11 @@
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
 		acedInitGet(RSG_NOZERO, _T("1 2 1d 2d"));
-		if (acedGetKword(_T("\nPretvorite u [1d/2d]<2d>: "), resultss) != RTNORM)
-			return;
+		{
+			const int rc = acedGetKword(_T("\nPretvorite u [1d/2d]<2d>: "), resultss);
+			if (rc == RTNONE) wcscpy_s(resultss, _T("2d"));   // Enter = podrazumijevano
+			else if (rc != RTNORM) { acedSSFree(sset); return; }
+		}
 
 		if (wcscmp(resultss, results1) == 0 || wcscmp(resultss, results2) == 0)
 		{
@@ -218,7 +221,7 @@
 
 
 		}
-		// Add your code for command Ventilation_ARX.TVS_1D2D here
+		acedSSFree(sset);
 	}
 
 	// - Ventilation_ARX.TVS_SPEC command (do not rename)
@@ -374,6 +377,7 @@
 		if (tvsTeeDialog::forSelection(sset, IDD_TEETYPE)) { acedSSFree(sset); return; }
 
 		Change(sset);
+		acedSSFree(sset);
 
 
 
@@ -567,7 +571,7 @@
 
 
 		}
-		// Add your code for command Ventilation_ARX.TVS_1D2D here
+		acedSSFree(sset);
 
 
 
@@ -592,7 +596,9 @@
 		while (status == false)
 		{
 
-			Astat = tvsCoordinates::selectEntity(_T("\nIzaberite liniju: "), ent, pt1);
+			const int picked = tvsCoordinates::selectEntity(_T("\nIzaberite liniju: "), ent, pt1);
+			if (picked == RTCAN) return;
+			Astat = picked == RTNORM;
 			if (Astat == true)
 			{
 
@@ -610,7 +616,7 @@
 								pLine->getStartPoint(pstart);
 								pLine->getEndPoint(pend);
 							}
-							pLine->close();
+							pEnt->close();
 						}
 					}
 					}
@@ -618,7 +624,7 @@
 			}
 		}
 		int * quantity = new int;
-		if (acedGetInt(_T("\nBroj segmenata: "), quantity) != RTNORM) return;
+		if (acedGetInt(_T("\nBroj segmenata: "), quantity) != RTNORM || *quantity < 1) { delete quantity; return; }
 		double pDist = pstart.distanceTo(pend);
 		for (int i = 1; i < *quantity + 1; i++)
 		{

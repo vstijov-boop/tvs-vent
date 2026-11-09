@@ -1,4 +1,4 @@
-# TVS_VENT – period testiranja (objedinjeno na master)
+﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
 ## Novi meni (TVS_VENT.cuix)
 Učitajte novi TVS_VENT.cuix (CUILOAD / Menuload ili zamjena postojećeg fajla).
@@ -22,6 +22,28 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 
 ## Otvoreno – treba testirati i javiti nazad
 **Prelaz – prenos dimenzija na susjedne kanale:** ispravljeno (vidi „Dimenzije na spojevima prelaz–kanal“ niže); provjeriti oba smjera.
+
+## Pregled koda – faze 1 i 2 (REVIEW_2026-11.md) – testirati
+**TVS_DIM_PRATI**
+- Kanal sa krajem na istoj tački u osnovi kao drugi kanal/prelaz na drugoj visini (jedan iznad drugog): promjena dimenzije gornjeg ne smije dirati donji.
+- Pitanje „Promijeniti cijelu dionicu…“ sada ima `[Da/Ne/Prelaz]`:
+  - **Ne** – mijenja se samo izabrani kanal; ako direktno naliježe na kanal/koljeno stare dimenzije, ispisuje se UPOZORENJE.
+  - **Prelaz** – samo izabrani kanal + prelaz nova→stara dimenzija na spoju (u susjednom kanalu; uz koljeno u izmijenjenom kanalu).
+- Poslije promjene cijele dionice (koljena pomjere krajeve) prelaz na kraju dionice treba da preuzme dimenziju.
+- Prelaz drugog oblika na kraju izmijenjenog kanala (okrugli/pravougaoni): poruka umjesto tihog preskakanja.
+- Dva otvorena crteža: izmjena u jednom ne smije se izgubiti ni prenijeti na drugi.
+- Kanal na zaključanom sloju uz prelaz: poruka.
+
+**Ostalo**
+- TVS_AttributesToProps: radi samo nad izabranim blokovima i pita `Da/Ne` (podrazumijevano Ne).
+- Svojstva okruglog koljena, „konstantan radijus“: poslije OK koljeno ostaje konstantnog radijusa.
+- TVS_EXCELSPEC bez Excel-a: poruka „Excel nije dostupan“, bez pada.
+- Menadžer blokova: dug tekst (>512 znakova) u ćeliji – bez pada (tekst se skraćuje).
+- TVS_SCALE: prazan klik i Enter ne ruše komandu; Esc izlazi.
+- TVS_1D2D: Enter = 2d.
+- TVS_AddAtrib: poruke grešaka sa nazivom bloka.
+- Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
+- Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
 ## Novo – testirati
 - **Štucna 45° (ASHRAE SR5-3):** opcija `Stucna` u TVS_CONNECTW, pri spajanju tokom crtanja, u opciji Tkomad i u TVS_TK_TIP. L = 0,25 × širina ogranka, min. 75 mm; kosi ulaz uzvodno (oKreni ga prebacuje); glavni kanal se crta neprekinut.

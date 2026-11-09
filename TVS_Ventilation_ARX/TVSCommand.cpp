@@ -36,4 +36,5 @@ void TVSCommand::execute(void)
 			}
 		}
 	}
+	acedSSFree(sset);
 }

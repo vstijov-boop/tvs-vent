@@ -131,14 +131,14 @@ void dgBlockManager::OnBnClickedOk()
 	for (int i = 0; i < blckList.specList.length(); i++)
 	{
 
-		wcscpy_s(blckList.specList[i].sPos, mGrid.GetItemText(i + 1, 1));
-		wcscpy_s(blckList.specList[i].sName, mGrid.GetItemText(i + 1, 2));
-		wcscpy_s(blckList.specList[i].sType, mGrid.GetItemText(i + 1, 3));
-		wcscpy_s(blckList.specList[i].sSize, mGrid.GetItemText(i + 1, 4));
-		wcscpy_s(blckList.specList[i].sArticle, mGrid.GetItemText(i + 1, 5));
-		wcscpy_s(blckList.specList[i].sManufacture, mGrid.GetItemText(i + 1, 6));
-		wcscpy_s(blckList.specList[i].sMass, mGrid.GetItemText(i + 1, 9));
-		wcscpy_s(blckList.specList[i].sCommit, mGrid.GetItemText(i + 1, 10));
+		wcsncpy_s(blckList.specList[i].sPos, mGrid.GetItemText(i + 1, 1), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sName, mGrid.GetItemText(i + 1, 2), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sType, mGrid.GetItemText(i + 1, 3), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sSize, mGrid.GetItemText(i + 1, 4), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sArticle, mGrid.GetItemText(i + 1, 5), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sManufacture, mGrid.GetItemText(i + 1, 6), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sMass, mGrid.GetItemText(i + 1, 9), _TRUNCATE);
+		wcsncpy_s(blckList.specList[i].sCommit, mGrid.GetItemText(i + 1, 10), _TRUNCATE);
 
 	}
 	this->OnOK();

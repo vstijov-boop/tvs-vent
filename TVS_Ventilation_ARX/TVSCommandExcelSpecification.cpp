@@ -21,6 +21,7 @@ void TVSCommandExcelSpecification::execute(void)
 	acedSSLength(sset, &len);
 	if (len == 0)
 	{
+		acedSSFree(sset);
 		return;
 	}
 
@@ -28,8 +29,9 @@ void TVSCommandExcelSpecification::execute(void)
 	#ifdef TVS_OFFSET_INTEGRATION
     if(!spec.processSetOfObjects(sset)){acedSSFree(sset);return;}
 #else
-    spec.processSetOfObjects(sset);
+        spec.processSetOfObjects(sset);
 #endif
+	acedSSFree(sset);
 	spec.sort();
 	TVSSpecTable table;
 	table.loadColumnsFromSettings();

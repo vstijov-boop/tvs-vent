@@ -121,6 +121,7 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 void TVSCommandLead::ShowLeadDlg()
 {
 	dgMLeadProperty dg;
+	CAcModuleResourceOverride resourceOverride;
 	dg.DoModal();
 }
 

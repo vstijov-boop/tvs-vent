@@ -17,6 +17,7 @@
 #include "MleaderController.h"
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "TeePort.h"
+#include "../geometry/SizeFollowRules.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
@@ -64,12 +65,20 @@ inline bool userEdit(){
     const CString& c=command();
     return c.IsEmpty()||!c.CompareNoCase(L"TVS_CHANGE")||!c.CompareNoCase(L"DBLCLKEDIT")||!c.CompareNoCase(L"PROPERTIES");
 }
+inline unsigned long long& postedAt(){static unsigned long long t=0;return t;}
+// Edits waiting in this drawing (the state is shared by all open drawings; each settles its own).
+inline bool waiting(AcDbDatabase* db){
+    for(std::map<AcDbObjectId,int>::const_iterator it=pending().begin();it!=pending().end();++it)if(it->first.database()==db)return true;
+    return false;
+}
 inline void post(){
-    if(posted()||(pending().empty()&&(touched().empty()||!autoLabels())))return;
-    if(pending().empty()){   // labels only: not into a running LISP / script (their input stream); later
-        resbuf rb={};if(acedGetVar(L"CMDACTIVE",&rb)==RTNORM&&rb.restype==RTSHORT&&(rb.resval.rint&(4|32)))return;}
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc)return;
-    posted()=true;acDocManager->sendStringToExecute(doc,L"_TVS_DIM_PRATI\n",false,true,false);
+    if(posted()&&tvsSpiro::nowMs()-postedAt()<5000)return;   // a posted run that never came (drawing closed) does not block for ever
+    const bool sizesWait=waiting(doc->database());
+    if(!sizesWait&&(touched().empty()||!autoLabels()))return;
+    if(!sizesWait){   // labels only: not into a running LISP / script (their input stream); later
+        resbuf rb={};if(acedGetVar(L"CMDACTIVE",&rb)==RTNORM&&rb.restype==RTSHORT&&(rb.resval.rint&(4|32)))return;}
+    posted()=true;postedAt()=tvsSpiro::nowMs();acDocManager->sendStringToExecute(doc,L"_TVS_DIM_PRATI\n",false,true,false);
 }
 class DbReactor : public AcDbDatabaseReactor {
 public:
@@ -94,7 +103,12 @@ public:
 };
 inline DbReactor& dbReactor(){static DbReactor r;return r;}
 inline std::set<AcDbDatabase*>& attached(){static std::set<AcDbDatabase*> s;return s;}
-inline void DbReactor::goodbye(const AcDbDatabase* db){attached().erase(const_cast<AcDbDatabase*>(db));}
+template<class M> inline void forget(M& m,const AcDbDatabase* db){for(typename M::iterator it=m.begin();it!=m.end();){if(it->first.database()==db)m.erase(it++);else ++it;}}
+inline void DbReactor::goodbye(const AcDbDatabase* db){
+    attached().erase(const_cast<AcDbDatabase*>(db));
+    forget(pending(),db);forget(previous(),db);forget(opened(),db);   // ids of a closing drawing
+    for(std::set<AcDbObjectId>::iterator it=touched().begin();it!=touched().end();){if(it->database()==db)touched().erase(it++);else ++it;}
+}
 class EdReactor : public AcEditorReactor {
 public:
     virtual void commandWillStart(const ACHAR* c){command()=c?c:L"";}
@@ -313,15 +327,16 @@ inline bool etazResize(const tvsOffsetRefit::Assembly& s,double A,double B,doubl
 #endif
 // TVS transition right behind a T komad: the duct `ductId` (end `nearIsFirst` on the T komad
 // port `at`) is shortened by the transition length; prelaz new size (A x B) -> its own size.
-inline void prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGePoint3d& at,double A,double B,double f){
+inline bool prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGePoint3d& at,double A,double B,double f,const wchar_t* where=L"Iza T komada"){
     AcGePoint3d N,E;double width=0,height=0,elev=0;bool oneD=false,round=false;
-    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return;
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return false;
      N=nearIsFirst?d->FirstPoint:d->LastPoint;E=nearIsFirst?d->LastPoint:d->FirstPoint;width=d->SizeA;height=d->SizeB;elev=d->Elev;oneD=d->This1D;round=d->ThisRound;}
     AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length(),lt=tvsSpiro::drawingLength(NULL,A,round,width,round,tvsTeeFit::transitionMm()/f);   // spiro: po katalogu SOKO
-    if(length<lt+50.0/f){acutPrintf(L"\nIza T komada: kanal je prekratak za prelaz %.0f mm; prilagodite ručno.",lt*f);return;}
+    if(length<lt+50.0/f){acutPrintf(L"\n%ls: kanal je prekratak za prelaz %.0f mm; prilagodite ručno.",where,lt*f);return false;}
     dir.normalize();const AcGePoint3d start(at.x,at.y,N.z),end=start+dir*lt;
-    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
-     if((nearIsFirst?d->put_FirstPoint(end):d->put_Lastpoint(end))!=Acad::eOk)return;d->recordGraphicsModified();}
+    {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);
+     if(d.openStatus()!=Acad::eOk){acutPrintf(L"\n%ls: kanal se ne može mijenjati (zaključan sloj?); prelaz nije umetnut.",where);return false;}
+     if((nearIsFirst?d->put_FirstPoint(end):d->put_Lastpoint(end))!=Acad::eOk)return false;d->recordGraphicsModified();}
     double a1=A,b1=round?0:B,a2=width,b2=round?0:height,len=lt;AcGeVector3d v=dir*lt;AcGePoint3d p0=start;
     TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,p0,round,round,1,oneD);
     if(t&&!t->objectId().isNull()){
@@ -329,8 +344,40 @@ inline void prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGeP
         if(o.openStatus()==Acad::eOk){
             AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()==Acad::eOk)o->setPropertiesFrom(d.object());
             o->put_Elevation(elev);o->recordGraphicsModified();}
-        acutPrintf(L"\nIza T komada umetnut prelaz na staru dimenziju, dužine %.0f mm.",lt*f);
+        acutPrintf(L"\n%ls umetnut prelaz na staru dimenziju, dužine %.0f mm.",where,lt*f);
+        return true;
     }
+    return false;
+}
+// Other elements with a port on the plan point `at` (not node `self`).
+inline int othersAt(const std::vector<tvsMove::Node>& nodes,int self,const tvsMove::Point& at,double tol){
+    int n=0;for(size_t k=0;k<nodes.size();++k){if(static_cast<int>(k)==self)continue;
+        for(size_t j=0;j<nodes[k].ports.size();++j)if(nearXY(nodes[k].ports[j],at,tol)){++n;break;}}
+    return n;
+}
+// Ends of the edited duct `start` (new size) lying directly on a duct / plan elbow of the old
+// size, without a prelaz. insert: a prelaz new -> old is put there, in the neighbouring duct
+// (the edited duct keeps its length) or, at an elbow, in the edited duct. Returns the number
+// of such joints (insert: of the transitions made).
+inline int joints(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& old,double tol,double f,bool insert){
+    const tvsMove::Node& s=nodes[start];double A=0,B=0;
+    {AcDbObjectPointer<TVS_Pipe> p(s.id,AcDb::kForRead);if(p.openStatus()!=Acad::eOk)return 0;A=p->SizeA;B=p->SizeB;}
+    int found=0;
+    for(int side=0;side<2&&side<static_cast<int>(s.ports.size());++side){
+        const tvsMove::Point at=s.ports[side];int next=-1,count=0;
+        for(size_t k=0;k<nodes.size();++k){if(static_cast<int>(k)==start)continue;
+            for(size_t j=0;j<nodes[k].ports.size();++j)
+                if(nearXY(nodes[k].ports[j],at,tol)&&std::fabs(nodes[k].elevation-s.elevation)<=tol){next=static_cast<int>(k);++count;break;}}
+        if(count!=1)continue;
+        const tvsMove::Node& n=nodes[next];
+        if((n.kind!=1&&n.kind!=2)||n.ports.size()!=2||n.round!=s.round||std::fabs(n.a-old.a[0])>1e-6||(!n.round&&std::fabs(n.b-old.b[0])>1e-6))continue;
+        {AcDbObjectPointer<AcDbEntity> e(n.id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!(plainDuct(e.object())||plainElbow(e.object())))continue;}
+        if(!insert){++found;continue;}
+        const AcGePoint3d P=tvsMove::acad(at);
+        if(n.kind==1){if(prelazBehind(n.id,nearXY(n.ports[0],at,tol),P,A,B,f,L"Na spoju"))++found;}
+        else if(prelazBehind(s.id,side==0,P,old.a[0],old.b[0],f,L"Na spoju (uz koljeno)"))++found;
+    }
+    return found;
 }
 // Applies the new size of duct `start` to the run. false: nothing changed (reason printed).
 inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run& run,const Etazes& etazes,double tol,std::vector<AcDbObjectId>& resized){
@@ -449,43 +496,52 @@ inline int refreshLabels(AcDbDatabase* db){
 // Spiro prelaz (oba kraja okrugla) poslije promjene precnika: duzina po katalogu SOKO. The end
 // `end` (0 = FirstPoint) sits on the duct `ductId`; that end moves along the transition and the
 // duct end with it, so the rest of the run stays where it is. Transition open for write.
-inline void spiroLength(TVS_TRANS* t,int end,const AcDbObjectId& ductId,double f){
-    if(!t||!tvsSpiro::applies(t->database(),t->SizeAp1,t->ThisRoundp1,t->SizeAp2,t->ThisRoundp2,t->getDuctType()==DuctTypeFlex))return;
-    AcGeVector3d dir=t->VectTr;dir.z=0;const double now=dir.length();if(now<1e-12)return;dir.normalize();
+inline bool spiroLength(TVS_TRANS* t,int end,const AcDbObjectId& ductId,double f){
+    if(!t||!tvsSpiro::applies(t->database(),t->SizeAp1,t->ThisRoundp1,t->SizeAp2,t->ThisRoundp2,t->getDuctType()==DuctTypeFlex))return false;
+    AcGeVector3d dir=t->VectTr;dir.z=0;const double now=dir.length();if(now<1e-12)return false;dir.normalize();
     const double want=tvsSpiro::drawingLength(t->database(),t->SizeAp1,true,t->SizeAp2,true,now),delta=want-now;
-    if(std::fabs(delta)<0.5/f)return;
+    if(std::fabs(delta)<0.5/f)return false;
     const AcGeVector3d shift=end==0?-dir*delta:dir*delta;
     const AcGePoint3d at=end==0?t->FirstPoint:t->FirstPoint+t->VectTr;   // axis point on the duct side (plan)
-    AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
+    AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return false;
     const bool first=d->FirstPoint.distanceTo(AcGePoint3d(at.x,at.y,d->FirstPoint.z))<=d->LastPoint.distanceTo(AcGePoint3d(at.x,at.y,d->LastPoint.z));
     const AcGePoint3d nearEnd=first?d->FirstPoint:d->LastPoint,other=first?d->LastPoint:d->FirstPoint;
     const AcGePoint3d moved=nearEnd+shift;AcGeVector3d rest=other-moved;rest.z=0;
     if(rest.length()<50.0/f||rest.dotProduct(other-nearEnd)<=0){
-        acutPrintf(L"\nSpiro prelaz: kanal je prekratak za katalošku dužinu %.0f mm; dužina prelaza nije promijenjena.",want*f);return;}
-    if((first?d->put_FirstPoint(moved):d->put_Lastpoint(moved))!=Acad::eOk)return;d->recordGraphicsModified();
+        acutPrintf(L"\nSpiro prelaz: kanal je prekratak za katalošku dužinu %.0f mm; dužina prelaza nije promijenjena.",want*f);return false;}
+    if((first?d->put_FirstPoint(moved):d->put_Lastpoint(moved))!=Acad::eOk)return false;d->recordGraphicsModified();
     t->assertWriteEnabled();
     if(end==0)t->FirstPoint+=shift;else t->LastPoint+=shift;
     t->put_Length(want);
     acutPrintf(L"\nSpiro prelaz: dužina po katalogu %.0f mm.",want*f);
+    return true;
 }
 inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work);
 inline void run(){
     posted()=false;
-    std::map<AcDbObjectId,int> work;work.swap(pending());
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
+    // this drawing only: edits waiting in another open drawing stay for it
+    std::map<AcDbObjectId,int> work;
+    for(std::map<AcDbObjectId,int>::iterator it=pending().begin();it!=pending().end();){
+        if(it->first.database()==db){work.insert(*it);pending().erase(it++);}else ++it;}
     if(db&&!work.empty())settle(db,work);
     if(db)refreshLabels(db);   // after the sizes: their own changes are in the set too
     touched().clear();
 }
 inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
     const double f=tvsUnits::factor(db),tol=1.0/f;
-    std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;if(!tvsMove::snapshot(db,nodes,labels))return;
+    std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
+    if(!tvsMove::snapshot(db,nodes,labels)){acutPrintf(L"\nTVS_DIM_PRATI: mreža se ne može pročitati (objekat otvoren u drugoj komandi?); dimenzije na spojevima nisu prilagođene.");return;}
+    bool dirty=false;   // geometry changed since the snapshot: read again before the next step
+    auto fresh=[&](){if(!dirty)return true;dirty=false;nodes.clear();labels.setLogicalLength(0);return tvsMove::snapshot(db,nodes,labels);};
     auto index=[&](const AcDbObjectId& id){for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==id)return static_cast<int>(i);return -1;};
     applying()=true;
     int ducts=0,transitions=0;
     std::vector<std::pair<AcDbObjectId,int> > queue(work.begin(),work.end());std::set<AcDbObjectId> done;
     {   // whole run up to the next prelaz: ask once for all edited ducts
-        std::map<AcDbObjectId,Sizes> old;old.swap(previous());
+        std::map<AcDbObjectId,Sizes> old;   // of the ducts settled now (other drawings keep theirs)
+        for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w){
+            std::map<AcDbObjectId,Sizes>::iterator p=previous().find(w->first);if(p!=previous().end()){old.insert(*p);previous().erase(p);}}
         std::vector<std::pair<int,Run> > runs;std::set<int> seen;int elbows=0,others=0,tees=0,etazCount=0,bypassCount=0;std::vector<CString> stops;
         Etazes etazes;
 #ifdef TVS_OFFSET_INTEGRATION
@@ -503,25 +559,35 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
         if(!runs.empty()){
             if(!stops.empty()){CString list;for(size_t k=0;k<stops.size();++k){if(k)list+=L", ";list+=stops[k];}
                 acutPrintf(L"\nDionica staje na: %ls (ti elementi se ne mijenjaju).",list.GetString());}
-            wchar_t prompt[260];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d, T komada %d, etaža %d, obilazaka %d)? [Da/Ne] <Da>: ",elbows,others,tees,etazCount,bypassCount);
-            acedInitGet(0,L"Da Ne");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw);
+            wchar_t prompt[260];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d, T komada %d, etaža %d, obilazaka %d)? [Da/Ne/Prelaz] <Da>: ",elbows,others,tees,etazCount,bypassCount);
+            acedInitGet(0,L"Da Ne Prelaz");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw);
             if(rc==RTNONE||(rc==RTNORM&&_wcsicmp(kw,L"Da")==0)){
                 int changed=0;
                 for(size_t k=0;k<runs.size();++k){std::vector<AcDbObjectId> resized;
                     if(!applyRun(nodes,runs[k].first,runs[k].second,etazes,tol,resized))continue;
                     changed+=static_cast<int>(runs[k].second.elbows.size()+runs[k].second.tees.size()+runs[k].second.etazes.size()+resized.size());
                     for(size_t j=0;j<resized.size();++j)if(done.insert(resized[j]).second)queue.push_back(std::make_pair(resized[j],3));}
-                if(changed)acutPrintf(L"\nDionica promijenjena: elemenata %d.",changed);
+                if(changed){acutPrintf(L"\nDionica promijenjena: elemenata %d.",changed);dirty=true;}
+            }else{
+                // Ne / Prelaz / Esc: the edited duct alone has the new size
+                const bool insert=rc==RTNORM&&_wcsicmp(kw,L"Prelaz")==0;int n=0;
+                for(size_t k=0;k<runs.size();++k){std::map<AcDbObjectId,Sizes>::const_iterator o=old.find(nodes[runs[k].first].id);
+                    if(o!=old.end())n+=joints(nodes,runs[k].first,o->second,tol,f,insert);}
+                if(insert){if(n)dirty=true;else acutPrintf(L"\nPrelaz na spoju nije umetnut (spoj sa više elemenata, T komad ili element druge dimenzije).");}
+                else if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza (opcija Prelaz ga umeće).",n);
             }
         }
     }
-    for(size_t q=0;q<queue.size()&&q<500;++q){
+    bool shapeNote=false;
+    for(size_t q=0;q<queue.size();++q){
+        if(q>=5000){acutPrintf(L"\nTVS_DIM_PRATI: prekinuto poslije 5000 elemenata; ostatak mreže nije prilagođen.");break;}
+        if(!fresh())break;
         const AcDbObjectId id=queue[q].first;const int ends=queue[q].second;const int i=index(id);if(i<0)continue;
         AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)continue;
         if(TVS_Pipe::cast(e.object())){
             // duct -> transitions at its ends
             if(!plainDuct(e.object()))continue;const TVS_Pipe* p=TVS_Pipe::cast(e.object());
-            const double A=p->SizeA,B=p->SizeB;const bool round=p->ThisRound;e.close();
+            const double A=p->SizeA,B=p->SizeB,level=p->Elev;const bool round=p->ThisRound;e.close();
             for(size_t k=0;k<nodes.size();++k){if(nodes[k].id==id||nodes[k].ports.size()!=2)continue;
                 int touching=0;   // ends of node k at an end of the duct (cheap test before opening)
                 for(int end=0;end<2;++end)for(int j=0;j<2;++j)if(nearXY(nodes[i].ports[j],nodes[k].ports[end],tol))touching|=1<<end;
@@ -530,26 +596,35 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 AcDbObjectPointer<TVS_TRANS> t(nodes[k].id,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
                 for(int end=0;end<2;++end){
                     if(!(touching&(1<<end)))continue;
-                    const bool tRound=end==0?t->ThisRoundp1:t->ThisRoundp2;if(tRound!=round)continue;
+                    const bool tRound=end==0?t->ThisRoundp1:t->ThisRoundp2;
                     double& ta=end==0?t->SizeAp1:t->SizeAp2;double& tb=end==0?t->SizeBp1:t->SizeBp2;
+                    // several elements on this plan point (ducts one above the other): the one that meets in height
+                    if(!tvsFollowRules::joined(othersAt(nodes,i,nodes[k].ports[end],tol),level,tvsFollowRules::height(A,B,round),
+                        t->Elev+(end==0?0:tvsTransAlignCmd::endOffset(t.object())),tvsFollowRules::height(ta,tb,tRound),tol))continue;
+                    if(tRound!=round){if(!shapeNote){shapeNote=true;acutPrintf(L"\nPrelaz uz izmijenjeni kanal ima drugi oblik na tom kraju (okrugli / pravougaoni): nije mijenjan, prilagodite ga u Svojstvima.");}continue;}
                     if(std::fabs(ta-A)<=1e-9&&std::fabs(tb-B)<=1e-9)continue;
                     const tvsTransAlignCmd::Before was=tvsTransAlignCmd::before(t.object());
                     t->assertWriteEnabled();ta=A;tb=B;
                     tvsTransAlignCmd::afterEdit(t.object(),was,-1,-1);   // outlet moved: TVS_PRELAZ_KOTA asks
-                    spiroLength(t.object(),end,id,f);                    // spiro: duzina po katalogu, kanal skraceni / produzeni
+                    if(spiroLength(t.object(),end,id,f))dirty=true;      // spiro: duzina po katalogu, kanal skraceni / produzeni
                     t->recordGraphicsModified();++transitions;
                 }
             }
         }else if(TVS_TRANS* t=TVS_TRANS::cast(e.object())){
             // transition end -> duct at that end (then on through that duct)
             if(nodes[i].ports.size()!=2)continue;
-            double A[2]={t->SizeAp1,t->SizeAp2},B[2]={t->SizeBp1,t->SizeBp2};bool R[2]={t->ThisRoundp1,t->ThisRoundp2};e.close();
+            double A[2]={t->SizeAp1,t->SizeAp2},B[2]={t->SizeBp1,t->SizeBp2};bool R[2]={t->ThisRoundp1,t->ThisRoundp2};
+            const double level[2]={t->Elev,t->Elev+tvsTransAlignCmd::endOffset(t)};e.close();
             for(int end=0;end<2;++end){if(!(ends&(1<<end)))continue;
                 for(size_t k=0;k<nodes.size();++k){if(nodes[k].kind!=1||nodes[k].id==id)continue;
                     bool touch=false;for(int j=0;j<2&&j<static_cast<int>(nodes[k].ports.size());++j)if(nearXY(nodes[k].ports[j],nodes[i].ports[end],tol))touch=true;
                     if(!touch)continue;
-                    AcDbObjectPointer<TVS_Pipe> p(nodes[k].id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object())||p->ThisRound!=R[end])continue;
+                    AcDbObjectPointer<TVS_Pipe> p(nodes[k].id,AcDb::kForWrite);
+                    if(p.openStatus()!=Acad::eOk){acutPrintf(L"\nKanal uz prelaz se ne može mijenjati (zaključan sloj?): dimenzija nije prenesena.");continue;}
+                    if(!plainDuct(p.object())||p->ThisRound!=R[end])continue;
                     if(std::fabs(p->SizeA-A[end])<=1e-9&&std::fabs(p->SizeB-B[end])<=1e-9)continue;
+                    if(!tvsFollowRules::joined(othersAt(nodes,i,nodes[i].ports[end],tol),level[end],tvsFollowRules::height(A[end],B[end],R[end]),
+                        p->Elev,tvsFollowRules::height(p->SizeA,p->SizeB,p->ThisRound),tol))continue;
                     p->put_SizeA(A[end]);p->put_SizeB(B[end]);p->recordGraphicsModified();++ducts;
                     if(done.insert(nodes[k].id).second)queue.push_back(std::make_pair(nodes[k].id,3));   // its other end
                 }
@@ -563,7 +638,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
             AcDbObjectPointer<AcDbEntity> e(*c,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!plainDuct(e.object()))continue;
             e.close();tvsTeePort::afterDuct(db,*c);}
     }
-    applying()=false;pending().clear();
+    applying()=false;
     if(ducts||transitions)acutPrintf(L"\nDimenzije na spojevima: prilagodjeno prelaza %d, kanala %d.",transitions,ducts);
 }
 }
