@@ -63,6 +63,7 @@
 #include "TeeInsert.h"
 #include "MatchCommand.h"
 #include "SectionCommand.h"
+#include "SectionDialog.h"
 #include "LevelTooltip.h"
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "../TVS_Ventilation_DBX/PortGrips.h"

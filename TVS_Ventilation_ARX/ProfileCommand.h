@@ -9,8 +9,8 @@
 #include "SectionCommand.h"
 #include "../geometry/Profile.h"
 namespace tvsProfileCmd {
-struct Params {std::wstring letter;AcDbObjectId first,last;double floor,ceiling,scale;
-    Params():floor(0),ceiling(0),scale(50){}};
+struct Params {std::wstring letter;AcDbObjectId first,last;double floor,ceiling,scale,sp;   // sp: spusteni plafon below the floor above (0 = none)
+    Params():floor(0),ceiling(0),scale(50),sp(0){}};
 inline const ACHAR* key(){return L"TVS_UZDUZNI_V1";}
 inline std::wstring blockName(const std::wstring& letter){return L"TVS_UZDUZNI_"+letter;}
 inline double pi(){return 3.14159265358979323846;}
@@ -77,6 +77,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
     tvsSectionCmd::line(btr,-margin,H,L+margin,H,layerId);
     tvsSectionCmd::text(btr,AcGePoint3d(-margin-gap,0,0),tvsSectionCmd::level(p.floor,f).c_str(),th,style,layerId,true);
     tvsSectionCmd::text(btr,AcGePoint3d(-margin-gap,H,0),tvsSectionCmd::level(p.ceiling,f).c_str(),th,style,layerId,true);
+    tvsSectionCmd::ceilingLine(btr,-margin,L+margin,p.floor,p.ceiling,p.sp,th,gap,style,layerId);
     double low=0;   // lowest drawn point (relative to the floor), for the table
     for(size_t k=0;k<pieces.size();++k){
         const tvsProfile::Piece& c=pieces[k];
@@ -142,11 +143,11 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
 inline void store(AcDbBlockTableRecord* btr,const Params& p){
     if(btr->createExtensionDictionary()!=Acad::eOk&&btr->extensionDictionary().isNull())return;
     AcDbObjectPointer<AcDbDictionary> dict(btr->extensionDictionary(),AcDb::kForWrite);if(dict.openStatus()!=Acad::eOk)return;
-    resbuf n[7]={};const short types[7]={1,1,330,330,40,40,40};
-    for(int j=0;j<7;++j){n[j].restype=types[j];n[j].rbnext=j<6?&n[j+1]:NULL;}
+    resbuf n[8]={};const short types[8]={1,1,330,330,40,40,40,40};
+    for(int j=0;j<8;++j){n[j].restype=types[j];n[j].rbnext=j<7?&n[j+1]:NULL;}
     n[0].resval.rstring=const_cast<ACHAR*>(L"TVS_UZDUZNI/1");n[1].resval.rstring=const_cast<ACHAR*>(p.letter.c_str());
     if(acdbGetAdsName(n[2].resval.rlname,p.first)!=Acad::eOk||acdbGetAdsName(n[3].resval.rlname,p.last)!=Acad::eOk)return;
-    n[4].resval.rreal=p.floor;n[5].resval.rreal=p.ceiling;n[6].resval.rreal=p.scale;
+    n[4].resval.rreal=p.floor;n[5].resval.rreal=p.ceiling;n[6].resval.rreal=p.scale;n[7].resval.rreal=p.sp;
     AcDbObjectId id;AcDbXrecord* rec=NULL;
     if(dict->getAt(key(),id)==Acad::eOk){if(acdbOpenObject(rec,id,AcDb::kForWrite)!=Acad::eOk)rec=NULL;}
     else{rec=new AcDbXrecord();if(dict->setAt(key(),rec,id)!=Acad::eOk){delete rec;rec=NULL;}}
@@ -165,6 +166,7 @@ inline bool load(const AcDbBlockTableRecord* btr,Params& p){
             case 3:if(acdbGetObjectId(p.last,q->resval.rlname)!=Acad::eOk)ok=false;break;
             case 4:p.floor=q->resval.rreal;break;case 5:p.ceiling=q->resval.rreal;break;case 6:p.scale=q->resval.rreal;break;}
         if(!ok)break;q=q->rbnext;}
+    if(ok&&q&&q->restype==40)p.sp=q->resval.rreal;   // spusteni plafon (older profiles: none)
     acutRelRb(data);return ok;
 }
 // TVS_PRESJEK -> Osvjezi on a uzduzni presjek. false = not a uzduzni presjek block.

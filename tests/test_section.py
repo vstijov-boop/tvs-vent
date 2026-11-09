@@ -116,7 +116,7 @@ class Section(unittest.TestCase):
    target=pathlib.Path(f)/'s';compile_cpp(cpp,target);subprocess.run([str(executable(target))],check=True)
  def test_contracts(self):
   e=entry_source()
-  self.assertIn('Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL',e);self.assertIn('tvsSectionCmd::run();',e)
+  self.assertIn('Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL',e);self.assertIn('tvsSectionDialog::run(IDD_SECTION);',e)
   s=(ROOT/'TVS_Ventilation_ARX/SectionCommand.h').read_text(encoding='utf-8-sig')
   self.assertIn('const int n=build(btr.object(),p);refreshReferences(btr.object());',s,'Osvjezi rebuilds the block from stored parameters')
   self.assertIn('const short types[]={1,1,10,10,70,40,40,40};',s)

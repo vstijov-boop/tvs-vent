@@ -26,9 +26,10 @@ namespace tvsProfileCmd {inline void run();inline bool rebuild(AcDbBlockTableRec
 namespace tvsSectionCmd {
 // depth: zone behind the section plane (drawing units, 0 = cut elements only);
 // hidden: 0 = parts covered by nearer elements are left out, 1 = drawn dashed.
-struct Params {AcGePoint3d p1,p2;bool flip;double floor,ceiling,scale,depth;int hidden;std::wstring letter;   // floor/ceiling: drawing units
-    Params():flip(false),floor(0),ceiling(0),scale(50),depth(0),hidden(0){}};
-struct Remembered {double floorM,ceilingM,scale;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),hidden(0){}};
+// sp: spusteni plafon, distance below the floor above (drawing units, 0 = none).
+struct Params {AcGePoint3d p1,p2;bool flip;double floor,ceiling,scale,depth,sp;int hidden;std::wstring letter;   // floor/ceiling: drawing units
+    Params():flip(false),floor(0),ceiling(0),scale(50),depth(0),sp(0),hidden(0){}};
+struct Remembered {double floorM,ceilingM,scale,spM;bool spOn;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),spM(0.5),spOn(false),hidden(0){}};
 inline Remembered& remembered(){static Remembered r;return r;}
 inline const ACHAR* key(){return L"TVS_PRESJEK_V1";}
 inline const ACHAR* layerName(){return L"TVS_PRESJEK";}
@@ -135,6 +136,8 @@ inline void levelMark(AcDbBlockTableRecord* btr,double x,double edge,bool top,co
     append(btr,tx,layerId);
 }
 inline std::wstring level(double drawing,double f){wchar_t s[40];swprintf_s(s,L"%+.3f",drawing*f/1000);return s;}
+// Spusteni plafon: dashed line at (H - sp) above the floor, with its level (left, as the floor levels).
+inline void ceilingLine(AcDbBlockTableRecord* btr,double x0,double x1,double floor,double ceiling,double sp,double th,double gap,const AcDbObjectId& style,const AcDbObjectId& layerId);
 // Dimension style of the sections at this text height: values in mm (dimlfac = units factor).
 inline AcDbObjectId dimStyle(AcDbDatabase* db,double th,double f,const AcDbObjectId& textStyle){
     wchar_t name[64];swprintf_s(name,L"TVS_PRESJEK_%.0f",th*f*100);
@@ -172,6 +175,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
     line(btr,-margin,H,L+margin,H,layerId);
     text(btr,AcGePoint3d(-margin-gap,0,0),level(p.floor,f).c_str(),th,style,layerId,true);
     text(btr,AcGePoint3d(-margin-gap,H,0),level(p.ceiling,f).c_str(),th,style,layerId,true);
+    ceilingLine(btr,-margin,L+margin,p.floor,p.ceiling,p.sp,th,gap,style,layerId);
     for(size_t i=0;i<cuts.size();++i){
         const tvsSection::Cut& c=cuts[i];const double x=c.s,y=c.z-p.floor,hw=c.w/2,hh=c.h/2;
         if(c.round){
@@ -241,7 +245,7 @@ inline void store(AcDbBlockTableRecord* btr,const Params& p){
     if(btr->createExtensionDictionary()!=Acad::eOk&&btr->extensionDictionary().isNull())return;
     AcDbObjectPointer<AcDbDictionary> dict(btr->extensionDictionary(),AcDb::kForWrite);if(dict.openStatus()!=Acad::eOk)return;
     resbuf* data=acutBuildList(1,L"TVS_PRESJEK/1",1,p.letter.c_str(),10,asDblArray(p.p1),10,asDblArray(p.p2),70,p.flip?1:0,
-        40,p.floor,40,p.ceiling,40,p.scale,40,p.depth,70,p.hidden,RTNONE);
+        40,p.floor,40,p.ceiling,40,p.scale,40,p.depth,70,p.hidden,40,p.sp,RTNONE);
     AcDbObjectId id;AcDbXrecord* rec=NULL;
     if(dict->getAt(key(),id)==Acad::eOk){if(acdbOpenObject(rec,id,AcDb::kForWrite)!=Acad::eOk)rec=NULL;}
     else{rec=new AcDbXrecord();if(dict->setAt(key(),rec,id)!=Acad::eOk){delete rec;rec=NULL;}}
@@ -259,7 +263,8 @@ inline bool load(const AcDbBlockTableRecord* btr,Params& p){
         switch(j){case 1:p.letter=q->resval.rstring;break;case 2:p.p1=asPnt3d(q->resval.rpoint);break;case 3:p.p2=asPnt3d(q->resval.rpoint);break;
             case 4:p.flip=q->resval.rint!=0;break;case 5:p.floor=q->resval.rreal;break;case 6:p.ceiling=q->resval.rreal;break;case 7:p.scale=q->resval.rreal;break;}
         q=q->rbnext;}
-    if(ok&&q&&q->restype==40){p.depth=q->resval.rreal;q=q->rbnext;if(q&&q->restype==70)p.hidden=q->resval.rint;}   // P1b; older sections: no depth
+    if(ok&&q&&q->restype==40){p.depth=q->resval.rreal;q=q->rbnext;if(q&&q->restype==70){p.hidden=q->resval.rint;q=q->rbnext;}   // P1b; older sections: no depth
+        if(q&&q->restype==40)p.sp=q->resval.rreal;}                                                              // spusteni plafon
     acutRelRb(data);return ok;
 }
 // Section line in plan: line, view arrows and letters (plain entities).
@@ -285,6 +290,16 @@ inline void planMarks(AcDbDatabase* db,const Params& p){
         AcDbText* t=new AcDbText(at,p.letter.c_str(),style,1.4*th,0);t->setDatabaseDefaults(db);t->setTextStyle(style);t->setHeight(1.4*th);
         t->setHorizontalMode(AcDb::kTextCenter);t->setVerticalMode(AcDb::kTextVertMid);t->setAlignmentPoint(at);append(space.object(),t,layerId);
     }
+}
+inline void ceilingLine(AcDbBlockTableRecord* btr,double x0,double x1,double floor,double ceiling,double sp,double th,double gap,const AcDbObjectId& style,const AcDbObjectId& layerId){
+    const double H=ceiling-floor;if(!(sp>0)||!(sp<H))return;
+    AcDbDatabase* db=btr->database();const double f=tvsUnits::factor(db),y=H-sp;
+    tvsLinetypes::ensure(db);AcDbObjectId dashed;AcDbLinetypeTable* lt=NULL;
+    if(db->getLinetypeTable(lt,AcDb::kForRead)==Acad::eOk){lt->getAt(L"tvs_hidden",dashed);lt->close();}
+    const AcDbObjectId id=append(btr,new AcDbLine(AcGePoint3d(x0,y,0),AcGePoint3d(x1,y,0)),layerId);
+    if(!dashed.isNull()){AcDbObjectPointer<AcDbLine> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk){o->setLinetype(dashed);o->setLinetypeScale(1/f);}}
+    const std::wstring t=L"SP "+level(ceiling-sp,f);
+    text(btr,AcGePoint3d(x0-gap,y,0),t.c_str(),th,style,layerId,true);
 }
 inline bool blockExists(AcDbDatabase* db,const std::wstring& name){
     AcDbBlockTable* raw=NULL;if(db->getBlockTable(raw,AcDb::kForRead)!=Acad::eOk)return false;

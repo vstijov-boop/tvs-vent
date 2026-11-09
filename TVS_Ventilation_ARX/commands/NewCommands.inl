@@ -67,7 +67,7 @@
     {
         if (ActivationErrorMessage() != pError_Ok) return;
         syncTVSGlobalUnits();
-        tvsSectionCmd::run();
+        tvsSectionDialog::run(IDD_SECTION);   // dialog (SectionDialog.h)
     }
     // TVS_MATCH: TVS properties of a source duct onto selected elements (MatchCommand.h).
     static void Ventilation_ARXTVS_MATCH(void)
