@@ -29,6 +29,7 @@
 #include "Func.h"
 #include "CoordinateInput.h"
 #include "TVSMoveCommand.h"
+#include "AlignCommand.h"
 #ifdef TVS_OFFSET_PROOF
 #include "TVSTestOffset.h"
 #endif
@@ -63,9 +64,12 @@
 #include "MatchCommand.h"
 #include "SectionCommand.h"
 #include "LevelTooltip.h"
+#include "../TVS_Ventilation_DBX/SpiroCatalog.h"
+#include "../TVS_Ventilation_DBX/PortGrips.h"
 #include "TransAlignCommand.h"
 #include "SizeFollow.h"
 #include "ExportCommand.h"
+#include "TeeTypeDialog.h"
 
 #include "TVSLeadCommand.h"
 #include "TVSCommandLeadRecalculate.h"
@@ -377,6 +381,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddProp
 
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MOVE, TVS_MOVE, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_ALIGN, TVS_ALIGN, ACRX_CMD_MODAL, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_TRANSPARENT, NULL)
@@ -418,7 +423,7 @@ ACED_ADSSYMBOL_ENTRY_AUTO(CTVS_Ventilation_ARXApp, MyLispFunction, false)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_STRETCH, TVS_STRETCH, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNE, TVS_FLEX_MANZETNE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_FLEX_MANZETNA, TVS_FLEX_MANZETNA, ACRX_CMD_MODAL, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TK_TIP, TVS_TK_TIP, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET | ACRX_CMD_REDRAW, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRELAZ_KOTA, TVS_PRELAZ_KOTA, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_DIM_PRATI, TVS_DIM_PRATI, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_LEAD_AUTO, TVS_LEAD_AUTO, ACRX_CMD_MODAL, NULL)

@@ -15,7 +15,8 @@ struct Section {
 struct Body {Kind kind;std::vector<Point> ports,axes,junctions;std::vector<Section> sections;Body():kind(Blocked){}};
 struct Contact {int body,port,count;Contact():body(-1),port(-1),count(0){}};
 enum Error { Ok,Invalid,Ambiguous,Unsupported,SectionMismatch,NotTangent,NonPlanar,TooShort,SideBranch,NewContact,Cycle,TooMany,MaskMismatch,UnsupportedBody,PartialRigid,BlockedNeighbour };
-struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;int problem;Result():changed(0),error(Invalid),problem(-1){}};
+// SideBranch: `other` is the body whose port (junction: centre of a T komad) lies at `where` inside pipe `problem`.
+struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;int problem,other;bool junction;Point where;Result():changed(0),error(Invalid),problem(-1),other(-1),junction(false){}};
 inline Contact contact(const std::vector<Body>& bodies,int owner,int port,double tol){
     Contact c;
     for(size_t i=0;i<bodies.size();++i)if(static_cast<int>(i)!=owner)
@@ -40,7 +41,8 @@ inline bool interior(const Point& q,const Point& a,const Point& b,double tol){
 // Pipes parallel to the translation absorb it by changing length; other pipes carry it on.
 inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta,double minimum,double tol,Result& out){
     out=Result();
-    if(selected<0||static_cast<size_t>(selected)>=bodies.size()||bodies[selected].kind!=Pipe
+    // Selected: a pipe (TVS_MOVE) or a rigid fitting (TVS_ALIGN), never a blocked element.
+    if(selected<0||static_cast<size_t>(selected)>=bodies.size()||bodies[selected].kind==Blocked
         ||!tvsMoveGeometry::finite(minimum)||minimum<=0||!tvsMoveGeometry::finite(tol)||tol<=0)return false;
     Point direction;
     if(!tvsMoveGeometry::unit(delta,direction)||!tvsMoveGeometry::valid(delta)||delta.length()<=tol
@@ -104,13 +106,13 @@ inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta
                 for(size_t p=0;p<bodies[k].ports.size();++p)
                     if(interior(bodies[k].ports[p],body.ports[0],body.ports[1],tol)
                         ||interior(out.ports[k][p],out.ports[i][0],out.ports[i][1],tol)){
-                        out.error=SideBranch;return false;}
+                        out.other=static_cast<int>(k);out.where=bodies[k].ports[p];out.error=SideBranch;return false;}
             for(size_t k=0;k<bodies.size();++k)if(k!=i)
                 for(size_t p=0;p<bodies[k].junctions.size();++p){
                     Point old=bodies[k].junctions[p];Point moved=out.masks[k]?old+delta:old;
                     if(interior(old,body.ports[0],body.ports[1],tol)
                         ||interior(moved,out.ports[i][0],out.ports[i][1],tol)){
-                        out.error=SideBranch;return false;}
+                        out.other=static_cast<int>(k);out.junction=true;out.where=old;out.error=SideBranch;return false;}
                 }
         }
         for(size_t j=0;j<body.ports.size();++j)if(out.masks[i]&(1<<static_cast<int>(j)))
@@ -197,13 +199,13 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
                 for(size_t p=0;p<bodies[k].ports.size();++p)
                     if(interior(bodies[k].ports[p],body.ports[0],body.ports[1],tol)
                         ||interior(out.ports[k][p],out.ports[i][0],out.ports[i][1],tol)){
-                        out.error=SideBranch;return false;}
+                        out.other=static_cast<int>(k);out.where=bodies[k].ports[p];out.error=SideBranch;return false;}
             for(size_t k=0;k<bodies.size();++k)if(k!=i)
                 for(size_t p=0;p<bodies[k].junctions.size();++p){
                     Point old=bodies[k].junctions[p];Point moved=out.masks[k]?old+delta:old;
                     if(interior(old,body.ports[0],body.ports[1],tol)
                         ||interior(moved,out.ports[i][0],out.ports[i][1],tol)){
-                        out.error=SideBranch;return false;}
+                        out.other=static_cast<int>(k);out.junction=true;out.where=old;out.error=SideBranch;return false;}
                 }
         }
         for(size_t j=0;j<body.ports.size();++j)if(out.masks[i]&(1<<static_cast<int>(j)))

@@ -35,6 +35,7 @@
 #define IDR_TVSPROPERTYZDYN             115
 #define IDR_TVSPROPERTYAADYN            116
 #define IDD_MATCHSET                    117
+#define IDD_TEETYPE                     118
 #define IDC_ZOldTop                     1210
 #define IDC_ZOldBottom                  1211
 #define IDC_ZRefTop                     1212

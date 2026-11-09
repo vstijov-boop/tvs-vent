@@ -19,6 +19,7 @@ CMDS = [
  ('MATCH', 'Prenos svojstava', 'Prenosi TVS svojstva izvornog elementa na izabrane elemente ili cijelu povezanu mrežu.', 'Atributi', 'Atributi', 'MA'),
  ('PRESJEK', 'Poprečni presjek', 'Generiše poprečni presjek kroz TVS kanale; ponovnim izborom presjek se osvježava.', 'Crtanje kanala', 'Oznake', 'PR'),
  ('KOTE', 'Prikaz kota', 'Uključuje ili isključuje prikaz visinskih kota na ekranu (ne štampa se).', 'Crtanje kanala', 'Oznake', 'KO'),
+ ('ALIGN', 'Poravnanje', 'Poravnava kanal ili fiting (osa ili ivica) prema LINE, pravom segmentu polilinije, XLINE ili RAY, uz odmak i izbor strane.', 'Crtanje kanala', 'Crtanje kanala', 'AL'),
  ('NATPIS', 'Natpis kanala', 'Uključuje ili isključuje natpis dimenzija / protok m3/h / brzina m/s na kanalima (na ekranu, ne štampa se).', 'Crtanje kanala', 'Oznake', 'NA'),
  ('BYPASS_DETALJ', 'Detalj obilaska', 'Bočni detalj postojećeg obilaska prepreke.', 'Crtanje kanala', 'Oznake', 'BD'),
  ('IZVOZ', 'Izvoz bez TVS', 'Kopija crteža u kojoj su TVS elementi zamijenjeni linijama, za korisnike bez TVS_VENT; otvoreni crtež se ne mijenja.', 'Specifikacija', 'Specifikacija', 'IZ'),

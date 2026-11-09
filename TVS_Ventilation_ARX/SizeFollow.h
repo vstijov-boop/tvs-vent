@@ -15,6 +15,8 @@
 #include "TransAlignCommand.h"
 #include "TeeCommand.h"
 #include "MleaderController.h"
+#include "../TVS_Ventilation_DBX/SpiroCatalog.h"
+#include "TeePort.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
@@ -202,7 +204,8 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
                 const bool branch=port==2;
                 const double pa=branch?w->SizeAotv:(port==1&&r.type==tvsTee::Branch&&r.second>0?r.second:w->SizeApr);
                 const double pb=branch?w->SizeBotv:w->SizeBpr;const bool pr=branch?w->ThisRoundotv:w->ThisRoundpr;
-                if(r.type==tvsTee::Pants){run.stops.push_back(L"gaćasti T komad (TK-G)");break;}
+                // TK-O / TK-G keep their sizes: the duct on the port gets a prelaz there (TeePort.h, after the run)
+                if(r.type==tvsTee::Pants||r.type==tvsTee::Branch){run.stops.push_back(L"T komad TK-O / TK-G (ostaje; prelaz na priključku)");break;}
                 if(!same(pa,pb,pr)){run.stops.push_back(L"T komad druge dimenzije");break;}
                 if(r.type==tvsTee::Branch&&port==1&&std::fabs(pb-old.b[0])>1e-6){run.stops.push_back(L"TK-O");break;}
                 seen.insert(next);TeeStep t={next,port,0};
@@ -314,8 +317,8 @@ inline void prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGeP
     AcGePoint3d N,E;double width=0,height=0,elev=0;bool oneD=false,round=false;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return;
      N=nearIsFirst?d->FirstPoint:d->LastPoint;E=nearIsFirst?d->LastPoint:d->FirstPoint;width=d->SizeA;height=d->SizeB;elev=d->Elev;oneD=d->This1D;round=d->ThisRound;}
-    AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length(),lt=tvsTeeFit::transitionMm()/f;
-    if(length<lt+50.0/f){acutPrintf(L"\nIza T komada: kanal je prekratak za prelaz %.0f mm; prilagodite ručno.",tvsTeeFit::transitionMm());return;}
+    AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length(),lt=tvsSpiro::drawingLength(NULL,A,round,width,round,tvsTeeFit::transitionMm()/f);   // spiro: po katalogu SOKO
+    if(length<lt+50.0/f){acutPrintf(L"\nIza T komada: kanal je prekratak za prelaz %.0f mm; prilagodite ručno.",lt*f);return;}
     dir.normalize();const AcGePoint3d start(at.x,at.y,N.z),end=start+dir*lt;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
      if((nearIsFirst?d->put_FirstPoint(end):d->put_Lastpoint(end))!=Acad::eOk)return;d->recordGraphicsModified();}
@@ -326,7 +329,7 @@ inline void prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGeP
         if(o.openStatus()==Acad::eOk){
             AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()==Acad::eOk)o->setPropertiesFrom(d.object());
             o->put_Elevation(elev);o->recordGraphicsModified();}
-        acutPrintf(L"\nIza T komada umetnut prelaz na staru dimenziju, dužine %.0f mm.",tvsTeeFit::transitionMm());
+        acutPrintf(L"\nIza T komada umetnut prelaz na staru dimenziju, dužine %.0f mm.",lt*f);
     }
 }
 // Applies the new size of duct `start` to the run. false: nothing changed (reason printed).
@@ -443,6 +446,28 @@ inline int refreshLabels(AcDbDatabase* db){
     int n=0;for(size_t k=0;k<labels.size();++k)if(ml.recalculateMleader(labels[k]))++n;
     return n;
 }
+// Spiro prelaz (oba kraja okrugla) poslije promjene precnika: duzina po katalogu SOKO. The end
+// `end` (0 = FirstPoint) sits on the duct `ductId`; that end moves along the transition and the
+// duct end with it, so the rest of the run stays where it is. Transition open for write.
+inline void spiroLength(TVS_TRANS* t,int end,const AcDbObjectId& ductId,double f){
+    if(!t||!tvsSpiro::applies(t->database(),t->SizeAp1,t->ThisRoundp1,t->SizeAp2,t->ThisRoundp2,t->getDuctType()==DuctTypeFlex))return;
+    AcGeVector3d dir=t->VectTr;dir.z=0;const double now=dir.length();if(now<1e-12)return;dir.normalize();
+    const double want=tvsSpiro::drawingLength(t->database(),t->SizeAp1,true,t->SizeAp2,true,now),delta=want-now;
+    if(std::fabs(delta)<0.5/f)return;
+    const AcGeVector3d shift=end==0?-dir*delta:dir*delta;
+    const AcGePoint3d at=end==0?t->FirstPoint:t->FirstPoint+t->VectTr;   // axis point on the duct side (plan)
+    AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);if(d.openStatus()!=Acad::eOk)return;
+    const bool first=d->FirstPoint.distanceTo(AcGePoint3d(at.x,at.y,d->FirstPoint.z))<=d->LastPoint.distanceTo(AcGePoint3d(at.x,at.y,d->LastPoint.z));
+    const AcGePoint3d nearEnd=first?d->FirstPoint:d->LastPoint,other=first?d->LastPoint:d->FirstPoint;
+    const AcGePoint3d moved=nearEnd+shift;AcGeVector3d rest=other-moved;rest.z=0;
+    if(rest.length()<50.0/f||rest.dotProduct(other-nearEnd)<=0){
+        acutPrintf(L"\nSpiro prelaz: kanal je prekratak za katalošku dužinu %.0f mm; dužina prelaza nije promijenjena.",want*f);return;}
+    if((first?d->put_FirstPoint(moved):d->put_Lastpoint(moved))!=Acad::eOk)return;d->recordGraphicsModified();
+    t->assertWriteEnabled();
+    if(end==0)t->FirstPoint+=shift;else t->LastPoint+=shift;
+    t->put_Length(want);
+    acutPrintf(L"\nSpiro prelaz: dužina po katalogu %.0f mm.",want*f);
+}
 inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work);
 inline void run(){
     posted()=false;
@@ -511,6 +536,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                     const tvsTransAlignCmd::Before was=tvsTransAlignCmd::before(t.object());
                     t->assertWriteEnabled();ta=A;tb=B;
                     tvsTransAlignCmd::afterEdit(t.object(),was,-1,-1);   // outlet moved: TVS_PRELAZ_KOTA asks
+                    spiroLength(t.object(),end,id,f);                    // spiro: duzina po katalogu, kanal skraceni / produzeni
                     t->recordGraphicsModified();++transitions;
                 }
             }
@@ -529,6 +555,13 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 }
             }
         }
+    }
+    {   // ducts on a TK-O / TK-G port: the T komad stays, a prelaz is inserted / adjusted at the port
+        std::set<AcDbObjectId> changed(done.begin(),done.end());
+        for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w)changed.insert(w->first);
+        for(std::set<AcDbObjectId>::const_iterator c=changed.begin();c!=changed.end();++c){
+            AcDbObjectPointer<AcDbEntity> e(*c,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!plainDuct(e.object()))continue;
+            e.close();tvsTeePort::afterDuct(db,*c);}
     }
     applying()=false;pending().clear();
     if(ducts||transitions)acutPrintf(L"\nDimenzije na spojevima: prilagodjeno prelaza %d, kanala %d.",transitions,ducts);

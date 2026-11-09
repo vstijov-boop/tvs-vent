@@ -79,7 +79,8 @@
     static void Ventilation_ARXTVS_TK_TIP(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
-        tvsTeeCommand::setType();
+        syncTVSGlobalUnits();
+        tvsTeeDialog::run(IDD_TEETYPE);   // dialog (TeeTypeDialog.h); prompt flow stays for drawing (Racva)
     }
     static void Ventilation_ARXTVS_FLEX_MANZETNA(void)
     {
@@ -98,5 +99,12 @@
         if (ActivationErrorMessage() != pError_Ok) return;
         syncTVSGlobalUnits();
         tvsMove::execute();
+    }
+    // TVS_ALIGN: one-off alignment to a LINE / polyline segment / XLINE / RAY (AlignCommand.h).
+    static void Ventilation_ARXTVS_ALIGN(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsAlignCmd::execute();
     }
 

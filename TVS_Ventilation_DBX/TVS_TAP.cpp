@@ -23,6 +23,7 @@
 //----- TVS_TAP.cpp : Implementation of TVS_TAP
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "PortGrips.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
 #include <limits>
@@ -2020,10 +2021,12 @@ Acad::ErrorStatus TVS_TAP::subGetGripPoints(
 #endif
 	assertReadEnabled();
 
-	//----- If you return eNotImplemented here, that will force AutoCAD to call
-	//----- the older getGripPoints() implementation. The call below may return
-	//----- eNotImplemented depending of your base class.
-	return (AcDbCurve::subGetGripPoints(grips, curViewUnitSize, gripSize, curViewDir, bitflags));
+	// ordinary grips (moved by index) + connector grips on free ports (PortGrips.h)
+	AcGePoint3dArray points; AcDbIntArray osnaps, geoms;
+	if (subGetGripPoints(points, osnaps, geoms) != Acad::eOk) return Acad::eOk;
+	tvsPortGrip::ordinary(points, grips);
+	tvsPortGrip::add(this, grips, curViewUnitSize);
+	return Acad::eOk;
 }
 
 Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(
@@ -2035,10 +2038,9 @@ Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(
 #endif
 	assertWriteEnabled();
 
-	//----- If you return eNotImplemented here, that will force AutoCAD to call
-	//----- the older getGripPoints() implementation. The call below may return
-	//----- eNotImplemented depending of your base class.
-	return (AcDbCurve::subMoveGripPointsAt(gripAppData, offset, bitflags));
+	AcDbIntArray idx; tvsPortGrip::indices(gripAppData, idx);   // connector grips do not move anything
+	if (idx.isEmpty()) return Acad::eOk;
+	return subMoveGripPointsAt(idx, offset);
 }
 
 //-----------------------------------------------------------------------------

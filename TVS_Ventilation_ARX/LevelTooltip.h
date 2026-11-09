@@ -9,6 +9,7 @@
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../TVS_Ventilation_DBX/LevelLabels.h"
 #include "../TVS_Ventilation_DBX/DuctCaption.h"
+#include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "../TVS_Ventilation_DBX/TVS_Pipe.h"
 #include "../TVS_Ventilation_DBX/TVS_TRANS.h"
 #include "../TVS_Ventilation_DBX/TransAlignData.h"
@@ -39,6 +40,12 @@ public:
                 const double z2=tr->Elev+tvsTransAlign::endOffset(tvsTransAlign::read(tr),tr->SizeAp1,tr->SizeBp1,tr->SizeAp2,tr->SizeBp2);
                 swprintf_s(text,L"TVS kote: pocetak gi %.0f / os %.0f / di %.0f, kraj gi %.0f / os %.0f / di %.0f mm (%ls)",
                     (tr->Elev+h1)*f,tr->Elev*f,(tr->Elev-h1)*f,(z2+h2)*f,z2*f,(z2-h2)*f,tvsTransAlign::name(tvsTransAlign::read(tr)));
+                if(tvsSpiro::applies(tr->database(),tr->SizeAp1,tr->ThisRoundp1,tr->SizeAp2,tr->ThisRoundp2,tr->getDuctType()==DuctTypeFlex)){   // spiro: sifra i proizvodna duzina
+                    const tvsSpiro::Settings ss=tvsSpiro::read(tr->database());const double d1=tr->SizeAp1*f,d2=tr->SizeAp2*f;
+                    wchar_t sifra[32];tvsSpiro::code(sifra,32,d1,d2,tvsSpiro::eccentric(tr->TransType,tvsTransAlign::read(tr)),ss.rg);
+                    const size_t used=wcslen(text);
+                    swprintf_s(text+used,260-used,L"\nSpiro %ls, L = %.0f mm, u crtezu %.0f mm%ls",sifra,tvsSpiro::productionMm(d1,d2,ss.rg),tr->VectTr.length()*f,
+                        tvsSpiro::standard(d1,d2,ss.rg)?L"":L" (nestandardno po katalogu)");}
                 e->close();output.setAdditionalTooltipString(text);return Acad::eOk;}
             if(t){const double f=tvsUnits::factor(e),half=(t->SizeB>0?t->SizeB:t->SizeA)/2;
                 swprintf_s(text,L"TVS kote: gi %.0f / os %.0f / di %.0f mm",(t->Elev+half)*f,t->Elev*f,(t->Elev-half)*f);

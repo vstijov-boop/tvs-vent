@@ -23,6 +23,7 @@
 //----- TVS_WYE.cpp : Implementation of TVS_WYE
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "PortGrips.h"
 #include "LevelLabels.h"
 #include "TVS_WYE.h"
 #include "TVS_Ventilation_DBX_i.h"
@@ -602,11 +603,12 @@ Acad::ErrorStatus TVS_WYE::subGetGripPoints (
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
 	assertReadEnabled () ;
-
-	//----- If you return eNotImplemented here, that will force AutoCAD to call
-	//----- the older getGripPoints() implementation. The call below may return
-	//----- eNotImplemented depending of your base class.
-	return (AcDbCurve::subGetGripPoints (grips, curViewUnitSize, gripSize, curViewDir, bitflags)) ;
+	// ordinary grips (moved by index) + connector grips on free ports (PortGrips.h)
+	AcGePoint3dArray points; AcDbIntArray osnaps, geoms;
+	if (subGetGripPoints(points, osnaps, geoms) != Acad::eOk) return Acad::eOk;
+	tvsPortGrip::ordinary(points, grips);
+	tvsPortGrip::add(this, grips, curViewUnitSize);
+	return Acad::eOk;
 }
 
 Acad::ErrorStatus TVS_WYE::subMoveGripPointsAt (
@@ -614,11 +616,9 @@ Acad::ErrorStatus TVS_WYE::subMoveGripPointsAt (
 	const int bitflags
 ) {
 	assertWriteEnabled () ;
-
-	//----- If you return eNotImplemented here, that will force AutoCAD to call
-	//----- the older getGripPoints() implementation. The call below may return
-	//----- eNotImplemented depending of your base class.
-	return (AcDbCurve::subMoveGripPointsAt (gripAppData, offset, bitflags)) ;
+	AcDbIntArray idx; tvsPortGrip::indices(gripAppData, idx);   // connector grips do not move anything
+	if (idx.isEmpty()) return Acad::eOk;
+	return subMoveGripPointsAt(idx, offset);
 }
 
 //-----------------------------------------------------------------------------

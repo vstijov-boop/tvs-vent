@@ -57,6 +57,16 @@ void tdbl::startEdit(AcDbEntity *pEnt, AcGePoint3d pt)
 
 
 		AcApDocument *pDoc=acDocManager->curDocument();
+		if (pEnt->isKindOf(TVS_WYE::desc()) == Adesk::kTrue && pDoc)
+		{	// T komad: the TVS_TK_TIP dialog, with this T komad preselected (TeeTypeDialog.h)
+			ads_name ename, ss;
+			if (acdbGetAdsName(ename, pEnt->objectId()) == Acad::eOk && acedSSAdd(ename, NULL, ss) == RTNORM)
+			{
+				acedSSSetFirst(ss, NULL); acedSSFree(ss);
+				acDocManager->sendStringToExecute(pDoc, L"_TVS_TK_TIP\n", false, true, false);
+				return;
+			}
+		}
 		acDocManager->lockDocument(pDoc,AcAp::kWrite);
 
 
