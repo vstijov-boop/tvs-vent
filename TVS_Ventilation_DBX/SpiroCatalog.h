@@ -17,12 +17,24 @@
 #include "dbapserv.h"
 #include "DrawingUnits.h"
 #include <cmath>
+#include <chrono>
 #include <cwchar>
 namespace tvsSpiro {
+inline unsigned long long nowMs(){return static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
 struct Settings{bool catalog;bool rg;double cMm;bool dashed;Settings():catalog(true),rg(false),cMm(25),dashed(true){}};
 inline const ACHAR* key(){return L"TVS_SPIRO_V1";}
+// Read cache: every round prelaz asks on every draw; kept 1 s per database, cleared by write().
+struct ReadCache {AcDbDatabase* db;unsigned long long at;Settings s;ReadCache():db(NULL),at(0){}};
+inline ReadCache& readCache(){static ReadCache c;return c;}
+inline Settings readNow(AcDbDatabase* db);
 inline Settings read(AcDbDatabase* db){
-    Settings s;if(!db)db=acdbHostApplicationServices()->workingDatabase();if(!db)return s;AcDbDictionary* nod=NULL;
+    if(!db)db=acdbHostApplicationServices()->workingDatabase();
+    ReadCache& c=readCache();const unsigned long long now=nowMs();
+    if(db&&c.db==db&&now-c.at<1000)return c.s;
+    const Settings s=readNow(db);c.db=db;c.at=now;c.s=s;return s;
+}
+inline Settings readNow(AcDbDatabase* db){
+    Settings s;if(!db)return s;AcDbDictionary* nod=NULL;
     if(db->getNamedObjectsDictionary(nod,AcDb::kForRead)!=Acad::eOk||!nod)return s;
     AcDbObjectId id;const bool has=nod->getAt(key(),id)==Acad::eOk;nod->close();if(!has)return s;
     AcDbObjectPointer<AcDbXrecord> rec(id,AcDb::kForRead);if(rec.openStatus()!=Acad::eOk)return s;
@@ -35,6 +47,7 @@ inline Settings read(AcDbDatabase* db){
     acutRelRb(data);return s;
 }
 inline bool write(AcDbDatabase* db,const Settings& s){
+    readCache().at=0;
     AcDbDictionary* nod=NULL;if(!db||db->getNamedObjectsDictionary(nod,AcDb::kForWrite)!=Acad::eOk||!nod)return false;
     AcDbObjectId id;AcDbXrecord* rec=NULL;bool ok=false;
     if(nod->getAt(key(),id)==Acad::eOk){if(acdbOpenObject(rec,id,AcDb::kForWrite)!=Acad::eOk)rec=NULL;}

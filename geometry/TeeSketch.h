@@ -13,8 +13,9 @@ enum Turn {Right=0,Left=1,Up=2,Down=3};
 struct Pt {double x,y;Pt(double px=0,double py=0):x(px),y(py){}};
 enum Kind {Polygon,Polyline,Circle,Text};
 struct Prim {
-    Kind kind;std::vector<Pt> pts;unsigned fill,stroke;double width,r;bool dash,bold;std::wstring text;int align;   // align: 0 left, 1 centre, 2 right
-    Prim():kind(Polyline),fill(0xFFFFFFFFu),stroke(0xFFFFFFFFu),width(1),r(0),dash(false),bold(false),align(0){}
+    Kind kind;std::vector<Pt> pts;unsigned fill,stroke;double width,r;bool dash,bold,scaled;   // scaled: circle radius in drawing units (else marker size)
+   std::wstring text;int align;   // align: 0 left, 1 centre, 2 right
+    Prim():kind(Polyline),fill(0xFFFFFFFFu),stroke(0xFFFFFFFFu),width(1),r(0),dash(false),bold(false),scaled(false),align(0){}
 };
 const unsigned none=0xFFFFFFFFu;
 struct Side {bool used,hasDuct,prelaz;int elbow,turn,order;Side():used(false),hasDuct(false),prelaz(false),elbow(0),turn(Right),order(0){}};

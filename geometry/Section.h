@@ -66,15 +66,15 @@ struct Prim {bool arc;double x0,y0,x1,y1,cx,cy,r,a0,a1,k;   // arc: (cx + k r co
     Prim sub(double t0,double t1)const{if(!arc){const P p=at(t0),q=at(t1);return line(p.x,p.y,q.x,q.y);}Prim q=*this;q.a0=a0+(a1-a0)*t0;q.a1=a0+(a1-a0)*t1;return q;}
 };
 // h1 > 0: height at x1 differs from h (prelaz seen from the side: trapezoid).
-struct View {double x0,x1,zc0,zc1,h,h1,closest;int tag;bool round,vertical,bend;std::vector<Prim> outline;std::vector<P> poly;
-    View():x0(0),x1(0),zc0(0),zc1(0),h(0),h1(0),closest(0),tag(0),round(false),vertical(false),bend(false){}
+struct View {double x0,x1,zc0,zc1,h,h1,closest,zlo,zhi;int tag;bool round,vertical,bend;std::vector<Prim> outline;std::vector<P> poly;
+    View():x0(0),x1(0),zc0(0),zc1(0),h(0),h1(0),closest(0),zlo(0),zhi(0),tag(0),round(false),vertical(false),bend(false){}
     bool level()const{return !bend&&!vertical&&std::fabs(zc0-zc1)<1e-9&&!(h1>0&&std::fabs(h1-h)>1e-9);}
     double zc(double x)const{return x1-x0>1e-12?zc0+(zc1-zc0)*(x-x0)/(x1-x0):zc0;}
     void quad(){outline.clear();const double e=h1>0?h1:h;
         outline.push_back(Prim::line(x0,zc0-h/2,x1,zc1-e/2));outline.push_back(Prim::line(x1,zc1-e/2,x1,zc1+e/2));
         outline.push_back(Prim::line(x1,zc1+e/2,x0,zc0+h/2));outline.push_back(Prim::line(x0,zc0+h/2,x0,zc0-h/2));seal();}
     void seal(){poly.clear();for(size_t i=0;i<outline.size();++i){const int n=outline[i].arc?24:1;for(int k=0;k<n;++k)poly.push_back(outline[i].at(double(k)/n));}
-        if(!poly.empty()){x0=x1=poly[0].x;for(size_t i=1;i<poly.size();++i){x0=(std::min)(x0,poly[i].x);x1=(std::max)(x1,poly[i].x);}}}
+        if(!poly.empty()){x0=x1=poly[0].x;zlo=zhi=poly[0].y;for(size_t i=1;i<poly.size();++i){x0=(std::min)(x0,poly[i].x);x1=(std::max)(x1,poly[i].x);zlo=(std::min)(zlo,poly[i].y);zhi=(std::max)(zhi,poly[i].y);}}}
     bool inside(double x,double z,double eps)const{   // strictly inside the outline
         bool in=false;for(size_t i=0,j=poly.size()-1;i<poly.size();j=i++){const P& a=poly[i];const P& b=poly[j];
             if((a.y>z)!=(b.y>z)){const double xc=a.x+(z-a.y)*(b.x-a.x)/(b.y-a.y);if(x<xc)in=!in;}}
@@ -185,7 +185,9 @@ inline std::vector<View> cover(const std::vector<Cut>& cuts,const std::vector<Vi
     return c;
 }
 inline bool covered(const std::vector<View>& c,int tag,double closest,double x,double z){
-    for(size_t j=0;j<c.size();++j){const View& o=c[j];if(o.tag==tag||!(o.closest<closest-1e-9))continue;if(o.inside(x,z,1e-9))return true;}
+    for(size_t j=0;j<c.size();++j){const View& o=c[j];if(o.tag==tag||!(o.closest<closest-1e-9))continue;
+        if(x<o.x0||x>o.x1||z<o.zlo||z>o.zhi)continue;   // bounding box first: most outlines are elsewhere
+        if(o.inside(x,z,1e-9))return true;}
     return false;
 }
 // Outline primitives of the views; a part is hidden when a nearer outline (another element, or
