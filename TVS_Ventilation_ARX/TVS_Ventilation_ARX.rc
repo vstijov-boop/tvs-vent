@@ -374,6 +374,7 @@ BEGIN
     EDITTEXT        1411,122,175,108,14,ES_AUTOHSCROLL
     LTEXT           "Zaklonjeni elementi",1419,10,195,120,8
     COMBOBOX        1412,10,204,220,60,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Tabela stacionaža, kota i dimenzija",1420,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,10,198,200,10
     LTEXT           "",1414,244,35,100,9
     RTEXT           "",1415,330,35,54,9
     CONTROL         "",1413,"Static",SS_OWNERDRAW,239,48,150,141

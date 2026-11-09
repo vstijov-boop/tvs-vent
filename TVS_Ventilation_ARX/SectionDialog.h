@@ -18,16 +18,17 @@ enum {Switch=3001};
 struct Setup {
     int mode;          // 0 poprečni, 1 uzdužni
     int action;        // 0 novi presjek, 1 osvježi postojeći
-    std::wstring letter;double floorM,ceilingM,spM,scale,depthM;bool spOn;int hidden;
+    std::wstring letter;double floorM,ceilingM,spM,scale,depthM;bool spOn,table;int hidden;
+    struct Row {double s,bottom;std::wstring size;};std::vector<Row> rows;   // uzduzni: table preview (drawing units)
     double f;double lengthDU;int count;   // section line length (poprečni) / developed length (uzdužni), cut ducts / route elements
     std::vector<tvsSectionSketch::Box> boxes;std::vector<std::vector<tvsTeeSketch::Pt> > bands;   // absolute z (drawing units)
     AcDbDatabase* db;
-    Setup():mode(0),action(0),floorM(0),ceilingM(3),spM(0.5),scale(50),depthM(0),spOn(false),hidden(0),f(1),lengthDU(0),count(0),db(NULL){}
+    Setup():mode(0),action(0),floorM(0),ceilingM(3),spM(0.5),scale(50),depthM(0),spOn(false),table(true),hidden(0),f(1),lengthDU(0),count(0),db(NULL){}
 };
 class Dialog : public CAdUiBaseDialog {
 public:
     enum {IdTabCross=1401,IdTabLong=1402,IdInfo=1403,IdAction=1404,IdLetter=1405,IdFloor=1406,IdCeiling=1407,IdSpOn=1408,IdSp=1409,
-          IdScale=1410,IdDepth=1411,IdHidden=1412,IdSketch=1413,IdCardTitle=1414,IdCardScale=1415,IdNote=1416,IdStatus=1417,IdDepthLabel=1418,IdHiddenLabel=1419};
+          IdScale=1410,IdDepth=1411,IdHidden=1412,IdSketch=1413,IdCardTitle=1414,IdCardScale=1415,IdNote=1416,IdStatus=1417,IdDepthLabel=1418,IdHiddenLabel=1419,IdTable=1420};
     Setup s;bool valid,loading;CString problem;CFont bold,title;CBrush back,white,band,info;
     Dialog(const Setup& setup,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),s(setup),valid(false),loading(false){}
 
@@ -49,6 +50,7 @@ public:
         if(number(GetDlgItem(IdScale),v,false))s.scale=v;
         if(s.mode==0&&number(GetDlgItem(IdDepth),v,true))s.depthM=v;
         if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(IdHidden)))s.hidden=c->GetCurSel()==1?1:0;
+        if(s.mode==1)s.table=IsDlgButtonChecked(IdTable)==BST_CHECKED;
     }
     bool exists(const std::wstring& letter)const{
         if(!s.db||letter.empty())return false;
@@ -66,16 +68,16 @@ public:
     void refresh(){
         valid=check(problem);const bool fresh=s.action==0;
         for(int id:{IdLetter,IdFloor,IdCeiling,IdSpOn,IdScale})enable(id,fresh);
-        enable(IdSp,fresh&&s.spOn);enable(IdDepth,fresh&&s.mode==0);enable(IdHidden,fresh&&s.mode==0&&s.depthM>0);
+        enable(IdSp,fresh&&s.spOn);enable(IdDepth,fresh&&s.mode==0);enable(IdHidden,fresh&&s.mode==0&&s.depthM>0);enable(IdTable,fresh);
         CString t;
         if(s.mode==0)t.Format(L"Linija presjeka  ·  L = %.2f m  ·  presječeno kanala: %d",s.lengthDU*s.f/1000,s.count);
-        else t.Format(L"Trasa  ·  %d elemenata  ·  razvijena dužina %.2f m",s.count,s.lengthDU*s.f/1000);
+        else t.Format(L"Trasa u crtežu  ·  %d elemenata  ·  razvijena dužina %.2f m",s.count,s.lengthDU*s.f/1000);
         SetDlgItemText(IdInfo,t);
-        t.Format(L"%ls %ls–%ls",s.mode==0?L"Presjek":L"Uzdužni presjek",s.letter.c_str(),s.letter.c_str());SetDlgItemText(IdCardTitle,t);
+        if(s.mode==0)t.Format(L"Presjek %ls\u2013%ls",s.letter.c_str(),s.letter.c_str());else t.Format(L"Uzdužni profil %ls",s.letter.c_str());SetDlgItemText(IdCardTitle,t);
         t.Format(L"1 : %.0f",s.scale);SetDlgItemText(IdCardScale,t);
         CString note;
         if(s.mode==0){if(s.depthM>0)note.Format(L"Dubina %.1f m  ·  zaklonjeni %ls",s.depthM,s.hidden?L"isprekidano":L"izostavljeni");else note=L"Samo presječeni elementi";}
-        else note=L"Razvijena trasa, prava veličina";
+        else note=s.table?L"Prikazana tabela stacionaža, kota i dimenzija":L"Bez tabele stacionaža, kota i dimenzija";
         CString th;th.Format(L"\nVisina teksta %.0f mm (0,7 mm × 1:%.0f)",0.7*s.scale,s.scale);note+=th;
         SetDlgItemText(IdNote,note);
         SetDlgItemText(IdStatus,!valid?problem:s.action==1?CString(L"Osvježava se postojeći presjek (izbor u crtežu)"):CString(L"Pregled prije izbora tačke umetanja"));
@@ -92,14 +94,16 @@ public:
         if(CComboBox* c=static_cast<CComboBox*>(GetDlgItem(IdHidden))){c->AddString(L"Izostavi");c->AddString(L"Isprekidano");c->SetCurSel(s.hidden);}
         loading=true;
         SetDlgItemText(IdLetter,s.letter.c_str());setValue(IdFloor,s.floorM,2);setValue(IdCeiling,s.ceilingM,2);
-        CheckDlgButton(IdSpOn,s.spOn?BST_CHECKED:BST_UNCHECKED);setValue(IdSp,s.spM,2);setValue(IdScale,s.scale,0);setValue(IdDepth,s.depthM,1);
+        CheckDlgButton(IdSpOn,s.spOn?BST_CHECKED:BST_UNCHECKED);CheckDlgButton(IdTable,s.table?BST_CHECKED:BST_UNCHECKED);
+        for(int id:{IdDepth,IdDepthLabel,IdHidden,IdHiddenLabel})if(CWnd* w=GetDlgItem(id))w->ShowWindow(s.mode==0?SW_SHOW:SW_HIDE);   // poprecni only
+        if(CWnd* w=GetDlgItem(IdTable))w->ShowWindow(s.mode==1?SW_SHOW:SW_HIDE);                                                 // uzduzni onlysetValue(IdSp,s.spM,2);setValue(IdScale,s.scale,0);setValue(IdDepth,s.depthM,1);
         loading=false;refresh();return TRUE;
     }
     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
         const int id=LOWORD(wp),code=HIWORD(wp);
         if(!loading){
             if((id==IdTabCross||id==IdTabLong)&&code==BN_CLICKED){if((id==IdTabLong)!=(s.mode==1)){read();EndDialog(Switch);}return TRUE;}
-            if(code==EN_CHANGE||code==CBN_SELCHANGE||(id==IdSpOn&&code==BN_CLICKED)){read();refresh();return TRUE;}
+            if(code==EN_CHANGE||code==CBN_SELCHANGE||((id==IdSpOn||id==IdTable)&&code==BN_CLICKED)){read();refresh();return TRUE;}
             if(code==EN_KILLFOCUS){read();loading=true;
                 if(id==IdFloor)setValue(id,s.floorM,2);else if(id==IdCeiling)setValue(id,s.ceilingM,2);else if(id==IdSp)setValue(id,s.spM,2);
                 else if(id==IdScale)setValue(id,s.scale,0);else if(id==IdDepth)setValue(id,s.depthM,1);
@@ -142,8 +146,26 @@ public:
         if(s.spOn){in.sp=s.spM*1000/s.f;in.spM=s.spM;}
         for(size_t i=0;i<s.boxes.size();++i){tvsSectionSketch::Box b=s.boxes[i];b.z-=fl;in.boxes.push_back(b);}
         for(size_t i=0;i<s.bands.size();++i){std::vector<tvsTeeSketch::Pt> q=s.bands[i];for(size_t j=0;j<q.size();++j)q[j].y-=fl;in.bands.push_back(q);}
+        in.lengthM=s.lengthDU*s.f/1000;
         std::vector<tvsTeeSketch::Prim> p;tvsSectionSketch::build(in,p);
-        tvsSketchRender::draw(CDC::FromHandle(it->hDC),CRect(it->rcItem),p,GetFont(),&bold,1e9,8);
+        CDC* dc=CDC::FromHandle(it->hDC);CRect r(it->rcItem);
+        if(s.mode==1&&s.table){   // picture above, table (stacionaza / kota dna / dimenzija) below, as the mockup
+            const int rowH=r.Height()/8,rowsShown=static_cast<int>(s.rows.size()>3?3:s.rows.size());
+            CRect pic(r.left,r.top,r.right,r.bottom-rowH*(rowsShown+1));tvsSketchRender::draw(dc,pic,p,GetFont(),&bold,1e9,6);
+            CRect tab(r.left,pic.bottom,r.right,r.bottom);dc->FillSolidRect(tab,RGB(255,255,255));
+            const int c1=tab.left+tab.Width()*36/100,c2=tab.left+tab.Width()*66/100;
+            CFont* of=dc->SelectObject(&bold);dc->SetBkMode(TRANSPARENT);dc->SetTextColor(RGB(0,26,45));
+            auto cell=[&](int x0,int x1,int y,const wchar_t* t){CRect c(x0+6,y,x1,y+rowH);dc->DrawText(t,-1,c,DT_LEFT|DT_VCENTER|DT_SINGLELINE|DT_END_ELLIPSIS);};
+            dc->FillSolidRect(tab.left,tab.top,tab.Width(),1,RGB(210,222,235));
+            cell(tab.left,c1,tab.top,L"Stacionaža [m]");cell(c1,c2,tab.top,L"Kota dna [m]");cell(c2,tab.right,tab.top,L"Dimenzija [mm]");
+            dc->SelectObject(GetFont());dc->SetTextColor(RGB(49,90,128));
+            std::vector<size_t> pick;if(s.rows.size()<=3)for(size_t k=0;k<s.rows.size();++k)pick.push_back(k);else{pick.push_back(0);pick.push_back(s.rows.size()/2);pick.push_back(s.rows.size()-1);}
+            for(size_t k=0;k<pick.size();++k){const Setup::Row& row=s.rows[pick[k]];const int y=tab.top+rowH*static_cast<int>(k+1);
+                dc->FillSolidRect(tab.left,y,tab.Width(),1,RGB(226,233,241));
+                CString a,b;a.Format(L"%.2f",row.s*s.f/1000);b.Format(L"%.2f",row.bottom*s.f/1000);a.Replace(L'.',L',');b.Replace(L'.',L',');
+                cell(tab.left,c1,y,a);cell(c1,c2,y,b);cell(c2,tab.right,y,row.size.c_str());}
+            dc->SelectObject(of);
+        }else tvsSketchRender::draw(dc,r,p,GetFont(),&bold,1e9,8);
     }
     virtual LRESULT WindowProc(UINT msg,WPARAM wp,LPARAM lp){
         if(msg==WM_ACAD_KEEPFOCUS)return TRUE;
@@ -172,9 +194,9 @@ namespace tvsSectionDialog {
 inline AcGePoint3d wcs(const ads_point p){resbuf from={};from.restype=RTSHORT;from.resval.rint=1;resbuf to={};to.restype=RTSHORT;to.resval.rint=0;
     ads_point w;acedTrans(p,&from,&to,0,w);return asPnt3d(w);}
 inline void remember(const Setup& s){tvsSectionCmd::Remembered& m=tvsSectionCmd::remembered();
-    m.floorM=s.floorM;m.ceilingM=s.ceilingM;m.scale=s.scale;m.spM=s.spM;m.spOn=s.spOn;if(s.mode==0)m.hidden=s.hidden;}
+    m.floorM=s.floorM;m.ceilingM=s.ceilingM;m.scale=s.scale;m.spM=s.spM;m.spOn=s.spOn;if(s.mode==0)m.hidden=s.hidden;else m.table=s.table;}
 inline void fill(Setup& s,AcDbDatabase* db,int mode){tvsSectionCmd::Remembered& m=tvsSectionCmd::remembered();
-    s.mode=mode;s.db=db;s.f=tvsUnits::factor(db);s.floorM=m.floorM;s.ceilingM=m.ceilingM;s.scale=m.scale;s.spM=m.spM;s.spOn=m.spOn;s.hidden=m.hidden;}
+    s.mode=mode;s.db=db;s.f=tvsUnits::factor(db);s.floorM=m.floorM;s.ceilingM=m.ceilingM;s.scale=m.scale;s.spM=m.spM;s.spOn=m.spOn;s.hidden=m.hidden;s.table=m.table;}
 inline bool insertion(const wchar_t* prompt,AcGePoint3d& at){ads_point ins;if(acedGetPoint(NULL,prompt,ins)!=RTNORM)return false;at=wcs(ins);return true;}
 inline void longitudinal(UINT idd);
 inline void cross(UINT idd,const ads_point* first){
@@ -222,12 +244,17 @@ inline void longitudinal(UINT idd){
     for(size_t i=0;i<pieces.size();++i){const tvsProfile::Piece& q=pieces[i];if(!(q.s1>q.s0))continue;
         std::vector<tvsTeeSketch::Pt> band;band.push_back(tvsTeeSketch::Pt(q.s0,q.z0+q.h0/2));band.push_back(tvsTeeSketch::Pt(q.s1,q.z1+q.h1/2));
         band.push_back(tvsTeeSketch::Pt(q.s1,q.z1-q.h1/2));band.push_back(tvsTeeSketch::Pt(q.s0,q.z0-q.h0/2));s.bands.push_back(band);}
+    {const std::vector<double> st=tvsProfile::stations(pieces,0.7*tvsSectionCmd::remembered().scale*1.8/f);
+     for(size_t k=0;k<st.size();++k){Setup::Row row;row.s=st[k];row.bottom=0;tvsProfile::bottomAt(pieces,st[k],tol,row.bottom);
+        for(size_t i=0;i<pieces.size();++i){const tvsProfile::Piece& q=pieces[i];if(st[k]>=q.s0-tol&&st[k]<=q.s1+tol&&q.kind!=tvsProfile::Taper){
+            wchar_t t[40];if(q.round)swprintf_s(t,L"\u00D8%.0f",q.A0*f);else swprintf_s(t,L"%.0f \u00D7 %.0f",q.A0*f,q.B0*f);row.size=t;break;}}
+        s.rows.push_back(row);}}
     const int rc=show(s,idd);remember(s);
     if(rc==Switch){route.clear();cross(idd,NULL);return;}
     if(rc!=IDOK)return;
     route.clear();
     if(s.action==1){tvsSectionCmd::refresh();return;}
-    p.letter=s.letter;p.floor=s.floorM*1000/f;p.ceiling=s.ceilingM*1000/f;p.scale=s.scale;p.sp=s.spOn?s.spM*1000/f:0;
+    p.letter=s.letter;p.floor=s.floorM*1000/f;p.ceiling=s.ceilingM*1000/f;p.scale=s.scale;p.sp=s.spOn?s.spM*1000/f:0;p.table=s.table?1:0;
     AcGePoint3d position;if(!insertion(L"\nTačka umetanja profila (početak trase, kota poda): ",position))return;
     AcDbObjectId btrId;
     {AcDbBlockTable* raw=NULL;if(db->getBlockTable(raw,AcDb::kForWrite)!=Acad::eOk)return;

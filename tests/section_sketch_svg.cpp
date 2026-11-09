@@ -19,14 +19,15 @@ static void svg(const Input& in,const std::string& file){
 }
 int main(int argc,char** argv){
     const std::string dir=argc>1?argv[1]:".";
-    Input a;a.L=6000;a.H=3200;a.floorM=0;a.ceilingM=3.2;
-    a.boxes.push_back({1200,2700,600,300,false});a.boxes.push_back({3500,2750,250,250,true});a.boxes.push_back({4800,2300,400,200,false});
+    Input a;a.L=24000;a.H=3200;a.floorM=0;a.ceilingM=3.2;
+    a.boxes.push_back({11200,2700,600,300,false});a.boxes.push_back({12500,2750,250,250,true});a.boxes.push_back({13800,2300,400,200,false});
     svg(a,dir+"/1_poprecni.svg");
     a.sp=600;a.spM=0.6;svg(a,dir+"/2_poprecni_sp.svg");
-    Input b;b.L=12000;b.H=3200;b.floorM=0;b.ceilingM=3.2;b.sp=500;b.spM=0.5;
+    Input b;b.L=12000;b.lengthM=12;b.H=3200;b.floorM=0;b.ceilingM=3.2;b.sp=500;b.spM=0.5;
     std::vector<Pt> band={Pt(0,2750),Pt(5000,2750),Pt(5000,2450),Pt(0,2450)};b.bands.push_back(band);
     band={Pt(5000,2750),Pt(5600,2350),Pt(5600,2100),Pt(5000,2450)};b.bands.push_back(band);
     band={Pt(5600,2350),Pt(12000,2350),Pt(12000,2100),Pt(5600,2100)};b.bands.push_back(band);
     svg(b,dir+"/3_uzduzni_sp.svg");
+    Input c;c.L=8000;c.H=3200;c.ceilingM=3.2;svg(c,dir+"/4_prazno.svg");
     return 0;
 }

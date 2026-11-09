@@ -29,7 +29,7 @@ namespace tvsSectionCmd {
 // sp: spusteni plafon, distance below the floor above (drawing units, 0 = none).
 struct Params {AcGePoint3d p1,p2;bool flip;double floor,ceiling,scale,depth,sp;int hidden;std::wstring letter;   // floor/ceiling: drawing units
     Params():flip(false),floor(0),ceiling(0),scale(50),depth(0),sp(0),hidden(0){}};
-struct Remembered {double floorM,ceilingM,scale,spM;bool spOn;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),spM(0.5),spOn(false),hidden(0){}};
+struct Remembered {double floorM,ceilingM,scale,spM;bool spOn,table;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),spM(0.5),spOn(false),table(true),hidden(0){}};
 inline Remembered& remembered(){static Remembered r;return r;}
 inline const ACHAR* key(){return L"TVS_PRESJEK_V1";}
 inline const ACHAR* layerName(){return L"TVS_PRESJEK";}
