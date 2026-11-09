@@ -29,7 +29,7 @@ namespace tvsSectionCmd {
 // sp: spusteni plafon, distance below the floor above (drawing units, 0 = none).
 struct Params {AcGePoint3d p1,p2;bool flip;double floor,ceiling,scale,depth,sp;int hidden;std::wstring letter;   // floor/ceiling: drawing units
     Params():flip(false),floor(0),ceiling(0),scale(50),depth(0),sp(0),hidden(0){}};
-struct Remembered {double floorM,ceilingM,scale,spM;bool spOn,table;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),spM(0.5),spOn(false),table(true),hidden(0){}};
+struct Remembered {double floorM,ceilingM,scale,spM,depthM;bool spOn,table;int hidden;Remembered():floorM(0),ceilingM(3),scale(50),spM(0.5),depthM(0),spOn(false),table(true),hidden(0){}};
 inline Remembered& remembered(){static Remembered r;return r;}
 inline const ACHAR* key(){return L"TVS_PRESJEK_V1";}
 inline const ACHAR* layerName(){return L"TVS_PRESJEK";}
@@ -337,8 +337,8 @@ public:
 class DepthJig : public AcEdJig {
     ZonePreview z;AcGePoint3d last;
 public:
-    bool flip;double depth;
-    DepthJig(const AcGePoint3d& a,const AcGePoint3d& b):flip(false),depth(0){z.p1=a;z.p2=b;last=b;
+    bool flip;double depth;double fixedDepth;   // fixedDepth >= 0: only the side is picked, the zone keeps this depth
+    DepthJig(const AcGePoint3d& a,const AcGePoint3d& b,double fixed=-1):flip(false),depth(0),fixedDepth(fixed){z.p1=a;z.p2=b;last=b;
         setDispPrompt(L"\nStrana gledanja i dubina presjeka (povucite misem): ");
         setUserInputControls(static_cast<UserInputControls>(kAccept3dCoordinates|kGovernedByOrthoMode));}
     virtual AcDbEntity* entity()const{return const_cast<ZonePreview*>(&z);}
@@ -347,7 +347,7 @@ public:
     virtual Adesk::Boolean update(){
         AcGeVector3d d=z.p2-z.p1;d.z=0;d.normalize();const AcGeVector3d left(-d.y,d.x,0);
         AcGeVector3d s=last-z.p1;s.z=0;const double v=s.dotProduct(left);
-        z.flip=flip=v<0;z.depth=depth=std::fabs(v);return Adesk::kTrue;}
+        z.flip=flip=v<0;z.depth=depth=fixedDepth>=0?fixedDepth:std::fabs(v);return Adesk::kTrue;}
 };
 inline bool askLevel(const wchar_t* prompt,double& valueM){
     wchar_t text[160];swprintf_s(text,L"%ls <%.2f>: ",prompt,valueM);acedInitGet(0,NULL);double v=0;

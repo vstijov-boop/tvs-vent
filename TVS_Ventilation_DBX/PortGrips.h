@@ -13,6 +13,9 @@
 #include "DrawingUnits.h"
 #include "dbobjptr.h"
 #include <cmath>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 namespace tvsPortGrip {
 const int base=200;
 struct Port {AcGePoint3d p;AcGeVector3d dir;double a,b;bool round;Port():a(0),b(0),round(false){}};
@@ -51,18 +54,33 @@ inline int points(const TVS_Entity* e,AcGePoint3d out[3]){
     if(const TVS_TAP* t=TVS_TAP::cast(e)){out[0]=t->MA;out[1]=t->MC;return 2;}
     Port q[3];const int n=ports(e,q);for(int k=0;k<n;++k)out[k]=q[k].p;return n;
 }
-inline bool isFree(const TVS_Entity* self,const AcGePoint3d& at,double tol){
-    AcDbObjectPointer<AcDbBlockTableRecord> space(self->ownerId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return false;
-    AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return false;
-    bool free=true;
-    for(;!it->done()&&free;it->step()){
-        AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk||id==self->objectId())continue;
+// All connection points of the space, on a grid; rebuilt at most every 1.5 s (grips are asked in
+// bursts when fittings are selected, so a selection of many fittings scans the drawing once).
+struct Cache {AcDbObjectId space;ULONGLONG at;double cell;std::unordered_map<long long,std::vector<std::pair<AcDbObjectId,AcGePoint3d> > > grid;Cache():at(0),cell(0){}};
+inline Cache& cache(){static Cache c;return c;}
+inline long long cellKey(double x,double y,double cell){const long long i=static_cast<long long>(std::floor(x/cell)),j=static_cast<long long>(std::floor(y/cell));return i*1000003LL+j;}
+inline void rebuild(const AcDbObjectId& spaceId,double tol){
+    Cache& c=cache();const ULONGLONG now=GetTickCount64();
+    if(c.space==spaceId&&c.cell==tol&&now-c.at<1500)return;
+    c.grid.clear();c.space=spaceId;c.cell=tol>0?tol:1;c.at=now;
+    AcDbObjectPointer<AcDbBlockTableRecord> space(spaceId,AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
+    AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
+    for(;!it->done();it->step()){
+        AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk)continue;
         AcDbEntity* e=NULL;if(acdbOpenAcDbEntity(e,id,AcDb::kForRead)!=Acad::eOk)continue;
         if(const TVS_Entity* o=TVS_Entity::cast(e)){AcGePoint3d q[3];const int n=points(o,q);
-            for(int k=0;k<n;++k)if(plan(q[k],at)<=tol){free=false;break;}}
+            for(int k=0;k<n;++k)c.grid[cellKey(q[k].x,q[k].y,c.cell)].push_back(std::make_pair(id,q[k]));}
         e->close();
     }
-    delete it;return free;
+    delete it;
+}
+inline bool isFree(const TVS_Entity* self,const AcGePoint3d& at,double tol){
+    rebuild(self->ownerId(),tol);const Cache& c=cache();
+    for(int dx=-1;dx<=1;++dx)for(int dy=-1;dy<=1;++dy){
+        auto f=c.grid.find(cellKey(at.x+dx*c.cell,at.y+dy*c.cell,c.cell));if(f==c.grid.end())continue;
+        for(size_t k=0;k<f->second.size();++k)if(f->second[k].first!=self->objectId()&&plan(f->second[k].second,at)<=tol)return false;
+    }
+    return true;
 }
 // Appends the connector grips of the free ports (call from the new-style subGetGripPoints).
 inline void add(const TVS_Entity* e,AcDbGripDataPtrArray& grips,double viewUnit){

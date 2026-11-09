@@ -194,7 +194,7 @@ namespace tvsSectionDialog {
 inline AcGePoint3d wcs(const ads_point p){resbuf from={};from.restype=RTSHORT;from.resval.rint=1;resbuf to={};to.restype=RTSHORT;to.resval.rint=0;
     ads_point w;acedTrans(p,&from,&to,0,w);return asPnt3d(w);}
 inline void remember(const Setup& s){tvsSectionCmd::Remembered& m=tvsSectionCmd::remembered();
-    m.floorM=s.floorM;m.ceilingM=s.ceilingM;m.scale=s.scale;m.spM=s.spM;m.spOn=s.spOn;if(s.mode==0)m.hidden=s.hidden;else m.table=s.table;}
+    m.floorM=s.floorM;m.ceilingM=s.ceilingM;m.scale=s.scale;m.spM=s.spM;m.spOn=s.spOn;if(s.mode==0){m.hidden=s.hidden;m.depthM=s.depthM;}else m.table=s.table;}
 inline void fill(Setup& s,AcDbDatabase* db,int mode){tvsSectionCmd::Remembered& m=tvsSectionCmd::remembered();
     s.mode=mode;s.db=db;s.f=tvsUnits::factor(db);s.floorM=m.floorM;s.ceilingM=m.ceilingM;s.scale=m.scale;s.spM=m.spM;s.spOn=m.spOn;s.hidden=m.hidden;s.table=m.table;}
 inline bool insertion(const wchar_t* prompt,AcGePoint3d& at){ads_point ins;if(acedGetPoint(NULL,prompt,ins)!=RTNORM)return false;at=wcs(ins);return true;}
@@ -207,7 +207,11 @@ inline void cross(UINT idd,const ads_point* first){
     if(acedGetPoint(a,L"\nDruga tačka linije presjeka: ",b)!=RTNORM)return;
     tvsSectionCmd::Params p;p.p1=wcs(a);p.p2=wcs(b);p.p1.z=p.p2.z=0;
     if(AcGeVector3d(p.p2.x-p.p1.x,p.p2.y-p.p1.y,0).length()<1e-9){acutPrintf(L"\nLinija presjeka je prekratka.");return;}
-    {tvsSectionCmd::DepthJig jig(p.p1,p.p2);if(jig.drag()!=AcEdJig::kNormal)return;p.flip=jig.flip;p.depth=jig.depth<1.0/f?0:jig.depth;}
+    {   // side only (click on the side to look at); the depth is the dialog value (remembered), not dragged
+        const double depth=tvsSectionCmd::remembered().depthM*1000/f;
+        tvsSectionCmd::DepthJig jig(p.p1,p.p2,depth>0?depth:p.p1.distanceTo(p.p2)*0.05);
+        jig.setDispPrompt(L"\nStrana gledanja presjeka (kliknite na stranu): ");
+        if(jig.drag()!=AcEdJig::kNormal)return;p.flip=jig.flip;p.depth=depth;}
     Setup s;fill(s,db,0);s.letter=tvsSectionCmd::nextLetter(db);s.depthM=p.depth*f/1000;s.lengthDU=p.p1.distanceTo(p.p2);
     {std::vector<tvsSection::Member> net;tvsSectionCmd::members(db,net);
      const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(tvsSection::P(p.p1.x,p.p1.y),tvsSection::P(p.p2.x,p.p2.y),net,p.flip,2.0/f);
