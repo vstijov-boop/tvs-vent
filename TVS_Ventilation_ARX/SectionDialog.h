@@ -21,9 +21,10 @@ struct Setup {
     std::wstring letter;double floorM,ceilingM,spM,scale,depthM;bool spOn,table;int hidden;
     struct Row {double s,bottom;std::wstring size;};std::vector<Row> rows;   // uzduzni: table preview (drawing units)
     double f;double lengthDU;int count;   // section line length (poprečni) / developed length (uzdužni), cut ducts / route elements
-    std::vector<tvsSectionSketch::Box> boxes;std::vector<std::vector<tvsTeeSketch::Pt> > bands;   // absolute z (drawing units)
+    std::vector<tvsSectionSketch::Box> boxes;std::vector<std::vector<tvsTeeSketch::Pt> > bands,lines;   // absolute z (drawing units)
+    std::vector<tvsSection::Member> net;tvsSection::P a,b;bool flip;double linesDepth;   // poprecni: elements seen in the depth (recomputed when it changes)
     AcDbDatabase* db;
-    Setup():mode(0),action(0),floorM(0),ceilingM(3),spM(0.5),scale(50),depthM(0),spOn(false),table(true),hidden(0),f(1),lengthDU(0),count(0),db(NULL){}
+    Setup():mode(0),action(0),floorM(0),ceilingM(3),spM(0.5),scale(50),depthM(0),spOn(false),table(true),hidden(0),f(1),lengthDU(0),count(0),db(NULL),flip(false),linesDepth(-1){}
 };
 class Dialog : public CAdUiBaseDialog {
 public:
@@ -65,8 +66,16 @@ public:
         if(s.mode==1&&s.count==0){why=L"Trasa nije pronađena.";return false;}
         return true;
     }
+    void depthLines(){   // outlines of the elements behind the section plane, for the preview
+        if(s.mode!=0)return;const double depth=s.depthM*1000/s.f;if(std::fabs(depth-s.linesDepth)<1e-9)return;
+        s.linesDepth=depth;s.lines.clear();if(!(depth>0))return;
+        const std::vector<tvsSection::View> v=tvsSection::views(s.a,s.b,s.net,s.flip,depth,2.0/s.f);
+        for(size_t i=0;i<v.size()&&i<400;++i)for(size_t k=0;k<v[i].outline.size();++k){const tvsSection::Prim& g=v[i].outline[k];
+            std::vector<tvsTeeSketch::Pt> q;const int n=g.arc?16:1;for(int j=0;j<=n;++j){const tvsSection::P t=g.at(double(j)/n);q.push_back(tvsTeeSketch::Pt(t.x,t.y));}
+            s.lines.push_back(q);}
+    }
     void refresh(){
-        valid=check(problem);const bool fresh=s.action==0;
+        depthLines();valid=check(problem);const bool fresh=s.action==0;
         for(int id:{IdLetter,IdFloor,IdCeiling,IdSpOn,IdScale})enable(id,fresh);
         enable(IdSp,fresh&&s.spOn);enable(IdDepth,fresh&&s.mode==0);enable(IdHidden,fresh&&s.mode==0&&s.depthM>0);enable(IdTable,fresh);
         CString t;
@@ -146,6 +155,7 @@ public:
         if(s.spOn){in.sp=s.spM*1000/s.f;in.spM=s.spM;}
         for(size_t i=0;i<s.boxes.size();++i){tvsSectionSketch::Box b=s.boxes[i];b.z-=fl;in.boxes.push_back(b);}
         for(size_t i=0;i<s.bands.size();++i){std::vector<tvsTeeSketch::Pt> q=s.bands[i];for(size_t j=0;j<q.size();++j)q[j].y-=fl;in.bands.push_back(q);}
+        for(size_t i=0;i<s.lines.size();++i){std::vector<tvsTeeSketch::Pt> q=s.lines[i];for(size_t j=0;j<q.size();++j)q[j].y-=fl;in.lines.push_back(q);}
         in.lengthM=s.lengthDU*s.f/1000;
         std::vector<tvsTeeSketch::Prim> p;tvsSectionSketch::build(in,p);
         CDC* dc=CDC::FromHandle(it->hDC);CRect r(it->rcItem);
@@ -207,14 +217,11 @@ inline void cross(UINT idd,const ads_point* first){
     if(acedGetPoint(a,L"\nDruga tačka linije presjeka: ",b)!=RTNORM)return;
     tvsSectionCmd::Params p;p.p1=wcs(a);p.p2=wcs(b);p.p1.z=p.p2.z=0;
     if(AcGeVector3d(p.p2.x-p.p1.x,p.p2.y-p.p1.y,0).length()<1e-9){acutPrintf(L"\nLinija presjeka je prekratka.");return;}
-    {   // side only (click on the side to look at); the depth is the dialog value (remembered), not dragged
-        const double depth=tvsSectionCmd::remembered().depthM*1000/f;
-        tvsSectionCmd::DepthJig jig(p.p1,p.p2,depth>0?depth:p.p1.distanceTo(p.p2)*0.05);
-        jig.setDispPrompt(L"\nStrana gledanja presjeka (kliknite na stranu): ");
-        if(jig.drag()!=AcEdJig::kNormal)return;p.flip=jig.flip;p.depth=depth;}
+    {   // side and depth by dragging (as before); the dialog shows the depth and can change it
+        tvsSectionCmd::DepthJig jig(p.p1,p.p2);if(jig.drag()!=AcEdJig::kNormal)return;p.flip=jig.flip;p.depth=jig.depth<1.0/f?0:jig.depth;}
     Setup s;fill(s,db,0);s.letter=tvsSectionCmd::nextLetter(db);s.depthM=p.depth*f/1000;s.lengthDU=p.p1.distanceTo(p.p2);
-    {std::vector<tvsSection::Member> net;tvsSectionCmd::members(db,net);
-     const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(tvsSection::P(p.p1.x,p.p1.y),tvsSection::P(p.p2.x,p.p2.y),net,p.flip,2.0/f);
+    {std::vector<tvsSection::Member>& net=s.net;tvsSectionCmd::members(db,net);s.a=tvsSection::P(p.p1.x,p.p1.y);s.b=tvsSection::P(p.p2.x,p.p2.y);s.flip=p.flip;
+     const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(s.a,s.b,net,p.flip,2.0/f);
      for(size_t i=0;i<cuts.size();++i){tvsSectionSketch::Box x;x.s=cuts[i].s;x.z=cuts[i].z;x.w=cuts[i].w;x.h=cuts[i].h;x.round=cuts[i].round;s.boxes.push_back(x);}
      s.count=static_cast<int>(cuts.size());}
     const int rc=show(s,idd);remember(s);

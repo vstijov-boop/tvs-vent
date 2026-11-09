@@ -28,6 +28,7 @@ int main(int argc,char** argv){
     band={Pt(5000,2750),Pt(5600,2350),Pt(5600,2100),Pt(5000,2450)};b.bands.push_back(band);
     band={Pt(5600,2350),Pt(12000,2350),Pt(12000,2100),Pt(5600,2100)};b.bands.push_back(band);
     svg(b,dir+"/3_uzduzni_sp.svg");
+    Input d;d.L=1000;d.H=3000;d.ceilingM=3;d.lines.push_back({Pt(-2000,2500),Pt(3000,2500),Pt(3000,2800),Pt(-2000,2800),Pt(-2000,2500)});svg(d,dir+"/5_dubina.svg");
     Input c;c.L=8000;c.H=3200;c.ceilingM=3.2;svg(c,dir+"/4_prazno.svg");
     return 0;
 }
