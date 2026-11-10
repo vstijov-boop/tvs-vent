@@ -56,6 +56,13 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Spojevi koje TVS_STRETCH / TVS_MOVE odbijaju – testirati
+- **Odbijen spoj:** ispis oba presjeka (dimenzije, osa u mm) i tačke spoja.
+- **Ista dimenzija, druga kota** (kanal na 0, T komad na 2850): pitanje „Izjednačiti kotu kanala…? [Da/Ne] <Da>“ → kanal dobija kotu susjeda → ponoviti komandu.
+- **Kanal druge dimenzije na priključku TK-O / TK-G** (npr. 150×150 na ogranku visine 100): „umetnuti prelaz? <Da>“ → prelaz na priključku → ponoviti komandu.
+- **TVS_DRAW / TVS_PIPE do priključka TK-O / TK-G** kanalom druge dimenzije: na kraju komande prelaz se umeće sam (poruka „T komad, …: umetnut prelaz…“). Isto kad crtanje počne sa priključka bez konektor-gripa.
+- **Prelaz poravnat gore/dolje** u mreži: TVS_STRETCH / TVS_MOVE više ne javljaju lažnu razliku kota iza njega.
+
 ## Ponovni pregled N2 – kopiranje između crteža sa različitim jedinicama – testirati
 Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → Insertion scale), TVS po svojim jedinicama (TVS_SETTINGS). Najbolje je da su u oba crteža iste (mm-crtež: INSUNITS = Millimeters, cm-crtež: Centimeters).
 - **INSUNITS odgovaraju TVS jedinicama:** Ctrl+C iz mm crteža, Ctrl+V u cm crtež → kanali, koljena, prelazi, T komadi su iste stvarne veličine (400 mm ostaje 400 mm, u cm crtežu 40); i linije oko njih. Isto cm → mm, mm → m.

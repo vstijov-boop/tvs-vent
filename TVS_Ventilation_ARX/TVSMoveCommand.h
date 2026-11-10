@@ -356,6 +356,9 @@ inline void sideBranchProblem(const std::vector<Node>& nodes,const tvsMoveNetwor
     StretchHighlight mark;mark.add(nodes[r.problem].id);mark.add(nodes[r.other].id);
     ACHAR answer[133]={0};acedGetString(0,L"\nOba elementa su istaknuta. Enter za povratak u crtež: ",answer);
 }
+// Repair offered for a refused joint (JointFix.h sets it; TeePort.h includes this header).
+typedef bool (*JointFix)(const std::vector<Node>&,const std::vector<tvsMoveNetwork::Body>&,int,int,int,int,const ACHAR*);
+inline JointFix& jointFixHook(){static JointFix h=NULL;return h;}
 // SectionMismatch: both sides of the joint (size, height, axis level in mm), so the cause can be seen.
 inline void sectionProblem(const std::vector<Node>& nodes,const std::vector<tvsMoveNetwork::Body>& bodies,const tvsMoveNetwork::Result& r,const ACHAR* command){
     if(r.error!=tvsMoveNetwork::SectionMismatch||r.problem<0||r.other<0||static_cast<size_t>(r.problem)>=bodies.size()||static_cast<size_t>(r.other)>=bodies.size())return;
@@ -368,6 +371,7 @@ inline void sectionProblem(const std::vector<Node>& nodes,const std::vector<tvsM
         else acutPrintf(L"\n  %ls: %.1f × %.1f, osa na %.1f mm",(k>=0&&k<=4)?names[k]:names[0],q.a*f,q.b*f,q.elevation*f);};
     acutPrintf(L"\n%ls: spoj u X=%.0f Y=%.0f mm:",command,r.where.x*f,r.where.y*f);line(r.problem,r.port);line(r.other,r.otherPort);
     acutPrintf(L"\n  (dozvoljena razlika 0,1 mm)");
+    if(jointFixHook())jointFixHook()(nodes,bodies,r.problem,r.port,r.other,r.otherPort,command);
 }
 inline void stretchProblem(const std::vector<Node>& nodes,int index,const ACHAR* message,const ACHAR* command=L"TVS_STRETCH"){
     acutPrintf(L"\n%s: %s",command,message);

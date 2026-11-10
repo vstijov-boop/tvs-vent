@@ -9,6 +9,7 @@
 	{
 				if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
+		tvsJointFix::AfterDrawing teePorts;   // new ducts on a TK-O / TK-G port: prelaz there (JointFix.h)
 		if (!currentLayerWritable()) { TVS_Pipe::SetParamsForDraw(AcDbObjectId::kNull, 0); return; }
 		int index;
 		AcDbObjectId id;

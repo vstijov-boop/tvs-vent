@@ -35,4 +35,11 @@ class Guard(unittest.TestCase):
   self.assertIn('inline void sectionProblem(',m);self.assertEqual(m.count('sectionProblem(nodes,bodies,result,'),2)
   g=text('TVS_Ventilation_ARX/MoveNetworkGeometry.h')
   self.assertEqual(g.count('out.other=c.body;out.port=static_cast<int>(j);out.otherPort=c.port;'),2)
+ def test_joint_fix(self):
+  j=text('TVS_Ventilation_ARX/JointFix.h')
+  self.assertIn('p->put_Elevation(so.elevation)',j);self.assertIn('tvsTeePort::ensure(nodes[o].id,k)',j)
+  self.assertIn('tvsTeePort::afterDuct(db,made[k]);',j)
+  self.assertIn('if(jointFixHook())jointFixHook()(nodes,bodies,',text('TVS_Ventilation_ARX/TVSMoveCommand.h'))
+  self.assertIn('tvsJointFix::install();',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
+  for f in ('Draw.inl','PipeTransWye.inl'):self.assertIn('tvsJointFix::AfterDrawing teePorts;',text('TVS_Ventilation_ARX/commands/'+f))
 if __name__=='__main__':unittest.main()

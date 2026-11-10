@@ -71,6 +71,7 @@
 #include "SizeFollow.h"
 #include "ElbowAngleCommand.h"
 #include "ScaleWindow.h"
+#include "JointFix.h"
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 
@@ -128,6 +129,7 @@ public:
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		tvsLevelTooltip::start();
 		tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
+		tvsJointFix::install();   // TVS_STRETCH / TVS_MOVE: ponuda popravke spoja
 		tvsScaleWindow::start();  // jedinice crteža pri kopiranju / umetanju (ScaleWindow.h)
 		tvsSizeFollow::enableTeeFollow(IDD_RUN, IDD_TEETYPE);   // TVS_TK_TIP: dionica iza kanala nove dimenzije
 		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)

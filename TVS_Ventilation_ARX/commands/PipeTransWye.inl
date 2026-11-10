@@ -5,6 +5,7 @@
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
 		if (!currentLayerWritable()) return;
+		tvsJointFix::AfterDrawing teePorts;   // new ducts on a TK-O / TK-G port: prelaz there (JointFix.h)
 
 		ads_point pt1, pt2;
 		int reg;
