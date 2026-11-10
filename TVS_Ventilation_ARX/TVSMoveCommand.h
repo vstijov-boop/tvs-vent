@@ -6,6 +6,7 @@
 #include "TVS_TAP.h"
 #include "TVS_TRANS.h"
 #include "TVS_WYE.h"
+#include "../TVS_Ventilation_DBX/TransAlignData.h"
 #include "MleaderController.h"
 #include <actrans.h>
 #include <dbmleader.h>
@@ -77,7 +78,9 @@ inline bool describe(AcDbEntity* entity,Node& n){
         n.ports.push_back(point(p->FirstPoint));n.ports.push_back(last);
         n.axes.push_back(Point(p->VectTr.x,p->VectTr.y,p->VectTr.z));n.axes.push_back(n.axes[0]);
         n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp1,p->SizeBp1,p->ThisRoundp1,p->Elev));
-        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp2,p->SizeBp2,p->ThisRoundp2,p->Elev));
+        // aligned in height (gore / dolje, TransAlignData.h): the axis at the end is Elev + endOffset
+        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp2,p->SizeBp2,p->ThisRoundp2,
+            p->Elev+tvsTransAlign::endOffset(tvsTransAlign::read(p),p->SizeAp1,p->SizeBp1,p->SizeAp2,p->SizeBp2)));
         Point direction;
         if(std::fabs(p->VectTr.z)<1e-8
             &&tvsMoveGeometry::unit(n.ports[1]-n.ports[0],direction))n.kind=3;
@@ -353,6 +356,23 @@ inline void sideBranchProblem(const std::vector<Node>& nodes,const tvsMoveNetwor
     StretchHighlight mark;mark.add(nodes[r.problem].id);mark.add(nodes[r.other].id);
     ACHAR answer[133]={0};acedGetString(0,L"\nOba elementa su istaknuta. Enter za povratak u crtež: ",answer);
 }
+// SectionMismatch: both sides of the joint (size, height, axis level in mm), so the cause can be seen.
+inline void sectionProblem(const std::vector<Node>& nodes,const std::vector<tvsMoveNetwork::Body>& bodies,const tvsMoveNetwork::Result& r,const ACHAR* command){
+    if(r.error!=tvsMoveNetwork::SectionMismatch||r.problem<0||r.other<0||static_cast<size_t>(r.problem)>=bodies.size()||static_cast<size_t>(r.other)>=bodies.size())return;
+    if(r.port<0||r.otherPort<0||static_cast<size_t>(r.port)>=bodies[r.problem].sections.size()||static_cast<size_t>(r.otherPort)>=bodies[r.other].sections.size())return;
+    static const ACHAR* names[]={L"element",L"kanal",L"koljeno",L"prelaz",L"T komad"};
+    const double f=tvsUnits::factor(acdbHostApplicationServices()->workingDatabase());
+    auto line=[&](int body,int port){const tvsMoveNetwork::Section& q=bodies[body].sections[port];
+        const int k=static_cast<size_t>(body)<nodes.size()?nodes[body].kind:0;
+        if(q.round)acutPrintf(L"
+  %ls: Ø%.1f, osa na %.1f mm",(k>=0&&k<=4)?names[k]:names[0],q.a*f,q.elevation*f);
+        else acutPrintf(L"
+  %ls: %.1f × %.1f, osa na %.1f mm",(k>=0&&k<=4)?names[k]:names[0],q.a*f,q.b*f,q.elevation*f);};
+    acutPrintf(L"
+%ls: spoj u X=%.0f Y=%.0f mm:",command,r.where.x*f,r.where.y*f);line(r.problem,r.port);line(r.other,r.otherPort);
+    acutPrintf(L"
+  (dozvoljena razlika 0,1 mm)");
+}
 inline void stretchProblem(const std::vector<Node>& nodes,int index,const ACHAR* message,const ACHAR* command=L"TVS_STRETCH"){
     acutPrintf(L"\n%s: %s",command,message);
     if(index<0||static_cast<size_t>(index)>=nodes.size())return;
@@ -544,7 +564,7 @@ inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
                          int selected,const Point& delta,double factor,double tol,double minimum,const ACHAR* command){
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::plan(bodies,selected,delta,minimum,tol,result)){
-        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\n%ls: %s",command,networkError(result.error));
+        roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\n%ls: %s",command,networkError(result.error));sectionProblem(nodes,bodies,result,command);
         sideBranchProblem(nodes,result,command);return false;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
@@ -815,7 +835,7 @@ inline void executeStretch(){
     selected.clear();
     tvsMoveNetwork::Result result;
     if(!tvsMoveNetwork::planSelection(bodies,masks,delta,minimum,tol,result)){
-        roundBranchAlert(nodes,result.problem,result.error,tol);stretchProblem(nodes,result.problem,networkError(result.error));return;}
+        roundBranchAlert(nodes,result.problem,result.error,tol);sectionProblem(nodes,bodies,result,L"TVS_STRETCH");stretchProblem(nodes,result.problem,networkError(result.error));return;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
         acutPrintf(L"\nTVS_STRETCH: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}

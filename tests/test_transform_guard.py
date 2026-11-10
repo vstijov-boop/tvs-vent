@@ -29,4 +29,10 @@ class Guard(unittest.TestCase):
   self.assertIn('r.l *= scale; r.second *= scale; r.radius2 *= scale;',text('TVS_Ventilation_DBX/TVS_WYE.cpp'))
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
   self.assertIn('tvsScaleWindow::start();',e);self.assertIn('tvsScaleWindow::stop();',e);self.assertIn('TVS_PRERACUNAJ, TVS_PRERACUNAJ',e)
+ def test_move_section_diagnostics(self):
+  m=text('TVS_Ventilation_ARX/TVSMoveCommand.h')
+  self.assertIn('p->Elev+tvsTransAlign::endOffset(tvsTransAlign::read(p),',m)   # prelaz poravnat gore/dolje: osa na kraju
+  self.assertIn('inline void sectionProblem(',m);self.assertEqual(m.count('sectionProblem(nodes,bodies,result,'),2)
+  g=text('TVS_Ventilation_ARX/MoveNetworkGeometry.h')
+  self.assertEqual(g.count('out.other=c.body;out.port=static_cast<int>(j);out.otherPort=c.port;'),2)
 if __name__=='__main__':unittest.main()
