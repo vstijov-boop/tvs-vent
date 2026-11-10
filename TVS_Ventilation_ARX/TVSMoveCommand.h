@@ -567,7 +567,7 @@ inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatri
 // element (its position before the move) they go with that port. Returns the number of flex
 // crijeva changed, -1 when one cannot be written.
 inline int followFlex(Transaction& tx,const std::vector<Node>& nodes,const std::vector<tvsMoveNetwork::Body>& bodies,
-                      const tvsMoveNetwork::Result& result,const std::vector<int>* frame,const Point& delta,double near){
+                      const tvsMoveNetwork::Result& result,const std::vector<int>* frame,const Point& delta,double reach){
     int moved=0;
     for(size_t i=0;i<nodes.size();++i){if(!nodes[i].flex||nodes[i].ports.size()!=2)continue;
         Point to[2]={nodes[i].ports[0],nodes[i].ports[1]};bool changed=false;
@@ -575,7 +575,7 @@ inline int followFlex(Transaction& tx,const std::vector<Node>& nodes,const std::
             if(frame&&i<frame->size()&&(*frame)[i]>0&&((*frame)[i]&(1<<j))){to[j]=nodes[i].ports[j]+delta;changed=true;continue;}
             for(size_t k=0;k<bodies.size()&&k<result.masks.size()&&k<result.ports.size();++k){if(!result.masks[k]||k==i)continue;
                 for(size_t q=0;q<bodies[k].ports.size()&&q<result.ports[k].size();++q)
-                    if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],nodes[i].ports[j],near)){to[j]=result.ports[k][q];changed=true;}}
+                    if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],nodes[i].ports[j],reach)){to[j]=result.ports[k][q];changed=true;}}
         }
         if(!changed)continue;
         TVS_Pipe* flex=TVS_Pipe::cast(tx.write(nodes[i].id));
