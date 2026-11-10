@@ -160,7 +160,8 @@ BEGIN
     CONTROL         "Gumena zaptivka (RG / RAG)",1052,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,220,150,10
     LTEXT           "Ravni dio do sićke, mm",-1,264,234,90,10
     EDITTEXT        1053,356,232,30,12,ES_AUTOHSCROLL | WS_GROUP
-    CONTROL         "Priključak u kanalu isprekidano",1054,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,247,170,10
+        CONTROL         "Priključak u kanalu isprekidano",1054,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,264,247,170,10
+    CONTROL         "Promjena dimenzije cijele dionice (dijalog)",1055,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,14,232,225,10
 
 END
 

@@ -46,6 +46,9 @@ inline bool& posted(){static bool b=false;return b;}
 // TVS elements modified in the command (any command, Properties, grips): their TVS labels get
 // their text again in TVS_DIM_PRATI (plan 15; TVS_LEAD_AUTO turns it off).
 inline std::set<AcDbObjectId>& touched(){static std::set<AcDbObjectId> s;return s;}
+// Whole run (dialog "Promjena dimenzije dionice"): off unless TVS_SETTINGS turns it on (TVS_DIONICA
+// env = 1). Off: only the size follow duct <-> prelaz, and a warning at a joint without prelaz.
+inline bool wholeRun(){ACHAR v[16]=L"";return acedGetEnv(L"TVS_DIONICA",v,16)==RTNORM&&!_wcsicmp(v,L"1");}
 inline bool autoLabels(){ACHAR v[16]=L"";return !(acedGetEnv(L"TVS_LEAD_AUTO",v,16)==RTNORM&&!_wcsicmp(v,L"0"));}
 // size of a user-edited duct before the edit (whole run: elements of that size follow)
 inline std::map<AcDbObjectId,Sizes>& previous(){static std::map<AcDbObjectId,Sizes> m;return m;}
@@ -645,8 +648,12 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
             for(size_t k=0;k<nodes.size();++k)if(excluded().count(nodes[k].id))seen.insert(static_cast<int>(k));
             for(size_t k=0;k<starts.size();++k){Run r;walk(nodes,starts[k],old[nodes[starts[k]].id],tol,etazes,r,seen,c);runs.push_back(std::make_pair(starts[k],r));}};
         auto anything=[&](){for(size_t k=0;k<runs.size();++k)if(!runs[k].second.empty())return true;return false;};
-        tvsRunDialog::Choices ch;collect(ch);
-        if(anything()){
+                tvsRunDialog::Choices ch;
+        if(!wholeRun()){int n=0;   // samo kanal <-> prelaz; spoj sa elementom stare dimenzije: upozorenje
+            for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,false);
+            if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza.",n);
+        }else collect(ch);
+        if(wholeRun()&&anything()){
             auto survey=[&](const tvsRunDialog::Choices& c,tvsRunDialog::Preview& pv){
                 const bool whole=c.scope!=tvsRunDialog::Only&&c.scope!=tvsRunDialog::OnlyPrelaz;
                 if(whole)collect(c);else{runs.clear();for(size_t k=0;k<starts.size();++k)pv.joints+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,false);}
@@ -752,7 +759,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
 // gets the run dialog (the T komad itself is left out). Cancel = prelaz on the far joint.
 // A prelaz at the far end takes the new size in settle; false when no dialog was shown.
 inline bool followFromTee(const AcDbObjectId& duct,const tvsTeePort::Section& was,const AcDbObjectId& tee){
-    AcDbDatabase* db=duct.database();if(!db||!ids().run)return false;
+        AcDbDatabase* db=duct.database();if(!db||!ids().run||!wholeRun())return false;
     {AcDbObjectPointer<TVS_Pipe> p(duct,AcDb::kForRead);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))return false;}
     Sizes old;old.a[0]=old.a[1]=was.a;old.b[0]=old.b[1]=was.round?0:was.b;old.round[0]=old.round[1]=was.round;
     previous()[duct]=old;std::map<AcDbObjectId,int> work;work[duct]=3;

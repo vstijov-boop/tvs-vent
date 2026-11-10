@@ -25,6 +25,7 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 
 ## Pregled koda – faze 1 i 2 (REVIEW_2026-11.md) – testirati
 **TVS_DIM_PRATI**
+- **Dijalog cijele dionice je podrazumijevano ISKLJUČEN** (TVS_SETTINGS → „Promjena dimenzije cijele dionice (dijalog)“, čuva se u profilu). Isključeno: radi samo prenos dimenzije kanal ↔ prelaz; spoj kanala nove dimenzije sa elementom stare dimenzije daje UPOZORENJE; TVS_TK_TIP umeće prelaz na kraju kanala kao ranije. Stavke ispod važe kad je uključeno.
 - Kanal sa krajem na istoj tački u osnovi kao drugi kanal/prelaz na drugoj visini (jedan iznad drugog): promjena dimenzije gornjeg ne smije dirati donji.
 - Umjesto pitanja u komandnoj liniji otvara se dijalog **„Promjena dimenzije dionice“** (samo kad dionica stare dimenzije ide dalje od izabranog kanala):
   - **Obuhvat:** cijela dionica do granica / samo izabrani kanal (UPOZORENJE ako naliježe na element stare dimenzije) / prema strani 1 ili 2 (brojevi su u pregledu na krajevima kanala) / samo kanal + prelaz na spoju.

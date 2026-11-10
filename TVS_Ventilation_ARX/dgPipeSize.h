@@ -92,6 +92,7 @@
 #define IDC_SpiroRG 1052
 #define IDC_SpiroC 1053
 #define IDC_SpiroDashed 1054
+#define IDC_WholeRun 1055
 //-----------------------------------------------------------------------------
 class dgPipeSize : public CAdUiBaseDialog {
 	DECLARE_DYNAMIC(dgPipeSize)
@@ -223,7 +224,8 @@ public:
 	CButton fDuctFlex;
 	BOOL DuctFlex;
 	BOOL LeadAuto;      // TVS_SETTINGS: TVS_LEAD_AUTO (env)
-	BOOL DuctCaption;   // TVS_SETTINGS: TVS_NATPIS (crtez)
+		BOOL DuctCaption;   // TVS_SETTINGS: TVS_NATPIS (crtez)
+	BOOL WholeRun;      // TVS_SETTINGS: TVS_DIONICA (env) - TVS_DIM_PRATI dijalog cijele dionice
 	BOOL SpiroCatalog, SpiroRG, SpiroDashed;   // TVS_SETTINGS: spiro prelazi (SpiroCatalog.h, crtez)
 	double SpiroC;      // ravni dio do sicke, mm
 	BOOL LevelTooltip;   // TVS_SETTINGS: oblacic sa kotama (LevelTooltip.h)

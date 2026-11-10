@@ -46,7 +46,8 @@
 		dg.WipeoutLength = globalWipeoutLength;
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
 		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
-		{ ACHAR v[16] = L""; dg.LeadAuto = (acedGetEnv(L"TVS_LEAD_AUTO", v, 16) == RTNORM && !_wcsicmp(v, L"0")) ? FALSE : TRUE; }
+				{ ACHAR v[16] = L""; dg.LeadAuto = (acedGetEnv(L"TVS_LEAD_AUTO", v, 16) == RTNORM && !_wcsicmp(v, L"0")) ? FALSE : TRUE; }
+		dg.WholeRun = tvsSizeFollow::wholeRun() ? TRUE : FALSE;
 		AcDbDatabase* capDb = acdbHostApplicationServices()->workingDatabase();
 		const bool capWas = capDb && tvsDuctCaption::enabled(capDb);
 		dg.DuctCaption = capWas ? TRUE : FALSE;
@@ -86,7 +87,8 @@
 		globalWipeoutLength = dg.WipeoutLength;
 
 		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
-		acedSetEnv(L"TVS_LEAD_AUTO", dg.LeadAuto == TRUE ? L"1" : L"0");   // isto kao TVS_LEAD_AUTO
+				acedSetEnv(L"TVS_LEAD_AUTO", dg.LeadAuto == TRUE ? L"1" : L"0");   // isto kao TVS_LEAD_AUTO
+		acedSetEnv(L"TVS_DIONICA", dg.WholeRun == TRUE ? L"1" : L"0");     // TVS_DIM_PRATI: dijalog cijele dionice
 		bool regen = capDb && (dg.DuctCaption == TRUE) != capWas && tvsDuctCaption::set(capDb, dg.DuctCaption == TRUE);   // isto kao TVS_NATPIS
 		{	// spiro prelazi po katalogu SOKO (po crtezu)
 			tvsSpiro::Settings sp; sp.catalog = dg.SpiroCatalog == TRUE; sp.rg = dg.SpiroRG == TRUE; sp.dashed = dg.SpiroDashed == TRUE; sp.cMm = dg.SpiroC;

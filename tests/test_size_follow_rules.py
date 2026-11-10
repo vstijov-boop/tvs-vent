@@ -44,6 +44,13 @@ class Rules(unittest.TestCase):
   self.assertEqual(s.count('if(reshape){stop('),3)                                 # T komad, etaz, obilazak ostaju
   self.assertIn('if(r.convert){t->put_ThisRound(round);',s)                        # koljeno mijenja oblik
   self.assertIn('(end==0?t->ThisRoundp1:t->ThisRoundp2)=round;',s)                 # prelaz na kraju preuzima oblik
+ def test_whole_run_setting(self):
+  s=text('TVS_Ventilation_ARX/SizeFollow.h')
+  self.assertIn('acedGetEnv(L"TVS_DIONICA",v,16)==RTNORM&&!_wcsicmp(v,L"1")',s)   # podrazumijevano iskljuceno
+  self.assertIn('if(wholeRun()&&anything()){',s);self.assertIn('||!wholeRun())return false;',s)
+  self.assertIn('acedSetEnv(L"TVS_DIONICA"',text('TVS_Ventilation_ARX/commands/DrawHelpers.inl'))
+  self.assertIn('DDX_Check(pDX, IDC_WholeRun, WholeRun);',text('TVS_Ventilation_ARX/dgPipeSize.cpp'))
+  self.assertIn(',1055,"Button"',text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc'))
  def test_run_sketch(self):
   (ROOT/'geometry/RunSketch.h').read_bytes().decode('ascii')
   with tempfile.TemporaryDirectory() as d:
