@@ -20,6 +20,7 @@
 #include "../geometry/SizeFollowRules.h"
 #include "RunDialog.h"
 #include "TeeTypeDialog.h"
+#include "Settings.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
@@ -35,7 +36,7 @@
 #include <set>
 #include <vector>
 namespace tvsSizeFollow {
-struct Sizes {double a[2],b[2];Sizes(){a[0]=a[1]=b[0]=b[1]=0;}};
+struct Sizes {double a[2],b[2];bool round[2];Sizes(){a[0]=a[1]=b[0]=b[1]=0;round[0]=round[1]=false;}};   // round: shape (a change of shape is followed too)
 inline bool& applying(){static bool b=false;return b;}
 inline CString& command(){static CString c;return c;}
 inline std::map<AcDbObjectId,Sizes>& opened(){static std::map<AcDbObjectId,Sizes> m;return m;}
@@ -56,8 +57,8 @@ inline bool plainDuct(const AcDbObject* o){
     return true;
 }
 inline bool sizes(const AcDbObject* o,Sizes& s){
-    if(plainDuct(o)){const TVS_Pipe* p=TVS_Pipe::cast(o);s.a[0]=s.a[1]=p->SizeA;s.b[0]=s.b[1]=p->SizeB;return true;}
-    if(const TVS_TRANS* t=TVS_TRANS::cast(o)){s.a[0]=t->SizeAp1;s.b[0]=t->SizeBp1;s.a[1]=t->SizeAp2;s.b[1]=t->SizeBp2;return true;}
+    if(plainDuct(o)){const TVS_Pipe* p=TVS_Pipe::cast(o);s.a[0]=s.a[1]=p->SizeA;s.b[0]=s.b[1]=p->SizeB;s.round[0]=s.round[1]=p->ThisRound;return true;}
+    if(const TVS_TRANS* t=TVS_TRANS::cast(o)){s.a[0]=t->SizeAp1;s.b[0]=t->SizeBp1;s.a[1]=t->SizeAp2;s.b[1]=t->SizeBp2;s.round[0]=t->ThisRoundp1;s.round[1]=t->ThisRoundp2;return true;}
     return false;
 }
 // User edits only: Properties palette (no command), double click / Svojstva (TVS_Change).
@@ -94,7 +95,7 @@ public:
         const Sizes was=it->second;opened().erase(it);
         if(applying()||o->isUndoing()||!userEdit())return;
         Sizes now;if(!sizes(o,now))return;
-        int ends=0;for(int k=0;k<2;++k)if(std::fabs(now.a[k]-was.a[k])>1e-9||std::fabs(now.b[k]-was.b[k])>1e-9)ends|=1<<k;
+        int ends=0;for(int k=0;k<2;++k)if(std::fabs(now.a[k]-was.a[k])>1e-9||std::fabs(now.b[k]-was.b[k])>1e-9||now.round[k]!=was.round[k])ends|=1<<k;
         if(!ends)return;
         pending()[o->objectId()]|=ends;
         if(plainDuct(o)&&!previous().count(o->objectId()))previous()[o->objectId()]=was;
@@ -145,16 +146,26 @@ inline bool plainElbow(const AcDbObject* o){
 #endif
     return true;
 }
-// Ports of a plan elbow with bend width A (same radius rule as tvsMove::describe / TVS_TAP).
-inline bool elbowPortsFor(const TVS_TAP* p,double A,tvsMove::Point out[2]){
-    const int type=static_cast<int>(p->ThisRound?p->RadiusTypeRound:p->RadiusTypeRect);
-    const bool variable=p->ThisRound?type==RadiusTypeRound_RadiusVariable:type==RadiusTypeRect_RadiusVariable;
-    const bool constant=p->ThisRound?type==RadiusTypeRound_RadiusConstant:type==RadiusTypeRect_RadiusConstant;
-    const bool specific=p->ThisRound?type==RadiusTypeRound_RadiusSpecific:type==RadiusTypeRect_RadiusSpecific;
-    if(p->ThisRound&&!(variable||constant))return false;
+// Radius rule of a plan elbow that gets shape `round`: its own when the shape stays, the
+// TVS_SETTINGS rule of the new shape when it changes (a round elbow needs R = k x D or R const).
+struct ElbowRule {bool convert;int typeRect,typeRound,roundTap;double k,constant;};
+inline ElbowRule elbowRule(const TVS_TAP* p,bool round){
+    ElbowRule r;r.convert=p->ThisRound!=round;r.typeRect=static_cast<int>(p->RadiusTypeRect);r.typeRound=static_cast<int>(p->RadiusTypeRound);
+    r.roundTap=static_cast<int>(p->TypeRoundTap);r.k=p->RadiusVariableParameter;r.constant=p->RadiusConst;
+    if(r.convert){r.typeRect=globalRadiusTypeRect;r.typeRound=globalRadiusTypeRound;r.roundTap=globalTypeRoundTap;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;
+        if(round&&r.typeRound!=RadiusTypeRound_RadiusVariable&&r.typeRound!=RadiusTypeRound_RadiusConstant){r.typeRound=RadiusTypeRound_RadiusVariable;if(!(r.k>0))r.k=1;}}
+    return r;
+}
+// Ports of a plan elbow with bend width A and shape `round` (same radius rule as tvsMove::describe / TVS_TAP).
+inline bool elbowPortsFor(const TVS_TAP* p,double A,bool round,tvsMove::Point out[2]){
+    const ElbowRule r=elbowRule(p,round);const int type=round?r.typeRound:r.typeRect;
+    const bool variable=round?type==RadiusTypeRound_RadiusVariable:type==RadiusTypeRect_RadiusVariable;
+    const bool constant=round?type==RadiusTypeRound_RadiusConstant:type==RadiusTypeRect_RadiusConstant;
+    const bool specific=round?type==RadiusTypeRound_RadiusSpecific:type==RadiusTypeRect_RadiusSpecific;
+    if(round&&!(variable||constant))return false;
     double radius=p->Radius;
-    if(variable)radius=A*p->RadiusVariableParameter;
-    if(constant)radius=p->RadiusConst;
+    if(variable)radius=A*r.k;
+    if(constant)radius=r.constant;
     if(specific)radius=tvsUnits::mm(A,p)<355?A:A/2;
     return tvsMoveGeometry::elbowPorts(tvsMove::point(p->MiddlePoint),tvsMove::Point(p->Startvector.x,p->Startvector.y,0),p->Swectangle,radius+A/2,out);
 }
@@ -194,7 +205,7 @@ inline bool ask(const wchar_t* prompt,const wchar_t* keywords,ACHAR* answer,cons
 // elbows, T komadi, etazi and obilasci of the old size; what happens at a T komad, etaz and
 // obilazak is decided in the dialog (ch), nothing is asked here.
 inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& old,double tol,const Etazes& etazes,Run& run,std::set<int>& seen,const tvsRunDialog::Choices& ch){
-    const bool round=nodes[start].round;
+        const bool round=old.round[0],reshape=nodes[start].round!=round;   // old shape; reshape: the edit changed the shape
     auto same=[&](double a,double b,bool r){return r==round&&std::fabs(a-old.a[0])<=1e-6&&(round||std::fabs(b-old.b[0])<=1e-6);};
     auto indexOf=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
     std::vector<std::pair<int,tvsMove::Point> > open;
@@ -224,6 +235,7 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
             }
             if(const TVS_WYE* w=TVS_WYE::cast(e.object())){
                 ++run.metTee;
+                if(reshape){stop(L"T komad (promjena oblika: ostaje, prelaz na priključku)");break;}
                 if(n.ports.size()!=3||port<0){stop(L"T komad");break;}
                 tvsTeeData::Record r;tvsTeeData::read(w,r);
                 const bool branch=port==2;
@@ -246,6 +258,7 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
 #ifdef TVS_SIZE_BYPASS
             if(tvsBypassData::marked(e.object())){
                 tvsBypassData::Record r;++run.metBypass;
+                if(reshape){stop(L"obilazak (promjena oblika: ostaje)");break;}
                 if(tvsBypassData::assembly(e.object(),r,false)!=tvsOffsetData::Valid||(n.id!=r.members[0]&&n.id!=r.members[6])){stop(L"obilazak");break;}
                 const bool atFirst=n.id==r.members[0];
                 const int h=indexOf(r.members[3]),other=indexOf(atFirst?r.members[6]:r.members[0]);
@@ -264,6 +277,7 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
 #ifdef TVS_OFFSET_INTEGRATION
             if(tvsOffsetData::marked(e.object())&&!tvsBypassData::marked(e.object())){
                 int found=-1;bool atA=true;++run.metEtaz;
+                if(reshape){stop(L"etaž (promjena oblika: ostaje)");break;}
                 for(size_t k=0;k<etazes.size();++k){
                     if(etazes[k].a==n.id&&nearXY(tvsMove::point(etazes[k].maA),at,tol)){found=static_cast<int>(k);atA=true;break;}
                     if(etazes[k].b==n.id&&nearXY(tvsMove::point(etazes[k].maB),at,tol)){found=static_cast<int>(k);atA=false;break;}}
@@ -334,18 +348,19 @@ inline bool etazResize(const tvsOffsetRefit::Assembly& s,double A,double B,doubl
 #endif
 // TVS transition right behind a T komad: the duct `ductId` (end `nearIsFirst` on the T komad
 // port `at`) is shortened by the transition length; prelaz new size (A x B) -> its own size.
-inline bool prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGePoint3d& at,double A,double B,double f,const wchar_t* where=L"Iza T komada"){
+inline bool prelazBehind(const AcDbObjectId& ductId,bool nearIsFirst,const AcGePoint3d& at,double A,double B,double f,const wchar_t* where=L"Iza T komada",int shapeA=-1){   // shapeA: 0 rect / 1 round end A x B, -1 as the duct
     AcGePoint3d N,E;double width=0,height=0,elev=0;bool oneD=false,round=false;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)return false;
      N=nearIsFirst?d->FirstPoint:d->LastPoint;E=nearIsFirst?d->LastPoint:d->FirstPoint;width=d->SizeA;height=d->SizeB;elev=d->Elev;oneD=d->This1D;round=d->ThisRound;}
-    AcGeVector3d dir=E-N;dir.z=0;const double length=dir.length(),lt=tvsSpiro::drawingLength(NULL,A,round,width,round,tvsTeeFit::transitionMm()/f);   // spiro: po katalogu SOKO
+    AcGeVector3d dir=E-N;dir.z=0;const bool roundA=shapeA<0?round:shapeA!=0;
+    const double length=dir.length(),lt=tvsSpiro::drawingLength(NULL,A,roundA,width,round,tvsTeeFit::transitionMm()/f);   // spiro: po katalogu SOKO
     if(length<lt+50.0/f){acutPrintf(L"\n%ls: kanal je prekratak za prelaz %.0f mm; prilagodite ručno.",where,lt*f);return false;}
     dir.normalize();const AcGePoint3d start(at.x,at.y,N.z),end=start+dir*lt;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForWrite);
      if(d.openStatus()!=Acad::eOk){acutPrintf(L"\n%ls: kanal se ne može mijenjati (zaključan sloj?); prelaz nije umetnut.",where);return false;}
      if((nearIsFirst?d->put_FirstPoint(end):d->put_Lastpoint(end))!=Acad::eOk)return false;d->recordGraphicsModified();}
-    double a1=A,b1=round?0:B,a2=width,b2=round?0:height,len=lt;AcGeVector3d v=dir*lt;AcGePoint3d p0=start;
-    TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,p0,round,round,1,oneD);
+    double a1=A,b1=roundA?0:B,a2=width,b2=round?0:height,len=lt;AcGeVector3d v=dir*lt;AcGePoint3d p0=start;
+    TVS_TRANS* t=TVS_TRANS::add_new(a1,b1,a2,b2,len,v,p0,roundA,round,1,oneD);
     if(t&&!t->objectId().isNull()){
         AcDbObjectPointer<TVS_TRANS> o(t->objectId(),AcDb::kForWrite);
         if(o.openStatus()==Acad::eOk){
@@ -377,12 +392,12 @@ inline int joints(const std::vector<tvsMove::Node>& nodes,int start,const Sizes&
                 if(nearXY(nodes[k].ports[j],at,tol)&&std::fabs(nodes[k].elevation-s.elevation)<=tol){next=static_cast<int>(k);++count;break;}}
         if(count!=1)continue;
         const tvsMove::Node& n=nodes[next];
-        if((n.kind!=1&&n.kind!=2)||n.ports.size()!=2||n.round!=s.round||std::fabs(n.a-old.a[0])>1e-6||(!n.round&&std::fabs(n.b-old.b[0])>1e-6))continue;
+        if((n.kind!=1&&n.kind!=2)||n.ports.size()!=2||n.round!=old.round[0]||std::fabs(n.a-old.a[0])>1e-6||(!n.round&&std::fabs(n.b-old.b[0])>1e-6))continue;
         {AcDbObjectPointer<AcDbEntity> e(n.id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!(plainDuct(e.object())||plainElbow(e.object())))continue;}
         if(!insert){++found;continue;}
         const AcGePoint3d P=tvsMove::acad(at);
-        if(n.kind==1){if(prelazBehind(n.id,nearXY(n.ports[0],at,tol),P,A,B,f,L"Na spoju"))++found;}
-        else if(prelazBehind(s.id,side==0,P,old.a[0],old.b[0],f,L"Na spoju (uz koljeno)"))++found;
+        if(n.kind==1){if(prelazBehind(n.id,nearXY(n.ports[0],at,tol),P,A,B,f,L"Na spoju",s.round?1:0))++found;}
+        else if(prelazBehind(s.id,side==0,P,old.a[0],old.b[0],f,L"Na spoju (uz koljeno)",old.round[0]?1:0))++found;
     }
     return found;
 }
@@ -394,7 +409,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
     std::vector<std::pair<tvsMove::Point,tvsMove::Point> > moves;   // port: old -> new
     for(size_t k=0;k<run.elbows.size();++k){const tvsMove::Node& n=nodes[run.elbows[k]];
         AcDbObjectPointer<TVS_TAP> t(n.id,AcDb::kForRead);tvsMove::Point np[2];
-        if(t.openStatus()!=Acad::eOk||!elbowPortsFor(t.object(),A,np)){acutPrintf(L"\nDionica nije promijenjena: koljeno se ne može preračunati.");return false;}
+        if(t.openStatus()!=Acad::eOk||!elbowPortsFor(t.object(),A,round,np)){acutPrintf(L"\nDionica nije promijenjena: koljeno se ne može preračunati.");return false;}
         for(int m=0;m<2;++m)moves.push_back(std::make_pair(n.ports[m],np[m]));
     }
 #ifdef TVS_OFFSET_INTEGRATION
@@ -429,7 +444,10 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
 #endif
     for(size_t k=0;k<run.elbows.size();++k){
         AcDbObjectPointer<TVS_TAP> t(nodes[run.elbows[k]].id,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
-        t->put_SizeA(A);if(!round)t->put_SizeB(B);t->recordGraphicsModified();
+        const ElbowRule r=elbowRule(t.object(),round);
+        if(r.convert){t->put_ThisRound(round);t->put_TypeRoundTap(r.roundTap);t->put_RadiusTypeRound(r.typeRound);t->put_RadiusTypeRect(r.typeRect);
+            t->put_RadiusVariableParameter(r.k);t->put_RadiusConst(r.constant);}
+        t->put_SizeA(A);if(!round)t->put_SizeB(B);else if(r.convert)t->put_SizeB(0);t->recordGraphicsModified();
     }
     for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];
         AcDbObjectPointer<TVS_WYE> w(nodes[t.node].id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)continue;
@@ -463,7 +481,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         AcDbObjectPointer<TVS_Pipe> p(nodes[ducts[k]].id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))continue;
         p->put_FirstPoint(AcGePoint3d(ends[k].first.x,ends[k].first.y,p->FirstPoint.z));
         p->put_Lastpoint(AcGePoint3d(ends[k].second.x,ends[k].second.y,p->LastPoint.z));
-        if(inRun.count(ducts[k])&&ducts[k]!=start){p->put_SizeA(A);p->put_SizeB(B);resized.push_back(nodes[ducts[k]].id);}
+        if(inRun.count(ducts[k])&&ducts[k]!=start){if(p->ThisRound!=round)p->put_ThisRound(round);p->put_SizeA(A);p->put_SizeB(B);resized.push_back(nodes[ducts[k]].id);}
         p->recordGraphicsModified();
     }
 #ifdef TVS_SIZE_BYPASS
@@ -635,7 +653,10 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 preview(nodes,starts,runs,etazes,pv);};
             CString banner;
             if(!starts.empty()){const tvsMove::Node& n=nodes[starts[0]];const Sizes& o=old[n.id];
-                if(n.round)banner.Format(L"Kanal  Ø%.0f  →  Ø%.0f mm",o.a[0]*f,n.a*f);else banner.Format(L"Kanal  %.0f × %.0f  →  %.0f × %.0f mm",o.a[0]*f,o.b[0]*f,n.a*f,n.b*f);
+                CString was,now;
+                if(o.round[0])was.Format(L"Ø%.0f",o.a[0]*f);else was.Format(L"%.0f × %.0f",o.a[0]*f,o.b[0]*f);
+                if(n.round)now.Format(L"Ø%.0f",n.a*f);else now.Format(L"%.0f × %.0f",n.a*f,n.b*f);
+                banner.Format(L"Kanal  %ls  →  %ls mm",was.GetString(),now.GetString());
                 if(starts.size()>1){CString more;more.Format(L"   (+ %d)",static_cast<int>(starts.size())-1);banner+=more;}}
             if(ids().run)++dialogsShown();
             if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=cancelScope();   // Otkaži: the edited duct alone
@@ -686,10 +707,11 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                     // several elements on this plan point (ducts one above the other): the one that meets in height
                     if(!tvsFollowRules::joined(othersAt(nodes,i,nodes[k].ports[end],tol),level,tvsFollowRules::height(A,B,round),
                         t->Elev+(end==0?0:tvsTransAlignCmd::endOffset(t.object())),tvsFollowRules::height(ta,tb,tRound),tol))continue;
-                    if(tRound!=round){if(!shapeNote){shapeNote=true;acutPrintf(L"\nPrelaz uz izmijenjeni kanal ima drugi oblik na tom kraju (okrugli / pravougaoni): nije mijenjan, prilagodite ga u Svojstvima.");}continue;}
-                    if(std::fabs(ta-A)<=1e-9&&std::fabs(tb-B)<=1e-9)continue;
+                    const bool reshape=tRound!=round;   // the duct changed its shape: the prelaz end takes it (rect <-> round prelaz)
+                    if(!reshape&&std::fabs(ta-A)<=1e-9&&std::fabs(tb-B)<=1e-9)continue;
                     const tvsTransAlignCmd::Before was=tvsTransAlignCmd::before(t.object());
                     t->assertWriteEnabled();ta=A;tb=B;
+                    if(reshape){(end==0?t->ThisRoundp1:t->ThisRoundp2)=round;if(!shapeNote){shapeNote=true;acutPrintf(L"\nPrelaz uz izmijenjeni kanal preuzeo je i njegov oblik na tom kraju.");}}
                     tvsTransAlignCmd::afterEdit(t.object(),was,-1,-1);   // outlet moved: TVS_PRELAZ_KOTA asks
                     if(spiroLength(t.object(),end,id,f))dirty=true;      // spiro: duzina po katalogu, kanal skraceni / produzeni
                     t->recordGraphicsModified();++transitions;
@@ -732,7 +754,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
 inline bool followFromTee(const AcDbObjectId& duct,const tvsTeePort::Section& was,const AcDbObjectId& tee){
     AcDbDatabase* db=duct.database();if(!db||!ids().run)return false;
     {AcDbObjectPointer<TVS_Pipe> p(duct,AcDb::kForRead);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))return false;}
-    Sizes old;old.a[0]=old.a[1]=was.a;old.b[0]=old.b[1]=was.round?0:was.b;
+    Sizes old;old.a[0]=old.a[1]=was.a;old.b[0]=old.b[1]=was.round?0:was.b;old.round[0]=old.round[1]=was.round;
     previous()[duct]=old;std::map<AcDbObjectId,int> work;work[duct]=3;
     const bool had=excluded().count(tee)>0;excluded().insert(tee);const int scope=cancelScope();cancelScope()=tvsRunDialog::OnlyPrelaz;
         const int shown=dialogsShown();settle(db,work);

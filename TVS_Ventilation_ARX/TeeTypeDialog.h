@@ -413,7 +413,7 @@ inline void chain(const Dialog& dg,const Side& d,double tol){
         p->assertWriteEnabled();p->ThisRound=ds.round;p->put_SizeA(ds.a);p->put_SizeB(ds.round?0:ds.b);p->recordGraphicsModified();}
     acutPrintf(L"\nUmetnuto koljeno %d° %ls%ls.",d.elbow,d.turn==Left?L"lijevo":L"desno",mismatch?L" i prelaz":L"");
 }
-// Duct on a port that got another size in the dialog (same shape): TVS_DIM_PRATI offers the run
+// Duct on a port that got another size or shape in the dialog: TVS_DIM_PRATI offers the run
 // beyond it (SizeFollow.h sets the hook). false / no hook: prelaz at its far end as before.
 typedef bool (*FollowHook)(const AcDbObjectId& duct,const Section& was,const AcDbObjectId& tee);
 inline FollowHook& followHook(){static FollowHook h=NULL;return h;}
@@ -464,7 +464,7 @@ inline void apply(const Dialog& d){
              first=tvsTeeFit::planDistance(p->FirstPoint,after.ok?after.p[d.place(x.k)]:before.p[d.place(x.k)])<=tol;}
             wchar_t t[32];tvsTeePort::sizeText(t,32,x.duct,f);acutPrintf(L"\nKanal na priključku je sada %ls mm.",t);
                         Follow fw={x.ductId,x.ductWas,first};
-            if(followHook()&&x.duct.round==x.ductWas.round)follow.push_back(fw);else tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
+            if(followHook())follow.push_back(fw);else tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
         tvsTeePort::ensure(s.id,x.k,x.lengthMm);
     }
     // the run beyond the resized ducts, after the T komad and its prelazi are written

@@ -37,6 +37,13 @@ class Rules(unittest.TestCase):
   self.assertIn('inline bool followFromTee(',s);self.assertIn('tvsTeeDialog::followHook()=&followFromTee;',s)
   self.assertIn('const bool wasApplying=applying();',s);self.assertIn('applying()=wasApplying;',s)   # ugnijezdeno: dijalog T komada iz dionice
   self.assertIn('tvsSizeFollow::enableTeeFollow(IDD_RUN, IDD_TEETYPE);',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
+ def test_shape(self):
+  s=text('TVS_Ventilation_ARX/SizeFollow.h')
+  self.assertIn('||now.round[k]!=was.round[k])ends|=1<<k;',s)                      # promjena oblika se prati
+  self.assertIn('const bool round=old.round[0],reshape=nodes[start].round!=round;',s)
+  self.assertEqual(s.count('if(reshape){stop('),3)                                 # T komad, etaz, obilazak ostaju
+  self.assertIn('if(r.convert){t->put_ThisRound(round);',s)                        # koljeno mijenja oblik
+  self.assertIn('(end==0?t->ThisRoundp1:t->ThisRoundp2)=round;',s)                 # prelaz na kraju preuzima oblik
  def test_run_sketch(self):
   (ROOT/'geometry/RunSketch.h').read_bytes().decode('ascii')
   with tempfile.TemporaryDirectory() as d:
