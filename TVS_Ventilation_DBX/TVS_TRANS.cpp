@@ -23,6 +23,7 @@
 //----- TVS_TRANS.cpp : Implementation of TVS_TRANS
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "TransformGuard.h"
 #include "PortGrips.h"
 #include "LevelLabels.h"
 #include "TransAlignData.h"
@@ -1036,6 +1037,7 @@ return Acad::eOk;
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_TRANS::subTransformBy(const AcGeMatrix3d & xform)
 {
+	if (!tvsTransform::rigid(xform)) return tvsTransform::refuse();   // SCALE: TransformGuard.h
 	assertWriteEnabled () ;
 	FirstPoint.transformBy(xform);
 	LastPoint.transformBy(xform);

@@ -23,6 +23,7 @@
 //----- TVS_WYE.cpp : Implementation of TVS_WYE
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "TransformGuard.h"
 #include "PortGrips.h"
 #include "LevelLabels.h"
 #include "TVS_WYE.h"
@@ -783,6 +784,7 @@ Acad::ErrorStatus TVS_WYE::getArea (double &area) const {
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_WYE::subTransformBy(const AcGeMatrix3d & xform)
 {
+	if (!tvsTransform::rigid(xform)) return tvsTransform::refuse();   // SCALE: TransformGuard.h
 	Acad::ErrorStatus retCode =AcDbEntity::subTransformBy (xform) ;
 	assertWriteEnabled () ;
 	Basepoint.transformBy(xform);

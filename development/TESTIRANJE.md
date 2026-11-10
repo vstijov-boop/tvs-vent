@@ -56,6 +56,12 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Faza 6 pregleda (elementi) – testirati
+- **SCALE nad TVS elementima:** odbijen, poruka jednom po komandi; ostali (ne-TVS) objekti u izboru se skaliraju normalno. MOVE, ROTATE, COPY i MIRROR rade kao ranije.
+- **MIRROR:** koljeno, prelaz poravnat uz ivicu (tip 2/3) i TK-O / TK-G treba da izgledaju kao ogledalska slika i ostanu spojeni.
+- **Provjeriti:** kopiranje (Ctrl+C / Ctrl+V) TVS elemenata između crteža sa različitim jedinicama (INSUNITS) – AutoCAD tada skalira, pa će TVS elementi biti odbijeni; javiti kako se ponaša.
+- **Kanal nulte dužine** (npr. oba kraja u istoj tački): bez čudne geometrije / gripova.
+
 ## Faza 5 pregleda (dijalozi) – testirati
 - **Decimalni zarez:** u TVS_SETTINGS (dimenzije, protok, dužine, kota, k radijusa, c spiro), u Svojstvima (protok, ugao, k radijusa, dimenzije) i u podešavanjima oznaka (razmjera) „0,5“ = „0.5“. Ranije se zarez čitao kao kraj broja (0,5 → 0) ili dijalog nije prihvatao unos. Nebroj u TVS_SETTINGS: poruka „Unesite broj“ i dijalog ostaje otvoren.
 - **Svojstva, Odustani:** ništa se ne mijenja (ni ugao koljena).
