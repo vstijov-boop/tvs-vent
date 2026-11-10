@@ -30,8 +30,8 @@ struct Node {
     std::vector<tvsMoveNetwork::Section> sections;
     Point middle;
     double a,b,elevation;
-    bool round;
-    Node():kind(0),a(0),b(0),elevation(0),round(false){}
+    bool round,flex;   // flex: flex crijevo (kind 0; bends, follows the network: followFlex)
+    Node():kind(0),a(0),b(0),elevation(0),round(false),flex(false){}
 };
 inline bool describe(AcDbEntity* entity,Node& n){
     TVS_Entity* tvs=TVS_Entity::cast(entity);if(!tvs)return false;
@@ -41,6 +41,7 @@ inline bool describe(AcDbEntity* entity,Node& n){
         n.ports.push_back(point(p->FirstPoint));n.ports.push_back(point(p->LastPoint));
         n.axes.push_back(n.ports[1]-n.ports[0]);n.axes.push_back(n.axes[0]);
         if(p->DuctType==DuctTypeStill)n.kind=1;
+        n.flex=p->DuctType==DuctTypeFlex;
     }else if(TVS_TAP* p=TVS_TAP::cast(entity)){
         n.a=p->SizeA;n.b=p->SizeB;n.round=p->ThisRound;n.elevation=p->Elev;
         n.middle=point(p->MiddlePoint);
@@ -533,6 +534,9 @@ inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork:
         if(nodes[i].kind==4)b.junctions.push_back(nodes[i].middle);
         bodies.push_back(b);
     }
+    // flex crijeva are not part of the rigid network: invisible to the planner (no contact, no
+    // refusal); their ends follow the moved ports afterwards (followFlex)
+    for(size_t i=0;i<nodes.size();++i)if(nodes[i].flex){bodies[i].ports.clear();bodies[i].axes.clear();bodies[i].sections.clear();bodies[i].kind=tvsMoveNetwork::Blocked;}
     fuseOffsets(nodes,bodies,members,tol);
     fuseBypasses(nodes,bodies,members,tol);
 }
@@ -559,6 +563,27 @@ inline bool moveEtazMembers(const std::vector<AcDbObjectId>& ids,const AcGeMatri
 #endif
 }
 // Shared by TVS_MOVE and TVS_ALIGN: plan and apply one bounded network translation (one transaction).
+// Flex ends: in the frame (frame bit set, TVS_STRETCH) they move by delta; on a port of a moved
+// element (its position before the move) they go with that port. Returns the number of flex
+// crijeva changed, -1 when one cannot be written.
+inline int followFlex(Transaction& tx,const std::vector<Node>& nodes,const std::vector<tvsMoveNetwork::Body>& bodies,
+                      const tvsMoveNetwork::Result& result,const std::vector<int>* frame,const Point& delta,double near){
+    int moved=0;
+    for(size_t i=0;i<nodes.size();++i){if(!nodes[i].flex||nodes[i].ports.size()!=2)continue;
+        Point to[2]={nodes[i].ports[0],nodes[i].ports[1]};bool changed=false;
+        for(int j=0;j<2;++j){
+            if(frame&&i<frame->size()&&(*frame)[i]>0&&((*frame)[i]&(1<<j))){to[j]=nodes[i].ports[j]+delta;changed=true;continue;}
+            for(size_t k=0;k<bodies.size()&&k<result.masks.size()&&k<result.ports.size();++k){if(!result.masks[k]||k==i)continue;
+                for(size_t q=0;q<bodies[k].ports.size()&&q<result.ports[k].size();++q)
+                    if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],nodes[i].ports[j],near)){to[j]=result.ports[k][q];changed=true;}}
+        }
+        if(!changed)continue;
+        TVS_Pipe* flex=TVS_Pipe::cast(tx.write(nodes[i].id));
+        if(!flex||flex->put_FirstPoint(acad(to[0]))!=Acad::eOk||flex->put_Lastpoint(acad(to[1]))!=Acad::eOk)return -1;
+        flex->recordGraphicsModified();++moved;
+    }
+    return moved;
+}
 inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
                          const std::vector<tvsMoveNetwork::Body>& bodies,const std::vector<std::vector<AcDbObjectId> >& members,
                          int selected,const Point& delta,double factor,double tol,double minimum,const ACHAR* command){
@@ -588,11 +613,13 @@ inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
             acutPrintf(L"\n%ls: fiting nije moguće pomjeriti. Izmjena je poništena.",command);return false;}
         entities[i]->recordGraphicsModified();
     }
+    const int flexMoved=followFlex(tx,nodes,bodies,result,NULL,delta,2.0/factor);
+    if(flexMoved<0){acutPrintf(L"\n%ls: flex crijevo je zaključano ili nedostupno. Izmjena je poništena.",command);return false;}
     const std::vector<char> carried=carriedBy(nodes,members,result.masks);
     if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
         acutPrintf(L"\n%ls: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.",command);return false;}
     if(!tx.commit())return false;
-    acutPrintf(L"\n%ls: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",command,result.changed,stretched,delta.length()*factor);
+    acutPrintf(L"\n%ls: povezana mreža — %d elemenata; prilagođeno dužina: %d; flex crijeva: %d. Pomjeraj: %.2f mm.",command,result.changed,stretched,flexMoved,delta.length()*factor);
     return true;
 }
 inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
@@ -807,6 +834,17 @@ inline void executeStretch(){
     if(!snapshot(db,nodes,labels))return;
     std::vector<tvsMoveNetwork::Body> bodies;std::vector<int> masks;
     std::vector<std::vector<AcDbObjectId> > members;bodiesFor(nodes,bodies,members,tol);
+    // flex crijeva: not part of the rigid network (they bend); an end in the frame moves with the
+    // frame, an end on a port of a moved element follows that port (after the plan, below)
+    auto inFrame=[&](const Point& p,bool& in){ads_point w={p.x,p.y,p.z},u;if(tvsCoordinates::transformPoint(w,0,1,u)!=RTNORM)return false;
+        in=u[0]>=(corner1[0]<corner2[0]?corner1[0]:corner2[0])-tol&&u[0]<=(corner1[0]>corner2[0]?corner1[0]:corner2[0])+tol
+            &&u[1]>=(corner1[1]<corner2[1]?corner1[1]:corner2[1])-tol&&u[1]<=(corner1[1]>corner2[1]?corner1[1]:corner2[1])+tol;return true;};
+    std::vector<int> flexMask(nodes.size(),-1);   // -1: not a flex
+    for(size_t i=0;i<nodes.size();++i){
+        if(!nodes[i].flex||nodes[i].ports.size()!=2)continue;   // bodiesFor: invisible to the planner
+        int m=0;for(int j=0;j<2;++j){bool in=false;if(!inFrame(nodes[i].ports[j],in))return;if(in)m|=1<<j;}
+        flexMask[i]=m;
+    }
     for(size_t i=0;i<nodes.size();++i){
         const tvsMoveNetwork::Body& b=bodies[i];int mask=0;
         for(size_t j=0;j<b.ports.size();++j){
@@ -822,7 +860,7 @@ inline void executeStretch(){
                 :L"Okvir presijeca etaž. Obuhvatite cijeli etaž ili ga izostavite.");return;}
         masks.push_back(mask);
     }
-    bool any=false;for(size_t i=0;i<masks.size();++i)if(masks[i])any=true;
+    bool any=false,anyRigid=false;for(size_t i=0;i<masks.size();++i)if(masks[i]||flexMask[i]>0){any=true;if(masks[i])anyRigid=true;}
     if(!any){acutPrintf(L"\nTVS_STRETCH: okvir ne obuhvata nijedan TVS priključak.");return;}
     StretchHighlight selected;
     for(size_t i=0;i<masks.size();++i)if(masks[i])selected.add(nodes[i].id);
@@ -834,7 +872,8 @@ inline void executeStretch(){
     Point delta=jig.displacement();
     selected.clear();
     tvsMoveNetwork::Result result;
-    if(!tvsMoveNetwork::planSelection(bodies,masks,delta,minimum,tol,result)){
+    if(!anyRigid){result.masks.assign(nodes.size(),0);result.ports.resize(nodes.size());result.changed=0;result.error=tvsMoveNetwork::Ok;}
+    else if(!tvsMoveNetwork::planSelection(bodies,masks,delta,minimum,tol,result)){
         roundBranchAlert(nodes,result.problem,result.error,tol);sectionProblem(nodes,bodies,result,L"TVS_STRETCH");stretchProblem(nodes,result.problem,networkError(result.error));return;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
     if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
@@ -870,10 +909,12 @@ inline void executeStretch(){
             acutPrintf(L"\nTVS_STRETCH: fiting nije moguće pomjeriti. Izmjena je poništena.");return;}
         entities[i]->recordGraphicsModified();
     }
+    const int flexMoved=followFlex(tx,nodes,bodies,result,&flexMask,delta,2.0/factor);
+    if(flexMoved<0){acutPrintf(L"\nTVS_STRETCH: flex crijevo je zaključano ili nedostupno. Izmjena je poništena.");return;}
     const std::vector<char> carried=carriedBy(nodes,members,result.masks);
-    if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
+    if(anyRigid&&!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
         acutPrintf(L"\nTVS_STRETCH: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
     if(!tx.commit())return;
-    acutPrintf(L"\nTVS_STRETCH: povezana mreža — %d elemenata; prilagođeno dužina: %d. Pomjeraj: %.2f mm.",result.changed,stretched,delta.length()*factor);
+    acutPrintf(L"\nTVS_STRETCH: povezana mreža — %d elemenata; prilagođeno dužina: %d; flex crijeva: %d. Pomjeraj: %.2f mm.",result.changed,stretched,flexMoved,delta.length()*factor);
 }
 }

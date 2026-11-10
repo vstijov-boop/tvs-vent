@@ -56,6 +56,13 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Flex crijeva u TVS_STRETCH / TVS_MOVE / TVS_ALIGN – testirati
+- **TVS_STRETCH:** kraj flex crijeva u okviru se pomjera sa okvirom (drugi kraj ostaje, crijevo se savije); cijelo crijevo u okviru se pomjeri.
+- **Kraj flexa na pomjerenom kanalu / fitingu** (i van okvira): ide za tim priključkom.
+- **TVS_MOVE / TVS_ALIGN kanala sa flexom na kraju:** više ne odbija („nepodržan element“), flex prati.
+- Samo flex u okviru (bez kanala): pomjeri se samo flex.
+- Na kraju poruka „… flex crijeva: N“.
+
 ## Spojevi koje TVS_STRETCH / TVS_MOVE odbijaju – testirati
 - **Odbijen spoj:** ispis oba presjeka (dimenzije, osa u mm) i tačke spoja.
 - **Ista dimenzija, druga kota** (kanal na 0, T komad na 2850): pitanje „Izjednačiti kotu kanala…? [Da/Ne] <Da>“ → kanal dobija kotu susjeda → ponoviti komandu.

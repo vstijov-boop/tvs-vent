@@ -42,4 +42,9 @@ class Guard(unittest.TestCase):
   self.assertIn('if(jointFixHook())jointFixHook()(nodes,bodies,',text('TVS_Ventilation_ARX/TVSMoveCommand.h'))
   self.assertIn('tvsJointFix::install();',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
   for f in ('Draw.inl','PipeTransWye.inl'):self.assertIn('tvsJointFix::AfterDrawing teePorts;',text('TVS_Ventilation_ARX/commands/'+f))
+ def test_flex_follows(self):
+  m=text('TVS_Ventilation_ARX/TVSMoveCommand.h')
+  self.assertIn('n.flex=p->DuctType==DuctTypeFlex;',m)
+  self.assertIn('if(nodes[i].flex){bodies[i].ports.clear();',m)            # planer ih ne vidi
+  self.assertEqual(m.count('followFlex(tx,nodes,bodies,result,'),2)        # MOVE/ALIGN i STRETCH
 if __name__=='__main__':unittest.main()
