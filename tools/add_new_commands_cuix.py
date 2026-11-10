@@ -23,6 +23,8 @@ CMDS = [
  ('NATPIS', 'Natpis kanala', 'Uključuje ili isključuje natpis dimenzija / protok m3/h / brzina m/s na kanalima (na ekranu, ne štampa se).', 'Crtanje kanala', 'Oznake', 'NA'),
  ('BYPASS_DETALJ', 'Detalj obilaska', 'Bočni detalj postojećeg obilaska prepreke.', 'Crtanje kanala', 'Oznake', 'BD'),
  ('IZVOZ', 'Izvoz bez TVS', 'Kopija crteža u kojoj su TVS elementi zamijenjeni linijama, za korisnike bez TVS_VENT; otvoreni crtež se ne mijenja.', 'Specifikacija', 'Specifikacija', 'IZ'),
+ ('PRERACUNAJ', 'Preračunaj jedinice', 'Izbor nacrtan u drugim jedinicama (mm/cm/m), zalijepljen 1:1, preračunava u jedinice ovog crteža (položaj i dimenzije).', 'Crtanje kanala', 'Crtanje kanala', 'PJ'),
+ ('KOLJENA_UGAO', 'Ugao koljena', 'Vraća koljena malo odstupljenog ugla na 15/22,5/30/45/60/75/90° (krajevi kanala prate).', 'Crtanje kanala', 'Crtanje kanala', 'KU'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)
