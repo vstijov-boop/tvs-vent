@@ -44,6 +44,8 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Kanal na zaključanom sloju uz prelaz: poruka.
 
 **Ostalo**
+- **Komande uklonjene iz izdanja** (samo razvojni build): TVS_TEST, TVS_TRANS, TVS_WYE, TVS_CONNECTTest, TVS_DUCT, TVS_SpecificationOld, TVS_Flex, TVS_Show, TVSSomeParts, MyCommand/MyPickFirst/MySessionCmd, TVS_OFFSET_TEST_BAD, TVS_OFFSET_FAIL_NEXT, TVS_TEST_OFFSET*, TVS_BYPASS_DETAIL_TEST/CHECK. Javiti ako je neka od njih bila potrebna.
+- **Komande više nisu transparentne** (ne mogu se pokrenuti sa ' usred druge komande), osim TVS_SETTINGS. Provjeriti da meni i ribbon pokreću sve kao ranije.
 - TVS_AttributesToProps: radi samo nad izabranim blokovima i pita `Da/Ne` (podrazumijevano Ne).
 - Svojstva okruglog koljena, „konstantan radijus“: poslije OK koljeno ostaje konstantnog radijusa.
 - TVS_EXCELSPEC bez Excel-a: poruka „Excel nije dostupan“, bez pada.
