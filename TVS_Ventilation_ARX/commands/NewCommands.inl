@@ -100,6 +100,13 @@
         syncTVSGlobalUnits();
         tvsMove::execute();
     }
+    // TVS_KOLJENA_UGAO: elbows a little off 15 / 22,5 / 30 / 45 / 60 / 75 / 90 deg back to it (ElbowAngleCommand.h).
+    static void Ventilation_ARXTVS_KOLJENA_UGAO(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsElbowAngle::execute();
+    }
     // TVS_ALIGN: one-off alignment to a LINE / polyline segment / XLINE / RAY (AlignCommand.h).
     static void Ventilation_ARXTVS_ALIGN(void)
     {

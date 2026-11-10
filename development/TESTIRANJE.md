@@ -56,6 +56,14 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Ponovni pregled N1 – Svojstva ne mijenjaju ništa na „OK“ – testirati
+- **Koljeno 45° / 90°** → Svojstva → OK bez izmjene → Properties: ugao ostaje tačno 45 / 90 (ranije 45,26 / 89,954).
+- **Crtež u metrima:** kanal Ø315 → Svojstva → OK → ostaje Ø315 (ranije Ø320). Isto kote i dužine prelaza.
+- **Više izabranih elemenata različitih vrijednosti:** polje prikazuje „Različito“ (ranije ruski tekst); ako se ne dira, ništa se ne mijenja.
+- **Dvoklik → Svojstva → Odustani:** ništa se ne mijenja.
+- **Promjena ugla u Svojstvima** (npr. 45 → 30) i dalje radi.
+- **TVS_KOLJENA_UGAO (novo):** izbor koljena ili Enter = cijeli crtež. Koljena u osnovi sa uglom manje od 0,5° od 15 / 22,5 / 30 / 45 / 60 / 75 / 90° dobijaju tačan ugao, krajevi kanala na njima se pomjere za njima. Koljeno uz koje je prelaz / T komad / drugo koljeno se ne dira (ispis koliko). Probati na crtežu gdje je TVS_MOVE / TVS_ALIGN javljao „ose nisu tangentne“ ili je TVS_DIM_PRATI stajao na koljenu, pa ponoviti.
+
 ## Faza 6 pregleda (elementi) – testirati
 - **SCALE nad TVS elementima:** odbijen, poruka jednom po komandi; ostali (ne-TVS) objekti u izboru se skaliraju normalno. MOVE, ROTATE, COPY i MIRROR rade kao ranije.
 - **MIRROR:** koljeno, prelaz poravnat uz ivicu (tip 2/3) i TK-O / TK-G treba da izgledaju kao ogledalska slika i ostanu spojeni.

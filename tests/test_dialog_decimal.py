@@ -20,4 +20,17 @@ class Decimal(unittest.TestCase):
   f=text('TVS_Ventilation_ARX/Func.cpp')
   self.assertIn('if (dg.DoModal() != IDOK) return;   // Odustani',f)
   self.assertIn('Nije promijenjeno %d elemenata (zaklju',f)
+ def test_no_rounding_on_ok(self):
+  f=text('TVS_Ventilation_ARX/Func.cpp')
+  self.assertNotIn('Format(L"%.2f\\n"',f)                                            # zaokruzivanje na 2 decimale + \n
+  self.assertIn('stringconst.Format(L"%.15g", myvar);',f)
+  self.assertIn('std::fabs(before - after) <= 1e-9',f)                     # poredjenje brojeva, ne teksta
+  self.assertNotIn('"Разные"',f)                            # ruski tekst u dijalogu
+  self.assertEqual(f.count('if (dg.DoModal() != IDOK) return;'),2)         # i dvoklik postuje Odustani
+  a=text('TVS_Ventilation_ARX/dgAllEdit.cpp')
+  self.assertIn('fSwectangle.SetWindowTextW(SwectangleRadians);',a)        # nediran ugao ostaje tacno isti
+ def test_elbow_angle_command(self):
+  c=text('TVS_Ventilation_ARX/ElbowAngleCommand.h')
+  self.assertIn('{15,22.5,30,45,60,75,90}',c);self.assertIn('standard(before,0.5)',c)
+  self.assertIn('TVS_KOLJENA_UGAO, TVS_KOLJENA_UGAO',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
 if __name__=='__main__':unittest.main()

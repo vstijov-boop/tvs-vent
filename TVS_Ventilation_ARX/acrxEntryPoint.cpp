@@ -69,6 +69,7 @@
 #include "../TVS_Ventilation_DBX/PortGrips.h"
 #include "TransAlignCommand.h"
 #include "SizeFollow.h"
+#include "ElbowAngleCommand.h"
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 
@@ -375,6 +376,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddProp
 
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MOVE, TVS_MOVE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_ALIGN, TVS_ALIGN, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOLJENA_UGAO, TVS_KOLJENA_UGAO, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_MODAL, NULL)

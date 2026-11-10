@@ -315,10 +315,12 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 		iRadiusTypeRound = _wtoi(RadiusTypeRound);
 		iRadiusTypeRect = _wtoi(RadiusTypeRect);
 		CString var;
+		SwectangleRadians = Swectangle; SwectangleShown.Empty();
 		if ((tvsDecimal::value(Swectangle) / M_PI * 180) != 0)
 		{
-			var.Format(L"%g", tvsDecimal::value(Swectangle) / M_PI * 180);
+			var.Format(L"%.10g", tvsDecimal::value(Swectangle) / M_PI * 180);
 			fSwectangle.SetWindowTextW(var);
+			SwectangleShown = var;
 		}
 
 
@@ -689,9 +691,11 @@ void dgAllEdit::OnBnClickedOk()
 	CString var;
 	fSwectangle.GetWindowTextW(var);
 
-	if ((M_PI*tvsDecimal::value(var) / 180) != 0)
+	if (!SwectangleShown.IsEmpty() && tvsDecimal::normalized(var) == tvsDecimal::normalized(SwectangleShown))
+		fSwectangle.SetWindowTextW(SwectangleRadians);   // ugao nije diran: ostaje tačno kakav je bio
+	else if ((M_PI*tvsDecimal::value(var) / 180) != 0)
 	{
-		var.Format(L"%g", M_PI*tvsDecimal::value(var) / 180);
+		var.Format(L"%.15g", M_PI*tvsDecimal::value(var) / 180);
 		fSwectangle.SetWindowTextW(var);
 	}
 

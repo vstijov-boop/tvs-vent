@@ -163,6 +163,7 @@ public:
 	CString TapRadiusVariableParameter;
 	CString TapRadiusConst;
 	CString Swectangle;
+	CString SwectangleRadians, SwectangleShown;   // as read and as shown in degrees: unchanged -> written back as it was
 
 	BOOL Wipe;
 	BOOL Grani;

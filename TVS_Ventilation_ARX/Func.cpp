@@ -1,5 +1,7 @@
 ﻿#pragma once;
 #include "StdAfx.h"
+#include "DecimalText.h"
+#include <cmath>
 #include "Func.h"
 #include "ElbowDirection.h"
 #include "TeeEditDialog.h"
@@ -1825,7 +1827,7 @@ void func::Change(AcDbEntity *pEnt)
 	{
 
 		CAcModuleResourceOverride resourceOverride;
-		dg.DoModal();
+		if (dg.DoModal() != IDOK) return;   // Odustani (dvoklik): ništa se ne mijenja
 
 	}
 
@@ -2487,7 +2489,7 @@ void func::strfil(double &myvar,
 )
 {
 	if (variableconst == true)
-		stringconst = CString("Разные");
+		stringconst = CString(L"Razli\u010Dito");
 	else
 	{
 		double pnum = myvar;
@@ -2500,7 +2502,7 @@ void func::strfil(double &myvar,
 			double g = 1;
 
 		}
-		else stringconst.Format(L"%.2f\n", myvar);
+		else stringconst.Format(L"%.15g", myvar);   // full precision: "%.2f\n" changed angles / m sizes on a plain OK
 	}
 
 	double g = 1;
@@ -2512,7 +2514,7 @@ void func::strfil(int &myvar,
 )
 {
 	if (variableconst == true)
-		stringconst = CString("Разные");
+		stringconst = CString(L"Razli\u010Dito");
 	else stringconst.Format(L"%i", myvar);
 
 }
@@ -2528,42 +2530,24 @@ void func::strfil(bool &myvar,
 
 }
 
+// Svar1: value shown in the dialog, Svar2: value after it. Numbers are compared as numbers (a
+// text that only looks different, "1.5" / "1,50", is no change); equ = true: nothing to write.
 void func::sequal(double &var,
 	CString &Svar1,//начальный
 	CString &Svar2,//конечный
 	bool &equ
 )
 {
-
-	CString s;
-	const wchar_t *wch;
-	char *ch;
-	int z;
-	size_t sizeb,
-		cnv;
-	wch = Svar2.GetBuffer();
-	sizeb = (Svar2.GetLength() + 1) * 2;
-	ch = new char[sizeb];
-	wcstombs_s(&cnv, ch, sizeb, wch, sizeb);
-	double dbl = atof(ch);
-
-
-	delete[] ch;
-
-
-	if (Svar1 == Svar2)
+	double before = 0, after = 0;
+	const bool numberBefore = tvsDecimal::parse(Svar1, before), numberAfter = tvsDecimal::parse(Svar2, after);
+	if (Svar1 == Svar2 || (numberBefore && numberAfter && std::fabs(before - after) <= 1e-9 * (std::fabs(before) > 1 ? std::fabs(before) : 1)))
 	{
 		equ = true;
-
+		return;
 	}
-
-	else
-	{
-		var = dbl;
-		equ = false;
-	}
-
-
+	if (!numberAfter) { equ = true; return; }   // text (Različito, empty): no change
+	var = after;
+	equ = false;
 }
 
 void func::sequal(int &var,
