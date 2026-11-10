@@ -42,6 +42,12 @@ class Release(unittest.TestCase):
   self.assertIn('const double minLength = 50.0 / tvsUnits::factor();',e)   # TVS_CUT u mm
   self.assertIn('if (es == Acad::eOk && eSet.length() > 0) es = pEnt->erase();',e)   # TVS_ERASE: original ostaje ako razbijanje ne uspije
   self.assertIn('TVS_RAZBIJ, TVS_RAZBIJ',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
+ def test_no_windows_macro_identifiers(self):
+  # near / far / small are Windows macros (MSVC): not as names of parameters or variables
+  import glob,re
+  pat=re.compile(r'\b(double|int|bool|float|auto|const)\s+(near|far|small)\b')
+  for f in glob.glob(str(ROOT/'TVS_Ventilation_ARX/*.h'))+glob.glob(str(ROOT/'TVS_Ventilation_ARX/commands/*.inl'))+glob.glob(str(ROOT/'TVS_Ventilation_DBX/*.h'))+glob.glob(str(ROOT/'geometry/*.h')):
+   self.assertIsNone(pat.search(pathlib.Path(f).read_text(encoding='utf-8-sig',errors='ignore')),f)
  def test_no_broken_string_literals(self):
   # a raw newline inside L"..." (python escapes written into C++) does not compile
   import glob
