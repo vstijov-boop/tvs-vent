@@ -64,8 +64,9 @@ public:
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
     Source src;int choice;bool flipped;Side side[2];int current;bool loading,valid;CString problem;
     bool newInlet;Section inletNew;int inletChoice;   // TVS_DIM_PRATI: the run arrived on the inlet with this section (openArriving)
+    int arriveK;Section arrive;                       // ... or on port arriveK (ogranak / prolaz): that port starts with its width
     CFont bold,title;CBrush back,white,band;
-    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false),newInlet(false),inletChoice(choiceOf(s.type)){}
+    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false),newInlet(false),inletChoice(choiceOf(s.type)),arriveK(-1){}
 
     // ---------------------------------------------------------------- model
     bool rectTee()const{return !src.roundPr&&src.Bpr>0;}
@@ -97,6 +98,8 @@ public:
         }else{
             b.used=true;b.k=2;b.tee.a=src.Aotv;b.tee.round=src.roundOtv;b.tee.b=src.roundOtv?0:src.Botv;b.shapeFree=true;
         }
+        for(int i=0;i<2;++i)if(side[i].used&&side[i].k==arriveK){Side& x=side[i];   // the run arrived here: the port takes its size
+            if(x.shapeFree){x.tee=arrive;}else if(arrive.round==x.tee.round){x.tee.a=arrive.a;if(!x.lockB)x.tee.b=arrive.round?0:arrive.b;}}
         for(int i=0;i<2;++i)if(side[i].used){neighbourOf(side[i]);side[i].lengthMm=tvsTeeFit::transitionMm();
             side[i].elbow=keep[i].elbow;side[i].turn=keep[i].turn;side[i].order=keep[i].order;}
         if(current>0&&!side[1].used)current=0;
@@ -489,7 +492,7 @@ inline bool openArriving(const AcDbObjectId& id,UINT idd,int k,const Section& in
         if(choice==Pants){s.Aotv=in.a;s.Botv=in.round?0:in.b;}
         else{if(!(s.second>0))s.second=s.Apr;s.Apr=in.a;s.Bpr=in.round?0:in.b;}   // prolaz C keeps its width
     }else tab=choice==Branch?(k==1?1:0):(k==0?1:0);
-    Dialog dg(s,idd);dg.newInlet=inlet;dg.inletNew=in;dg.current=tab;
+        Dialog dg(s,idd);dg.newInlet=inlet;dg.inletNew=in;dg.current=tab;if(!inlet){dg.arriveK=k;dg.arrive=in;}
     {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return false;}
     apply(dg);return true;
 }
