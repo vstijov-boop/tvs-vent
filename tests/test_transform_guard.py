@@ -15,5 +15,5 @@ class Guard(unittest.TestCase):
   self.assertIn('if (xform.det() < 0 && std::fabs(std::fabs(Normvector.z) - 1) < 1e-8)',text('TVS_Ventilation_DBX/TVS_TAP.cpp'))
  def test_zero_length(self):
   s=text('TVS_Ventilation_DBX/TVS_Pipe.cpp')
-  self.assertNotIn('curViewUnitSize / Length;',s);self.assertNotIn('SizeA/Length/2',s)
+  self.assertNotIn('curViewUnitSize / Length;',s);self.assertNotIn('SizeA/Length/2',s);self.assertNotIn(')/Length/2',s)
 if __name__=='__main__':unittest.main()

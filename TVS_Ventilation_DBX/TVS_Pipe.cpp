@@ -1111,8 +1111,9 @@ void TVS_Pipe::Gimme4PipePointsWipe ()
 	X1=LastPoint.x-FirstPoint.x;
 	Y1=LastPoint.y-FirstPoint.y;
 
-	X2=Y1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
-	Y2=X1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
+	const double L = Length > 1e-12 ? Length : 1;   // kanal nulte duzine: bez NaN
+	X2=Y1*(SizeA+tvsUnits::drawing(200.0, this))/L/2;
+	Y2=X1*(SizeA+tvsUnits::drawing(200.0, this))/L/2;
 	//AW=AcGePoint3d(FirstPoint.x-X2,FirstPoint.y+Y2,FirstPoint.z);
 	//BW=AcGePoint3d(LastPoint.x-X2,LastPoint.y+Y2,FirstPoint.z);
 	//CW=AcGePoint3d(LastPoint.x+X2,LastPoint.y-Y2,FirstPoint.z);
