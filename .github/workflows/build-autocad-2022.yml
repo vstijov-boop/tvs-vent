@@ -9,6 +9,7 @@ on:
       - 'TVS_Ventilation_ARX/**'
       - 'TVS_Ventilation_DBX/**'
       - 'geometry/**'
+      - 'tests/**'
       - 'Installer/TVS_VENT/TVS_VENT.cuix'
       - 'GridCtrl_src/**'
       - 'Installer/TVS_TOOLS/KGTEZ.lsp'
@@ -19,7 +20,16 @@ permissions:
   contents: read
 
 jobs:
+  tests:
+    # contract and geometry tests (python + g++) first: a broken rule stops the build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run tests
+        run: python3 tests/run_all.py
   build:
+    needs: tests
     runs-on: windows-2022
     timeout-minutes: 30
     defaults:
