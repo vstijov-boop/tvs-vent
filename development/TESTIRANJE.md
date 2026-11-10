@@ -56,6 +56,14 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Ponovni pregled N2 – kopiranje između crteža sa različitim jedinicama – testirati
+Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → Insertion scale), TVS po svojim jedinicama (TVS_SETTINGS). Najbolje je da su u oba crteža iste (mm-crtež: INSUNITS = Millimeters, cm-crtež: Centimeters).
+- **INSUNITS odgovaraju TVS jedinicama:** Ctrl+C iz mm crteža, Ctrl+V u cm crtež → kanali, koljena, prelazi, T komadi su iste stvarne veličine (400 mm ostaje 400 mm, u cm crtežu 40); i linije oko njih. Isto cm → mm, mm → m.
+- **INSUNITS ne odgovaraju** (npr. oba „Unitless“): poslije lijepljenja poruka „TVS: umetnuti elementi su iz crteža u mm…“ → TVS_PRERACUNAJ, izbor, [mm/cm/m] izvora, bazna tačka → sve na pravu veličinu.
+- **EXPLODE / INSERT bloka sa TVS elementima** umetnutog sa razmjerom: poslije razbijanja dimenzije prate razmjeru.
+- **SCALE** nad TVS elementima: i dalje odbijen.
+- **TK-O / TK-G** poslije kopiranja mm → cm: oblik i priključci isti (kragna, druga širina, radijus).
+
 ## Ponovni pregled N1 – Svojstva ne mijenjaju ništa na „OK“ – testirati
 - **Koljeno 45° / 90°** → Svojstva → OK bez izmjene → Properties: ugao ostaje tačno 45 / 90 (ranije 45,26 / 89,954).
 - **Crtež u metrima:** kanal Ø315 → Svojstva → OK → ostaje Ø315 (ranije Ø320). Isto kote i dužine prelaza.

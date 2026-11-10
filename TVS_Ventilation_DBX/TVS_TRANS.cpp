@@ -1037,13 +1037,15 @@ return Acad::eOk;
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_TRANS::subTransformBy(const AcGeMatrix3d & xform)
 {
-	if (!tvsTransform::rigid(xform)) return tvsTransform::refuse();   // SCALE: TransformGuard.h
+	const double scale = tvsTransform::accepted(xform);   // TransformGuard.h: SCALE refused, paste between units scaled
+	if (scale <= 0) return tvsTransform::refuse();
 	assertWriteEnabled () ;
 	FirstPoint.transformBy(xform);
 	LastPoint.transformBy(xform);
 	VectTr.transformBy(xform);
 	// MIRROR: a prelaz flush with one side keeps that side flush (types 2 and 3 swap sides).
 	if (xform.det() < 0) { if (TransType == 2) TransType = 3; else if (TransType == 3) TransType = 2; }
+	if (scale != 1) { tvsTransform::scaleCommon(this, scale); SizeAp1 *= scale; SizeBp1 *= scale; SizeAp2 *= scale; SizeBp2 *= scale; LengthTr *= scale; }
 	return (Acad::eOk);
 }
 

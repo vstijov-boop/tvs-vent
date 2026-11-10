@@ -70,6 +70,7 @@
 #include "TransAlignCommand.h"
 #include "SizeFollow.h"
 #include "ElbowAngleCommand.h"
+#include "ScaleWindow.h"
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 
@@ -127,6 +128,7 @@ public:
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		tvsLevelTooltip::start();
 		tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
+		tvsScaleWindow::start();  // jedinice crteža pri kopiranju / umetanju (ScaleWindow.h)
 		tvsSizeFollow::enableTeeFollow(IDD_RUN, IDD_TEETYPE);   // TVS_TK_TIP: dionica iza kanala nove dimenzije
 		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)
 #ifdef TVS_BYPASS_PREVIEW
@@ -163,6 +165,7 @@ public:
         PropertyAdmin::uninitialize();
         tvsLevelTooltip::stop();
         tvsSizeFollow::stop();
+        tvsScaleWindow::stop();
 #ifdef TVS_OFFSET_INTEGRATION
         acedEditor->removeReactor(&offsetReactor());tvsOffsetData::clearClonePermits();tvsOffsetRefit::detachAll();
 #endif
@@ -377,6 +380,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddProp
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_MOVE, TVS_MOVE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_ALIGN, TVS_ALIGN, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOLJENA_UGAO, TVS_KOLJENA_UGAO, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRERACUNAJ, TVS_PRERACUNAJ, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_MODAL, NULL)

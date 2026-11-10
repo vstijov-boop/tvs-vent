@@ -1191,7 +1191,8 @@ TVS_Pipe* TVS_Pipe::add_new(AcGePoint3d &pFirstPoint,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 {
-	if (!tvsTransform::rigid(xform)) return tvsTransform::refuse();   // SCALE: TransformGuard.h
+	const double scale = tvsTransform::accepted(xform);   // TransformGuard.h: SCALE refused, paste between units scaled
+	if (scale <= 0) return tvsTransform::refuse();
 #ifdef TVS_OFFSET_INTEGRATION
     if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS: clan obilaska/offseta se moze samo pomjeriti ili rotirati oko Z (SCALE/MIRROR nisu dozvoljeni).");return Acad::eNotApplicable;}
 #endif
@@ -1199,6 +1200,7 @@ Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 
 	FirstPoint.transformBy(xform);
 	LastPoint.transformBy(xform);
+	if (scale != 1) tvsTransform::scaleCommon(this, scale);
 	return (Acad::eOk);
 }
 void TVS_Pipe::setLastpoint (AcGePoint3d pLastpoint)

@@ -2322,7 +2322,8 @@ TVS_TAP *TVS_TAP::add_new(double &pSizeA,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 {
-	if (!tvsTransform::rigid(xform)) return tvsTransform::refuse();   // SCALE: TransformGuard.h
+	const double scale = tvsTransform::accepted(xform);   // TransformGuard.h: SCALE refused, paste between units scaled
+	if (scale <= 0) return tvsTransform::refuse();
 #ifdef TVS_OFFSET_INTEGRATION
     if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS: clan obilaska/offseta se moze samo pomjeriti ili rotirati oko Z (SCALE/MIRROR nisu dozvoljeni).");return Acad::eNotApplicable;}
 #endif
@@ -2334,6 +2335,7 @@ Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 		Startvector.rotateBy(Swectangle, Normvector);
 	MiddlePoint.transformBy(xform);
 	Startvector.transformBy(xform);
+	if (scale != 1) { tvsTransform::scaleCommon(this, scale); Radius *= scale; RadiusConst *= scale; Startvector /= scale; }   // direction keeps its length
 	return (Acad::eOk);
 }
 
