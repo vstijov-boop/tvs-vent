@@ -81,9 +81,9 @@
 				//acdbEntDel(ename);
 				//pipi=pipie.add_new(A1,lastpipi,pSizeA,pSizeB);
 				acdbGetObjectId(id, eName);
-				acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite);
+				if (!reopen(pipi)) return;
 				pipi->assertWriteEnabled();
-				pipi->LastPoint = lastpipi;
+				pipi->put_Lastpoint(lastpipi);
 				pipi->close();
 				pipi = pipie.add_new(A2, A3, pSizeA, pSizeB, false, pThisRound);
 				A1 = A2;
@@ -245,118 +245,60 @@
 	}
 
 	// - Ventilation_ARX.TVS_CUT command (do not rename)
+	// TVS_CUT: cuts a duct in two at the picked point (projected on its axis). The new part gets
+	// all properties of the duct (size, shape, elevation, flow, flex, layer, colour, TVS
+	// properties / xdata). Each part at least 50 mm; members of an etaz / obilazak are refused.
 	static void Ventilation_ARXTVS_CUT(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
-		AcGePoint3d pCut;
-		double Lx, Ly, startangle;
-		ads_name vozd1, vozd2, eName;
-		ACHAR handle[17];
-		ads_point pt1, pt2;
-		ads_real sise = 0;
-		AcDbEntity *pEnt1, *pEnt2 = NULL;
-		AcDbObjectId id;
-		TVS_WYE wyie;
-		TVS_TAP * Tapie;
-		TVS_Pipe * Pipi1, *Pipi2;
-		double NewSiseA, NewRadius;
-		resbuf *rb = NULL;
-		AcGeLine3d Line;
-		bool ft = false, s2 = false;
-		AcCmColor pColor;
-		AcDb::LineWeight pWeight;
-		AcDbObjectId pLayer;
-		AcDbObjectId pLineType;
-
-		while (ft == false)
+		if (!currentLayerWritable()) return;
+		const double minLength = 50.0 / tvsUnits::factor();
+		for (;;)
 		{
-
-			if (tvsCoordinates::selectEntity(_T("\nIzaberite kanal:"), vozd1, pt1) == RTCAN)
-				return;
-
-			pCut = asPnt3d(pt1);
-
-			if (acdbGetObjectId(id, vozd1) == eOk)
+			ads_name picked; ads_point pt;
+			const int rc = tvsCoordinates::selectEntity(_T("\nIzaberite kanal na mjestu presijecanja: "), picked, pt);
+			if (rc == RTCAN) return;
+			if (rc != RTNORM) continue;
+			AcDbObjectId id;
+			if (acdbGetObjectId(id, picked) != eOk || id.isNull()) continue;
+			AcDbEntity* pEnt = NULL;
+			const Acad::ErrorStatus es = acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite);
+			if (es != eOk) { acutPrintf(_T("\nObjekat se ne može mijenjati (%ls)."), acadErrorStatusText(es)); continue; }
+			TVS_Pipe* pipe = TVS_Pipe::cast(pEnt);
+			if (!pipe) { pEnt->close(); acutPrintf(_T("\nIzabrani objekat nije TVS kanal.")); continue; }
+#ifdef TVS_OFFSET_INTEGRATION
+			if (tvsOffsetData::marked(pEnt)) { pEnt->close(); acutPrintf(_T("\nKanal je dio etaža / obilaska i ne može se presjeći.")); continue; }
+#endif
+			AcGeLine3d axis(pipe->FirstPoint, pipe->LastPoint);
+			AcGePoint3d at = axis.closestPointTo(asPnt3d(pt));
+			if (length2p(at, pipe->FirstPoint) < minLength || length2p(at, pipe->LastPoint) < minLength)
 			{
-
-				acdbGetObjectId(id, vozd1);
-
-				{if (id != AcDbObjectId::kNull)
-				{
-					if (acdbOpenAcDbEntity(pEnt1, id, AcDb::kForWrite) == eOk)
-					{
-						if ((Pipi1 = TVS_Pipe::cast(pEnt1)) != NULL)
-						{
-							Line.set(Pipi1->FirstPoint, Pipi1->LastPoint);
-							pCut = Line.closestPointTo(pCut);
-
-
-							if ((length2p(pCut, Pipi1->FirstPoint) <= (Pipi1->Length - 1))
-								&& (length2p(pCut, Pipi1->LastPoint) <= (Pipi1->Length - 1)))
-							{
-
-
-								Pipi2 = Pipi1->add_new(pCut,
-									Pipi1->LastPoint,
-									Pipi1->SizeA,
-									Pipi1->SizeB,
-									Pipi1->This1D,
-									Pipi1->ThisRound
-								);
-								Pipi1->put_Lastpoint(pCut);
-								s2 = true;
-								pColor = Pipi1->color();
-								pWeight = Pipi1->lineWeight();
-								pLayer = Pipi1->layerId();
-								pLineType = Pipi1->linetypeId();
-							}
-							Pipi1->close();
-
-							if (s2 == true)
-							{
-
-								if (acdbOpenAcDbEntity(pEnt2, Pipi2->id(), AcDb::kForWrite) == eOk)
-								{
-
-
-
-
-									Pipi2->setColor(pColor);
-									Pipi2->setLineWeight(pWeight);
-									Pipi2->setLayer(pLayer);
-									Pipi2->setLinetype(pLineType);
-
-									Pipi2->put_Wipeout(Pipi1->Wipeout);
-									Pipi2->close();
-
-								}
-
-
-								s2 = false;
-								ft = true;
-							}
-
-
-						}
-					}
-
-					else {
-						acutPrintf(_T("\nObjekat je zaključan"));
-
-
-					}
-
-				}
-				}
-
-
+				pEnt->close();
+				acutPrintf(_T("\nMjesto presijecanja je preblizu kraja kanala (najmanje 50 mm do kraja)."));
+				continue;
 			}
+						// the new part first (the duct stays open: its properties are read from it as it is)
+			AcGePoint3d last = pipe->LastPoint;
+			double a = pipe->SizeA, b = pipe->SizeB;
+			TVS_Pipe* part = TVS_Pipe::add_new(at, last, a, b, pipe->This1D, pipe->ThisRound);
+			if (!part || part->objectId().isNull()) { pEnt->close(); acutPrintf(_T("\nNovi dio kanala nije napravljen.")); return; }
+			SetPropertyLikePipe(pipe, part);   // size, shape, elevation, flow, flex, wipeout, layer, colour ...
+			{
+				AcDbObjectPointer<TVS_Pipe> p(part->objectId(), AcDb::kForWrite);
+				if (p.openStatus() == Acad::eOk)
+				{
+					p->setPropertiesFrom(pipe);
+					if (resbuf* xdata = pipe->xData(NULL)) { p->setXData(xdata); acutRelRb(xdata); }   // TVS svojstva, oznake
+					p->recordGraphicsModified();
+				}
+			}
+			pipe->put_Lastpoint(at);
+			pipe->recordGraphicsModified();
+			pEnt->close();
+			acutPrintf(_T("\nKanal je presječen."));
+			return;
 		}
-
-
-
-		// Add your code for command Ventilation_ARX.TVS_CUT here
 	}
 
 	// - Ventilation_ARX.TVS_Change command (do not rename)
@@ -392,68 +334,31 @@
 
 
 
-	static Acad::ErrorStatus postToDatabase(AcDbVoidPtrArray eSet)
+	// Parts of an exploded element into the space that owned it (model, paper or block).
+	static Acad::ErrorStatus postToDatabase(const AcDbVoidPtrArray& eSet, const AcDbObjectId& owner)
 	{
-		Acad::ErrorStatus es;
-		AcDbBlockTable *pBtbl;
-		AcDbBlockTableRecord *pBtblr;
-		es = acdbHostApplicationServices()->workingDatabase()
-			->getSymbolTable(pBtbl, AcDb::kForRead);
+		AcDbBlockTableRecord* space = NULL;
+		Acad::ErrorStatus es = acdbOpenObject(space, owner, AcDb::kForWrite);
 		if (es != Acad::eOk)
 		{
-			acutPrintf(L"\nNije moguće otvoriti tabelu blokova");
+			acutPrintf(L"\nNije moguće otvoriti prostor crteža; dijelovi nisu dodati.");
+			for (int i = 0; i < eSet.length(); i++) delete static_cast<AcRxObject*>(eSet[i]);
 			return es;
 		}
-		es = pBtbl->getAt(ACDB_MODEL_SPACE, pBtblr, AcDb::kForWrite);
-		if (es != Acad::eOk)
-		{
-			acutPrintf(L"\nNije moguće otvoriti zapis tabele blokova");
-			es = pBtbl->close();
-			if (es != Acad::eOk)
-			{
-				acutPrintf(L"\nNije moguće zatvoriti tabelu blokova");
-			}
-			return es;
-		}
-
-		es = pBtbl->close();
-		if (es != Acad::eOk)
-		{
-			acutPrintf(L"\nNije moguće zatvoriti tabelu blokova");
-			return es;
-		}
-
 		for (int i = 0; i < eSet.length(); i++)
 		{
-			AcDbObjectId ObjId;
-			AcDbEntity *pNewEnt = AcDbEntity::cast((AcRxObject*)eSet[i]);
-			es = pBtblr->appendAcDbEntity(ObjId, pNewEnt);
-			if (es != Acad::eOk)
-			{
-				acutPrintf(L"\nNije moguće dodati objekat");
-			}
-
-			es = pNewEnt->close();
-			if (es != Acad::eOk)
-			{
-				acutPrintf(L"\nNije moguće zatvoriti objekat");
-			}
+			AcDbEntity* part = AcDbEntity::cast(static_cast<AcRxObject*>(eSet[i]));
+			if (!part) { delete static_cast<AcRxObject*>(eSet[i]); continue; }
+			AcDbObjectId partId;
+			if (space->appendAcDbEntity(partId, part) == Acad::eOk) part->close();
+			else { delete part; acutPrintf(L"\nNije moguće dodati dio elementa."); }
 		}
-
-		es = pBtblr->close();
-		if (es != Acad::eOk)
-		{
-			acutPrintf(L"\nNije moguće zatvoriti zapis tabele blokova");
-		}
-		return es;
+		return space->close();
 	}
 
-
-
-
-
-
 	// - Ventilation_ARX.TVS_ERASE command (do not rename)
+		// TVS_RAZBIJ: the same as TVS_ERASE (its old name says "erase", it explodes TVS elements into plain lines).
+	static void Ventilation_ARXTVS_RAZBIJ(void) { Ventilation_ARXTVS_ERASE(); }
 	static void Ventilation_ARXTVS_ERASE(void)
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
@@ -485,92 +390,31 @@
 
 		acedSSLength(sset, &len);
 		//consoleprint(double(len),_T("\nL: "));
+		int done = 0, failed = 0, locked = 0;
 		for (long i = 0; i < len; i++)
 		{
-
-
-			if (NULL != (acedSSName(sset, i, eName)))
+			if (acedSSName(sset, i, eName) != RTNORM) continue;
+			if (acdbGetObjectId(id, eName) != eOk || id.isNull()) continue;
+			AcDbEntity* pEnt = NULL;
+			if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) != eOk) { ++locked; continue; }
+			if (!TVS_Pipe::cast(pEnt) && !TVS_TAP::cast(pEnt) && !TVS_WYE::cast(pEnt) && !TVS_TRANS::cast(pEnt)) { pEnt->close(); continue; }
+			AcDbVoidPtrArray eSet;
+			const AcDbObjectId owner = pEnt->ownerId();
+			Acad::ErrorStatus es = pEnt->explode(eSet);
+			// the original goes only when its parts exist (a failed explode keeps the element)
+			if (es == Acad::eOk && eSet.length() > 0) es = pEnt->erase();
+			pEnt->close();
+			if (es != Acad::eOk || eSet.length() == 0)
 			{
-
-				//consoleprint(double(i),_T("\nd"));
-
-
-				acdbGetObjectId(id, eName);
-
-				bool g = false;
-				if (id != AcDbObjectId::kNull)
-				{
-					if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) == eOk)
-					{
-
-
-						if ((Pipi = TVS_Pipe::cast(pEnt)) != NULL)
-						{
-
-							AcDbVoidPtrArray eSet;
-							Acad::ErrorStatus es = pEnt->explode(eSet);
-							pEnt->close();
-
-							//delete the original entity
-							acdbEntDel(eName);
-
-							// Add the new entities to the db
-							es = postToDatabase(eSet);
-							g = true;
-						}
-
-						if ((Tapie = TVS_TAP::cast(pEnt)) != NULL)
-						{
-							AcDbVoidPtrArray eSet;
-							Acad::ErrorStatus es = pEnt->explode(eSet);
-							pEnt->close();
-
-							//delete the original entity
-							acdbEntDel(eName);
-
-							// Add the new entities to the db
-							es = postToDatabase(eSet);
-							g = true;
-						}
-
-						if ((Wyeie = TVS_WYE::cast(pEnt)) != NULL)
-						{
-							AcDbVoidPtrArray eSet;
-							Acad::ErrorStatus es = pEnt->explode(eSet);
-							pEnt->close();
-
-							//delete the original entity
-							acdbEntDel(eName);
-
-							// Add the new entities to the db
-							es = postToDatabase(eSet);
-							g = true;
-						}
-
-						if ((Transie = TVS_TRANS::cast(pEnt)) != NULL)
-						{
-							AcDbVoidPtrArray eSet;
-							Acad::ErrorStatus es = pEnt->explode(eSet);
-							pEnt->close();
-
-							//delete the original entity
-							acdbEntDel(eName);
-
-							// Add the new entities to the db
-							es = postToDatabase(eSet);
-							g = true;
-						}
-
-
-						if (g == false)pEnt->close();
-						g = false;
-					}
-
-				}
+				for (int k = 0; k < eSet.length(); k++) delete static_cast<AcRxObject*>(eSet[k]);
+				++failed; continue;
 			}
-
-
+			postToDatabase(eSet, owner);
+			++done;
 		}
+		acutPrintf(_T("\nRazbijeno TVS elemenata: %d."), done);
+		if (failed) acutPrintf(_T("\nNije razbijeno (element ostaje): %d."), failed);
+		if (locked) acutPrintf(_T("\nNa zaključanom sloju (preskočeno): %d."), locked);
 		acedSSFree(sset);
 
 
@@ -655,7 +499,7 @@
 		TVS_TAP* pTap = TVS_TAP::add_new(pPipe->SizeA, pPipe->SizeB, Axis, AcGeVector3d(0, 0, 1), AcGeVector3d(y, -x, 0), pPipe->LastPoint, Axis, pPipe->This1D, pPipe->ThisRound);
 		SetGlobalProperty(pTap);
 		SetPropertyLikePipe(pPipe, pTap);
-		acdbOpenAcDbEntity(pEnt, pTap->id(), AcDb::kForWrite);
+		if (!reopen(pTap)) return;
 		pTap->put_Form(stat);
 		pTap->close();
 		pTap->draw();
@@ -670,7 +514,7 @@
 		p1 = shortlength(pPipe->FirstPoint, p2, plecho1);
 
 
-		acdbOpenAcDbEntity(pEnt, pPipe->id(), AcDb::kForWrite);
+		if (!reopen(pPipe)) return;
 		pPipe->put_Lastpoint(p1);
 		pPipe->close();
 

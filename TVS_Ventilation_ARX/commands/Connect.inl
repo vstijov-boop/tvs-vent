@@ -3,6 +3,7 @@
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
+		if (!currentLayerWritable()) return;
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -109,6 +110,7 @@
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
+		if (!currentLayerWritable()) return;
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -215,6 +217,7 @@
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
+		if (!currentLayerWritable()) return;
 		// Add your code for command Ventilation_ARX.TVS_CONNECT here
 
 		double Lx, Ly, startangle;
@@ -315,11 +318,11 @@
 
 		}
 
-		acdbOpenAcDbEntity(pEnt1, id1, AcDb::kForWrite);
-		(Pipi1 = TVS_Pipe::cast(pEnt1));
+				if (acdbOpenAcDbEntity(pEnt1, id1, AcDb::kForWrite) != eOk) return;
+		if (acdbOpenAcDbEntity(pEnt2, id2, AcDb::kForWrite) != eOk) { pEnt1->close(); return; }
+		Pipi1 = TVS_Pipe::cast(pEnt1); Pipi2 = TVS_Pipe::cast(pEnt2);
+		if (!Pipi1 || !Pipi2) { pEnt1->close(); pEnt2->close(); return; }
 
-		acdbOpenAcDbEntity(pEnt2, id2, AcDb::kForWrite);
-		(Pipi2 = TVS_Pipe::cast(pEnt2));
 
 		int con1end;
 		Pipi1->getConnectorByIndex(conPipeEnd, con1end);

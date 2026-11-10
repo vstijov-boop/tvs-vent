@@ -2827,7 +2827,7 @@ TVS_TAP* func::drawTapDirect(AcGePoint3d t1, AcGePoint3d t2, AcGePoint3d t3)
 	acdbGetAdsName(eName, id);
 	acdbGetObjectId(id, eName);
 	AcDbEntity* pnt;
-	acdbOpenAcDbEntity(pnt, id, AcDb::kForWrite);
+	if (acdbOpenAcDbEntity(pnt, id, AcDb::kForWrite) != eOk || pnt != pEnt) { if (pnt && pnt != pEnt) pnt->close(); return pEnt; }   // locked layer: defaults stay
 
 	pEnt->assertWriteEnabled();
 	pEnt->RadiusConst = (globalTapRadiusConst);

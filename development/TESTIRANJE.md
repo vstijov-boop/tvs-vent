@@ -56,6 +56,13 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Faza 4 pregleda (stari kod crtanja i spajanja) – testirati
+- **TVS_PIPE, TVS_DRAW:** crtanje kao ranije, sa Dimenzija / Koljeno / Račva / Tkomad / Z. Na zaključanom trenutnom sloju komanda odmah javi i ne počinje. Promjena dimenzije tokom crtanja u crtežu u cm ili m: prvi komad iza prelaza je 100 mm (ranije 100 jedinica = 1 m / 100 m).
+- **Koljeno tokom crtanja (opcija K):** klik na nešto što nije kanal ponovo traži izbor (ranije se komanda „zaglavila“); izbor kanala koji se crta – poruka.
+- **TVS_CONNECTW / TVS_CONNECTT:** spajanje kao ranije (T komad, koljeno, kolinearni sa prelazom). Kanal na zaključanom sloju ili zaključan trenutni sloj – poruka umjesto pada.
+- **TVS_CUT:** jedan rez; novi dio ima sve iz originala (protok, kotu, flex, sloj, boju, TVS svojstva / oznake). Najmanje 50 mm do kraja. Član etaža / obilaska se ne može presjeći (poruka). Klik pored kanala – ponovo izbor; Esc izlazi.
+- **TVS_ERASE (novo ime TVS_RAZBIJ, staro radi):** razbija TVS elemente u prostor u kojem su (i u Layout-u); ako razbijanje ne uspije, element ostaje (ranije bi bio obrisan). Na kraju ispis koliko je razbijeno / preskočeno.
+
 ## Novo – testirati
 - **Štucna 45° (ASHRAE SR5-3):** opcija `Stucna` u TVS_CONNECTW, pri spajanju tokom crtanja, u opciji Tkomad i u TVS_TK_TIP. L = 0,25 × širina ogranka, min. 75 mm; kosi ulaz uzvodno (oKreni ga prebacuje); glavni kanal se crta neprekinut.
 - **TVS_ERASE:** TK-O, TK-G, štucna i bočno poravnati prelazi se razbijaju u nacrtani oblik.

@@ -32,4 +32,14 @@ class Release(unittest.TestCase):
    m=z.read('MenuGroup.cui').decode('utf-8','ignore')
   for c in set(re.findall(r'\^C\^C_?(TVS_\w+)',m)):
    self.assertTrue(', %s, '%c in r or 'L"%s"'%c in r,c)
+ def test_phase4(self):
+  c=text('TVS_Ventilation_ARX/commands/ConnectHelpers.inl');d=text('TVS_Ventilation_ARX/commands/DrawHelpers.inl');e=text('TVS_Ventilation_ARX/commands/Edit.inl')
+  for s in (c,d,e,text('TVS_Ventilation_ARX/commands/Connect.inl'),text('TVS_Ventilation_ARX/commands/Draw.inl')):
+   self.assertNotRegex(s,r'(?m)^\s*acdbOpenAcDbEntity\(')          # svako otvaranje provjereno (reopen)
+  self.assertIn('static bool reopen(AcDbObject* o)',c);self.assertIn('static bool currentLayerWritable()',c)
+  self.assertNotIn('pipi->LastPoint = ',d+e)                         # kraj kanala samo kroz put_Lastpoint
+  self.assertIn('const double stub = 100.0 / tvsUnits::factor();',d)
+  self.assertIn('const double minLength = 50.0 / tvsUnits::factor();',e)   # TVS_CUT u mm
+  self.assertIn('if (es == Acad::eOk && eSet.length() > 0) es = pEnt->erase();',e)   # TVS_ERASE: original ostaje ako razbijanje ne uspije
+  self.assertIn('TVS_RAZBIJ, TVS_RAZBIJ',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
 if __name__=='__main__':unittest.main()

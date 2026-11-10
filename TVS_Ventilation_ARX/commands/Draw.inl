@@ -7,8 +7,9 @@
 
 	static void Ventilation_ARXTVS_DRAW(void)
 	{
-		if (ActivationErrorMessage() != pError_Ok) return;
+				if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
+		if (!currentLayerWritable()) { TVS_Pipe::SetParamsForDraw(AcDbObjectId::kNull, 0); return; }
 		int index;
 		AcDbObjectId id;
 		TVS_Pipe::GetParamsForDraw(id, index);
@@ -55,7 +56,7 @@
 					pt2[1] = pipi->get_Lastpoint().y;
 					pt2[2] = pipi->get_Lastpoint().z;
 					pEnt->close();
-					if (drawStep3(pt1, pt2, pipi) == false);
+					drawStep3(pt1, pt2, pipi);
 				}
 
 			}
@@ -168,6 +169,10 @@
 			case RTKWORD:
 				acedGetInput(resultss);
 				break;
+			case RTNORM:
+				break;
+			default:   // RTERROR / RTNONE ...: no point was given
+				return false;
 			}
 
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
@@ -206,6 +211,10 @@
 			case RTKWORD:
 				acedGetInput(resultss);
 				break;
+			case RTNORM:
+				break;
+			default:   // RTERROR / RTNONE ...: no point was given
+				return false;
 			}
 
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
@@ -283,7 +292,9 @@
 			case RTNORM:
 				A3 = asPnt3d(pt2);
 				nextpipe(A1, A2, A3, pipi, pt1);
-
+				break;
+			default:   // RTERROR ...
+				return false;
 			}
 
 
