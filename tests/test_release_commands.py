@@ -42,4 +42,11 @@ class Release(unittest.TestCase):
   self.assertIn('const double minLength = 50.0 / tvsUnits::factor();',e)   # TVS_CUT u mm
   self.assertIn('if (es == Acad::eOk && eSet.length() > 0) es = pEnt->erase();',e)   # TVS_ERASE: original ostaje ako razbijanje ne uspije
   self.assertIn('TVS_RAZBIJ, TVS_RAZBIJ',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
+ def test_no_broken_string_literals(self):
+  # a raw newline inside L"..." (python escapes written into C++) does not compile
+  import glob
+  for f in glob.glob(str(ROOT/'TVS_Ventilation_ARX/**/*.[hc]*'),recursive=True)+glob.glob(str(ROOT/'TVS_Ventilation_ARX/commands/*.inl'))+glob.glob(str(ROOT/'TVS_Ventilation_DBX/*.[hc]*')):
+   if f.endswith(('.rc','.rc2'))or'_i.'in f:continue
+   for n,l in enumerate(pathlib.Path(f).read_text(encoding='utf-8-sig',errors='ignore').split('\n'),1):
+    self.assertFalse(l.rstrip().endswith('L"') and not l.strip().startswith('//'),'%s:%d'%(f,n))
 if __name__=='__main__':unittest.main()
