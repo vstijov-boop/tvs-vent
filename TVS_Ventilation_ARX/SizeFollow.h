@@ -525,6 +525,11 @@ inline bool spiroLength(TVS_TRANS* t,int end,const AcDbObjectId& ductId,double f
 }
 // Dialog resources (set by the command: resource.h is not known here).
 struct DialogIds {UINT run,tee;};
+// Elements the walk does not enter (the T komad whose dialog resized the duct) and the scope
+// used when the run dialog is cancelled (from a T komad: prelaz on the joint, as before).
+inline std::set<AcDbObjectId>& excluded(){static std::set<AcDbObjectId> s;return s;}
+inline int& cancelScope(){static int c=tvsRunDialog::Only;return c;}
+inline int& dialogsShown(){static int n=0;return n;}
 inline DialogIds& ids(){static DialogIds d={0,0};return d;}
 inline std::wstring shortMark(const CString& why){
     if(why.Find(L"T komad")==0||why==L"TK-O")return L"T komad";
@@ -602,7 +607,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
     bool dirty=false;   // geometry changed since the snapshot: read again before the next step
     auto fresh=[&](){if(!dirty)return true;dirty=false;nodes.clear();labels.setLogicalLength(0);return tvsMove::snapshot(db,nodes,labels);};
     auto index=[&](const AcDbObjectId& id){for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==id)return static_cast<int>(i);return -1;};
-    applying()=true;
+        const bool wasApplying=applying();applying()=true;   // also when nested: TVS_TK_TIP opened from a run
     int ducts=0,transitions=0;
     std::vector<std::pair<AcDbObjectId,int> > queue(work.begin(),work.end());std::set<AcDbObjectId> done;
     {   // whole run up to the next prelaz: one dialog for all edited ducts (RunDialog.h)
@@ -619,6 +624,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
         std::vector<std::pair<int,Run> > runs;
         auto collect=[&](const tvsRunDialog::Choices& c){
             runs.clear();std::set<int> seen(starts.begin(),starts.end());
+            for(size_t k=0;k<nodes.size();++k)if(excluded().count(nodes[k].id))seen.insert(static_cast<int>(k));
             for(size_t k=0;k<starts.size();++k){Run r;walk(nodes,starts[k],old[nodes[starts[k]].id],tol,etazes,r,seen,c);runs.push_back(std::make_pair(starts[k],r));}};
         auto anything=[&](){for(size_t k=0;k<runs.size();++k)if(!runs[k].second.empty())return true;return false;};
         tvsRunDialog::Choices ch;collect(ch);
@@ -631,7 +637,8 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
             if(!starts.empty()){const tvsMove::Node& n=nodes[starts[0]];const Sizes& o=old[n.id];
                 if(n.round)banner.Format(L"Kanal  Ø%.0f  →  Ø%.0f mm",o.a[0]*f,n.a*f);else banner.Format(L"Kanal  %.0f × %.0f  →  %.0f × %.0f mm",o.a[0]*f,o.b[0]*f,n.a*f,n.b*f);
                 if(starts.size()>1){CString more;more.Format(L"   (+ %d)",static_cast<int>(starts.size())-1);banner+=more;}}
-            if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=tvsRunDialog::Only;   // Otkaži: the edited duct alone
+            if(ids().run)++dialogsShown();
+            if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=cancelScope();   // Otkaži: the edited duct alone
                 acutPrintf(L"\nDionica nije mijenjana; izabrani kanal zadržava novu dimenziju.");}
             if(ch.scope==tvsRunDialog::Only||ch.scope==tvsRunDialog::OnlyPrelaz){
                 const bool insert=ch.scope==tvsRunDialog::OnlyPrelaz;int n=0;
@@ -716,7 +723,21 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
             AcDbObjectPointer<AcDbEntity> e(*c,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!plainDuct(e.object()))continue;
             e.close();tvsTeePort::afterDuct(db,*c);}
     }
-    applying()=false;
+        applying()=wasApplying;
     if(ducts||transitions)acutPrintf(L"\nDimenzije na spojevima: prilagodjeno prelaza %d, kanala %d.",transitions,ducts);
 }
+// TVS_TK_TIP gave the duct on a port another size (same shape): the run of the old size beyond it
+// gets the run dialog (the T komad itself is left out). Cancel = prelaz on the far joint.
+// A prelaz at the far end takes the new size in settle; false when no dialog was shown.
+inline bool followFromTee(const AcDbObjectId& duct,const tvsTeePort::Section& was,const AcDbObjectId& tee){
+    AcDbDatabase* db=duct.database();if(!db||!ids().run)return false;
+    {AcDbObjectPointer<TVS_Pipe> p(duct,AcDb::kForRead);if(p.openStatus()!=Acad::eOk||!plainDuct(p.object()))return false;}
+    Sizes old;old.a[0]=old.a[1]=was.a;old.b[0]=old.b[1]=was.round?0:was.b;
+    previous()[duct]=old;std::map<AcDbObjectId,int> work;work[duct]=3;
+    const bool had=excluded().count(tee)>0;excluded().insert(tee);const int scope=cancelScope();cancelScope()=tvsRunDialog::OnlyPrelaz;
+        const int shown=dialogsShown();settle(db,work);
+    cancelScope()=scope;if(!had)excluded().erase(tee);previous().erase(duct);
+    return dialogsShown()>shown;   // no run beyond the duct: the caller puts a prelaz on its far end (as before)
+}
+inline void enableTeeFollow(UINT runDialog,UINT teeDialog){ids().run=runDialog;ids().tee=teeDialog;tvsTeeDialog::followHook()=&followFromTee;}
 }

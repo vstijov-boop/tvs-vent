@@ -125,7 +125,8 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		tvsLevelTooltip::start();
-		tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
+				tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
+		tvsSizeFollow::enableTeeFollow(IDD_RUN, IDD_TEETYPE);   // TVS_TK_TIP: dionica iza kanala nove dimenzije
 		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)
 #ifdef TVS_BYPASS_PREVIEW
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETAIL_TEST",L"TVS_BYPASS_DETAIL_TEST",ACRX_CMD_MODAL,&tvsBypassDetailTestCommand)!=Acad::eOk)

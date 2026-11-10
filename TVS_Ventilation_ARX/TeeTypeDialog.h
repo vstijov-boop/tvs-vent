@@ -410,6 +410,10 @@ inline void chain(const Dialog& dg,const Side& d,double tol){
         p->assertWriteEnabled();p->ThisRound=ds.round;p->put_SizeA(ds.a);p->put_SizeB(ds.round?0:ds.b);p->recordGraphicsModified();}
     acutPrintf(L"\nUmetnuto koljeno %d° %ls%ls.",d.elbow,d.turn==Left?L"lijevo":L"desno",mismatch?L" i prelaz":L"");
 }
+// Duct on a port that got another size in the dialog (same shape): TVS_DIM_PRATI offers the run
+// beyond it (SizeFollow.h sets the hook). false / no hook: prelaz at its far end as before.
+typedef bool (*FollowHook)(const AcDbObjectId& duct,const Section& was,const AcDbObjectId& tee);
+inline FollowHook& followHook(){static FollowHook h=NULL;return h;}
 inline void apply(const Dialog& d){
     const Source& s=d.src;const double f=s.f;tvsTeeFit::Ports before,after;
     {AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nT komad nije dostupan (zaključan sloj?).");return;}
@@ -447,7 +451,8 @@ inline void apply(const Dialog& d){
                 AcGePoint3d to=(q.end==0?p->FirstPoint:p->LastPoint)+shift;if(q.end==0)p->put_FirstPoint(to);else p->put_Lastpoint(to);p->recordGraphicsModified();}}
         else if(n.kind!=0)acutPrintf(L"\nT komad: element na pomjerenom priključku nije kanal ni prelaz; prilagodite ručno.");
     }
-    // per side: elbow chain, or the duct size and the prelaz at the port
+        // per side: elbow chain, or the duct size and the prelaz at the port
+    struct Follow {AcDbObjectId duct;Section was;bool first;};std::vector<Follow> follow;
     for(int i=0;i<2;++i){const Side& x=d.side[i];if(!x.used)continue;
         if(x.elbow){chain(d,x,tol);continue;}
         if(x.neighbour==1&&!tvsTeePort::same(x.duct,x.ductWas,1e-9)){bool first=false;
@@ -455,9 +460,12 @@ inline void apply(const Dialog& d){
              p->assertWriteEnabled();p->ThisRound=x.duct.round;p->put_SizeA(x.duct.a);p->put_SizeB(x.duct.round?0:x.duct.b);p->recordGraphicsModified();
              first=tvsTeeFit::planDistance(p->FirstPoint,after.ok?after.p[d.place(x.k)]:before.p[d.place(x.k)])<=tol;}
             wchar_t t[32];tvsTeePort::sizeText(t,32,x.duct,f);acutPrintf(L"\nKanal na priključku je sada %ls mm.",t);
-            tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
+                        Follow fw={x.ductId,x.ductWas,first};
+            if(followHook()&&x.duct.round==x.ductWas.round)follow.push_back(fw);else tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
         tvsTeePort::ensure(s.id,x.k,x.lengthMm);
     }
+    // the run beyond the resized ducts, after the T komad and its prelazi are written
+    for(size_t k=0;k<follow.size();++k)if(!followHook()(follow[k].duct,follow[k].was,s.id))tvsTeeFit::farEnd(s.id,follow[k].duct,follow[k].first,tol,f);
     {const int inletPort=d.choice==Pants?2:0;tvsTeePort::ensure(s.id,inletPort);}
     acutPrintf(L"\nT komad: %ls.",d.choice==Branch?L"TK-O sa ogrankom":d.choice==Pants?L"TK-G sa dva ogranka":d.choice==Tap?L"štucna":L"TK0");
 }

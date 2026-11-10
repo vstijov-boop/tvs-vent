@@ -34,6 +34,7 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
   - **Otkaži** = samo izabrani kanal. Otkaži u dijalogu T komada = T komad ostaje, na priključku prelaz (kao do sada).
   - Provjeriti primjer: kanal između prelaza i TK-O → poslije Primijeni otvara se dijalog TK-O, ulaz ima novu dimenziju, visine priključaka je prate.
   - Dionica koja u TK-O / TK-G dolazi sa strane ogranka ili prolaza: dijalog se otvara na toj kartici.
+- **TVS_TK_TIP → kanal u nastavku nove dimenzije:** kad se u dijalogu T komada promijeni dimenzija kanala na prolazu/ogranku (isti oblik), a iza njega se nastavlja mreža stare dimenzije (koljeno, kanali, etaž…), otvara se dijalog „Promjena dimenzije dionice“ za taj dio (T komad se ne dira). Otkaži = prelaz na spoju sa prvim elementom stare dimenzije (kao do sada). Ako iza kanala nema ništa stare dimenzije – prelaz na kraju kao do sada.
 - Poslije promjene cijele dionice (koljena pomjere krajeve) prelaz na kraju dionice treba da preuzme dimenziju.
 - Prelaz drugog oblika na kraju izmijenjenog kanala (okrugli/pravougaoni): poruka umjesto tihog preskakanja.
 - Dva otvorena crteža: izmjena u jednom ne smije se izgubiti ni prenijeti na drugi.
