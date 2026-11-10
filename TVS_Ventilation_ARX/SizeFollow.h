@@ -18,6 +18,8 @@
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "TeePort.h"
 #include "../geometry/SizeFollowRules.h"
+#include "RunDialog.h"
+#include "TeeTypeDialog.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetRefit.h"
 #endif
@@ -163,7 +165,11 @@ struct TeeStep {int node,port,mode;};
 // Etaz on the run (index into the etaz list, entered at its first elbow side).
 struct EtazStep {int index;bool atA;};
 // Obilazak on the run: its first member (the TVS_BYPASS dialog rebuilds it at the end).
-struct Run {std::vector<int> elbows,ducts;std::vector<TeeStep> tees;std::vector<EtazStep> etazes;std::vector<AcDbObjectId> bypasses;std::vector<CString> stops;};
+// dialogs: TK-O / TK-G the run arrived at (their dialog opens after the run is written); marks:
+// boundaries for the preview; met*: such elements on the way, passed or not (dialog rows).
+struct Run {std::vector<int> elbows,ducts;std::vector<TeeStep> tees,dialogs;std::vector<EtazStep> etazes;std::vector<AcDbObjectId> bypasses;std::vector<CString> stops;
+    std::vector<std::pair<tvsMove::Point,CString> > marks;int metTee,metEtaz,metBypass;Run():metTee(0),metEtaz(0),metBypass(0){}
+    bool empty()const{return elbows.empty()&&ducts.empty()&&tees.empty()&&dialogs.empty()&&etazes.empty()&&bypasses.empty();}};
 #ifdef TVS_OFFSET_INTEGRATION
 typedef std::vector<tvsOffsetRefit::Assembly> Etazes;
 #else
@@ -184,69 +190,72 @@ inline bool ask(const wchar_t* prompt,const wchar_t* keywords,ACHAR* answer,cons
     if(rc==RTNONE){wcscpy_s(answer,32,def);return true;}
     return rc==RTNORM;
 }
-// From both ends of duct `start`, through joined ducts, plan elbows, T komadi and etazi of the
-// old size; T komad on the main and etaz ask how to go on.
-inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& old,double tol,const Etazes& etazes,Run& run,std::set<int>& seen){
+// From the ends of duct `start` (both, or one side: ch.scope), through joined ducts, plan
+// elbows, T komadi, etazi and obilasci of the old size; what happens at a T komad, etaz and
+// obilazak is decided in the dialog (ch), nothing is asked here.
+inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& old,double tol,const Etazes& etazes,Run& run,std::set<int>& seen,const tvsRunDialog::Choices& ch){
     const bool round=nodes[start].round;
     auto same=[&](double a,double b,bool r){return r==round&&std::fabs(a-old.a[0])<=1e-6&&(round||std::fabs(b-old.b[0])<=1e-6);};
     auto indexOf=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
     std::vector<std::pair<int,tvsMove::Point> > open;
-    for(int side=0;side<2&&side<static_cast<int>(nodes[start].ports.size());++side)open.push_back(std::make_pair(start,nodes[start].ports[side]));
+    for(int side=0;side<2&&side<static_cast<int>(nodes[start].ports.size());++side){
+        if((ch.scope==tvsRunDialog::Side1&&side!=0)||(ch.scope==tvsRunDialog::Side2&&side!=1))continue;
+        open.push_back(std::make_pair(start,nodes[start].ports[side]));}
     for(size_t o=0;o<open.size();++o){
         int prev=open[o].first;tvsMove::Point at=open[o].second;
+        auto stop=[&](const CString& why){run.stops.push_back(why);run.marks.push_back(std::make_pair(at,why));};
         for(int guard=0;guard<2000;++guard){
             int next=-1,count=0,port=-1;
             for(size_t k=0;k<nodes.size();++k){if(static_cast<int>(k)==prev)continue;
                 for(size_t j=0;j<nodes[k].ports.size();++j)
                     if(nearXY(nodes[k].ports[j],at,tol)&&std::fabs(nodes[k].elevation-nodes[prev].elevation)<=tol){next=static_cast<int>(k);port=static_cast<int>(j);++count;break;}}
             if(count==0)break;                                            // free end
-            if(count>1){run.stops.push_back(L"spoj sa više elemenata");break;}
+            if(count>1){stop(L"spoj sa više elemenata");break;}
             if(seen.count(next))break;                                    // closed loop
             AcDbObjectPointer<AcDbEntity> e(nodes[next].id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)break;
-            if(TVS_TRANS::cast(e.object()))break;                         // prelaz: the size follow below
+            if(TVS_TRANS::cast(e.object())){run.marks.push_back(std::make_pair(at,CString(L"prelaz")));break;}   // prelaz: the size follow below
             const tvsMove::Node& n=nodes[next];
             const bool duct=plainDuct(e.object())&&n.kind==1,elbow=plainElbow(e.object())&&n.kind==2;
             if(duct||elbow){
-                if(!same(n.a,n.b,n.round)||n.ports.size()!=2){run.stops.push_back(L"element druge dimenzije");break;}
+                if(!same(n.a,n.b,n.round)||n.ports.size()!=2){stop(L"element druge dimenzije");break;}
                 seen.insert(next);(duct?run.ducts:run.elbows).push_back(next);
                 const int farPort=std::hypot(n.ports[0].x-at.x,n.ports[0].y-at.y)>std::hypot(n.ports[1].x-at.x,n.ports[1].y-at.y)?0:1;
                 prev=next;at=n.ports[farPort];continue;
             }
             if(const TVS_WYE* w=TVS_WYE::cast(e.object())){
-                if(n.ports.size()!=3||port<0){run.stops.push_back(L"T komad");break;}
+                ++run.metTee;
+                if(n.ports.size()!=3||port<0){stop(L"T komad");break;}
                 tvsTeeData::Record r;tvsTeeData::read(w,r);
                 const bool branch=port==2;
                 const double pa=branch?w->SizeAotv:(port==1&&r.type==tvsTee::Branch&&r.second>0?r.second:w->SizeApr);
                 const double pb=branch?w->SizeBotv:w->SizeBpr;const bool pr=branch?w->ThisRoundotv:w->ThisRoundpr;
                 // TK-O / TK-G keep their sizes: the duct on the port gets a prelaz there (TeePort.h, after the run)
-                if(r.type==tvsTee::Pants||r.type==tvsTee::Branch){run.stops.push_back(L"T komad TK-O / TK-G (ostaje; prelaz na priključku)");break;}
-                if(!same(pa,pb,pr)){run.stops.push_back(L"T komad druge dimenzije");break;}
-                if(r.type==tvsTee::Branch&&port==1&&std::fabs(pb-old.b[0])>1e-6){run.stops.push_back(L"TK-O");break;}
+                if(r.type==tvsTee::Pants||r.type==tvsTee::Branch){
+                    if(ch.tee==0){TeeStep t={next,port,3};run.dialogs.push_back(t);seen.insert(next);stop(L"T komad TK-O / TK-G (njegov dijalog)");break;}
+                    stop(L"T komad TK-O / TK-G (ostaje; prelaz na priključku)");break;}
+                if(!same(pa,pb,pr)){stop(L"T komad druge dimenzije");break;}
+                if(r.type==tvsTee::Branch&&port==1&&std::fabs(pb-old.b[0])>1e-6){stop(L"TK-O");break;}
                 seen.insert(next);TeeStep t={next,port,0};
                 if(branch||r.type==tvsTee::Branch){run.tees.push_back(t);break;}   // ogranak / one side of TK-O: stops here
                 e.close();
-                ACHAR kw[32];
-                if(!ask(L"\nT komad na glavnom kanalu [Nastavi iza T komada/Prelaz iza T komada/Stani] <Nastavi>: ",L"Nastavi Prelaz Stani",kw,L"Nastavi")||_wcsicmp(kw,L"Stani")==0){
-                    run.stops.push_back(L"T komad (Stani)");break;}
-                t.mode=_wcsicmp(kw,L"Prelaz")==0?2:1;run.tees.push_back(t);
+                if(ch.tee==1){seen.erase(next);stop(L"T komad (Stani)");break;}
+                t.mode=ch.tee==2?2:1;run.tees.push_back(t);
                 if(t.mode==2)break;
                 prev=next;at=n.ports[port==0?1:0];continue;               // on through the other main side
             }
 #ifdef TVS_SIZE_BYPASS
             if(tvsBypassData::marked(e.object())){
-                tvsBypassData::Record r;
-                if(tvsBypassData::assembly(e.object(),r,false)!=tvsOffsetData::Valid||(n.id!=r.members[0]&&n.id!=r.members[6])){run.stops.push_back(L"obilazak");break;}
+                tvsBypassData::Record r;++run.metBypass;
+                if(tvsBypassData::assembly(e.object(),r,false)!=tvsOffsetData::Valid||(n.id!=r.members[0]&&n.id!=r.members[6])){stop(L"obilazak");break;}
                 const bool atFirst=n.id==r.members[0];
                 const int h=indexOf(r.members[3]),other=indexOf(atFirst?r.members[6]:r.members[0]);
                 AcGePoint3d next3;
-                {AcDbObjectPointer<TVS_Pipe> q(atFirst?r.outlet:r.inlet,AcDb::kForRead);if(q.openStatus()!=Acad::eOk||h<0||other<0){run.stops.push_back(L"obilazak");break;}
+                {AcDbObjectPointer<TVS_Pipe> q(atFirst?r.outlet:r.inlet,AcDb::kForRead);if(q.openStatus()!=Acad::eOk||h<0||other<0){stop(L"obilazak");break;}
                  // the duct end at the obilazak on the other side
                  next3=atFirst?(r.reverse?q->LastPoint:q->FirstPoint):(r.reverse?q->FirstPoint:q->LastPoint);}
-                if(!same(nodes[h].a,nodes[h].b,nodes[h].round)){run.stops.push_back(L"obilazak druge dimenzije");break;}
+                if(!same(nodes[h].a,nodes[h].b,nodes[h].round)){stop(L"obilazak druge dimenzije");break;}
                 e.close();
-                ACHAR kw[32];
-                if(!ask(L"\nDionica prolazi kroz obilazak: preračunati ga za novu dimenziju (otvara se dijalog obilaska)? [Da/Ne] <Da>: ",L"Da Ne",kw,L"Da")||_wcsicmp(kw,L"Ne")==0){
-                    run.stops.push_back(L"obilazak (nije preračunat)");break;}
+                if(!ch.bypass){stop(L"obilazak (nije preračunat)");break;}
                 for(int m=0;m<7;++m){const int x=indexOf(r.members[m]);if(x>=0)seen.insert(x);}
                 run.bypasses.push_back(r.members[0]);
                 prev=other;at=tvsMove::point(next3);continue;
@@ -254,22 +263,20 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
 #endif
 #ifdef TVS_OFFSET_INTEGRATION
             if(tvsOffsetData::marked(e.object())&&!tvsBypassData::marked(e.object())){
-                int found=-1;bool atA=true;
+                int found=-1;bool atA=true;++run.metEtaz;
                 for(size_t k=0;k<etazes.size();++k){
                     if(etazes[k].a==n.id&&nearXY(tvsMove::point(etazes[k].maA),at,tol)){found=static_cast<int>(k);atA=true;break;}
                     if(etazes[k].b==n.id&&nearXY(tvsMove::point(etazes[k].maB),at,tol)){found=static_cast<int>(k);atA=false;break;}}
-                if(found<0){run.stops.push_back(L"etaž");break;}
+                if(found<0){stop(L"etaž");break;}
                 const int pi=indexOf(etazes[found].p),other=indexOf(atA?etazes[found].b:etazes[found].a);
-                if(pi<0||other<0||!same(nodes[pi].a,nodes[pi].b,nodes[pi].round)){run.stops.push_back(L"etaž druge dimenzije");break;}
+                if(pi<0||other<0||!same(nodes[pi].a,nodes[pi].b,nodes[pi].round)){stop(L"etaž druge dimenzije");break;}
                 e.close();
-                ACHAR kw[32];
-                if(!ask(L"\nDionica prolazi kroz etaž: preračunati ga za novu dimenziju? [Da/Ne] <Da>: ",L"Da Ne",kw,L"Da")||_wcsicmp(kw,L"Ne")==0){
-                    run.stops.push_back(L"etaž (nije preračunat)");break;}
+                if(!ch.etaz){stop(L"etaž (nije preračunat)");break;}
                 seen.insert(next);seen.insert(pi);seen.insert(other);EtazStep st={found,atA};run.etazes.push_back(st);
                 prev=other;at=tvsMove::point(atA?etazes[found].maB:etazes[found].maA);continue;
             }
 #endif
-            run.stops.push_back(boundary(e.object()));break;
+            stop(boundary(e.object()));break;
         }
     }
 }
@@ -516,8 +523,68 @@ inline bool spiroLength(TVS_TRANS* t,int end,const AcDbObjectId& ductId,double f
     acutPrintf(L"\nSpiro prelaz: dužina po katalogu %.0f mm.",want*f);
     return true;
 }
+// Dialog resources (set by the command: resource.h is not known here).
+struct DialogIds {UINT run,tee;};
+inline DialogIds& ids(){static DialogIds d={0,0};return d;}
+inline std::wstring shortMark(const CString& why){
+    if(why.Find(L"T komad")==0||why==L"TK-O")return L"T komad";
+    if(why.Find(L"etaž")==0)return L"etaž";if(why.Find(L"obilazak")==0)return L"obilazak";
+    if(why==L"prelaz")return L"prelaz";if(why.Find(L"spoj")==0)return L"spoj";
+    if(why.Find(L"druge dimenzije")>=0)return L"druga dim.";
+    return L"";
+}
+// Preview of the dialog: the edited ducts, what the runs change, the T komadi with their own
+// dialog and the network around them (plan, true widths), the boundaries and the counts.
+inline void preview(const std::vector<tvsMove::Node>& nodes,const std::vector<int>& starts,const std::vector<std::pair<int,Run> >& runs,const Etazes& etazes,tvsRunDialog::Preview& pv){
+    std::map<int,int> state;
+    auto indexOf=[&](const AcDbObjectId& id){for(size_t k=0;k<nodes.size();++k)if(nodes[k].id==id)return static_cast<int>(k);return -1;};
+    auto set=[&](int k,int st){if(k>=0&&!state.count(k))state[k]=st;};
+    for(size_t k=0;k<starts.size();++k)set(starts[k],tvsRunSketch::Selected);
+    for(size_t k=0;k<runs.size();++k){const Run& r=runs[k].second;
+        pv.ducts+=static_cast<int>(r.ducts.size());pv.elbows+=static_cast<int>(r.elbows.size());pv.tees+=static_cast<int>(r.tees.size());
+        pv.etazes+=static_cast<int>(r.etazes.size());pv.bypasses+=static_cast<int>(r.bypasses.size());pv.teeDialogs+=static_cast<int>(r.dialogs.size());
+        pv.metTee+=r.metTee;pv.metEtaz+=r.metEtaz;pv.metBypass+=r.metBypass;
+        for(size_t j=0;j<r.dialogs.size();++j)set(r.dialogs[j].node,tvsRunSketch::TeeDialog);
+        for(size_t j=0;j<r.ducts.size();++j)set(r.ducts[j],tvsRunSketch::Changes);
+        for(size_t j=0;j<r.elbows.size();++j)set(r.elbows[j],tvsRunSketch::Changes);
+        for(size_t j=0;j<r.tees.size();++j)set(r.tees[j].node,tvsRunSketch::Changes);
+#ifdef TVS_OFFSET_INTEGRATION
+        for(size_t j=0;j<r.etazes.size();++j){const tvsOffsetRefit::Assembly& e=etazes[r.etazes[j].index];
+            set(indexOf(e.a),tvsRunSketch::Changes);set(indexOf(e.p),tvsRunSketch::Changes);set(indexOf(e.b),tvsRunSketch::Changes);}
+#else
+        (void)etazes;
+#endif
+        for(size_t j=0;j<r.bypasses.size();++j)set(indexOf(r.bypasses[j]),tvsRunSketch::Changes);
+        for(size_t j=0;j<r.stops.size();++j){const std::wstring t=static_cast<const wchar_t*>(r.stops[j]);
+            if(std::find(pv.stops.begin(),pv.stops.end(),t)==pv.stops.end())pv.stops.push_back(t);}
+        for(size_t j=0;j<r.marks.size();++j){tvsRunSketch::Mark m;m.at=tvsTeeSketch::Pt(r.marks[j].first.x,r.marks[j].first.y);m.text=shortMark(r.marks[j].second);
+            bool dup=false;for(size_t q=0;q<pv.sketch.marks.size();++q)if(std::hypot(pv.sketch.marks[q].at.x-m.at.x,pv.sketch.marks[q].at.y-m.at.y)<1e-6)dup=true;
+            if(!dup)pv.sketch.marks.push_back(m);}
+    }
+    if(state.empty())return;
+    // window: the elements of the run and a margin round them; the rest of the network inside it is context
+    double x0=1e300,y0=1e300,x1=-1e300,y1=-1e300;
+    for(std::map<int,int>::const_iterator it=state.begin();it!=state.end();++it){const tvsMove::Node& n=nodes[it->first];
+        for(size_t j=0;j<n.ports.size();++j){if(n.ports[j].x<x0)x0=n.ports[j].x;if(n.ports[j].x>x1)x1=n.ports[j].x;if(n.ports[j].y<y0)y0=n.ports[j].y;if(n.ports[j].y>y1)y1=n.ports[j].y;}}
+    const double pad=0.25*std::hypot(x1-x0,y1-y0)+1e-9;x0-=pad;x1+=pad;y0-=pad;y1+=pad;
+    auto clip=[&](tvsTeeSketch::Pt& q){if(q.x<x0)q.x=x0;if(q.x>x1)q.x=x1;if(q.y<y0)q.y=y0;if(q.y>y1)q.y=y1;};
+    for(size_t k=0;k<nodes.size();++k){const tvsMove::Node& n=nodes[k];const std::map<int,int>::const_iterator st=state.find(static_cast<int>(k));
+        if(n.ports.size()<2)continue;
+        if(st==state.end()){bool inside=false;for(size_t j=0;j<n.ports.size();++j)if(n.ports[j].x>=x0&&n.ports[j].x<=x1&&n.ports[j].y>=y0&&n.ports[j].y<=y1)inside=true;if(!inside)continue;}
+        tvsRunSketch::Element e;e.state=st==state.end()?tvsRunSketch::Context:st->second;
+        e.kind=n.kind==2&&n.axes.size()>=2?2:n.kind==4&&n.ports.size()>=3?4:1;
+        const int count=e.kind==4?3:2;
+        for(int j=0;j<count;++j){e.p[j]=tvsTeeSketch::Pt(n.ports[j].x,n.ports[j].y);e.w[j]=static_cast<int>(n.sections.size())>j?n.sections[j].a:n.a;}
+        if(e.kind==2)for(int j=0;j<2;++j)e.dir[j]=tvsTeeSketch::Pt(n.axes[j].x,n.axes[j].y);
+        if(e.kind==1&&st==state.end()){clip(e.p[0]);clip(e.p[1]);}   // long ducts leaving the window
+        pv.sketch.items.push_back(e);
+    }
+    if(starts.size()==1){const tvsMove::Node& n=nodes[starts[0]];   // sides of the edited duct (Obuhvat: strana 1 / 2)
+        for(int j=0;j<2;++j){tvsRunSketch::Mark m;m.at=tvsTeeSketch::Pt(n.ports[j].x,n.ports[j].y);m.text=j==0?L"1":L"2";m.below=true;pv.sketch.marks.push_back(m);}}
+}
 inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work);
-inline void run(){
+inline void run(UINT runDialog=0,UINT teeDialog=0){
+    if(runDialog)ids().run=runDialog;if(teeDialog)ids().tee=teeDialog;
     posted()=false;
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();
     // this drawing only: edits waiting in another open drawing stay for it
@@ -538,43 +605,54 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
     applying()=true;
     int ducts=0,transitions=0;
     std::vector<std::pair<AcDbObjectId,int> > queue(work.begin(),work.end());std::set<AcDbObjectId> done;
-    {   // whole run up to the next prelaz: ask once for all edited ducts
+    {   // whole run up to the next prelaz: one dialog for all edited ducts (RunDialog.h)
         std::map<AcDbObjectId,Sizes> old;   // of the ducts settled now (other drawings keep theirs)
         for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w){
             std::map<AcDbObjectId,Sizes>::iterator p=previous().find(w->first);if(p!=previous().end()){old.insert(*p);previous().erase(p);}}
-        std::vector<std::pair<int,Run> > runs;std::set<int> seen;int elbows=0,others=0,tees=0,etazCount=0,bypassCount=0;std::vector<CString> stops;
         Etazes etazes;
 #ifdef TVS_OFFSET_INTEGRATION
         tvsOffsetRefit::assemblies(db,etazes);
 #endif
-        for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w){
-            std::map<AcDbObjectId,Sizes>::const_iterator o=old.find(w->first);const int i=index(w->first);
-            if(o==old.end()||i<0||nodes[i].kind!=1||nodes[i].ports.size()!=2||seen.count(i))continue;
-            seen.insert(i);Run r;walk(nodes,i,o->second,tol,etazes,r,seen);
-            for(size_t k=0;k<r.stops.size();++k)if(std::find(stops.begin(),stops.end(),r.stops[k])==stops.end())stops.push_back(r.stops[k]);
-            if(r.elbows.empty()&&r.ducts.empty()&&r.tees.empty()&&r.etazes.empty()&&r.bypasses.empty())continue;
-            elbows+=static_cast<int>(r.elbows.size());others+=static_cast<int>(r.ducts.size());
-            tees+=static_cast<int>(r.tees.size());etazCount+=static_cast<int>(r.etazes.size());bypassCount+=static_cast<int>(r.bypasses.size());runs.push_back(std::make_pair(i,r));
-        }
-        if(!runs.empty()){
-            if(!stops.empty()){CString list;for(size_t k=0;k<stops.size();++k){if(k)list+=L", ";list+=stops[k];}
-                acutPrintf(L"\nDionica staje na: %ls (ti elementi se ne mijenjaju).",list.GetString());}
-            wchar_t prompt[260];swprintf_s(prompt,L"\nPromijeniti cijelu dionicu do prelaza (koljena %d, kanala %d, T komada %d, etaža %d, obilazaka %d)? [Da/Ne/Prelaz] <Da>: ",elbows,others,tees,etazCount,bypassCount);
-            acedInitGet(0,L"Da Ne Prelaz");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw);
-            if(rc==RTNONE||(rc==RTNORM&&_wcsicmp(kw,L"Da")==0)){
-                int changed=0;
-                for(size_t k=0;k<runs.size();++k){std::vector<AcDbObjectId> resized;
-                    if(!applyRun(nodes,runs[k].first,runs[k].second,etazes,tol,resized))continue;
-                    changed+=static_cast<int>(runs[k].second.elbows.size()+runs[k].second.tees.size()+runs[k].second.etazes.size()+resized.size());
-                    for(size_t j=0;j<resized.size();++j)if(done.insert(resized[j]).second)queue.push_back(std::make_pair(resized[j],3));}
-                if(changed){acutPrintf(L"\nDionica promijenjena: elemenata %d.",changed);dirty=true;}
-            }else{
-                // Ne / Prelaz / Esc: the edited duct alone has the new size
-                const bool insert=rc==RTNORM&&_wcsicmp(kw,L"Prelaz")==0;int n=0;
-                for(size_t k=0;k<runs.size();++k){std::map<AcDbObjectId,Sizes>::const_iterator o=old.find(nodes[runs[k].first].id);
-                    if(o!=old.end())n+=joints(nodes,runs[k].first,o->second,tol,f,insert);}
+        std::vector<int> starts;   // edited plain ducts with a known old size
+        for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w){const int i=index(w->first);
+            if(old.count(w->first)&&i>=0&&nodes[i].kind==1&&nodes[i].ports.size()==2)starts.push_back(i);}
+        std::vector<std::pair<int,Run> > runs;
+        auto collect=[&](const tvsRunDialog::Choices& c){
+            runs.clear();std::set<int> seen(starts.begin(),starts.end());
+            for(size_t k=0;k<starts.size();++k){Run r;walk(nodes,starts[k],old[nodes[starts[k]].id],tol,etazes,r,seen,c);runs.push_back(std::make_pair(starts[k],r));}};
+        auto anything=[&](){for(size_t k=0;k<runs.size();++k)if(!runs[k].second.empty())return true;return false;};
+        tvsRunDialog::Choices ch;collect(ch);
+        if(anything()){
+            auto survey=[&](const tvsRunDialog::Choices& c,tvsRunDialog::Preview& pv){
+                const bool whole=c.scope!=tvsRunDialog::Only&&c.scope!=tvsRunDialog::OnlyPrelaz;
+                if(whole)collect(c);else{runs.clear();for(size_t k=0;k<starts.size();++k)pv.joints+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,false);}
+                preview(nodes,starts,runs,etazes,pv);};
+            CString banner;
+            if(!starts.empty()){const tvsMove::Node& n=nodes[starts[0]];const Sizes& o=old[n.id];
+                if(n.round)banner.Format(L"Kanal  Ø%.0f  →  Ø%.0f mm",o.a[0]*f,n.a*f);else banner.Format(L"Kanal  %.0f × %.0f  →  %.0f × %.0f mm",o.a[0]*f,o.b[0]*f,n.a*f,n.b*f);
+                if(starts.size()>1){CString more;more.Format(L"   (+ %d)",static_cast<int>(starts.size())-1);banner+=more;}}
+            if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=tvsRunDialog::Only;   // Otkaži: the edited duct alone
+                acutPrintf(L"\nDionica nije mijenjana; izabrani kanal zadržava novu dimenziju.");}
+            if(ch.scope==tvsRunDialog::Only||ch.scope==tvsRunDialog::OnlyPrelaz){
+                const bool insert=ch.scope==tvsRunDialog::OnlyPrelaz;int n=0;
+                for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,insert);
                 if(insert){if(n)dirty=true;else acutPrintf(L"\nPrelaz na spoju nije umetnut (spoj sa više elemenata, T komad ili element druge dimenzije).");}
-                else if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza (opcija Prelaz ga umeće).",n);
+                else if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza (obuhvat „kanal + prelaz na spoju“ ga umeće).",n);
+            }else{
+                collect(ch);int changed=0;
+                struct Arrival {AcDbObjectId tee;int port;tvsTeePort::Section in;};std::vector<Arrival> arrivals;
+                for(size_t k=0;k<runs.size();++k){const Run& r=runs[k].second;if(r.empty())continue;std::vector<AcDbObjectId> resized;
+                    if(!applyRun(nodes,runs[k].first,r,etazes,tol,resized))continue;
+                    changed+=static_cast<int>(r.elbows.size()+r.tees.size()+r.etazes.size()+resized.size());
+                    for(size_t j=0;j<resized.size();++j)if(done.insert(resized[j]).second)queue.push_back(std::make_pair(resized[j],3));
+                    AcDbObjectPointer<TVS_Pipe> p(nodes[runs[k].first].id,AcDb::kForRead);if(p.openStatus()!=Acad::eOk)continue;
+                    for(size_t j=0;j<r.dialogs.size();++j){Arrival a;a.tee=nodes[r.dialogs[j].node].id;a.port=r.dialogs[j].port;
+                        a.in.a=p->SizeA;a.in.round=p->ThisRound;a.in.b=p->ThisRound?0:p->SizeB;arrivals.push_back(a);}}
+                if(changed){acutPrintf(L"\nDionica promijenjena: elemenata %d.",changed);dirty=true;}
+                // TK-O / TK-G on the run: their own dialog, with the new size on the port the run arrived at
+                for(size_t k=0;k<arrivals.size();++k){
+                    if(tvsTeeDialog::openArriving(arrivals[k].tee,ids().tee,arrivals[k].port,arrivals[k].in))dirty=true;
+                    else acutPrintf(L"\nT komad nije mijenjan: na priključku ostaje prelaz na njegovu dimenziju.");}
             }
         }
     }

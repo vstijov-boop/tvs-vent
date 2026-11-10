@@ -63,8 +63,9 @@ public:
           IdElbow=1321,IdTurn=1322,IdTurnLabel=1325,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
     Source src;int choice;bool flipped;Side side[2];int current;bool loading,valid;CString problem;
+    bool newInlet;Section inletNew;int inletChoice;   // TVS_DIM_PRATI: the run arrived on the inlet with this section (openArriving)
     CFont bold,title;CBrush back,white,band;
-    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false){}
+    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false),newInlet(false),inletChoice(choiceOf(s.type)){}
 
     // ---------------------------------------------------------------- model
     bool rectTee()const{return !src.roundPr&&src.Bpr>0;}
@@ -413,6 +414,9 @@ inline void apply(const Dialog& d){
     const Source& s=d.src;const double f=s.f;tvsTeeFit::Ports before,after;
     {AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nT komad nije dostupan (zaključan sloj?).");return;}
      before=tvsTeeFit::ports(w.object());w->assertWriteEnabled();
+     if(d.newInlet&&(d.choice==Pants)==(d.inletChoice==Pants)){   // inlet takes the size of the run that arrived (TVS_DIM_PRATI)
+        if(d.choice==Pants){w->SizeAotv=d.inletNew.a;w->SizeBotv=d.inletNew.round?0:d.inletNew.b;}
+        else{w->SizeApr=d.inletNew.a;w->SizeBpr=d.inletNew.round?0:d.inletNew.b;}}
      tvsTeeData::Record r;r.type=teeType(d.choice);r.l=tvsTeeData::collarMm()/f;
      const Side& b=d.side[0];const Side& c=d.side[1];
      if(d.choice==Branch){w->SizeAotv=b.tee.a;w->SizeBotv=w->SizeBpr;r.second=c.tee.a;
@@ -461,6 +465,24 @@ inline bool open(const AcDbObjectId& id,UINT idd){
     Source s;if(!readSource(id,s)){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
     Dialog dg(s,idd);
     {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return true;}
+    apply(dg);return true;
+}
+// TVS_DIM_PRATI: a resized run arrived on port k of a TK-O / TK-G with section `in`. On the
+// inlet (TK-O port 0, TK-G port 2) the T komad takes that section (heights of all ports with
+// it; the other widths stay) and the dialog decides the rest; on another port the dialog
+// opens on that side, where the duct already shows the new size. false: dialog cancelled or
+// not possible (the caller leaves the T komad as it is: prelaz on the port).
+inline bool openArriving(const AcDbObjectId& id,UINT idd,int k,const Section& in){
+    Source s;if(!idd||!readSource(id,s))return false;
+    const int choice=choiceOf(s.type);if(choice!=Branch&&choice!=Pants)return false;
+    const bool inlet=choice==Pants?k==2:k==0;int tab=0;
+    if(inlet){
+        if((choice==Pants?s.roundOtv:s.roundPr)!=in.round){acutPrintf(L"\nT komad: ulaz je drugog oblika od kanala; T komad nije mijenjan (prelaz na priključku).");return false;}
+        if(choice==Pants){s.Aotv=in.a;s.Botv=in.round?0:in.b;}
+        else{if(!(s.second>0))s.second=s.Apr;s.Apr=in.a;s.Bpr=in.round?0:in.b;}   // prolaz C keeps its width
+    }else tab=choice==Branch?(k==1?1:0):(k==0?1:0);
+    Dialog dg(s,idd);dg.newInlet=inlet;dg.inletNew=in;dg.current=tab;
+    {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return false;}
     apply(dg);return true;
 }
 inline void run(UINT idd){

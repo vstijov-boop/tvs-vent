@@ -26,9 +26,14 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 ## Pregled koda – faze 1 i 2 (REVIEW_2026-11.md) – testirati
 **TVS_DIM_PRATI**
 - Kanal sa krajem na istoj tački u osnovi kao drugi kanal/prelaz na drugoj visini (jedan iznad drugog): promjena dimenzije gornjeg ne smije dirati donji.
-- Pitanje „Promijeniti cijelu dionicu…“ sada ima `[Da/Ne/Prelaz]`:
-  - **Ne** – mijenja se samo izabrani kanal; ako direktno naliježe na kanal/koljeno stare dimenzije, ispisuje se UPOZORENJE.
-  - **Prelaz** – samo izabrani kanal + prelaz nova→stara dimenzija na spoju (u susjednom kanalu; uz koljeno u izmijenjenom kanalu).
+- Umjesto pitanja u komandnoj liniji otvara se dijalog **„Promjena dimenzije dionice“** (samo kad dionica stare dimenzije ide dalje od izabranog kanala):
+  - **Obuhvat:** cijela dionica do granica / samo izabrani kanal (UPOZORENJE ako naliježe na element stare dimenzije) / prema strani 1 ili 2 (brojevi su u pregledu na krajevima kanala) / samo kanal + prelaz na spoju.
+  - **T komad:** Nastavi (TK0 i štucna: glavni kanal se mijenja i dionica ide dalje; **TK-O / TK-G: poslije primjene otvara se dijalog tog T komada** sa novom dimenzijom na ulazu – tu se podešavaju ogranak, prolaz, kanali u nastavku i prelazi) / Stani / Prelaz iza T komada.
+  - **Etaž, Obilazak:** preračunaj ili stani prije njih. Redovi su aktivni samo ako takav element postoji na trasi.
+  - **Pregled:** osnova trase; tamno plavo = izabrani kanal, plavo = mijenja se, žuto = T komad čiji se dijalog otvara, sivo = ostaje. Mijenja se sa svakim izborom.
+  - **Otkaži** = samo izabrani kanal. Otkaži u dijalogu T komada = T komad ostaje, na priključku prelaz (kao do sada).
+  - Provjeriti primjer: kanal između prelaza i TK-O → poslije Primijeni otvara se dijalog TK-O, ulaz ima novu dimenziju, visine priključaka je prate.
+  - Dionica koja u TK-O / TK-G dolazi sa strane ogranka ili prolaza: dijalog se otvara na toj kartici.
 - Poslije promjene cijele dionice (koljena pomjere krajeve) prelaz na kraju dionice treba da preuzme dimenziju.
 - Prelaz drugog oblika na kraju izmijenjenog kanala (okrugli/pravougaoni): poruka umjesto tihog preskakanja.
 - Dva otvorena crteža: izmjena u jednom ne smije se izgubiti ni prenijeti na drugi.

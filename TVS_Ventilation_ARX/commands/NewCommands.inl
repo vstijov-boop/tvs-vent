@@ -42,7 +42,7 @@
     static void Ventilation_ARXTVS_DIM_PRATI(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
-        tvsSizeFollow::run();
+        tvsSizeFollow::run(IDD_RUN, IDD_TEETYPE);
     }
     static void Ventilation_ARXTVS_PRELAZ_KOTA(void)
     {
