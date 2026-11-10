@@ -1131,7 +1131,7 @@ void func::Change(ads_name &sset)
 
 			if (id != AcDbObjectId::kNull)
 			{
-				if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) == eOk)
+				if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForRead) == eOk)
 				{
 
 
@@ -1313,9 +1313,10 @@ void func::Change(ads_name &sset)
 	{
 
 		CAcModuleResourceOverride resourceOverride;
-		dg.DoModal();
+		if (dg.DoModal() != IDOK) return;   // Odustani: ništa se ne mijenja
 
 	}
+	int skipped = 0;   // elements on a locked layer (open for write refused)
 
 
 	bool cSizeA = true;
@@ -1393,7 +1394,8 @@ void func::Change(ads_name &sset)
 			acdbGetObjectId(id, eName);
 			if (id != AcDbObjectId::kNull)
 			{
-				if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) == eOk)
+				if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) != eOk) ++skipped;
+				else
 				{
 
 
@@ -1501,6 +1503,7 @@ void func::Change(ads_name &sset)
 			}
 		}
 	}
+	if (skipped) acutPrintf(_T("\nNije promijenjeno %d elemenata (zaključan sloj)."), skipped);
 }
 
 

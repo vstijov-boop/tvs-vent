@@ -56,6 +56,12 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 - Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
 - Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
 
+## Faza 5 pregleda (dijalozi) – testirati
+- **Decimalni zarez:** u TVS_SETTINGS (dimenzije, protok, dužine, kota, k radijusa, c spiro), u Svojstvima (protok, ugao, k radijusa, dimenzije) i u podešavanjima oznaka (razmjera) „0,5“ = „0.5“. Ranije se zarez čitao kao kraj broja (0,5 → 0) ili dijalog nije prihvatao unos. Nebroj u TVS_SETTINGS: poruka „Unesite broj“ i dijalog ostaje otvoren.
+- **Svojstva, Odustani:** ništa se ne mijenja (ni ugao koljena).
+- **Svojstva, elementi na zaključanom sloju:** na kraju poruka „Nije promijenjeno N elemenata (zaključan sloj)“ (ranije tiho preskočeno).
+- **Menadžer blokova / Menadžer svojstava:** otvaranje i zatvaranje kao ranije.
+
 ## Faza 4 pregleda (stari kod crtanja i spajanja) – testirati
 - **TVS_PIPE, TVS_DRAW:** crtanje kao ranije, sa Dimenzija / Koljeno / Račva / Tkomad / Z. Na zaključanom trenutnom sloju komanda odmah javi i ne počinje. Promjena dimenzije tokom crtanja u crtežu u cm ili m: prvi komad iza prelaza je 100 mm (ranije 100 jedinica = 1 m / 100 m).
 - **Koljeno tokom crtanja (opcija K):** klik na nešto što nije kanal ponovo traži izbor (ranije se komanda „zaglavila“); izbor kanala koji se crta – poruka.

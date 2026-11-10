@@ -29,17 +29,16 @@
 #include "dgAllEdit.h"
 
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
+#include "DecimalText.h"
 static void DDX_MillimetreString(CDataExchange* dx, int id, CString& value) {
     const double factor = tvsUnits::factor();
     CString display = value;
-    wchar_t* end = NULL;
-    double number = wcstod(value, &end);
-    if (!dx->m_bSaveAndValidate && end != (LPCTSTR)value && end && *end == 0)
+    double number = 0;
+    if (!dx->m_bSaveAndValidate && tvsDecimal::parse(value, number))
         display.Format(L"%.15g", number * factor);
     DDX_Text(dx, id, display);
     if (dx->m_bSaveAndValidate) {
-        number = wcstod(display, &end);
-        if (end != (LPCTSTR)display && end && *end == 0) value.Format(L"%.15g", number / factor);
+        if (tvsDecimal::parse(display, number)) value.Format(L"%.15g", number / factor);   // decimal comma or point
         else value = display;
     }
 }
@@ -151,7 +150,7 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 
 	DDX_MillimetreString(pDX, IDC_SizeA, SizeA);
 	DDX_MillimetreString(pDX, IDC_SizeB, SizeB);
-	DDX_Text(pDX, IDC_Flow, Flow);
+		tvsDecimal::DDX_Number(pDX, IDC_Flow, Flow);
 	DDX_MillimetreString(pDX, IDC_SizeA2, SizeA2);
 	DDX_MillimetreString(pDX, IDC_SizeB2, SizeB2);
 	DDX_MillimetreString(pDX, IDC_TransLength, LengthTr);
@@ -166,8 +165,8 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_Text(pDX, IDC_i, I);
 	DDX_Text(pDX, IDC_dP, Dp);
 
-	DDX_Text(pDX, IDC_Swectangle, Swectangle);
-	DDX_Text(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
+		tvsDecimal::DDX_Number(pDX, IDC_Swectangle, Swectangle);
+		tvsDecimal::DDX_Number(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
 	DDX_MillimetreString(pDX, IDC_TapRadiusConst, TapRadiusConst);
 
 
@@ -316,9 +315,9 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 		iRadiusTypeRound = _wtoi(RadiusTypeRound);
 		iRadiusTypeRect = _wtoi(RadiusTypeRect);
 		CString var;
-		if ((_wtof(Swectangle) / M_PI * 180) != 0)
+		if ((tvsDecimal::value(Swectangle) / M_PI * 180) != 0)
 		{
-			var.Format(L"%g", _wtof(Swectangle) / M_PI * 180);
+			var.Format(L"%g", tvsDecimal::value(Swectangle) / M_PI * 180);
 			fSwectangle.SetWindowTextW(var);
 		}
 
@@ -413,9 +412,9 @@ void dgAllEdit::ChangeSizeA()
 	fSizeA.GetWindowTextW(zSizeA);
 	fFlow.GetWindowTextW(zFlow);
 
-	pSizeA = _wtof(zSizeA);
-	pSizeB = _wtof(zSizeB);
-	pFlow = _wtof(zFlow);
+	pSizeA = tvsDecimal::value(zSizeA);
+	pSizeB = tvsDecimal::value(zSizeB);
+	pFlow = tvsDecimal::value(zFlow);
 	pSpeed = TVS_Calculate::getSpeed(pSizeA, pSizeB, pFlow);
 	pI = TVS_Calculate::getI(pSizeA, pSizeB, pFlow);
 	//pDp=TVS_Calculate::getdP(pSizeA,pSizeB,pFlow);
@@ -439,9 +438,9 @@ void dgAllEdit::ChangeSpeed()
 	// 	fSizeA.GetWindowTextW(zSizeA);
 	// 	fSpeed.GetWindowTextW(zSpeed);
 	// 
-	// 	pSizeA=_wtof(zSizeA);
-	// 	pSizeB=_wtof(zSizeB);
-	// 	pSpeed=_wtof(zSpeed);
+	// 	pSizeA=tvsDecimal::value(zSizeA);
+	// 	pSizeB=tvsDecimal::value(zSizeB);
+	// 	pSpeed=tvsDecimal::value(zSpeed);
 	// 	pFlow=TVS_Calculate::getFlow(pSizeA,pSizeB,pSpeed);
 	// 	pI=TVS_Calculate::getI(pSizeA,pSizeB,pFlow);
 	// 
@@ -690,9 +689,9 @@ void dgAllEdit::OnBnClickedOk()
 	CString var;
 	fSwectangle.GetWindowTextW(var);
 
-	if ((M_PI*_wtof(var) / 180) != 0)
+	if ((M_PI*tvsDecimal::value(var) / 180) != 0)
 	{
-		var.Format(L"%g", M_PI*_wtof(var) / 180);
+		var.Format(L"%g", M_PI*tvsDecimal::value(var) / 180);
 		fSwectangle.SetWindowTextW(var);
 	}
 

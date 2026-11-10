@@ -54,6 +54,7 @@ LRESULT dgBlockManager::OnAcadKeepFocus(WPARAM, LPARAM) {
 
 void dgBlockManager::OnShowWindow(BOOL bShow, UINT nStatus)
 {
+	if (!bShow) { CAdUiBaseDialog::OnShowWindow(bShow, nStatus); return; }   // closing: the grid is not filled again
 
 	// 	int width = 800,
 	// 		height = min((blckList.specList.length()+1)*20+50,800);

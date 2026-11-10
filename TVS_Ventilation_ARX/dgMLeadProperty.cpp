@@ -1,5 +1,6 @@
 ﻿#include "StdAfx.h"
 #include "dgMLeadProperty.h"
+#include "DecimalText.h"
 #include "Settings.h"
 #include "MLeaderStyleTools.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
@@ -62,7 +63,7 @@ void dgMLeadProperty::fillStyles(const CString& select) {
 
 // Text height shown as: style height (paper mm) x scale = model height.
 void dgMLeadProperty::updateInfo() {
-	CString scaleText; GetDlgItemText(IDC_MLSCALE, scaleText); const double scale = _wtof(scaleText);
+	CString scaleText; GetDlgItemText(IDC_MLSCALE, scaleText); const double scale = tvsDecimal::value(scaleText);
 	AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
 	CString name; const int sel = styles.GetCurSel(); if (sel > 0) styles.GetLBText(sel, name);
 	AcDbObjectId id = sel <= 0 ? (db ? db->mleaderstyle() : AcDbObjectId()) : tvsMLeaderStyle::find(db, name);
@@ -95,7 +96,7 @@ void dgMLeadProperty::OnImport() {
 
 void dgMLeadProperty::OnOK() {
 	if (!UpdateData(TRUE)) return;
-	CString scaleText; GetDlgItemText(IDC_MLSCALE, scaleText); const double scale = _wtof(scaleText);
+	CString scaleText; GetDlgItemText(IDC_MLSCALE, scaleText); const double scale = tvsDecimal::value(scaleText);
 	if (!(scale > 0) || scale > 100000) { AfxMessageBox(L"Razmjera mora biti broj veći od 0 (npr. 50 za 1:50)."); return; }
 	MLeaderSettings& m = Settings::get()->mLeader;
 	CString name; const int sel = styles.GetCurSel(); if (sel > 0) styles.GetLBText(sel, name);

@@ -66,6 +66,7 @@ CString getString(const size_t &val) {
 
 void dgTVSPropertyManager::OnShowWindow(BOOL bShow, UINT nStatus)
 {
+	if (!bShow) { CAdUiBaseDialog::OnShowWindow(bShow, nStatus); return; }   // closing: the grid is not filled again
 	int rowsc = propertySpec.rows.size();
 	int wide = 50;
 	mGrid.SetFixedColumnCount(1);
