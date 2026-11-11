@@ -1,9 +1,11 @@
 ﻿	// ----- Ventilation_ARX.TVS_PIPE command
-	static void Ventilation_ARXTVS_PIPE(void)
+		static void Ventilation_ARXTVS_PIPE(void)
 	{
 
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
+		if (!currentLayerWritable()) return;
+		tvsJointFix::AfterDrawing teePorts;   // new ducts on a TK-O / TK-G port: prelaz there (JointFix.h)
 
 		ads_point pt1, pt2;
 		int reg;
@@ -26,6 +28,10 @@
 			case RTKWORD:
 				acedGetInput(resultss);
 				break;
+			case RTNORM:
+				break;
+			default:   // RTERROR / RTNONE ...: no point was given
+				return;
 			}
 
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
@@ -55,6 +61,10 @@
 			case RTKWORD:
 				acedGetInput(resultss);
 				break;
+			case RTNORM:
+				break;
+			default:   // RTERROR / RTNONE ...: no point was given
+				return;
 			}
 
 			if (Astat == RTKWORD && (_wcsicmp(resultss, _T("Dimenzija")) == 0 || _wcsicmp(resultss, _T("D")) == 0))
@@ -116,7 +126,9 @@
 			case RTNORM:
 				A3 = asPnt3d(pt2);
 				nextpipe(A1, A2, A3, pipi, pt1);
-
+				break;
+			default:   // RTERROR ...
+				return;
 			}
 
 

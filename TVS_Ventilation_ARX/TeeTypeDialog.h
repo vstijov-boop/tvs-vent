@@ -63,8 +63,10 @@ public:
           IdElbow=1321,IdTurn=1322,IdTurnLabel=1325,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
     Source src;int choice;bool flipped;Side side[2];int current;bool loading,valid;CString problem;
+    bool newInlet;Section inletNew;int inletChoice;   // TVS_DIM_PRATI: the run arrived on the inlet with this section (openArriving)
+    int arriveK;Section arrive;                       // ... or on port arriveK (ogranak / prolaz): that port starts with its width
     CFont bold,title;CBrush back,white,band;
-    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false){}
+    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false),newInlet(false),inletChoice(choiceOf(s.type)),arriveK(-1){}
 
     // ---------------------------------------------------------------- model
     bool rectTee()const{return !src.roundPr&&src.Bpr>0;}
@@ -96,6 +98,8 @@ public:
         }else{
             b.used=true;b.k=2;b.tee.a=src.Aotv;b.tee.round=src.roundOtv;b.tee.b=src.roundOtv?0:src.Botv;b.shapeFree=true;
         }
+        for(int i=0;i<2;++i)if(side[i].used&&side[i].k==arriveK){Side& x=side[i];   // the run arrived here: the port takes its size
+            if(x.shapeFree){x.tee=arrive;}else if(arrive.round==x.tee.round){x.tee.a=arrive.a;if(!x.lockB)x.tee.b=arrive.round?0:arrive.b;}}
         for(int i=0;i<2;++i)if(side[i].used){neighbourOf(side[i]);side[i].lengthMm=tvsTeeFit::transitionMm();
             side[i].elbow=keep[i].elbow;side[i].turn=keep[i].turn;side[i].order=keep[i].order;}
         if(current>0&&!side[1].used)current=0;
@@ -409,10 +413,17 @@ inline void chain(const Dialog& dg,const Side& d,double tol){
         p->assertWriteEnabled();p->ThisRound=ds.round;p->put_SizeA(ds.a);p->put_SizeB(ds.round?0:ds.b);p->recordGraphicsModified();}
     acutPrintf(L"\nUmetnuto koljeno %d° %ls%ls.",d.elbow,d.turn==Left?L"lijevo":L"desno",mismatch?L" i prelaz":L"");
 }
+// Duct on a port that got another size or shape in the dialog: TVS_DIM_PRATI offers the run
+// beyond it (SizeFollow.h sets the hook). false / no hook: prelaz at its far end as before.
+typedef bool (*FollowHook)(const AcDbObjectId& duct,const Section& was,const AcDbObjectId& tee);
+inline FollowHook& followHook(){static FollowHook h=NULL;return h;}
 inline void apply(const Dialog& d){
     const Source& s=d.src;const double f=s.f;tvsTeeFit::Ports before,after;
     {AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nT komad nije dostupan (zaključan sloj?).");return;}
      before=tvsTeeFit::ports(w.object());w->assertWriteEnabled();
+     if(d.newInlet&&(d.choice==Pants)==(d.inletChoice==Pants)){   // inlet takes the size of the run that arrived (TVS_DIM_PRATI)
+        if(d.choice==Pants){w->SizeAotv=d.inletNew.a;w->SizeBotv=d.inletNew.round?0:d.inletNew.b;}
+        else{w->SizeApr=d.inletNew.a;w->SizeBpr=d.inletNew.round?0:d.inletNew.b;}}
      tvsTeeData::Record r;r.type=teeType(d.choice);r.l=tvsTeeData::collarMm()/f;
      const Side& b=d.side[0];const Side& c=d.side[1];
      if(d.choice==Branch){w->SizeAotv=b.tee.a;w->SizeBotv=w->SizeBpr;r.second=c.tee.a;
@@ -443,7 +454,8 @@ inline void apply(const Dialog& d){
                 AcGePoint3d to=(q.end==0?p->FirstPoint:p->LastPoint)+shift;if(q.end==0)p->put_FirstPoint(to);else p->put_Lastpoint(to);p->recordGraphicsModified();}}
         else if(n.kind!=0)acutPrintf(L"\nT komad: element na pomjerenom priključku nije kanal ni prelaz; prilagodite ručno.");
     }
-    // per side: elbow chain, or the duct size and the prelaz at the port
+        // per side: elbow chain, or the duct size and the prelaz at the port
+    struct Follow {AcDbObjectId duct;Section was;bool first;};std::vector<Follow> follow;
     for(int i=0;i<2;++i){const Side& x=d.side[i];if(!x.used)continue;
         if(x.elbow){chain(d,x,tol);continue;}
         if(x.neighbour==1&&!tvsTeePort::same(x.duct,x.ductWas,1e-9)){bool first=false;
@@ -451,9 +463,12 @@ inline void apply(const Dialog& d){
              p->assertWriteEnabled();p->ThisRound=x.duct.round;p->put_SizeA(x.duct.a);p->put_SizeB(x.duct.round?0:x.duct.b);p->recordGraphicsModified();
              first=tvsTeeFit::planDistance(p->FirstPoint,after.ok?after.p[d.place(x.k)]:before.p[d.place(x.k)])<=tol;}
             wchar_t t[32];tvsTeePort::sizeText(t,32,x.duct,f);acutPrintf(L"\nKanal na priključku je sada %ls mm.",t);
-            tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
+                        Follow fw={x.ductId,x.ductWas,first};
+            if(followHook())follow.push_back(fw);else tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
         tvsTeePort::ensure(s.id,x.k,x.lengthMm);
     }
+    // the run beyond the resized ducts, after the T komad and its prelazi are written
+    for(size_t k=0;k<follow.size();++k)if(!followHook()(follow[k].duct,follow[k].was,s.id))tvsTeeFit::farEnd(s.id,follow[k].duct,follow[k].first,tol,f);
     {const int inletPort=d.choice==Pants?2:0;tvsTeePort::ensure(s.id,inletPort);}
     acutPrintf(L"\nT komad: %ls.",d.choice==Branch?L"TK-O sa ogrankom":d.choice==Pants?L"TK-G sa dva ogranka":d.choice==Tap?L"štucna":L"TK0");
 }
@@ -461,6 +476,24 @@ inline bool open(const AcDbObjectId& id,UINT idd){
     Source s;if(!readSource(id,s)){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
     Dialog dg(s,idd);
     {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return true;}
+    apply(dg);return true;
+}
+// TVS_DIM_PRATI: a resized run arrived on port k of a TK-O / TK-G with section `in`. On the
+// inlet (TK-O port 0, TK-G port 2) the T komad takes that section (heights of all ports with
+// it; the other widths stay) and the dialog decides the rest; on another port the dialog
+// opens on that side, where the duct already shows the new size. false: dialog cancelled or
+// not possible (the caller leaves the T komad as it is: prelaz on the port).
+inline bool openArriving(const AcDbObjectId& id,UINT idd,int k,const Section& in){
+    Source s;if(!idd||!readSource(id,s))return false;
+    const int choice=choiceOf(s.type);if(choice!=Branch&&choice!=Pants)return false;
+    const bool inlet=choice==Pants?k==2:k==0;int tab=0;
+    if(inlet){
+        if((choice==Pants?s.roundOtv:s.roundPr)!=in.round){acutPrintf(L"\nT komad: ulaz je drugog oblika od kanala; T komad nije mijenjan (prelaz na priključku).");return false;}
+        if(choice==Pants){s.Aotv=in.a;s.Botv=in.round?0:in.b;}
+        else{if(!(s.second>0))s.second=s.Apr;s.Apr=in.a;s.Bpr=in.round?0:in.b;}   // prolaz C keeps its width
+    }else tab=choice==Branch?(k==1?1:0):(k==0?1:0);
+        Dialog dg(s,idd);dg.newInlet=inlet;dg.inletNew=in;dg.current=tab;if(!inlet){dg.arriveK=k;dg.arrive=in;}
+    {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return false;}
     apply(dg);return true;
 }
 inline void run(UINT idd){

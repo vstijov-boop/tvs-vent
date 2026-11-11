@@ -46,7 +46,8 @@
 		dg.WipeoutLength = globalWipeoutLength;
 		if (globalDuctType == DuctTypeFlex) dg.DuctFlex = TRUE; else dg.DuctFlex = FALSE;
 		dg.LevelTooltip = tvsLevelTooltip::enabled() ? TRUE : FALSE;
-		{ ACHAR v[16] = L""; dg.LeadAuto = (acedGetEnv(L"TVS_LEAD_AUTO", v, 16) == RTNORM && !_wcsicmp(v, L"0")) ? FALSE : TRUE; }
+				{ ACHAR v[16] = L""; dg.LeadAuto = (acedGetEnv(L"TVS_LEAD_AUTO", v, 16) == RTNORM && !_wcsicmp(v, L"0")) ? FALSE : TRUE; }
+		dg.WholeRun = tvsSizeFollow::wholeRun() ? TRUE : FALSE;
 		AcDbDatabase* capDb = acdbHostApplicationServices()->workingDatabase();
 		const bool capWas = capDb && tvsDuctCaption::enabled(capDb);
 		dg.DuctCaption = capWas ? TRUE : FALSE;
@@ -86,7 +87,8 @@
 		globalWipeoutLength = dg.WipeoutLength;
 
 		tvsLevelTooltip::setEnabled(dg.LevelTooltip == TRUE);   // oblacic sa kotama
-		acedSetEnv(L"TVS_LEAD_AUTO", dg.LeadAuto == TRUE ? L"1" : L"0");   // isto kao TVS_LEAD_AUTO
+				acedSetEnv(L"TVS_LEAD_AUTO", dg.LeadAuto == TRUE ? L"1" : L"0");   // isto kao TVS_LEAD_AUTO
+		acedSetEnv(L"TVS_DIONICA", dg.WholeRun == TRUE ? L"1" : L"0");     // TVS_DIM_PRATI: dijalog cijele dionice
 		bool regen = capDb && (dg.DuctCaption == TRUE) != capWas && tvsDuctCaption::set(capDb, dg.DuctCaption == TRUE);   // isto kao TVS_NATPIS
 		{	// spiro prelazi po katalogu SOKO (po crtezu)
 			tvsSpiro::Settings sp; sp.catalog = dg.SpiroCatalog == TRUE; sp.rg = dg.SpiroRG == TRUE; sp.dashed = dg.SpiroDashed == TRUE; sp.cMm = dg.SpiroC;
@@ -173,9 +175,7 @@
 
 		acdbGetAdsName(eName, id);
 		acdbGetObjectId(id, eName);
-		AcDbEntity* pnt;
-		acdbOpenAcDbEntity(pnt, id, AcDb::kForWrite);
-
+		if (!reopen(pEnt)) return NULL;
 		pEnt->assertWriteEnabled();
 		pEnt->RadiusConst = (globalTapRadiusConst);
 		pEnt->RadiusTypeRound = (globalRadiusTypeRound);
@@ -242,9 +242,9 @@
 				id = pipi->id();
 				acdbGetAdsName(eName, id);
 				acdbGetObjectId(id, eName);
-				acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite);
+				if (!reopen(pipi)) return;
 				pipi->assertWriteEnabled();
-				pipi->LastPoint = A2a;
+				pipi->put_Lastpoint(A2a);
 				pipi->close();
 				pipi = pipie.add_new(A2b, A3, globSizeA, globSizeB, false, globRound);
 				SetGlobalProperty(pipi);
@@ -259,10 +259,7 @@
 			else
 			{
 
-				AcDbEntity* pnt;
-				acdbOpenAcDbEntity(pnt, pTap->id(), AcDb::kForWrite);
-				pTap->erase();
-				pTap->close();
+				if (reopen(pTap)) { pTap->erase(); pTap->close(); }
 
 			}
 		}
@@ -273,7 +270,7 @@
 			id = pipi->id();
 			acdbGetAdsName(eName, id);
 			acdbGetObjectId(id, eName);
-			acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite);
+			if (!reopen(pipi)) return;
 			pipi->assertWriteEnabled();
 			pipi->setLastpoint(A3);
 			pipi->close();
@@ -305,8 +302,9 @@
 		AcDbObjectId id;
 		ads_name eName, vozd;
 		AcDbEntity *pEnt, *pEnt2;
-		while (ft == false)
+				while (ft == false)
 		{
+			lt = false;   // a pick that is not a duct asks again (before: the same pick for ever)
 			while (lt == false)
 			{
 				stat = tvsCoordinates::selectEntity(_T("\nIzaberite kanal:"), vozd, pt1);
@@ -331,11 +329,10 @@
 				{
 					if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) == eOk)
 					{
-						if ((pipi2 = TVS_Pipe::cast(pEnt)) != NULL)
+												if ((pipi2 = TVS_Pipe::cast(pEnt)) != NULL)
 						{
-
-							ft = true;
-
+							if (pipi2 == pipi1) acutPrintf(_T("\nIzabran je kanal koji se crta; izaberite drugi kanal."));
+							else ft = true;
 						}
 					}
 
@@ -400,7 +397,7 @@
 			SetGlobalProperty(pTap);
 			SetPropertyLikePipe(pPipe, pTap);
 
-			acdbOpenAcDbEntity(pEnt, pTap->id(), AcDb::kForWrite);
+			if (!reopen(pTap)) return false;
 			pTap->put_Form(Form_Up);
 			pTap->close();
 			pTap->draw();
@@ -426,23 +423,23 @@
 			if (startZ > nextZ)
 			{
 
-				acdbOpenAcDbEntity(pEnt, pTap2->id(), AcDb::kForWrite);
+				if (!reopen(pTap2)) return false;
 				pTap2->put_Form(Form_Up);
 				pTap2->put_Centerpoint(p5);
 				pTap2->close();
-				acdbOpenAcDbEntity(pEnt, pTap->id(), AcDb::kForWrite);
+				if (!reopen(pTap)) return false;
 				pTap->put_Form(Form_Down);
 				pTap->close();
 
 			}
 			else
 			{
-				acdbOpenAcDbEntity(pEnt, pTap->id(), AcDb::kForWrite);
+				if (!reopen(pTap)) return false;
 				pTap->put_Form(Form_Up);
 				pTap->put_Elevation(startZ);
 				pTap->close();
 
-				acdbOpenAcDbEntity(pEnt, pTap2->id(), AcDb::kForWrite);
+				if (!reopen(pTap2)) return false;
 				pTap2->put_Form(Form_Down);
 				pTap2->put_Centerpoint(p5);
 				pTap2->put_Elevation(nextZ);
@@ -455,7 +452,7 @@
 				TVS_Pipe*pPipe1 = pPipe1->add_new(p3, p4, globSizeA, globSizeB);
 				SetGlobalProperty(pPipe1);
 				SetPropertyLikePipe(pPipe, pPipe1);
-				acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
+				if (!reopen(pPipe1)) return false;
 
 				pPipe1->put_Elevation(startZ);
 				pPipe1->close();
@@ -464,12 +461,12 @@
 			TVS_Pipe*pPipe2 = pPipe2->add_new(p6, p7, globSizeA, globSizeB);
 			SetGlobalProperty(pPipe2);
 			SetPropertyLikePipe(pPipe, pPipe2);
-			acdbOpenAcDbEntity(pEnt, pPipe2->id(), AcDb::kForWrite);
+			if (!reopen(pPipe2)) return false;
 
 			pPipe2->put_Elevation(nextZ);
 			pPipe2->close();
 			//correct PPipe
-			acdbOpenAcDbEntity(pEnt, pPipe->id(), AcDb::kForWrite);
+			if (!reopen(pPipe)) return false;
 			pPipe->put_Lastpoint(p1);
 			pPipe->close();
 			pPipe = pPipe2;
@@ -642,9 +639,10 @@
 				else if (pTransType == 3) pFirstPoint -= right * s;
 			}
 		}
-		AcGePoint3d pLastPoint = AcGePoint3d(pFirstPoint.x + 100 * Vect.x,
-			pFirstPoint.y + 100 * Vect.y,
-			pFirstPoint.z + 100 * Vect.z
+				const double stub = 100.0 / tvsUnits::factor();   // first 100 mm of the next duct (drawing units: mm, cm or m)
+		AcGePoint3d pLastPoint = AcGePoint3d(pFirstPoint.x + stub * Vect.x,
+			pFirstPoint.y + stub * Vect.y,
+			pFirstPoint.z + stub * Vect.z
 		);
 
 		bool pThis1d = false;

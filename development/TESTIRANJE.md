@@ -1,4 +1,4 @@
-# TVS_VENT – period testiranja (objedinjeno na master)
+﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
 ## Novi meni (TVS_VENT.cuix)
 Učitajte novi TVS_VENT.cuix (CUILOAD / Menuload ili zamjena postojećeg fajla).
@@ -22,6 +22,88 @@ Regularni paket (tvs-vent-autocad-20xx-x64) i DEV paket sada imaju iste komande,
 
 ## Otvoreno – treba testirati i javiti nazad
 **Prelaz – prenos dimenzija na susjedne kanale:** ispravljeno (vidi „Dimenzije na spojevima prelaz–kanal“ niže); provjeriti oba smjera.
+
+## Pregled koda – faze 1 i 2 (REVIEW_2026-11.md) – testirati
+**TVS_DIM_PRATI**
+- **Dijalog cijele dionice je podrazumijevano ISKLJUČEN** (TVS_SETTINGS → „Promjena dimenzije cijele dionice (dijalog)“, čuva se u profilu). Isključeno: radi samo prenos dimenzije kanal ↔ prelaz; spoj kanala nove dimenzije sa elementom stare dimenzije daje UPOZORENJE; TVS_TK_TIP umeće prelaz na kraju kanala kao ranije. Stavke ispod važe kad je uključeno.
+- Kanal sa krajem na istoj tački u osnovi kao drugi kanal/prelaz na drugoj visini (jedan iznad drugog): promjena dimenzije gornjeg ne smije dirati donji.
+- Umjesto pitanja u komandnoj liniji otvara se dijalog **„Promjena dimenzije dionice“** (samo kad dionica stare dimenzije ide dalje od izabranog kanala):
+  - **Obuhvat:** cijela dionica do granica / samo izabrani kanal (UPOZORENJE ako naliježe na element stare dimenzije) / prema strani 1 ili 2 (brojevi su u pregledu na krajevima kanala) / samo kanal + prelaz na spoju.
+  - **T komad:** Nastavi (TK0 i štucna: glavni kanal se mijenja i dionica ide dalje; **TK-O / TK-G: poslije primjene otvara se dijalog tog T komada** sa novom dimenzijom na ulazu – tu se podešavaju ogranak, prolaz, kanali u nastavku i prelazi) / Stani / Prelaz iza T komada.
+  - **Etaž, Obilazak:** preračunaj ili stani prije njih. Redovi su aktivni samo ako takav element postoji na trasi.
+  - **Pregled:** osnova trase; tamno plavo = izabrani kanal, plavo = mijenja se, žuto = T komad čiji se dijalog otvara, sivo = ostaje. Mijenja se sa svakim izborom.
+  - **Otkaži** = samo izabrani kanal. Otkaži u dijalogu T komada = T komad ostaje, na priključku prelaz (kao do sada).
+  - Provjeriti primjer: kanal između prelaza i TK-O → poslije Primijeni otvara se dijalog TK-O, ulaz ima novu dimenziju, visine priključaka je prate.
+  - Dionica koja u TK-O / TK-G dolazi sa strane ogranka ili prolaza: dijalog se otvara na toj kartici.
+- **Dionica dolazi na ogranak / prolaz TK-O ili TK-G:** u dijalogu T komada taj priključak odmah ima novu širinu (prelaz se ne umeće). Visina ogranka kod TK-O/TK-G ostaje visina ulaza – ako se razlikuje, prelaz samo zbog visine.
+- **Promjena oblika (pravougaoni ↔ okrugli) u Svojstvima kanala ili u TVS_TK_TIP („Kanal u nastavku“):** dijalog dionice se otvara i tada. Kanali i koljena u osnovi mijenjaju oblik i dimenziju (koljeno dobija radijus iz TVS_SETTINGS za novi oblik; krajevi kanala prate koljeno). T komad, etaž i obilazak su granica (ostaju; T komad dobija prelaz na priključku). Prelaz na kraju dionice preuzima oblik na tom kraju (postaje prelaz pravougaoni ↔ okrugli). „Kanal + prelaz na spoju“ umeće prelaz novog → starog oblika.
+- **TVS_TK_TIP → kanal u nastavku nove dimenzije:** kad se u dijalogu T komada promijeni dimenzija kanala na prolazu/ogranku (isti oblik), a iza njega se nastavlja mreža stare dimenzije (koljeno, kanali, etaž…), otvara se dijalog „Promjena dimenzije dionice“ za taj dio (T komad se ne dira). Otkaži = prelaz na spoju sa prvim elementom stare dimenzije (kao do sada). Ako iza kanala nema ništa stare dimenzije – prelaz na kraju kao do sada.
+- Poslije promjene cijele dionice (koljena pomjere krajeve) prelaz na kraju dionice treba da preuzme dimenziju.
+- Prelaz drugog oblika na kraju izmijenjenog kanala (okrugli/pravougaoni): poruka umjesto tihog preskakanja.
+- Dva otvorena crteža: izmjena u jednom ne smije se izgubiti ni prenijeti na drugi.
+- Kanal na zaključanom sloju uz prelaz: poruka.
+
+**Ostalo**
+- **Komande uklonjene iz izdanja** (samo razvojni build): TVS_TEST, TVS_TRANS, TVS_WYE, TVS_CONNECTTest, TVS_DUCT, TVS_SpecificationOld, TVS_Flex, TVS_Show, TVSSomeParts, MyCommand/MyPickFirst/MySessionCmd, TVS_OFFSET_TEST_BAD, TVS_OFFSET_FAIL_NEXT, TVS_TEST_OFFSET*, TVS_BYPASS_DETAIL_TEST/CHECK. Javiti ako je neka od njih bila potrebna.
+- **Komande više nisu transparentne** (ne mogu se pokrenuti sa ' usred druge komande), osim TVS_SETTINGS. Provjeriti da meni i ribbon pokreću sve kao ranije.
+- TVS_AttributesToProps: radi samo nad izabranim blokovima i pita `Da/Ne` (podrazumijevano Ne).
+- Svojstva okruglog koljena, „konstantan radijus“: poslije OK koljeno ostaje konstantnog radijusa.
+- TVS_EXCELSPEC bez Excel-a: poruka „Excel nije dostupan“, bez pada.
+- Menadžer blokova: dug tekst (>512 znakova) u ćeliji – bez pada (tekst se skraćuje).
+- TVS_SCALE: prazan klik i Enter ne ruše komandu; Esc izlazi.
+- TVS_1D2D: Enter = 2d.
+- TVS_AddAtrib: poruke grešaka sa nazivom bloka.
+- Dugi rad sa TVS_Change / TVS_1D2D / TVS_ERASE / specifikacijama: izbor objekata ne prestaje da radi.
+- Podešavanja specifikacije (TVS_Sp → Podešavanja): Odustani ne mijenja kolone.
+
+## Flex crijeva u TVS_STRETCH / TVS_MOVE / TVS_ALIGN – testirati
+- **TVS_STRETCH:** kraj flex crijeva u okviru se pomjera sa okvirom (drugi kraj ostaje, crijevo se savije); cijelo crijevo u okviru se pomjeri.
+- **Kraj flexa na pomjerenom kanalu / fitingu** (i van okvira): ide za tim priključkom.
+- **TVS_MOVE / TVS_ALIGN kanala sa flexom na kraju:** više ne odbija („nepodržan element“), flex prati.
+- Samo flex u okviru (bez kanala): pomjeri se samo flex.
+- Na kraju poruka „… flex crijeva: N“.
+
+## Spojevi koje TVS_STRETCH / TVS_MOVE odbijaju – testirati
+- **Odbijen spoj:** ispis oba presjeka (dimenzije, osa u mm) i tačke spoja.
+- **Ista dimenzija, druga kota** (kanal na 0, T komad na 2850): pitanje „Izjednačiti kotu kanala…? [Da/Ne] <Da>“ → kanal dobija kotu susjeda → ponoviti komandu.
+- **Kanal druge dimenzije na priključku TK-O / TK-G** (npr. 150×150 na ogranku visine 100): „umetnuti prelaz? <Da>“ → prelaz na priključku → ponoviti komandu.
+- **TVS_DRAW / TVS_PIPE do priključka TK-O / TK-G** kanalom druge dimenzije: na kraju komande prelaz se umeće sam (poruka „T komad, …: umetnut prelaz…“). Isto kad crtanje počne sa priključka bez konektor-gripa.
+- **Prelaz poravnat gore/dolje** u mreži: TVS_STRETCH / TVS_MOVE više ne javljaju lažnu razliku kota iza njega.
+
+## Ponovni pregled N2 – kopiranje između crteža sa različitim jedinicama – testirati
+Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → Insertion scale), TVS po svojim jedinicama (TVS_SETTINGS). Najbolje je da su u oba crteža iste (mm-crtež: INSUNITS = Millimeters, cm-crtež: Centimeters).
+- **INSUNITS odgovaraju TVS jedinicama:** Ctrl+C iz mm crteža, Ctrl+V u cm crtež → kanali, koljena, prelazi, T komadi su iste stvarne veličine (400 mm ostaje 400 mm, u cm crtežu 40); i linije oko njih. Isto cm → mm, mm → m.
+- **INSUNITS ne odgovaraju** (npr. oba „Unitless“): poslije lijepljenja poruka „TVS: umetnuti elementi su iz crteža u mm…“ → TVS_PRERACUNAJ, izbor, [mm/cm/m] izvora, bazna tačka → sve na pravu veličinu.
+- **EXPLODE / INSERT bloka sa TVS elementima** umetnutog sa razmjerom: poslije razbijanja dimenzije prate razmjeru.
+- **SCALE** nad TVS elementima: i dalje odbijen.
+- **TK-O / TK-G** poslije kopiranja mm → cm: oblik i priključci isti (kragna, druga širina, radijus).
+
+## Ponovni pregled N1 – Svojstva ne mijenjaju ništa na „OK“ – testirati
+- **Koljeno 45° / 90°** → Svojstva → OK bez izmjene → Properties: ugao ostaje tačno 45 / 90 (ranije 45,26 / 89,954).
+- **Crtež u metrima:** kanal Ø315 → Svojstva → OK → ostaje Ø315 (ranije Ø320). Isto kote i dužine prelaza.
+- **Više izabranih elemenata različitih vrijednosti:** polje prikazuje „Različito“ (ranije ruski tekst); ako se ne dira, ništa se ne mijenja.
+- **Dvoklik → Svojstva → Odustani:** ništa se ne mijenja.
+- **Promjena ugla u Svojstvima** (npr. 45 → 30) i dalje radi.
+- **TVS_KOLJENA_UGAO (novo):** izbor koljena ili Enter = cijeli crtež. Koljena u osnovi sa uglom manje od 0,5° od 15 / 22,5 / 30 / 45 / 60 / 75 / 90° dobijaju tačan ugao, krajevi kanala na njima se pomjere za njima. Koljeno uz koje je prelaz / T komad / drugo koljeno se ne dira (ispis koliko). Probati na crtežu gdje je TVS_MOVE / TVS_ALIGN javljao „ose nisu tangentne“ ili je TVS_DIM_PRATI stajao na koljenu, pa ponoviti.
+
+## Faza 6 pregleda (elementi) – testirati
+- **SCALE nad TVS elementima:** odbijen, poruka jednom po komandi; ostali (ne-TVS) objekti u izboru se skaliraju normalno. MOVE, ROTATE, COPY i MIRROR rade kao ranije.
+- **MIRROR:** koljeno, prelaz poravnat uz ivicu (tip 2/3) i TK-O / TK-G treba da izgledaju kao ogledalska slika i ostanu spojeni.
+- **Provjeriti:** kopiranje (Ctrl+C / Ctrl+V) TVS elemenata između crteža sa različitim jedinicama (INSUNITS) – AutoCAD tada skalira, pa će TVS elementi biti odbijeni; javiti kako se ponaša.
+- **Kanal nulte dužine** (npr. oba kraja u istoj tački): bez čudne geometrije / gripova.
+
+## Faza 5 pregleda (dijalozi) – testirati
+- **Decimalni zarez:** u TVS_SETTINGS (dimenzije, protok, dužine, kota, k radijusa, c spiro), u Svojstvima (protok, ugao, k radijusa, dimenzije) i u podešavanjima oznaka (razmjera) „0,5“ = „0.5“. Ranije se zarez čitao kao kraj broja (0,5 → 0) ili dijalog nije prihvatao unos. Nebroj u TVS_SETTINGS: poruka „Unesite broj“ i dijalog ostaje otvoren.
+- **Svojstva, Odustani:** ništa se ne mijenja (ni ugao koljena).
+- **Svojstva, elementi na zaključanom sloju:** na kraju poruka „Nije promijenjeno N elemenata (zaključan sloj)“ (ranije tiho preskočeno).
+- **Menadžer blokova / Menadžer svojstava:** otvaranje i zatvaranje kao ranije.
+
+## Faza 4 pregleda (stari kod crtanja i spajanja) – testirati
+- **TVS_PIPE, TVS_DRAW:** crtanje kao ranije, sa Dimenzija / Koljeno / Račva / Tkomad / Z. Na zaključanom trenutnom sloju komanda odmah javi i ne počinje. Promjena dimenzije tokom crtanja u crtežu u cm ili m: prvi komad iza prelaza je 100 mm (ranije 100 jedinica = 1 m / 100 m).
+- **Koljeno tokom crtanja (opcija K):** klik na nešto što nije kanal ponovo traži izbor (ranije se komanda „zaglavila“); izbor kanala koji se crta – poruka.
+- **TVS_CONNECTW / TVS_CONNECTT:** spajanje kao ranije (T komad, koljeno, kolinearni sa prelazom). Kanal na zaključanom sloju ili zaključan trenutni sloj – poruka umjesto pada.
+- **TVS_CUT:** jedan rez; novi dio ima sve iz originala (protok, kotu, flex, sloj, boju, TVS svojstva / oznake). Najmanje 50 mm do kraja. Član etaža / obilaska se ne može presjeći (poruka). Klik pored kanala – ponovo izbor; Esc izlazi.
+- **TVS_ERASE (novo ime TVS_RAZBIJ, staro radi):** razbija TVS elemente u prostor u kojem su (i u Layout-u); ako razbijanje ne uspije, element ostaje (ranije bi bio obrisan). Na kraju ispis koliko je razbijeno / preskočeno.
 
 ## Novo – testirati
 - **Štucna 45° (ASHRAE SR5-3):** opcija `Stucna` u TVS_CONNECTW, pri spajanju tokom crtanja, u opciji Tkomad i u TVS_TK_TIP. L = 0,25 × širina ogranka, min. 75 mm; kosi ulaz uzvodno (oKreni ga prebacuje); glavni kanal se crta neprekinut.

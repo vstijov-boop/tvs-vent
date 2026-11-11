@@ -1,4 +1,26 @@
-﻿	static bool addTrans(TVS_Pipe *pPipe1,
+﻿	// Re-opens for write an element this command created or opened before (old code keeps the
+	// pointer; it stays valid while the drawing is open). false: it cannot be changed (locked
+	// layer, open elsewhere) - the command stops instead of writing into a closed object.
+	static bool reopen(AcDbObject* o)
+	{
+		if (!o || o->objectId().isNull()) return false;
+		AcDbObject* p = NULL;
+		const Acad::ErrorStatus es = acdbOpenObject(p, o->objectId(), AcDb::kForWrite);
+		if (es != Acad::eOk) { acutPrintf(L"\nElement se ne može mijenjati (%ls); operacija nije dovršena.", acadErrorStatusText(es)); return false; }
+		if (p != o) { p->close(); acutPrintf(L"\nElement se ne može mijenjati; operacija nije dovršena."); return false; }
+		return true;
+	}
+	// New elements go to the current layer: a locked current layer would stop the command half way.
+	static bool currentLayerWritable()
+	{
+		AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
+		if (!db) return false;
+		AcDbObjectPointer<AcDbLayerTableRecord> layer(db->clayer(), AcDb::kForRead);
+		if (layer.openStatus() != Acad::eOk) return true;
+		if (layer->isLocked()) { acutPrintf(L"\nTrenutni sloj je zaključan - otključajte ga ili izaberite drugi sloj."); return false; }
+		return true;
+	}
+	static bool addTrans(TVS_Pipe *pPipe1,
 		TVS_Pipe  *pPipe2, AcGePoint3d &point1, AcGePoint3d &midp, AcGePoint3d &point2)
 	{
 		if (length2p(pPipe1->FirstPoint, point1) > length2p(pPipe1->LastPoint, point1))
@@ -131,7 +153,7 @@
 		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
 		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Kolinearni")); }
 		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Upravni")); }
-		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeA == pPipe2->SizeA)) SizeStatus = TVSisSameSize;
+		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeB == pPipe2->SizeB)) SizeStatus = TVSisSameSize;
 		else SizeStatus = TVSisNoSameSize;
 		int GroseStatus = whyIsGrose(pPipe1, pPipe2);
 		AcGePoint3d pointSelect1 = line1.closestPointTo(asPnt3d(pnt1));
@@ -246,7 +268,7 @@
 
 			addTrans(pPipe1, pPipe2, kr1, midp, kr2);
 
-			acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
+			if (!reopen(pPipe1)) return false;
 			pPipe1->assertWriteEnabled();
 			pPipe1->put_FirstPoint(kr1);
 			pPipe1->put_Lastpoint(kr2);
@@ -297,7 +319,7 @@
 		if (line1.isParallelTo(line2, dop)) { LineStatus = TVSisParallel; acutPrintf(_T("\n Paralelni")); }
 		if (line1.isColinearTo(line2, dop)) { LineStatus = TVSisLinear; acutPrintf(_T("\n Kolinearni")); }
 		if (line1.isPerpendicularTo(line2, dop)) { LineStatus = TVSisPerpendicular; acutPrintf(_T("\n Upravni")); }
-		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeA == pPipe2->SizeA)) SizeStatus = TVSisSameSize;
+		if ((pPipe1->SizeA == pPipe2->SizeA) && (pPipe1->SizeB == pPipe2->SizeB)) SizeStatus = TVSisSameSize;
 		else SizeStatus = TVSisNoSameSize;
 		int GroseStatus = whyIsGrose(pPipe1, pPipe2);
 		AcGePoint3d pointSelect1 = line1.closestPointTo(asPnt3d(pnt1));
@@ -338,7 +360,7 @@
 					temp = p2;
 					p2 = p1;
 					p1 = temp;
-					acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
+					if (!reopen(pPipe1)) return false;
 					pPipe1->assertWriteEnabled();
 					pPipe1->put_FirstPoint(p1);
 					pPipe1->put_Lastpoint(p2);
@@ -354,7 +376,7 @@
 					temp = p2;
 					p2 = p1;
 					p1 = temp;
-					acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
+					if (!reopen(pPipe1)) return false;
 					pPipe1->assertWriteEnabled();
 					pPipe1->put_FirstPoint(p1);
 					pPipe1->put_Lastpoint(p2);
@@ -398,7 +420,7 @@
 
 
 
-			acdbOpenAcDbEntity(pEnt, pPipe2->id(), AcDb::kForWrite);
+			if (!reopen(pPipe2)) return false;
 			pPipe2->assertWriteEnabled();
 			pPipe2->put_FirstPoint(p3);
 			pPipe2->put_Lastpoint(intersectpoint);
@@ -421,12 +443,12 @@
 			wyeId = pWye->id();
 
 
-			acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
+			if (!reopen(pPipe1)) return false;
 			pPipe1->assertWriteEnabled();
 
 			pPipe1->put_Lastpoint(shortlength(p1, intersectpoint, pPipe2->SizeA / 2 + pWye->LengthPl));
 			pPipe1->close();
-			acdbOpenAcDbEntity(pEnt, pPipe2->id(), AcDb::kForWrite);
+			if (!reopen(pPipe2)) return false;
 			pPipe2->assertWriteEnabled();
 			pPipe2->put_Lastpoint(shortlength(p3, intersectpoint, pPipe1->SizeA / 2 + pWye->LengthPl));
 			pPipe2->close();
@@ -436,7 +458,7 @@
 				TVS_Pipe* tempPipe;
 				tempPipe = tempPipe->add_new(intersectpoint, p4, globSizeA, globSizeB);
 				SetPropertyLikePipe(pPipe2, tempPipe);
-				acdbOpenAcDbEntity(pEnt, tempPipe->id(), AcDb::kForWrite);
+				if (!reopen(tempPipe)) return false;
 				tempPipe->assertWriteEnabled();
 				tempPipe->put_FirstPoint(shortlength(p4, intersectpoint, pPipe1->SizeA / 2 + pWye->LengthPl));
 				tempPipe->close();
@@ -469,7 +491,7 @@
 
 			addTrans(pPipe1, pPipe2, kr1, midp, kr2);
 
-			acdbOpenAcDbEntity(pEnt, pPipe1->id(), AcDb::kForWrite);
+			if (!reopen(pPipe1)) return false;
 			pPipe1->assertWriteEnabled();
 			pPipe1->put_FirstPoint(kr1);
 			pPipe1->put_Lastpoint(kr2);

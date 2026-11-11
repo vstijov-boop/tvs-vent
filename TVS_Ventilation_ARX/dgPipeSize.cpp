@@ -27,10 +27,12 @@
 #include "Resource.h"
 #include "dgPipeSize.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
+#include "DecimalText.h"
+using tvsDecimal::DDX_Real;
 
 static void DDX_Millimetres(CDataExchange* dx, int id, double& value, double factor) {
-    double mm = value * factor;
-    DDX_Text(dx, id, mm);
+        double mm = value * factor;
+    tvsDecimal::DDX_Real(dx, id, mm);
     if (dx->m_bSaveAndValidate) value = mm / factor;
 }
 
@@ -73,7 +75,7 @@ END_MESSAGE_MAP()
 
 //-----------------------------------------------------------------------------
 dgPipeSize::dgPipeSize(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : CAdUiBaseDialog(dgPipeSize::IDD, pParent, hInstance), SizeA(0)
-, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), LeadAuto(TRUE), DuctCaption(FALSE), SpiroCatalog(TRUE), SpiroRG(FALSE), SpiroDashed(TRUE), SpiroC(25), TransVert(0), TransPlan(1)
+, SizeB(0), allowDrawingUnitsChange(false), unitsFactor(tvsUnits::factor()), LevelTooltip(FALSE), LeadAuto(TRUE), DuctCaption(FALSE), WholeRun(FALSE), SpiroCatalog(TRUE), SpiroRG(FALSE), SpiroDashed(TRUE), SpiroC(25), TransVert(0), TransPlan(1)
 {
 }
 
@@ -116,18 +118,18 @@ void dgPipeSize::DoDataExchange(CDataExchange *pDX) {
 
 	DDX_Millimetres(pDX, IDC_SizeA, SizeA, unitsFactor);
 	DDX_Millimetres(pDX, IDC_SizeB, SizeB, unitsFactor);
-	DDX_Text(pDX, IDC_Flow, Flow);
+	DDX_Real(pDX, IDC_Flow, Flow);
 	//DDX_Text(pDX, IDC_SizeA2, SizeA2);
 	//DDX_Text(pDX, IDC_SizeB2, SizeB2);
 	DDX_Millimetres(pDX, IDC_TransLength, LengthTr, unitsFactor);
 	DDX_Millimetres(pDX, IDC_LengthWye, LengthW, unitsFactor);
 	DDX_Millimetres(pDX, IDC_ElevVal, Elev, unitsFactor);
-	DDX_Text(pDX, IDC_Speed, Speed);
-	DDX_Text(pDX, IDC_i, I);
+	DDX_Real(pDX, IDC_Speed, Speed);
+	DDX_Real(pDX, IDC_i, I);
 	//DDX_Text(pDX, IDC_dP, Dp);
 
 	//DDX_Text(pDX, IDC_Swectangle, Swectangle);
-	DDX_Text(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
+	DDX_Real(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
 	DDX_Millimetres(pDX, IDC_TapRadiusConst, TapRadiusConst, unitsFactor);
 
 
@@ -163,11 +165,12 @@ void dgPipeSize::DoDataExchange(CDataExchange *pDX) {
 	DDX_Check(pDX, IDC_DuctFlex, DuctFlex);
 	DDX_Check(pDX, IDC_LevelTooltip, LevelTooltip);
 	DDX_Check(pDX, IDC_LeadAuto, LeadAuto);
-	DDX_Check(pDX, IDC_DuctCaption, DuctCaption);
+		DDX_Check(pDX, IDC_DuctCaption, DuctCaption);
+	DDX_Check(pDX, IDC_WholeRun, WholeRun);
 	DDX_Check(pDX, IDC_SpiroCatalog, SpiroCatalog);
 	DDX_Check(pDX, IDC_SpiroRG, SpiroRG);
 	DDX_Check(pDX, IDC_SpiroDashed, SpiroDashed);
-	DDX_Text(pDX, IDC_SpiroC, SpiroC);
+	DDX_Real(pDX, IDC_SpiroC, SpiroC);
 	DDV_MinMaxDouble(pDX, SpiroC, 0, 100);
 	//DDX_Check(pDX, IDC_TapUp, TapUp);
 	//DDX_Check(pDX, IDC_TapMid, TapMid);
@@ -279,9 +282,9 @@ void dgPipeSize::ChangeSizeA()
 	fSizeA.GetWindowTextW(zSizeA);
 	fFlow.GetWindowTextW(zFlow);
 
-	pSizeA = _wtof(zSizeA);
-	pSizeB = _wtof(zSizeB);
-	pFlow = _wtof(zFlow);
+	pSizeA = tvsDecimal::value(zSizeA);
+	pSizeB = tvsDecimal::value(zSizeB);
+	pFlow = tvsDecimal::value(zFlow);
 	pSpeed = TVS_Calculate::getSpeed(pSizeA, pSizeB, pFlow);
 	pI = TVS_Calculate::getI(pSizeA, pSizeB, pFlow);
 	//pDp=TVS_Calculate::getdP(pSizeA,pSizeB,pFlow);
@@ -305,9 +308,9 @@ void dgPipeSize::ChangeSpeed()
 	// 	fSizeA.GetWindowTextW(zSizeA);
 	// 	fSpeed.GetWindowTextW(zSpeed);
 	// 
-	// 	pSizeA=_wtof(zSizeA);
-	// 	pSizeB=_wtof(zSizeB);
-	// 	pSpeed=_wtof(zSpeed);
+	// 	pSizeA=tvsDecimal::value(zSizeA);
+	// 	pSizeB=tvsDecimal::value(zSizeB);
+	// 	pSpeed=tvsDecimal::value(zSpeed);
 	// 	pFlow=TVS_Calculate::getFlow(pSizeA,pSizeB,pSpeed);
 	// 	pI=TVS_Calculate::getI(pSizeA,pSizeB,pFlow);
 	// 

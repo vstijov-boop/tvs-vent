@@ -23,12 +23,14 @@ void TVSCommandPropertyManager::execute(void)
 	#ifdef TVS_OFFSET_INTEGRATION
     if(!spec.processSetOfObjects(sset)){acedSSFree(sset);return;}
 #else
-    spec.processSetOfObjects(sset);
+        spec.processSetOfObjects(sset);
 #endif
+	acedSSFree(sset);
 	spec.sort();
 	if (spec.rows.size() > 0) {
 		dgTVSPropertyManager dg;
 		dg.propertySpec = spec;
+		CAcModuleResourceOverride resourceOverride;
 		dg.DoModal();
 	}
 }

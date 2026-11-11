@@ -14,6 +14,7 @@
 		//		SPEClist speclist, speclistflex;
 		SpecWithAttrlist specatrlist;
 		fillspecification(sset, specatrlist, L"%%d", L"%%c");
+		acedSSFree(sset);
 
 
 		if (specatrlist.specList.physicalLength() != 0)
@@ -206,65 +207,37 @@
 	{
 		if (ActivationErrorMessage() != pError_Ok) return;
 		syncTVSGlobalUnits();
-		ads_name sset, eName, ent;
+		ads_name sset, ent;
 		ads_point pt1;
-		bool isOk = false;
-		int acadStatus;
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
 
-
 		double length = 0;
-
-		isOk = false;
-		while (isOk == false)
+		for (;;)
 		{
-			acadStatus = acedEntSel(_T("\nIzaberite referentnu liniju: "), ent, pt1);
-			switch (acadStatus)
-			{
-			case RTCAN:
-				return;
-				break;
-
-			}
-			if (acadStatus = RTNORM)
-			{
-				AcDbObjectId pId;
-				acdbGetObjectId(pId, ent);
-
-				AcDbObjectPointer<AcDbLine>pLine(pId, AcDb::kForRead);
-				if (pLine.openStatus() == Acad::eOk)
-				{
-					isOk = true;
-					length = pLine->endPoint().distanceTo(pLine->startPoint());
-				}
-			}
+			const int acadStatus = acedEntSel(_T("\nIzaberite referentnu liniju: "), ent, pt1);
+			if (acadStatus == RTCAN) { acedSSFree(sset); return; }
+			if (acadStatus != RTNORM) continue;   // prazan klik: ponovo
+			AcDbObjectId pId;
+			if (acdbGetObjectId(pId, ent) != Acad::eOk) continue;
+			AcDbObjectPointer<AcDbLine>pLine(pId, AcDb::kForRead);
+			if (pLine.openStatus() != Acad::eOk) { acutPrintf(_T("\nIzabrani objekat nije linija.")); continue; }
+			length = pLine->endPoint().distanceTo(pLine->startPoint());
+			if (length > 1e-9) break;
+			acutPrintf(_T("\nLinija nema dužinu."));
 		}
 
-
-		ads_real  len;
-		isOk = false;
-		while (isOk == false)
+		ads_real len = 0;
+		for (;;)
 		{
-			double newLength;
-
-			acadStatus = acedGetReal(_T("\nUnesite potrebnu dužinu: "), &len);
-			switch (acadStatus)
-			{
-			case RTCAN:
-				return;
-				break;
-
-			}
-			if (acadStatus = RTNORM)
-			{
-				newLength = len;
-				isOk = true;
-			}
-
+			acedInitGet(RSG_NONULL | RSG_NOZERO | RSG_NONEG, NULL);
+			const int acadStatus = acedGetReal(_T("\nUnesite potrebnu dužinu: "), &len);
+			if (acadStatus == RTCAN) { acedSSFree(sset); return; }
+			if (acadStatus == RTNORM && len > 0) break;
 		}
 		ads_real scale = len / length;
 		acedCommandS(RTSTR, _T("_SCALE"), RTPICKS, sset, RTSTR, _T(""), RTPOINT, pt1, RTREAL, scale, RTNONE);
+		acedSSFree(sset);
 		return;
 
 	}
@@ -294,10 +267,10 @@
 				break;
 
 			}
-			if (acadStatus = RTNORM)
+			if (acadStatus == RTNORM)
 			{
 				AcDbObjectId pId;
-				acdbGetObjectId(pId, ent);
+				if (acdbGetObjectId(pId, ent) != Acad::eOk) continue;
 
 				AcDbObjectPointer<AcDbPolyline>pLine(pId, AcDb::kForRead);
 				if (pLine.openStatus() == Acad::eOk)

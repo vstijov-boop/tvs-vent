@@ -42,7 +42,7 @@
     static void Ventilation_ARXTVS_DIM_PRATI(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
-        tvsSizeFollow::run();
+        tvsSizeFollow::run(IDD_RUN, IDD_TEETYPE);
     }
     static void Ventilation_ARXTVS_PRELAZ_KOTA(void)
     {
@@ -99,6 +99,20 @@
         if (ActivationErrorMessage() != pError_Ok) return;
         syncTVSGlobalUnits();
         tvsMove::execute();
+    }
+    // TVS_PRERACUNAJ: elements pasted 1:1 from a drawing in other units -> this drawing's units (ScaleWindow.h).
+    static void Ventilation_ARXTVS_PRERACUNAJ(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsScaleWindow::recalculate();
+    }
+    // TVS_KOLJENA_UGAO: elbows a little off 15 / 22,5 / 30 / 45 / 60 / 75 / 90 deg back to it (ElbowAngleCommand.h).
+    static void Ventilation_ARXTVS_KOLJENA_UGAO(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsElbowAngle::execute();
     }
     // TVS_ALIGN: one-off alignment to a LINE / polyline segment / XLINE / RAY (AlignCommand.h).
     static void Ventilation_ARXTVS_ALIGN(void)

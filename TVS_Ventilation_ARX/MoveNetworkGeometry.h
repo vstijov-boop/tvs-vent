@@ -16,7 +16,7 @@ struct Body {Kind kind;std::vector<Point> ports,axes,junctions;std::vector<Secti
 struct Contact {int body,port,count;Contact():body(-1),port(-1),count(0){}};
 enum Error { Ok,Invalid,Ambiguous,Unsupported,SectionMismatch,NotTangent,NonPlanar,TooShort,SideBranch,NewContact,Cycle,TooMany,MaskMismatch,UnsupportedBody,PartialRigid,BlockedNeighbour };
 // SideBranch: `other` is the body whose port (junction: centre of a T komad) lies at `where` inside pipe `problem`.
-struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;int problem,other;bool junction;Point where;Result():changed(0),error(Invalid),problem(-1),other(-1),junction(false){}};
+struct Result {std::vector<int> masks;std::vector<std::vector<Point> > ports;int changed;Error error;int problem,other,port,otherPort;bool junction;Point where;Result():changed(0),error(Invalid),problem(-1),other(-1),port(-1),otherPort(-1),junction(false){}};   // port / otherPort: SectionMismatch
 inline Contact contact(const std::vector<Body>& bodies,int owner,int port,double tol){
     Contact c;
     for(size_t i=0;i<bodies.size();++i)if(static_cast<int>(i)!=owner)
@@ -78,6 +78,7 @@ inline bool plan(const std::vector<Body>& bodies,int selected,const Point& delta
                 if(bodies[c.body].kind==Blocked){out.error=Unsupported;return false;}
                 if(static_cast<size_t>(c.port)>=bodies[c.body].sections.size()
                     ||!compatible(body.sections[j],bodies[c.body].sections[c.port],tol)){
+                    out.other=c.body;out.port=static_cast<int>(j);out.otherPort=c.port;out.where=body.ports[j];
                     out.error=SectionMismatch;return false;}
                 Point aAxis,bAxis;
                 if(bodies[c.body].axes.size()!=bodies[c.body].ports.size()
@@ -172,6 +173,7 @@ inline bool planSelection(const std::vector<Body>& bodies,const std::vector<int>
                 if(b.kind==Blocked||b.sections.size()!=b.ports.size()||b.axes.size()!=b.ports.size()){
                     out.error=BlockedNeighbour;return false;}
                 if(!compatible(bodies[i].sections[j],b.sections[c.port],tol)){
+                    out.other=c.body;out.port=static_cast<int>(j);out.otherPort=c.port;out.where=bodies[i].ports[j];
                     out.error=SectionMismatch;return false;}
                 Point aAxis,bAxis;
                 if(!tvsMoveGeometry::unit(bodies[i].axes[j],aAxis)||!tvsMoveGeometry::unit(b.axes[c.port],bAxis)

@@ -181,10 +181,11 @@
 		SpecWithAttrlist specatrlist;
 
 		fillspecification(sset, speclist, speclistflex, specatrlist, L"°", L"⌀");
+		acedSSFree(sset);
 		CMSExcel* m_msExcel = new CMSExcel;
 		acedSetStatusBarProgressMeter(_T("Izvoz u Excel"), 0, 100);
 
-		if (FAILED(m_msExcel->NewExcelBook(false) == E_FAIL)) { acutPrintf(_T("\n Greška")); acedRestoreStatusBar(); delete m_msExcel; return; }
+		if (FAILED(m_msExcel->NewExcelBook(false))) { acutPrintf(_T("\nExcel nije dostupan (nije instaliran ili se ne može pokrenuti); izvoz nije urađen.")); acedRestoreStatusBar(); delete m_msExcel; return; }
 		acedRestoreStatusBar();
 		if (speclist.specList.physicalLength() != 0)
 		{
@@ -239,13 +240,13 @@
 
 		if (!pBlkTbl->has(pName))
 		{
-			acutPrintf(L"\nDefinicija bloka TEST ne postoji");
+			acutPrintf(L"\nDefinicija bloka \"%s\" ne postoji.", pName);
 			pBlkTbl->close();
 			return false;
 		}
 
-		es = pBlkTbl->getAt(pName, pBlkRec, AcDb::kForWrite);
-		// create a AttributeDefinition
+		es = pBlkTbl->getAt(pName, pBlkRec, AcDb::kForRead);
+		if (es != Acad::eOk) { pBlkTbl->close(); return false; }
 
 		AcDbBlockTableRecordIterator *pIterBTR = NULL;
 		if ((es = pBlkRec->newIterator(pIterBTR)) == Acad::eOk) {
@@ -270,8 +271,9 @@
 							// 													acutPrintf(_T("\nTag2=%s"),LPCTSTR(tag));
 							//	const ACHAR* tagconst=LPCTSTR(pAttdef->tagConst());
 							if (wcscmp(tag, pAttdef->tagConst()) == 0) {
-								//	pAttDef->close();
-								pBlkRec->close();
+									pSubEnt.close();
+									delete pIterBTR;
+									pBlkRec->close();
 								pBlkTbl->close();
 
 								return false;
@@ -286,22 +288,22 @@
 						}
 					}
 					else {
-						acutPrintf(_T("\nNije moguće otvoriti element u bloku! Greška: %s",
-							LPCTSTR(acadErrorStatusText(es))));
+						acutPrintf(_T("\nNije moguće otvoriti element u bloku! Greška: %s"),
+							LPCTSTR(acadErrorStatusText(es)));
 					}
 				}
 				else {
-					acutPrintf(_T("\nNije moguće dobiti AcDbObjectId elementa u bloku! Greška: %s",
-						LPCTSTR(acadErrorStatusText(es))));
+					acutPrintf(_T("\nNije moguće dobiti AcDbObjectId elementa u bloku! Greška: %s"),
+						LPCTSTR(acadErrorStatusText(es)));
 				}
 			}
 		}
 		else {
-			acutPrintf(_T("\nNije moguće napraviti iterator zapisa tabele blokova! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
+			acutPrintf(_T("\nNije moguće napraviti iterator zapisa tabele blokova! Greška: %s"), LPCTSTR(acadErrorStatusText(es)));
 		}
 
 
-		//pAttDef->close();
+		delete pIterBTR;
 		pBlkRec->close();
 		pBlkTbl->close();
 		return true;
@@ -333,13 +335,14 @@
 
 		if (!pBlkTbl->has(pName))
 		{
-			acutPrintf(L"\nDefinicija bloka TEST ne postoji");
+			acutPrintf(L"\nDefinicija bloka \"%s\" ne postoji.", pName);
 			pBlkTbl->close();
 			return;
 
 		}
 
 		es = pBlkTbl->getAt(pName, pBlkRec, AcDb::kForWrite);
+		if (es != Acad::eOk) { pBlkTbl->close(); acutPrintf(L"\nBlok \"%s\" se ne može mijenjati (zaključan?).", pName); return; }
 		// create a AttributeDefinition
 		pAttDef = new AcDbAttributeDefinition(attLoc, text,
 			tag, prompt);
@@ -348,7 +351,7 @@
 		// append the AttributeDefinition to the definition
 		es = pBlkRec->appendAcDbEntity(attId, pAttDef);
 
-		pAttDef->close();
+		if (es == Acad::eOk) pAttDef->close(); else delete pAttDef;
 		pBlkRec->close();
 		pBlkTbl->close();
 		//delete pAttDef;
@@ -370,6 +373,7 @@
 		//		SPEClist speclist, speclistflex;
 		SpecWithAttrlist specatrlist;
 		fillspecification(sset, specatrlist, L"%%d", L"%%c");
+		acedSSFree(sset);
 
 
 		if (specatrlist.specList.physicalLength() != 0)

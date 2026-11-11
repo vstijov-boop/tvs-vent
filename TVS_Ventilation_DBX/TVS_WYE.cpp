@@ -23,6 +23,7 @@
 //----- TVS_WYE.cpp : Implementation of TVS_WYE
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "TransformGuard.h"
 #include "PortGrips.h"
 #include "LevelLabels.h"
 #include "TVS_WYE.h"
@@ -783,11 +784,19 @@ Acad::ErrorStatus TVS_WYE::getArea (double &area) const {
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_WYE::subTransformBy(const AcGeMatrix3d & xform)
 {
+	const double scale = tvsTransform::accepted(xform);   // TransformGuard.h: SCALE refused, paste between units scaled
+	if (scale <= 0) return tvsTransform::refuse();
 	Acad::ErrorStatus retCode =AcDbEntity::subTransformBy (xform) ;
 	assertWriteEnabled () ;
 	Basepoint.transformBy(xform);
 	Vectpr.transformBy(xform);
 	Vectotv.transformBy(xform);
+	if (scale != 1) {
+		tvsTransform::scaleCommon(this, scale); SizeApr *= scale; SizeBpr *= scale; SizeAotv *= scale; SizeBotv *= scale; LengthPl *= scale;
+		Vectpr /= scale; Vectotv /= scale;   // directions keep their length
+		tvsTeeData::Record r;   // TK-O / TK-G: collar, second width and radius are lengths too
+		if (tvsTeeData::read(this, r)) { r.l *= scale; r.second *= scale; r.radius2 *= scale; tvsTeeData::write(this, r); }
+	}
 
 
 	return (Acad::eOk);

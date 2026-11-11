@@ -23,6 +23,7 @@
 //----- TVS_Pipe.cpp : Implementation of TVS_Pipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "TransformGuard.h"
 #include "LevelLabels.h"
 #include "DuctCaption.h"
 #ifdef TVS_OFFSET_INTEGRATION
@@ -735,7 +736,7 @@ Acad::ErrorStatus TVS_Pipe::subGetGripPoints (
 
 	AcDbGripData *pEnd = new AcDbGripData();
 
-	double k=1+10*curViewUnitSize / Length;
+	double k=1+10*curViewUnitSize / (Length > 1e-12 ? Length : 1e-12);   // kanal nulte duzine: bez NaN
 
 
 
@@ -1094,8 +1095,9 @@ void TVS_Pipe::Gimme4PipePoints ()
 	X1=LastPoint.x-FirstPoint.x;
 	Y1=LastPoint.y-FirstPoint.y;
 
-	X2=Y1*SizeA/Length/2;
-	Y2=X1*SizeA/Length/2;
+	const double L = Length > 1e-12 ? Length : 1;   // kanal nulte duzine: bez NaN geometrije
+	X2=Y1*SizeA/L/2;
+	Y2=X1*SizeA/L/2;
 	A=AcGePoint3d(FirstPoint.x-X2,FirstPoint.y+Y2,FirstPoint.z);
 	B=AcGePoint3d(LastPoint.x-X2,LastPoint.y+Y2,FirstPoint.z);
 	C=AcGePoint3d(LastPoint.x+X2,LastPoint.y-Y2,FirstPoint.z);
@@ -1109,8 +1111,9 @@ void TVS_Pipe::Gimme4PipePointsWipe ()
 	X1=LastPoint.x-FirstPoint.x;
 	Y1=LastPoint.y-FirstPoint.y;
 
-	X2=Y1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
-	Y2=X1*(SizeA+tvsUnits::drawing(200.0, this))/Length/2;
+	const double L = Length > 1e-12 ? Length : 1;   // kanal nulte duzine: bez NaN
+	X2=Y1*(SizeA+tvsUnits::drawing(200.0, this))/L/2;
+	Y2=X1*(SizeA+tvsUnits::drawing(200.0, this))/L/2;
 	//AW=AcGePoint3d(FirstPoint.x-X2,FirstPoint.y+Y2,FirstPoint.z);
 	//BW=AcGePoint3d(LastPoint.x-X2,LastPoint.y+Y2,FirstPoint.z);
 	//CW=AcGePoint3d(LastPoint.x+X2,LastPoint.y-Y2,FirstPoint.z);
@@ -1188,6 +1191,8 @@ TVS_Pipe* TVS_Pipe::add_new(AcGePoint3d &pFirstPoint,
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 {
+	const double scale = tvsTransform::accepted(xform);   // TransformGuard.h: SCALE refused, paste between units scaled
+	if (scale <= 0) return tvsTransform::refuse();
 #ifdef TVS_OFFSET_INTEGRATION
     if(!tvsOffsetData::allowTransform(this,xform)){acutPrintf(L"\nTVS: clan obilaska/offseta se moze samo pomjeriti ili rotirati oko Z (SCALE/MIRROR nisu dozvoljeni).");return Acad::eNotApplicable;}
 #endif
@@ -1195,6 +1200,7 @@ Acad::ErrorStatus TVS_Pipe::subTransformBy(const AcGeMatrix3d & xform)
 
 	FirstPoint.transformBy(xform);
 	LastPoint.transformBy(xform);
+	if (scale != 1) tvsTransform::scaleCommon(this, scale);
 	return (Acad::eOk);
 }
 void TVS_Pipe::setLastpoint (AcGePoint3d pLastpoint)
@@ -1465,7 +1471,7 @@ Acad::ErrorStatus TVS_FlexDuct::subGetGripPoints( AcDbGripDataPtrArray &grips, c
 
 	AcDbGripData *pEnd = new AcDbGripData();
 
-	double k=1+10*curViewUnitSize / Length;
+	double k=1+10*curViewUnitSize / (Length > 1e-12 ? Length : 1e-12);   // kanal nulte duzine: bez NaN
 
 
 
