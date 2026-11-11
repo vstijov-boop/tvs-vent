@@ -3,7 +3,7 @@ name: Build AutoCAD 2022
 on:
   workflow_dispatch:
   push:
-    branches: [master, razvoj-tkomad]
+    branches: [master, razvoj-tkomad, razvoj-protoci]
     paths:
       - '.github/workflows/build-autocad-2022.yml'
       - 'TVS_Ventilation_ARX/**'

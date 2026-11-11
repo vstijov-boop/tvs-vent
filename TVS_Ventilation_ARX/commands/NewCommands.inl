@@ -107,6 +107,13 @@
         syncTVSGlobalUnits();
         tvsCheck::execute();
     }
+    // TVS_PROTOK: flows from the terminals summed to the unit (FlowCommand.h).
+    static void Ventilation_ARXTVS_PROTOK(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsFlow::execute();
+    }
     // TVS_PRERACUNAJ: elements pasted 1:1 from a drawing in other units -> this drawing's units (ScaleWindow.h).
     static void Ventilation_ARXTVS_PRERACUNAJ(void)
     {

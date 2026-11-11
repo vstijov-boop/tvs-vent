@@ -26,6 +26,7 @@ CMDS = [
  ('PRERACUNAJ', 'Preračunaj jedinice', 'Izbor nacrtan u drugim jedinicama (mm/cm/m), zalijepljen 1:1, preračunava u jedinice ovog crteža (položaj i dimenzije).', 'Crtanje kanala', 'Crtanje kanala', 'PJ'),
  ('KOLJENA_UGAO', 'Ugao koljena', 'Vraća koljena malo odstupljenog ugla na 15/22,5/30/45/60/75/90° (krajevi kanala prate).', 'Crtanje kanala', 'Crtanje kanala', 'KU'),
  ('PROVJERA', 'Provjera mreže', 'Spojevi različitih dimenzija / kota bez prelaza, promašeni priključci, kraj kanala usred kanala, uglovi koljena, kratki kanali; zum na svaki problem.', 'Crtanje kanala', 'Crtanje kanala', 'PV'),
+ ('PROTOK', 'Protoci mreže', 'Sabira protoke krajnjih elemenata do jedinice (izbor kraja mreže kod jedinice); krajnjim elementima bez protoka unosi se protok; prikazuje najveću brzinu.', 'Crtanje kanala', 'Crtanje kanala', 'PT'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)

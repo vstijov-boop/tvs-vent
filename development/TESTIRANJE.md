@@ -1,5 +1,14 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## TVS_PROTOK (novo, grana razvoj-protoci) – testirati
+- Klik na kanal kod jedinice, blizu njegovog slobodnog kraja (taj kraj ne smije biti spojen). Svi elementi od tog kraja dalje dobiju zbir protoka krajnjih elemenata iza sebe; krajnji elementi (ništa dalje spojeno) zadržavaju svoj protok.
+- Ispis: broj elemenata mreže, krajnjih elemenata (bez protoka), ukupno m³/h, slobodni priključci na fitinzima (npr. otvoren ogranak T komada), najveća brzina u kanalu.
+- Krajnji elementi bez protoka: [Unos/Nastavi] – Unos zumira na svaki i pita protok (Enter = preskoči, Kraj = prekini unos).
+- Ništa se ne upisuje prije „Upisati protoke u N elemenata? [Da/Ne]“; jedno UNDO vraća sve. TVS oznake (MLeader) promijenjenih elemenata se osvježe.
+- Etaž i obilazak su jedan element (svi članovi dobiju isti protok); flex crijeva nose protok kao kanali.
+- Petlja u mreži ili tačka u kojoj se sastaje više od dva kraja: poruka sa zumom, ništa se ne upisuje.
+- Tip sistema se ne bira (dovod i odvod isto). Brzine / prijedlog dimenzija i oznaka „ručno“ – sljedeći korak.
+
 ## TVS_PROVJERA (novo) – testirati
 - Enter = cijeli crtež, ili izbor dijela mreže. Ispis: broj problema po vrsti, pa lista (do 200) sa X/Y u mm.
 - Vrste: spoj različitih dimenzija bez prelaza; ista dimenzija, druga kota; kraj promašuje priključak (0,1–5 mm); kraj kanala usred drugog kanala (bez T komada); koljeno malo van 15/22,5/30/45/60/75/90°; kanal kraći od 10 mm.
