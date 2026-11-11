@@ -2,7 +2,7 @@
 import pathlib,re,unittest
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def text(p):return (ROOT/p).read_text(encoding='utf-8-sig')
-DEV=('TVS_TEST','TVS_TRANS','TVS_WYE','TVS_CONNECTTest','TVS_DUCT','TVS_SpecificationOld','TVS_Flex','TVS_Show','TVSSomeParts',
+DEV=('TVS_HEATFLOOR','TVS_TEST','TVS_TRANS','TVS_WYE','TVS_CONNECTTest','TVS_DUCT','TVS_SpecificationOld','TVS_Flex','TVS_Show','TVSSomeParts',
      'MyCommand','MyPickFirst','MySessionCmd','TVS_OFFSET_TEST_BAD','TVS_OFFSET_FAIL_NEXT','TVS_TEST_OFFSET','TVS_BYPASS_DETAIL_TEST','TVS_BYPASS_DETAIL_CHECK')
 def release(s):
     """Lines outside #ifdef TVS_DEV / #if ...defined(TVS_DEV) blocks (nesting counted)."""
@@ -42,6 +42,11 @@ class Release(unittest.TestCase):
   self.assertIn('const double minLength = 50.0 / tvsUnits::factor();',e)   # TVS_CUT u mm
   self.assertIn('if (es == Acad::eOk && eSet.length() > 0) es = pEnt->erase();',e)   # TVS_ERASE: original ostaje ako razbijanje ne uspije
   self.assertIn('TVS_RAZBIJ, TVS_RAZBIJ',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
+ def test_release_defines_and_units(self):
+  for y in ('2020','2022'):self.assertNotIn('TVS_BYPASS_FAULT_INJECTION',text('TVS_Ventilation_ARX/TVS_Ventilation_ARX%s.vcxproj'%y))
+  e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
+  for f in ('tvsBypassCommandEntry','tvsBypassPreviewCommandEntry','tvsBypassExistingDetailEntry'):self.assertIn('static void %s(){syncTVSGlobalUnits();'%f,e)
+  self.assertIn('Ventilation_ARXTVS_OFFSET(){syncTVSGlobalUnits();',text('TVS_Ventilation_ARX/commands/NewCommands.inl'))
  def test_no_windows_macro_identifiers(self):
   # near / far / small are Windows macros (MSVC): not as names of parameters or variables
   import glob,re

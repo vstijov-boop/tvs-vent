@@ -111,8 +111,9 @@
 #ifdef TVS_BYPASS_PREVIEW
 // Live radius mode from the shared Settings.h globals (Settings.cpp).
 static TVSBypassRadius tvsBypassRadiusSettings(){TVSBypassRadius r;r.mode=globalRadiusTypeRect;r.roundMode=globalRadiusTypeRound;r.typeRoundTap=globalTypeRoundTap;r.k=globalTapRadiusVariableParameter;r.constant=globalTapRadiusConst;return r;}
-static void tvsBypassCommandEntry(){tvsBypassCommand(tvsBypassRadiusSettings());}
-static void tvsBypassPreviewCommandEntry(){tvsBypassPreviewCommand(tvsBypassRadiusSettings());}
+static void tvsBypassCommandEntry(){syncTVSGlobalUnits();tvsBypassCommand(tvsBypassRadiusSettings());}   // jedinice ovog crteža
+static void tvsBypassExistingDetailEntry(){syncTVSGlobalUnits();tvsBypassExistingDetailCommand();}
+static void tvsBypassPreviewCommandEntry(){syncTVSGlobalUnits();tvsBypassPreviewCommand(tvsBypassRadiusSettings());}
 #endif
 class CTVS_Ventilation_ARXApp : public AcRxArxApp {
 
@@ -144,7 +145,7 @@ public:
             acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
-        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand)!=Acad::eOk)
+        if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_DETALJ nije uspjela.");
 #endif
 		PropertyAdmin::initialize();
@@ -405,7 +406,9 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_LEAD_Re
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SCALE, TVS_SCALE, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_AddAtrib, TVS_AddAtrib, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SETTINGS, TVS_SETTINGS, ACRX_CMD_TRANSPARENT | ACRX_CMD_USEPICKSET, NULL)
-ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_HEATFLOOR, TVS_HEATFLOOR, ACRX_CMD_MODAL, NULL)
+#ifdef TVS_DEV
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_HEATFLOOR, TVS_HEATFLOOR, ACRX_CMD_MODAL, NULL)   // nedovršeno; podno grijanje radi drugi program
+#endif
 
 
 
