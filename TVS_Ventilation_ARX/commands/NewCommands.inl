@@ -100,6 +100,13 @@
         syncTVSGlobalUnits();
         tvsMove::execute();
     }
+    // TVS_PROVJERA: network check with zoom to each problem (CheckCommand.h).
+    static void Ventilation_ARXTVS_PROVJERA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsCheck::execute();
+    }
     // TVS_PRERACUNAJ: elements pasted 1:1 from a drawing in other units -> this drawing's units (ScaleWindow.h).
     static void Ventilation_ARXTVS_PRERACUNAJ(void)
     {

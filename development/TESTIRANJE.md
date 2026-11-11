@@ -1,5 +1,12 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## TVS_PROVJERA (novo) – testirati
+- Enter = cijeli crtež, ili izbor dijela mreže. Ispis: broj problema po vrsti, pa lista (do 200) sa X/Y u mm.
+- Vrste: spoj različitih dimenzija bez prelaza; ista dimenzija, druga kota; kraj promašuje priključak (0,1–5 mm); kraj kanala usred drugog kanala (bez T komada); koljeno malo van 15/22,5/30/45/60/75/90°; kanal kraći od 10 mm.
+- Obilazak: zum na problem, elementi označeni (gripovi), [Sljedeci/Prethodni/Kraj].
+- Probati na jučerašnjim slučajevima (kanal na 0 uz T komad na 2850; kanal 150×150 na ogranku visine 100) – oba treba da se nađu.
+- Lažni nalazi (npr. kanali jedan iznad drugog sa krajevima u istoj tački) – javiti.
+
 ## Novi meni (TVS_VENT.cuix)
 Učitajte novi TVS_VENT.cuix (CUILOAD / Menuload ili zamjena postojećeg fajla).
 Nove komande su u meniju "Crtanje kanala", na traci TVS_VENT i na ribbonu:
