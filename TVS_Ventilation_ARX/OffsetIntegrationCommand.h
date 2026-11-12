@@ -81,10 +81,12 @@ inline Outcome interact(const AcDbObjectId& source,tvsOffsetOperation::End end,d
     if(plan.status==tvsOffsetOperation::NoChange)return NoChange;
     if(plan.status!=tvsOffsetOperation::Ready){
         if(plan.status==tvsOffsetOperation::TooShort)tvsOffsetService::reject(L"Ulaz je prekratak za koljeno i ostatak od 1 mm.");
-        else acutPrintf(L"\nTVS OFFSET DEV: Lmin=%.3f, minProjection=%.3f mm. %s",request.minimumStraight,request.minimumProjection,errorText(plan.geometryStatus));
+        else acutPrintf(L"\nTVS OFFSET: geometrija nije moguća (najmanji ravni dio %.0f mm). %s",request.minimumStraight,errorText(plan.geometryStatus));
         return Failed;
     }
+#ifdef TVS_DEV
     acutPrintf(L"\nDEV preview: zelena osa/spojevi u osnovi; zute oznake su apsolutne fizicke kote, nisu WCS Z.");
+#endif
     acutPrintf(L"\nDva glatka pravougaona koljena: Ri=%.3f, ugao=%.3f; A x B=%.3f x %.3f mm.",request.ri,request.angleDegrees,snapshot.physical.a*snapshot.physical.factor,snapshot.physical.b*snapshot.physical.factor);
     acutPrintf(L"\nZ %.3f -> %.3f mm; P=%.6f, rise=%.6f, L=%.6f mm; izlazni nastavak 300 mm.",
         snapshot.physical.elevation*snapshot.physical.factor,plan.acceptedElevation*snapshot.physical.factor,
@@ -104,7 +106,7 @@ inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acce
     if(result==Applied){
         current=output.residentOutput;acceptedElevation=output.elevation;acceptedAngle=output.angle;
         try {tvsOffsetSession::applied(acdbHostApplicationServices()->workingDatabase(),original,output.output,output.before);}
-        catch(...){acutPrintf(L"\nDEV: geometrija je upisana; sesijska evidencija nije sacuvana.");}
+        catch(...){acutPrintf(L"\nTVS OFFSET: geometrija je upisana; evidencija za praćenje kote nije sačuvana.");}
     }
     return result;
 }

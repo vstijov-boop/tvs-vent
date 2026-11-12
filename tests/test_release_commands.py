@@ -3,7 +3,8 @@ import pathlib,re,unittest
 ROOT=pathlib.Path(__file__).resolve().parents[1]
 def text(p):return (ROOT/p).read_text(encoding='utf-8-sig')
 DEV=('TVS_HEATFLOOR','TVS_TEST','TVS_TRANS','TVS_WYE','TVS_CONNECTTest','TVS_DUCT','TVS_SpecificationOld','TVS_Flex','TVS_Show','TVSSomeParts',
-     'MyCommand','MyPickFirst','MySessionCmd','TVS_OFFSET_TEST_BAD','TVS_OFFSET_FAIL_NEXT','TVS_TEST_OFFSET','TVS_BYPASS_DETAIL_TEST','TVS_BYPASS_DETAIL_CHECK')
+     'MyCommand','MyPickFirst','MySessionCmd','TVS_OFFSET_TEST_BAD','TVS_OFFSET_FAIL_NEXT','TVS_TEST_OFFSET','TVS_BYPASS_DETAIL_TEST','TVS_BYPASS_DETAIL_CHECK',
+     'TVS_BYPASS_PREVIEW','TVS_OFFSET_STATUS','TVS_OFFSET_POLICY')
 def release(s):
     """Lines outside #ifdef TVS_DEV / #if ...defined(TVS_DEV) blocks (nesting counted)."""
     out=[];stack=[]

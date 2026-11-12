@@ -144,11 +144,13 @@ public:
             acutPrintf(L"\nDEV: registracija provjere detalja nije uspjela.");
 #endif
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS",L"TVS_BYPASS",ACRX_CMD_MODAL,&tvsBypassCommandEntry)!=Acad::eOk)
-            acutPrintf(L"\nDEV: registracija TVS_BYPASS nije uspjela.");
+            acutPrintf(L"\nTVS: registracija TVS_BYPASS nije uspjela.");
+#ifdef TVS_DEV   // pregled obilaska bez upisa: razvojni alat (opcija Obilazak u TVS_DRAW ima svoj pregled)
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_PREVIEW",L"TVS_BYPASS_PREVIEW",ACRX_CMD_MODAL,&tvsBypassPreviewCommandEntry)!=Acad::eOk)
             acutPrintf(L"\nDEV: registracija TVS_BYPASS_PREVIEW nije uspjela.");
+#endif
         if(acedRegCmds->addCommand(L"TVS_BYPASS_DEV",L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailEntry)!=Acad::eOk)
-            acutPrintf(L"\nDEV: registracija TVS_BYPASS_DETALJ nije uspjela.");
+            acutPrintf(L"\nTVS: registracija TVS_BYPASS_DETALJ nije uspjela.");
 #endif
 		PropertyAdmin::initialize();
 #ifdef TVS_OFFSET_INTEGRATION
@@ -453,10 +455,14 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TEST_OF
 #endif
 
 #ifdef TVS_OFFSET_INTEGRATION
+#ifdef TVS_DEV   // dijagnostika etaža / obilaska
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_STATUS, TVS_OFFSET_STATUS, ACRX_CMD_MODAL, NULL)
+#endif
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET, TVS_OFFSET, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_ETAZ_KOTA, TVS_ETAZ_KOTA, ACRX_CMD_MODAL, NULL)
+#ifdef TVS_DEV   // dijagnostika etaža / obilaska
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_POLICY, TVS_OFFSET_POLICY, ACRX_CMD_MODAL, NULL)
+#endif
 #ifdef TVS_DEV
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OFFSET_TEST_BAD, TVS_OFFSET_TEST_BAD, ACRX_CMD_MODAL, NULL)
 #endif

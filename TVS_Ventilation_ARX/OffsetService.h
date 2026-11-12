@@ -350,7 +350,9 @@ inline Outcome write(const Snapshot& s,const tvsOffsetOperation::Request& reques
     if(!tx.commit())return Failed;
     pending.elevation=verified.acceptedElevation;pending.angle=verified.angleDegrees;pending.before=s.physical.elevation;
     result=pending;
+#ifdef TVS_DEV
     acutPrintf(L"\nTVS OFFSET DEV: P=%.6f, riseStraight=%.6f, Lphysical=%.6f mm.",g.projectedLength,g.axis[2].z-g.axis[1].z,g.straightLength);
+#endif
     return Applied;
 }
 }
