@@ -542,6 +542,11 @@ bool tvsBypassResize(const AcDbObjectId& member,const TVSBypassRadius& radius,Ac
    if(action!=704||!dialog.view.ready||!dialog.engine.ready())return false;
    // Prihvati: old members out, inlet + outlet back into the straight route duct.
    {tvsOffsetData::WriteScope scope;
+    // N5: every member, inlet and outlet must be writable before the first one is erased
+    // (locked layer, open elsewhere): otherwise a half removed obilazak would stay.
+    {std::vector<AcDbObjectId> all(r.members,r.members+7);all.push_back(r.inlet);all.push_back(r.outlet);
+     for(size_t j=0;j<all.size();++j){AcDbObjectPointer<AcDbEntity> e(all[j],AcDb::kForWrite);
+      if(e.openStatus()!=Acad::eOk){acutPrintf(L"\nObilazak: element sklopa se ne može mijenjati (%ls). Ništa nije promijenjeno.",acadErrorStatusText(e.openStatus()));return false;}}}
     for(int j=0;j<7;++j){AcDbObjectPointer<AcDbEntity> e(r.members[j],AcDb::kForWrite);
      if(e.openStatus()!=Acad::eOk||e->erase()!=Acad::eOk){acutPrintf(L"\nObilazak: član sklopa nije obrisan; ništa nije promijenjeno do ovog koraka.");return false;}}
     // the parent record (NOD TVS_BYPASS_<guid>) goes too: it still names the inlet, so TVS_BYPASS
@@ -557,7 +562,7 @@ bool tvsBypassResize(const AcDbObjectId& member,const TVSBypassRadius& radius,Ac
    tvsBypassService::Snapshot native;tvsBypassService::Commit result;
    if(!tvsBypassService::capture(r.inlet,r.obstacle,r.reverse,native,radius.typeRoundTap)||!tvsBypassService::current(native)
       ||!tvsBypassService::write(native,dialog.view,dialog.options,result)){
-    acutPrintf(L"\nObilazak: stari je uklonjen i trasa je ponovo prava, ali novi nije upisan (razlog iznad). Pokrenite TVS_BYPASS na tom kanalu.");return false;}
+    acutPrintf(L"\nObilazak: stari je uklonjen i trasa je ponovo prava, ali novi nije upisan (razlog iznad). UNDO vraća stari obilazak; ili pokrenite TVS_BYPASS na tom kanalu.");return false;}
    outlet=result.output;
    acutPrintf(L"\nObilazak preračunat za novu dimenziju.");
    return true;

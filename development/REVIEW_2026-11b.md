@@ -203,3 +203,9 @@ Popravka: pod `TVS_DEV` (dodati u `tests/test_release_commands.py`).
 3. **Jedna transakcija + jedna UNDO grupa po radnji** kao zajednički pomoćnik (već postoji `tvsMove::Transaction`) za TVS_TK_TIP, dionicu, obilazak, razbijanje.
 4. **Numerička polja dijaloga kroz jedan sloj** (`double` + prikaz u mm/stepenima, poređenje brojeva) – uklanja cijelu klasu grešaka N1 iz Svojstava i olakšava novi izgled dijaloga (stavka 22 plana).
 5. **Dionica bez dijaloga**: umjesto modalnog dijaloga poslije svake izmjene – upozorenje u komandnoj liniji + posebna komanda „TVS_DIONICA“ koju korisnik pokrene kad želi (izabere kanal, vidi pregled, potvrdi).
+
+## Status (12.11.2026)
+- Urađeno: N1, N2 (korak 1 i 2), N6 (TVS_HEATFLOOR pod TVS_DEV), V1 (TVS_BYPASS_PREVIEW, TVS_OFFSET_STATUS / POLICY pod TVS_DEV; DEV poruke iz TVS_OFFSET i COPY/WBLOCK obilaska uklonjene), fault injection van izdanja, prijedlog 1 (TVS_PROVJERA).
+- N5: prije brisanja starog obilaska provjerava se da su svi članovi, ulaz i izlaz upisivi – ništa se ne briše ako jedan nije; ako novi obilazak ne uspije, poruka upućuje na UNDO (komanda je jedna UNDO grupa).
+- V7: TVS_ERASE / TVS_RAZBIJ preskače članove etaža / obilaska (poruka sa brojem, upućuje na TVS_IZVOZ); original se briše tek kad su dijelovi dodati u prostor.
+- Ostaje: N3, N4, N7, N8, N9, K4/K5/V12 ostaci, TVS_OFFSET_PROOF razdvajanje i dev build, D1–D8, prijedlozi 2–5.

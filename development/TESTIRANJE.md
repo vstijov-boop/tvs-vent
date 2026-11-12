@@ -1,5 +1,11 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## Izdanje i sklopovi (12.11.) – testirati
+- TVS_BYPASS_PREVIEW, TVS_OFFSET_STATUS, TVS_OFFSET_POLICY više ne postoje u izdanju (Unknown command). TVS_OFFSET i opcija Z ne ispisuju „DEV“ linije.
+- TVS_RAZBIJ / TVS_ERASE: izbor koji obuhvata etaž ili obilazak – članovi sklopa se preskaču uz poruku; ostali TVS elementi se razbiju kao ranije.
+- Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
+- Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
+
 ## TVS_PROTOK (novo, grana razvoj-protoci) – testirati
 - Klik na kanal kod jedinice, blizu njegovog slobodnog kraja (taj kraj ne smije biti spojen). Svi elementi od tog kraja dalje dobiju zbir protoka krajnjih elemenata iza sebe; krajnji elementi (ništa dalje spojeno) zadržavaju svoj protok.
 - Ispis: broj elemenata mreže, krajnjih elemenata (bez protoka), ukupno m³/h, slobodni priključci na fitinzima (npr. otvoren ogranak T komada), najveća brzina u kanalu.

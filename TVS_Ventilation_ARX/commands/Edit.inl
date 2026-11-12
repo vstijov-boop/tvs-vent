@@ -390,28 +390,34 @@
 
 		acedSSLength(sset, &len);
 		//consoleprint(double(len),_T("\nL: "));
-		int done = 0, failed = 0, locked = 0;
+		int done = 0, failed = 0, locked = 0, assembly = 0;
 		for (long i = 0; i < len; i++)
 		{
 			if (acedSSName(sset, i, eName) != RTNORM) continue;
 			if (acdbGetObjectId(id, eName) != eOk || id.isNull()) continue;
+			// etaž / obilazak: a member alone would leave the assembly record orphaned (V7)
+			if (tvsAlignCmd::inAssembly(id)) { ++assembly; continue; }
 			AcDbEntity* pEnt = NULL;
 			if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) != eOk) { ++locked; continue; }
 			if (!TVS_Pipe::cast(pEnt) && !TVS_TAP::cast(pEnt) && !TVS_WYE::cast(pEnt) && !TVS_TRANS::cast(pEnt)) { pEnt->close(); continue; }
 			AcDbVoidPtrArray eSet;
 			const AcDbObjectId owner = pEnt->ownerId();
 			Acad::ErrorStatus es = pEnt->explode(eSet);
-			// the original goes only when its parts exist (a failed explode keeps the element)
-			if (es == Acad::eOk && eSet.length() > 0) es = pEnt->erase();
-			pEnt->close();
+			// the original goes only when its parts are in the drawing (a failed explode or a
+			// space that cannot take the parts keeps the element)
 			if (es != Acad::eOk || eSet.length() == 0)
 			{
+				pEnt->close();
 				for (int k = 0; k < eSet.length(); k++) delete static_cast<AcRxObject*>(eSet[k]);
 				++failed; continue;
 			}
-			postToDatabase(eSet, owner);
+			es = postToDatabase(eSet, owner);
+			if (es == Acad::eOk) es = pEnt->erase();
+			pEnt->close();
+			if (es != Acad::eOk) { ++failed; continue; }
 			++done;
 		}
+		if (assembly) acutPrintf(_T("\nČlanovi etaža / obilaska se ne razbijaju pojedinačno (preskočeno: %d). Za crtež bez TVS elemenata: TVS_IZVOZ."), assembly);
 		acutPrintf(_T("\nRazbijeno TVS elemenata: %d."), done);
 		if (failed) acutPrintf(_T("\nNije razbijeno (element ostaje): %d."), failed);
 		if (locked) acutPrintf(_T("\nNa zaključanom sloju (preskočeno): %d."), locked);
