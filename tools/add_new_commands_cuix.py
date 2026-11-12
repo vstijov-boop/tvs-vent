@@ -25,6 +25,7 @@ CMDS = [
  ('IZVOZ', 'Izvoz bez TVS', 'Kopija crteža u kojoj su TVS elementi zamijenjeni linijama, za korisnike bez TVS_VENT; otvoreni crtež se ne mijenja.', 'Specifikacija', 'Specifikacija', 'IZ'),
  ('PRERACUNAJ', 'Preračunaj jedinice', 'Izbor nacrtan u drugim jedinicama (mm/cm/m), zalijepljen 1:1, preračunava u jedinice ovog crteža (položaj i dimenzije).', 'Crtanje kanala', 'Crtanje kanala', 'PJ'),
  ('KOLJENA_UGAO', 'Ugao koljena', 'Vraća koljena malo odstupljenog ugla na 15/22,5/30/45/60/75/90° (krajevi kanala prate).', 'Crtanje kanala', 'Crtanje kanala', 'KU'),
+ ('PROVJERA', 'Provjera mreže', 'Spojevi različitih dimenzija / kota bez prelaza, promašeni priključci, kraj kanala usred kanala, uglovi koljena, kratki kanali; zum na svaki problem.', 'Crtanje kanala', 'Crtanje kanala', 'PV'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)

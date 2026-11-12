@@ -1,8 +1,8 @@
 ﻿#ifdef TVS_OFFSET_PROOF
 #ifdef TVS_OFFSET_INTEGRATION
-    static void Ventilation_ARXTVS_OFFSET(){tvsOffsetIntegration::standalone();}
+    static void Ventilation_ARXTVS_OFFSET(){syncTVSGlobalUnits();tvsOffsetIntegration::standalone();}   // jedinice ovog crteža
     // TVS_ETAZ_KOTA: etaz follows a changed duct elevation (run automatically, OffsetRefit.h).
-    static void Ventilation_ARXTVS_ETAZ_KOTA(){if(ActivationErrorMessage()!=pError_Ok)return;tvsOffsetRefit::run();}
+    static void Ventilation_ARXTVS_ETAZ_KOTA(){if(ActivationErrorMessage()!=pError_Ok)return;syncTVSGlobalUnits();tvsOffsetRefit::run();}
     static void Ventilation_ARXTVS_OFFSET_FAIL_NEXT(){tvsOffsetIntegration::failNext()=true;acutPrintf(L"\nDEV: sljedeci potvrdeni offset/Z prekida transakciju poslije podataka i kraja izvora.");}
     static void Ventilation_ARXTVS_OFFSET_STATUS(){tvsOffsetDiagnostics::status();}
     static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
@@ -99,6 +99,13 @@
         if (ActivationErrorMessage() != pError_Ok) return;
         syncTVSGlobalUnits();
         tvsMove::execute();
+    }
+    // TVS_PROVJERA: network check with zoom to each problem (CheckCommand.h).
+    static void Ventilation_ARXTVS_PROVJERA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsCheck::execute();
     }
     // TVS_PRERACUNAJ: elements pasted 1:1 from a drawing in other units -> this drawing's units (ScaleWindow.h).
     static void Ventilation_ARXTVS_PRERACUNAJ(void)

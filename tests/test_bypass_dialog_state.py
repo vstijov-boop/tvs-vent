@@ -96,7 +96,7 @@ int main(){
         self.assertNotIn('tvsBypassService::write(',body)
         self.assertRegex(body,r"(?s)deviation<=\.001.*?tvsSideDetail::insert\(")
         entry=entry_source()
-        self.assertIn('L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailCommand',entry)
+        self.assertIn('L"TVS_BYPASS_DETALJ",L"TVS_BYPASS_DETALJ",ACRX_CMD_MODAL,&tvsBypassExistingDetailEntry',entry)   # entry: syncTVSGlobalUnits + tvsBypassExistingDetailCommand
 
 if __name__=='__main__':
     unittest.main()
