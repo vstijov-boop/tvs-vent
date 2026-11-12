@@ -78,29 +78,62 @@ inline void fastest(const Net& net,const tvsFlowNetwork::Result& r,double f){
 }
 inline double& maximumVelocity(){static double v=5.0;return v;}
 const wchar_t* const lockApp=L"TVS_RUCNO";
-inline bool locked(const AcDbObjectId& id){
-    AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)return false;
-    resbuf* x=e->xData(lockApp);if(!x)return false;
-    bool on=false;for(resbuf* r=x;r;r=r->rbnext)if(r->restype==1070&&r->resval.rint==1)on=true;
-    acutRelRb(x);return on;
+// "ručno" on a duct: xdata TVS_RUCNO (1070 = 1, 1040 width, 1040 height, 0 = round), the size
+// the user chose for the dionica (mm). No proposal for it any more; its velocity is shown.
+struct Manual {bool on;double a,b;Manual():on(false),a(0),b(0){}};
+inline Manual manualOf(const AcDbObjectId& id){
+    Manual m;AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)return m;
+    resbuf* x=e->xData(lockApp);if(!x)return m;int reals=0;
+    for(resbuf* r=x;r;r=r->rbnext){if(r->restype==1070&&r->resval.rint==1)m.on=true;
+        if(r->restype==1040){if(reals==0)m.a=r->resval.rreal;else if(reals==1)m.b=r->resval.rreal;++reals;}}
+    acutRelRb(x);return m;
 }
-inline bool setLocked(const AcDbObjectId& id,bool on){
+inline bool setManual(const AcDbObjectId& id,const Manual& m){
     acdbRegApp(lockApp);
     AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForWrite);if(e.openStatus()!=Acad::eOk)return false;
-    resbuf* x=on?acutBuildList(1001,lockApp,1070,1,0):acutBuildList(1001,lockApp,0);if(!x)return false;
+    resbuf* x=m.on?acutBuildList(1001,lockApp,1070,1,1040,m.a,1040,m.b,0):acutBuildList(1001,lockApp,0);if(!x)return false;
     const Acad::ErrorStatus es=e->setXData(x);acutRelRb(x);return es==Acad::eOk;
 }
-struct Dionica {std::vector<AcDbObjectId> ducts;int worst;double flow,v;bool round,manual;double a,b;tvsDuctSizing::Size width,both;};
+struct Dionica {std::vector<AcDbObjectId> ducts;int worst;double flow,v;bool round;Manual manual;double a,b;tvsDuctSizing::Size width,both;};
 inline void sizeText(wchar_t* out,size_t n,bool round,double a,double b){
     if(round)swprintf_s(out,n,L"Ø%.0f",a);else swprintf_s(out,n,L"%.0f×%.0f",a,b);
 }
-inline void describe(const Dionica& d,int k,int count){
+inline void describe(const Dionica& d,int k,int count,double vmax){
     wchar_t now[32],w[32],h[32];sizeText(now,32,d.round,d.a,d.b);
     acutPrintf(L"\n  %d/%d: %ls, %.0f m³/h, %.2f m/s",k,count,now,d.flow,d.v);
-    if(d.manual){acutPrintf(L" – ručno, bez prijedloga");return;}
+    if(d.manual.on){
+        if(d.manual.a>0){const bool rd=!(d.manual.b>0);sizeText(w,32,rd,d.manual.a,d.manual.b);
+            const double v=tvsDuctSizing::velocity(d.flow,d.manual.a,d.manual.b,rd);
+            acutPrintf(L" – ručno: %ls, %.2f m/s%ls",w,v,v>vmax+1e-9?L" (i dalje iznad)":L"");}
+        else acutPrintf(L" – ručno (zadržana sadašnja dimenzija)");
+        return;}
     if(d.round){if(d.width.ok){sizeText(w,32,true,d.width.a,0);acutPrintf(L" → %ls (%.2f m/s)",w,d.width.v);}else acutPrintf(L" → nema standardnog prečnika");return;}
     if(d.width.ok){sizeText(w,32,false,d.width.a,d.width.b);acutPrintf(L" → širina: %ls (%.2f m/s)",w,d.width.v);}else acutPrintf(L" → širina: nema do 3000 mm");
     if(d.both.ok){sizeText(h,32,false,d.both.a,d.both.b);acutPrintf(L"; š×v: %ls (%.2f m/s)",h,d.both.v);}
+}
+// "Rucno" in the walk-through: the user's size for the dionica (or keep / remove the mark).
+inline bool askManual(Dionica& d,double vmax){
+    for(;;){wchar_t prompt[220],now[32];
+        if(d.manual.on&&d.manual.a>0){sizeText(now,32,!(d.manual.b>0),d.manual.a,d.manual.b);
+            swprintf_s(prompt,220,L"\nRučna dimenzija dionice (sada %ls), npr. 300x150 ili d200; U = ukloni oznaku; Enter = zadrži: ",now);}
+        else if(d.manual.on)swprintf_s(prompt,220,L"\nRučna dimenzija dionice, npr. 300x150 ili d200; U = ukloni oznaku; Enter = zadrži: ");
+        else swprintf_s(prompt,220,L"\nRučna dimenzija dionice, npr. 300x150 ili d200; Enter = sadašnja dimenzija: ");
+        ACHAR text[64]=L"";const int g=acedGetString(1,prompt,text,64);
+        if(g!=RTNORM)return false;
+        Manual m;
+        if(text[0]==0){if(d.manual.on)return false;m.on=true;}
+        else if((text[0]==L'U'||text[0]==L'u')&&text[1]==0)m.on=false;
+        else{tvsDuctSizing::Size s;if(!tvsDuctSizing::parse(text,d.round,s)){acutPrintf(L"\nNije dimenzija: „%ls“. Primjeri: 300x150, d200%ls.",text,d.round?L", 200":L"");continue;}
+            m.on=true;m.a=s.a;m.b=s.b;}
+        int done=0;for(size_t k=0;k<d.ducts.size();++k)if(setManual(d.ducts[k],m))++done;
+        if(done<static_cast<int>(d.ducts.size()))acutPrintf(L"\nOznaka nije upisana u %d kanala (zaključan sloj?).",static_cast<int>(d.ducts.size())-done);
+        d.manual=m;
+        if(!m.on)acutPrintf(L"\nOznaka „ručno“ uklonjena; dionica ponovo dobija prijedlog.");
+        else if(m.a>0){const bool rd=!(m.b>0);const double v=tvsDuctSizing::velocity(d.flow,m.a,m.b,rd);sizeText(now,32,rd,m.a,m.b);
+            acutPrintf(L"\nRučno: %ls, %.2f m/s%ls. Dimenziju kanala promijenite u Svojstvima / TVS_DIM_PRATI.",now,v,v>vmax+1e-9?L" – i dalje iznad najveće brzine":L"");}
+        else acutPrintf(L"\nDionica označena „ručno“ sa sadašnjom dimenzijom; nema više prijedloga.");
+        return true;
+    }
 }
 // Dionice of the network above vmax (manual ones too, marked), fastest first.
 inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f){
@@ -110,10 +143,10 @@ inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
      if(g==RTCAN||g==RTKWORD)return;if(g==RTNORM)maximumVelocity()=v;}
     const double vmax=maximumVelocity();
     std::vector<int> group;const int count=tvsDuctSizing::dionice(r.parent,r.reached,group);
-    std::vector<Dionica> all(count);for(int g=0;g<count;++g){all[g].worst=-1;all[g].v=0;all[g].manual=false;}
+    std::vector<Dionica> all(count);for(int g=0;g<count;++g){all[g].worst=-1;all[g].v=0;}
     for(size_t i=0;i<net.nodes.size();++i){const tvsMove::Node& n=net.nodes[i];
         if(net.owner[i]!=static_cast<int>(i)||!net.members[i].empty()||n.kind!=1||n.flex||group[i]<0)continue;
-        Dionica& d=all[group[i]];d.ducts.push_back(n.id);if(locked(n.id))d.manual=true;
+        Dionica& d=all[group[i]];d.ducts.push_back(n.id);{const Manual m=manualOf(n.id);if(m.on&&!d.manual.on)d.manual=m;}
         const double v=tvsDuctSizing::velocity(r.flow[i],n.a*f,n.b*f,n.round);
         if(d.worst<0||v>d.v){d.worst=static_cast<int>(i);d.v=v;d.flow=r.flow[i];d.round=n.round;d.a=n.a*f;d.b=n.round?0:n.b*f;}}
     std::vector<Dionica> fast;
@@ -123,22 +156,20 @@ inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
         fast.push_back(d);}
     std::sort(fast.begin(),fast.end(),[](const Dionica& x,const Dionica& y){return x.v>y.v;});
     if(fast.empty()){acutPrintf(L"\nTVS_PROTOK: sve dionice su do %.1f m/s.",vmax);return;}
-    int manual=0;for(size_t k=0;k<fast.size();++k)if(fast[k].manual)++manual;
+    int manual=0;for(size_t k=0;k<fast.size();++k)if(fast[k].manual.on)++manual;
     acutPrintf(L"\nTVS_PROTOK: brzina iznad %.1f m/s u %d dionica (ručno: %d):",vmax,static_cast<int>(fast.size()),manual);
-    for(size_t k=0;k<fast.size()&&k<50;++k)describe(fast[k],static_cast<int>(k)+1,static_cast<int>(fast.size()));
+    for(size_t k=0;k<fast.size()&&k<50;++k)describe(fast[k],static_cast<int>(k)+1,static_cast<int>(fast.size()),vmax);
     if(fast.size()>50)acutPrintf(L"\n  ... još %d",static_cast<int>(fast.size())-50);
     int at=0;
-    for(;;){const Dionica& d=fast[at];
+    for(;;){Dionica& d=fast[at];
         const tvsFlowNetwork::Element& e=el[d.worst];tvsMoveGeometry::Point c(0,0,0);
         for(size_t p=0;p<e.ports.size();++p){c.x+=e.ports[p].x/e.ports.size();c.y+=e.ports[p].y/e.ports.size();}
-        tvsCheck::zoom(c.x,c.y,3000.0/f);tvsCheck::select(d.ducts);describe(d,at+1,static_cast<int>(fast.size()));
-        acedInitGet(0,L"Sljedeci Prethodni Rucno Kraj");ACHAR kw[32]=L"";
-        const int k=acedGetKword(d.manual?L"\nRucno = ukloni oznaku. [Sljedeci/Prethodni/Rucno/Kraj] <Sljedeci>: ":L"\nRucno = bez prijedloga za ovu dionicu. [Sljedeci/Prethodni/Rucno/Kraj] <Sljedeci>: ",kw,32);
-        if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Kraj")==0))break;
-        if(k==RTNORM&&_wcsicmp(kw,L"Rucno")==0){
-            const bool on=!d.manual;int done=0;for(size_t m=0;m<d.ducts.size();++m)if(setLocked(d.ducts[m],on))++done;
-            fast[at].manual=on;
-            acutPrintf(on?L"\nDionica označena „ručno“ (%d kanala): TVS_PROTOK je više ne predlaže.":L"\nOznaka „ručno“ uklonjena (%d kanala).",done);continue;}
+        tvsCheck::zoom(c.x,c.y,3000.0/f);tvsCheck::select(d.ducts);describe(d,at+1,static_cast<int>(fast.size()),vmax);
+        const bool last=fast.size()==1;
+        acedInitGet(0,last?L"Rucno Kraj":L"Sljedeci Prethodni Rucno Kraj");ACHAR kw[32]=L"";
+        const int k=acedGetKword(last?L"\nRucno = svoja dimenzija dionice. [Rucno/Kraj] <Kraj>: ":L"\nRucno = svoja dimenzija dionice. [Sljedeci/Prethodni/Rucno/Kraj] <Sljedeci>: ",kw,32);
+        if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Kraj")==0)||(last&&k==RTNONE))break;
+        if(k==RTNORM&&_wcsicmp(kw,L"Rucno")==0){askManual(d,vmax);continue;}
         if(k==RTNORM&&_wcsicmp(kw,L"Prethodni")==0){at=at>0?at-1:static_cast<int>(fast.size())-1;continue;}
         at=(at+1)%static_cast<int>(fast.size());
     }

@@ -15,7 +15,9 @@
 - Petlja u mreži ili tačka u kojoj se sastaje više od dva kraja: poruka sa zumom, ništa se ne upisuje.
 - Tip sistema se ne bira (dovod i odvod isto).
 - Brzine (poslije upisa, i kad su protoci već tačni ili je odgovor Ne): „najveća brzina [m/s] ili [Ne] <5.0>“ (pamti se do zatvaranja AutoCAD-a). Lista dionica (dio mreže između račvi) iznad te brzine, najbrža prva, sa prijedlogom: pravougaoni „širina: 800×200“ (visina ostaje) i „š×v: 400×400“ (š ≥ v, odnos ≤ 1:4, visina ne manja od sadašnje); okrugli – sljedeći standardni prečnik.
-- Obilazak: zum i označeni kanali dionice, [Sljedeci/Prethodni/Rucno/Kraj]. Rucno označi kanale dionice (xdata TVS_RUCNO) – ostaje na listi sa „ručno, bez prijedloga“; ponovo Rucno uklanja oznaku. Dimenzije se ne mijenjaju (Svojstva / TVS_DIM_PRATI).
+- Obilazak: zum (bez ispisa ZOOM u komandnoj liniji) i označeni kanali dionice, [Sljedeci/Prethodni/Rucno/Kraj]; kad je samo jedna dionica [Rucno/Kraj].
+- Rucno: upišite svoju dimenziju (300x150, 300×150, d200, za okrugli i samo 200) – ispiše se brzina za nju; Enter = ručno sa sadašnjom dimenzijom; kod već ručne dionice U = ukloni oznaku. Oznaka ide u xdata TVS_RUCNO kanala; sljedeći put lista pokazuje „ručno: 300×150, x m/s“ umjesto prijedloga. Dimenzije kanala se ne mijenjaju (Svojstva / TVS_DIM_PRATI).
+- TVS_ALIGN: opcije reference sada [Izabrana/Druga/Osa] (klik radi).
 
 ## TVS_PROVJERA (novo) – testirati
 - Enter = cijeli crtež, ili izbor dijela mreže. Ispis: broj problema po vrsti, pa lista (do 200) sa X/Y u mm.

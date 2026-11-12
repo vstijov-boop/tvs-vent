@@ -62,7 +62,7 @@ struct Reference {Point anchor,direction,seg[2];};
 inline bool askMode(bool edges,tvsAlign::Reference& mode){
     mode=tvsAlign::PickedEdge;if(!edges){mode=tvsAlign::Axis;return true;}
     ACHAR keyword[132];acedInitGet(0,L"Izabrana Druga Osa");
-    const int status=acedGetKword(L"\nReferenca na elementu [Izabrana ivica/Druga ivica/Osa] <Izabrana>: ",keyword);
+    const int status=acedGetKword(L"\nReferenca na elementu: Izabrana / Druga ivica ili Osa [Izabrana/Druga/Osa] <Izabrana>: ",keyword);
     if(status!=RTNORM&&status!=RTNONE)return false;
     if(status==RTNORM){
         if(_wcsicmp(keyword,L"Druga")==0)mode=tvsAlign::OtherEdge;

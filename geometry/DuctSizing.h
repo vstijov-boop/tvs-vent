@@ -8,6 +8,8 @@
 //   Dionica: a chain of elements between branchings (same flow), from the parent array of
 //   the flow network.
 #include <cmath>
+#include <cwchar>
+#include <string>
 #include <vector>
 namespace tvsDuctSizing {
 inline const std::vector<double>& rectangular(){
@@ -45,6 +47,25 @@ inline Size diameter(double flow,double vmax){
     for(size_t i=0;i<diameters().size();++i){const double d=diameters()[i];const double v=velocity(flow,d,0,true);
         if(v<=vmax+1e-9){r.ok=true;r.a=d;r.v=v;return r;}}
     return r;
+}
+// Manual size typed by the user: "300x150", "300 x 150", "300*150", "300\u00D7150" (rectangular),
+// "d200", "D200", "\u00D8200", "\u00F8200" (round), or a single number: round when the duct is round.
+// false: not a size (sizes 10..5000 mm).
+inline bool parse(const std::wstring& text,bool roundDuct,Size& out){
+    out=Size();std::wstring t;
+    for(size_t i=0;i<text.size();++i){const wchar_t c=text[i];if(c!=L' '&&c!=L'\t')t+=c;}
+    if(t.empty())return false;
+    bool isRound=false;
+    if(t[0]==L'd'||t[0]==L'D'||t[0]==L'\u00D8'||t[0]==L'\u00F8'){isRound=true;t.erase(0,1);}
+    for(size_t i=0;i<t.size();++i)if(t[i]==L','){t[i]=L'.';}
+    size_t sep=std::wstring::npos;
+    for(size_t i=0;i<t.size();++i)if(t[i]==L'x'||t[i]==L'X'||t[i]==L'*'||t[i]==L'\u00D7'){sep=i;break;}
+    auto number=[](const std::wstring& s,double& v){if(s.empty())return false;wchar_t* end=NULL;v=std::wcstod(s.c_str(),&end);return end&&*end==0&&v>=10&&v<=5000;};
+    if(sep==std::wstring::npos){double d=0;if(!number(t,d))return false;
+        if(isRound||roundDuct){out.ok=true;out.a=d;out.b=0;return true;}return false;}
+    if(isRound)return false;
+    double a=0,b=0;if(!number(t.substr(0,sep),a)||!number(t.substr(sep+1),b))return false;
+    out.ok=true;out.a=a;out.b=b;return true;
 }
 // Dionice: group[i] = index of the dionica of element i (-1 unreached). A dionica starts at the
 // root or at a child of a branching element (more than one child) and goes on while there is

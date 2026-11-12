@@ -18,7 +18,7 @@ class Flow(unittest.TestCase):
  def test_velocities(self):
   c=text('TVS_Ventilation_ARX/FlowCommand.h')
   self.assertEqual(c.count('velocities(net,r,el,f);'),3)          # posle upisa, bez izmjene i uz Ne
-  self.assertIn('L"TVS_RUCNO"',c);self.assertIn('acdbRegApp(lockApp)',c)
+  self.assertIn('L"TVS_RUCNO"',c);self.assertIn('tvsDuctSizing::parse(text,d.round,s)',c);self.assertIn('L"CMDECHO"',text('TVS_Ventilation_ARX/CheckCommand.h'));self.assertIn('acdbRegApp(lockApp)',c)
   self.assertIn('tvsDuctSizing::widthOnly(',c);self.assertIn('tvsDuctSizing::widthHeight(',c);self.assertIn('tvsDuctSizing::diameter(',c)
   self.assertNotIn('put_SizeA',c)                                  # prijedlog, bez promjene dimenzija
  def test_command(self):

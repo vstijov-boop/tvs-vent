@@ -10,7 +10,7 @@ class Prompts(unittest.TestCase):
     if line.lstrip().startswith('//'):continue
     for s in re.findall(r'(?:L|_T\()"((?:[^"\\]|\\.)*)"',line):
      for opt in re.findall(r'\[([^\]]*)\]',s):
-      if '/' in opt and '(' in opt:bad.append('%s:%d %s'%(p.relative_to(ROOT),n,opt))
+      if '/' in opt and any(c in opt for c in '( =')and'%'not in opt:bad.append('%s:%d %s'%(p.relative_to(ROOT),n,opt))
   self.assertEqual(bad,[])
  def test_tee_aliases(self):
   t=(ROOT/'TVS_Ventilation_ARX/TeeCommand.h').read_text(encoding='utf-8-sig')

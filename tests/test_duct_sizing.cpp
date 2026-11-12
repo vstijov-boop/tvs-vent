@@ -27,5 +27,14 @@ int main(){
     // order independent: a child listed before its parent
     {std::vector<int> parent={2,-1,1,0};std::vector<char> reached={1,1,1,1};std::vector<int> g;
      assert(dionice(parent,reached,g)==1&&g[0]==g[1]&&g[2]==g[3]&&g[0]==g[3]);}
+    // manual size
+    {Size s;assert(parse(L"300x150",false,s)&&s.a==300&&s.b==150);
+     assert(parse(L" 300 X 150 ",false,s)&&s.a==300&&s.b==150);
+     assert(parse(L"300*150",false,s)&&parse(L"300\u00D7150",false,s)&&s.b==150);
+     assert(parse(L"d200",false,s)&&s.a==200&&s.b==0);assert(parse(L"\u00D8250",false,s)&&s.a==250);
+     assert(parse(L"200",true,s)&&s.a==200&&s.b==0);
+     assert(!parse(L"200",false,s));assert(!parse(L"",false,s));assert(!parse(L"abc",false,s));
+     assert(!parse(L"d200x100",false,s));assert(!parse(L"300x",false,s));assert(!parse(L"5x150",false,s));
+     assert(parse(L"312,5x150",false,s)&&s.a==312.5);}
     std::puts("duct sizing OK");return 0;
 }

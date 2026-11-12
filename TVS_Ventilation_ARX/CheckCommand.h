@@ -32,7 +32,11 @@ inline void describeIssue(const tvsNetworkCheck::Issue& e,const std::vector<tvsM
 }
 inline void zoom(double x,double y,double height){
     ads_point w={x,y,0},u;if(tvsCoordinates::transformPoint(w,0,1,u)!=RTNORM)return;
+    // CMDECHO 0: the ZOOM prompts would push the question of the walk-through out of sight
+    resbuf echo;const bool saved=acedGetVar(L"CMDECHO",&echo)==RTNORM;
+    resbuf off;off.restype=RTSHORT;off.resval.rint=0;off.rbnext=NULL;if(saved)acedSetVar(L"CMDECHO",&off);
     acedCommandS(RTSTR,L"_.ZOOM",RTSTR,L"_C",RTPOINT,u,RTREAL,height,RTNONE);
+    if(saved)acedSetVar(L"CMDECHO",&echo);
 }
 inline void select(const std::vector<AcDbObjectId>& ids){
     ads_name ss;if(acedSSAdd(NULL,NULL,ss)!=RTNORM)return;
