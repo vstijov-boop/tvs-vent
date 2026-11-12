@@ -5,6 +5,10 @@
 //   Rectangular, width and height: the smallest standard section with width >= height,
 //   width / height <= 4 and height at least the current one (the ceiling decides the rest).
 //   Round: the smallest standard diameter (spiro series, SOKO catalogue sizes included).
+//   Friction R (Pa/m): Darcy-Weisbach, lambda from Colebrook-White (iterated), air 20 C
+//   (rho 1.2 kg/m3, nu 15.1e-6 m2/s), galvanised sheet k = 0.15 mm; rectangular by the
+//   hydraulic diameter 2ab/(a+b) at the real velocity.
+//   Candidates (dialog): standard sizes around the limit, smallest first, two too fast ones too.
 //   Dionica: a chain of elements between branchings (same flow), from the parent array of
 //   the flow network.
 #include <cmath>
@@ -22,7 +26,7 @@ inline const std::vector<double>& diameters(){
 }
 inline double area(double a,double b,bool isRound){const double pi=3.14159265358979323846;return isRound?pi*a*a/4e6:a*b/1e6;}
 inline double velocity(double flow,double a,double b,bool isRound){const double s=area(a,b,isRound);return s>0?std::fabs(flow)/3600.0/s:0;}
-struct Size {bool ok;double a,b;double v;Size():ok(false),a(0),b(0),v(0){}};
+struct Size {bool ok;double a,b;double v,r;Size():ok(false),a(0),b(0),v(0),r(0){}};   // r: Pa/m (friction)
 // Rectangular, height b kept.
 inline Size widthOnly(double flow,double b,double vmax){
     Size r;if(!(b>0)||!(vmax>0))return r;
@@ -47,6 +51,35 @@ inline Size diameter(double flow,double vmax){
     for(size_t i=0;i<diameters().size();++i){const double d=diameters()[i];const double v=velocity(flow,d,0,true);
         if(v<=vmax+1e-9){r.ok=true;r.a=d;r.v=v;return r;}}
     return r;
+}
+inline double friction(double flow,double a,double b,bool isRound,double roughnessMm=0.15){
+    const double v=velocity(flow,a,b,isRound);if(!(v>0))return 0;
+    const double dh=(isRound?a:2*a*b/(a+b))/1000.0;if(!(dh>0))return 0;
+    const double rho=1.2,nu=15.1e-6,k=roughnessMm/1000.0,re=v*dh/nu;
+    double lambda;
+    if(re<2300)lambda=64/re;
+    else{double x=1/std::sqrt(0.02);   // 1/sqrt(lambda)
+        for(int i=0;i<50;++i){const double n=-2*std::log10(k/(3.71*dh)+2.51*x/re);if(std::fabs(n-x)<1e-12){x=n;break;}x=n;}
+        lambda=1/(x*x);}
+    return lambda/dh*rho*v*v/2;
+}
+inline Size sized(double flow,double a,double b,bool isRound){Size s;s.ok=true;s.a=a;s.b=isRound?0:b;s.v=velocity(flow,a,b,isRound);s.r=friction(flow,a,b,isRound);return s;}
+// mode: 0 height b kept, 1 width / height <= 4 (width >= height); round ducts: diameters.
+inline void candidates(double flow,bool isRound,double b,int mode,double vmax,std::vector<Size>& out,int before=2,int after=4){
+    out.clear();std::vector<Size> all;
+    if(isRound){for(size_t i=0;i<diameters().size();++i)all.push_back(sized(flow,diameters()[i],0,true));}
+    else if(mode==0){if(!(b>0))return;for(size_t i=0;i<rectangular().size();++i)all.push_back(sized(flow,rectangular()[i],b,false));}
+    else{const std::vector<double>& s=rectangular();
+        for(size_t j=0;j<s.size();++j)for(size_t i=0;i<s.size();++i){const double w=s[i],h=s[j];
+            if(w>=h-1e-9&&w<=4*h+1e-9&&w<=2000+1e-9)all.push_back(sized(flow,w,h,false));}
+        // smallest section first; the same area: the squarer one first
+        for(size_t i=1;i<all.size();++i){Size x=all[i];size_t j=i;
+            while(j>0&&(all[j-1].a*all[j-1].b>x.a*x.b+1e-9||(std::fabs(all[j-1].a*all[j-1].b-x.a*x.b)<=1e-9&&all[j-1].a-all[j-1].b>x.a-x.b))){all[j]=all[j-1];--j;}
+            all[j]=x;}}
+    size_t first=all.size();for(size_t i=0;i<all.size();++i)if(all[i].v<=vmax+1e-9){first=i;break;}
+    if(first==all.size()){const size_t from=all.size()>static_cast<size_t>(before)?all.size()-before:0;for(size_t i=from;i<all.size();++i)out.push_back(all[i]);return;}
+    const size_t from=first>static_cast<size_t>(before)?first-before:0,to=first+after<all.size()?first+after:all.size();
+    for(size_t i=from;i<to;++i)out.push_back(all[i]);
 }
 // Manual size typed by the user: "300x150", "300 x 150", "300*150", "300\u00D7150" (rectangular),
 // "d200", "D200", "\u00D8200", "\u00F8200" (round), or a single number: round when the duct is round.

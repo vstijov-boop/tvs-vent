@@ -112,7 +112,7 @@
     {
         if (ActivationErrorMessage() != pError_Ok) return;
         syncTVSGlobalUnits();
-        tvsFlow::execute();
+        tvsFlow::execute(IDD_SIZING);
     }
     // TVS_PRERACUNAJ: elements pasted 1:1 from a drawing in other units -> this drawing's units (ScaleWindow.h).
     static void Ventilation_ARXTVS_PRERACUNAJ(void)

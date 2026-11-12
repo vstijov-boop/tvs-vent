@@ -36,5 +36,21 @@ int main(){
      assert(!parse(L"200",false,s));assert(!parse(L"",false,s));assert(!parse(L"abc",false,s));
      assert(!parse(L"d200x100",false,s));assert(!parse(L"300x",false,s));assert(!parse(L"5x150",false,s));
      assert(parse(L"312,5x150",false,s)&&s.a==312.5);}
+    // friction: 400x200 at 10 m/s (Dh 266.7 mm, Re ~1.77e5, k 0.15): about 4.2 Pa/m
+    {const double r=friction(2880,400,200,false);assert(r>3.9&&r<4.5);
+     const double d=friction(1000,250,0,true);assert(d>1.3&&d<1.8);   // d250, 5.66 m/s: ~1.5 Pa/m
+     assert(friction(1000,500,250,false)<friction(1000,400,200,false));assert(friction(0,400,200,false)==0);}
+    // candidates: height kept, 2 too fast first, then the acceptable ones, widths ascending
+    {std::vector<Size> c;candidates(2880,false,200,0,5,c);
+     assert(c.size()==6&&c[0].a==700&&c[1].a==750&&c[2].a==800&&c[2].v<=5&&c[1].v>5&&c[5].a==950);
+     for(size_t i=0;i<c.size();++i)assert(c[i].b==200&&c[i].r>0);}
+    // ratio <= 4: areas ascending, width >= height, width <= 4 height
+    {std::vector<Size> c;candidates(2880,false,200,1,5,c);assert(c.size()==6);
+     for(size_t i=0;i<c.size();++i){assert(c[i].a>=c[i].b&&c[i].a<=4*c[i].b);if(i)assert(c[i].a*c[i].b>=c[i-1].a*c[i-1].b);}
+     assert(c[1].v>5&&c[2].v<=5&&c[2].a==400&&c[2].b==400);}
+    // round
+    {std::vector<Size> c;candidates(1000,true,0,0,4,c);assert(c[2].a==300&&c[1].v>4&&c[2].b==0);}
+    // nothing fast enough: the largest ones
+    {std::vector<Size> c;candidates(1e8,false,100,0,2,c);assert(c.size()==2&&c[1].a==3000);}
     std::puts("duct sizing OK");return 0;
 }

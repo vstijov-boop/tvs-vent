@@ -17,10 +17,19 @@ class Flow(unittest.TestCase):
    self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
  def test_velocities(self):
   c=text('TVS_Ventilation_ARX/FlowCommand.h')
-  self.assertEqual(c.count('velocities(net,r,el,f);'),3)          # posle upisa, bez izmjene i uz Ne
-  self.assertIn('L"TVS_RUCNO"',c);self.assertIn('tvsDuctSizing::parse(text,d.round,s)',c);self.assertIn('L"CMDECHO"',text('TVS_Ventilation_ARX/CheckCommand.h'));self.assertIn('acdbRegApp(lockApp)',c)
+  self.assertEqual(c.count('velocities(net,r,el,f,sizingDialog);'),3)          # posle upisa, bez izmjene i uz Ne
+  self.assertIn('L"TVS_RUCNO"',c);self.assertIn('tvsSizingDialog::show(in,def,sizingDialog)',c);self.assertIn('L"CMDECHO"',text('TVS_Ventilation_ARX/CheckCommand.h'));self.assertIn('acdbRegApp(lockApp)',c)
   self.assertIn('tvsDuctSizing::widthOnly(',c);self.assertIn('tvsDuctSizing::widthHeight(',c);self.assertIn('tvsDuctSizing::diameter(',c)
-  self.assertNotIn('put_SizeA',c)                                  # prijedlog, bez promjene dimenzija
+  self.assertNotIn('put_SizeA',c)
+ def test_dialog(self):
+  d=text('TVS_Ventilation_ARX/SizingDialog.h');self.assertTrue((ROOT/'TVS_Ventilation_ARX/SizingDialog.h').read_bytes().startswith(b'\xef\xbb\xbf'))
+  self.assertIn('tvsDuctSizing::candidates(',d);self.assertIn('tvsDuctSizing::friction(',d);self.assertIn('tvsDuctSizing::parse(',d)
+  self.assertIn('CAcModuleResourceOverride',d);self.assertNotIn('put_Size',d)
+  rc=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc');self.assertIn('IDD_SIZING DIALOGEX',rc);self.assertIn('#define IDD_SIZING',text('TVS_Ventilation_ARX/resource.h'))
+  block=rc[rc.index('IDD_SIZING DIALOGEX'):];block=block[:block.index('\nEND')]
+  import re
+  ids=set(int(x) for x in re.findall(r'[\s,](16\d\d),',block))
+  for k in re.findall(r'Id\w+=(16\d\d)',d):self.assertIn(int(k),ids,k)                                  # prijedlog, bez promjene dimenzija
  def test_command(self):
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/FlowCommand.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   c=text('TVS_Ventilation_ARX/FlowCommand.h')
@@ -29,7 +38,7 @@ class Flow(unittest.TestCase):
   self.assertIn('tvsMove::bodiesFor(',c)   # etaz / obilazak as one element
   self.assertIn('TVS_PROTOK, TVS_PROTOK',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
   self.assertIn('#include "FlowCommand.h"',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
-  self.assertIn('tvsFlow::execute();',text('TVS_Ventilation_ARX/commands/NewCommands.inl'))
+  self.assertIn('tvsFlow::execute(IDD_SIZING);',text('TVS_Ventilation_ARX/commands/NewCommands.inl'))
   self.assertIn("('PROTOK',",text('tools/add_new_commands_cuix.py'))
   for s in (16,32):self.assertTrue((ROOT/('Installer/TVS_VENT/icons/TVS_PROTOK_%d.png'%s)).exists())
 if __name__=='__main__':unittest.main()

@@ -4,14 +4,16 @@
 // terminals behind it. Terminals keep their own flow; those without one can be entered here
 // (zoom on each). An etaz / obilazak counts as one element (TVS_MOVE bodies), flex too.
 // Nothing is written before the confirmation; TVS labels of changed elements are refreshed.
-// Then the velocities: dionice (chains between branchings) above a maximum velocity, with the
-// size proposals (geometry/DuctSizing.h), walked through with a zoom. Nothing is resized; a
-// dionica can be marked "ručno" (xdata TVS_RUCNO on its ducts): no proposal for it any more.
+// Then the velocities: dionice (chains between branchings) above a maximum velocity, listed with
+// the size proposals (geometry/DuctSizing.h), then the dialog "Dimenzije dionice" for each
+// (SizingDialog.h: m/s, Pa/m, own size) with a zoom between them. Nothing is resized; "Zadrži
+// ručno" marks the dionica (xdata TVS_RUCNO on its ducts, with the chosen size).
 #include "TVSMoveCommand.h"
 #include "CheckCommand.h"
 #include "../TVS_Ventilation_DBX/DuctCaption.h"
 #include "../geometry/FlowNetwork.h"
 #include "../geometry/DuctSizing.h"
+#include "SizingDialog.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -77,6 +79,7 @@ inline void fastest(const Net& net,const tvsFlowNetwork::Result& r,double f){
     else acutPrintf(L"\n  najveća brzina u kanalu: %.2f m/s (%.0f×%.0f, %.0f m³/h).",best,n.a*f,n.b*f,r.flow[net.owner[at]]);
 }
 inline double& maximumVelocity(){static double v=5.0;return v;}
+inline int& sizingMode(){static int m=0;return m;}   // dialog: 0 height kept, 1 width : height <= 4
 const wchar_t* const lockApp=L"TVS_RUCNO";
 // "ručno" on a duct: xdata TVS_RUCNO (1070 = 1, 1040 width, 1040 height, 0 = round), the size
 // the user chose for the dionica (mm). No proposal for it any more; its velocity is shown.
@@ -111,32 +114,8 @@ inline void describe(const Dionica& d,int k,int count,double vmax){
     if(d.width.ok){sizeText(w,32,false,d.width.a,d.width.b);acutPrintf(L" → širina: %ls (%.2f m/s)",w,d.width.v);}else acutPrintf(L" → širina: nema do 3000 mm");
     if(d.both.ok){sizeText(h,32,false,d.both.a,d.both.b);acutPrintf(L"; š×v: %ls (%.2f m/s)",h,d.both.v);}
 }
-// "Rucno" in the walk-through: the user's size for the dionica (or keep / remove the mark).
-inline bool askManual(Dionica& d,double vmax){
-    for(;;){wchar_t prompt[220],now[32];
-        if(d.manual.on&&d.manual.a>0){sizeText(now,32,!(d.manual.b>0),d.manual.a,d.manual.b);
-            swprintf_s(prompt,220,L"\nRučna dimenzija dionice (sada %ls), npr. 300x150 ili d200; U = ukloni oznaku; Enter = zadrži: ",now);}
-        else if(d.manual.on)swprintf_s(prompt,220,L"\nRučna dimenzija dionice, npr. 300x150 ili d200; U = ukloni oznaku; Enter = zadrži: ");
-        else swprintf_s(prompt,220,L"\nRučna dimenzija dionice, npr. 300x150 ili d200; Enter = sadašnja dimenzija: ");
-        ACHAR text[64]=L"";const int g=acedGetString(1,prompt,text,64);
-        if(g!=RTNORM)return false;
-        Manual m;
-        if(text[0]==0){if(d.manual.on)return false;m.on=true;}
-        else if((text[0]==L'U'||text[0]==L'u')&&text[1]==0)m.on=false;
-        else{tvsDuctSizing::Size s;if(!tvsDuctSizing::parse(text,d.round,s)){acutPrintf(L"\nNije dimenzija: „%ls“. Primjeri: 300x150, d200%ls.",text,d.round?L", 200":L"");continue;}
-            m.on=true;m.a=s.a;m.b=s.b;}
-        int done=0;for(size_t k=0;k<d.ducts.size();++k)if(setManual(d.ducts[k],m))++done;
-        if(done<static_cast<int>(d.ducts.size()))acutPrintf(L"\nOznaka nije upisana u %d kanala (zaključan sloj?).",static_cast<int>(d.ducts.size())-done);
-        d.manual=m;
-        if(!m.on)acutPrintf(L"\nOznaka „ručno“ uklonjena; dionica ponovo dobija prijedlog.");
-        else if(m.a>0){const bool rd=!(m.b>0);const double v=tvsDuctSizing::velocity(d.flow,m.a,m.b,rd);sizeText(now,32,rd,m.a,m.b);
-            acutPrintf(L"\nRučno: %ls, %.2f m/s%ls. Dimenziju kanala promijenite u Svojstvima / TVS_DIM_PRATI.",now,v,v>vmax+1e-9?L" – i dalje iznad najveće brzine":L"");}
-        else acutPrintf(L"\nDionica označena „ručno“ sa sadašnjom dimenzijom; nema više prijedloga.");
-        return true;
-    }
-}
 // Dionice of the network above vmax (manual ones too, marked), fastest first.
-inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f){
+inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f,UINT sizingDialog){
     {acedInitGet(RSG_NOZERO|RSG_NONEG,L"Ne");double v=maximumVelocity();wchar_t prompt[120];
      swprintf_s(prompt,120,L"\nProvjera brzina – najveća brzina [m/s] ili [Ne] <%.1f>: ",maximumVelocity());
      const int g=acedGetReal(prompt,&v);
@@ -160,22 +139,32 @@ inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
     acutPrintf(L"\nTVS_PROTOK: brzina iznad %.1f m/s u %d dionica (ručno: %d):",vmax,static_cast<int>(fast.size()),manual);
     for(size_t k=0;k<fast.size()&&k<50;++k)describe(fast[k],static_cast<int>(k)+1,static_cast<int>(fast.size()),vmax);
     if(fast.size()>50)acutPrintf(L"\n  ... još %d",static_cast<int>(fast.size())-50);
+    // dialog per dionica (SizingDialog.h); between two the drawing zooms on the next one
     int at=0;
     for(;;){Dionica& d=fast[at];
         const tvsFlowNetwork::Element& e=el[d.worst];tvsMoveGeometry::Point c(0,0,0);
         for(size_t p=0;p<e.ports.size();++p){c.x+=e.ports[p].x/e.ports.size();c.y+=e.ports[p].y/e.ports.size();}
-        tvsCheck::zoom(c.x,c.y,3000.0/f);tvsCheck::select(d.ducts);describe(d,at+1,static_cast<int>(fast.size()),vmax);
-        const bool last=fast.size()==1;
-        acedInitGet(0,last?L"Rucno Kraj":L"Sljedeci Prethodni Rucno Kraj");ACHAR kw[32]=L"";
-        const int k=acedGetKword(last?L"\nRucno = svoja dimenzija dionice. [Rucno/Kraj] <Kraj>: ":L"\nRucno = svoja dimenzija dionice. [Sljedeci/Prethodni/Rucno/Kraj] <Sljedeci>: ",kw,32);
-        if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Kraj")==0)||(last&&k==RTNONE))break;
-        if(k==RTNORM&&_wcsicmp(kw,L"Rucno")==0){askManual(d,vmax);continue;}
-        if(k==RTNORM&&_wcsicmp(kw,L"Prethodni")==0){at=at>0?at-1:static_cast<int>(fast.size())-1;continue;}
+        tvsCheck::zoom(c.x,c.y,3000.0/f);tvsCheck::select(d.ducts);acedUpdateDisplay();
+        tvsSizingDialog::Input in;in.index=at+1;in.count=static_cast<int>(fast.size());in.flow=d.flow;in.a=d.a;in.b=d.b;in.round=d.round;
+        in.manual=d.manual.on;in.manualA=d.manual.a;in.manualB=d.manual.b;in.ducts=static_cast<int>(d.ducts.size());
+        tvsSizingDialog::Result def;def.vmax=maximumVelocity();def.mode=sizingMode();
+        const tvsSizingDialog::Result res=tvsSizingDialog::show(in,def,sizingDialog);
+        if(res.vmax>0)maximumVelocity()=res.vmax;if(!d.round)sizingMode()=res.mode;
+        if(res.action==tvsSizingDialog::Close)break;
+        if(res.action==tvsSizingDialog::Keep||res.action==tvsSizingDialog::Remove){
+            Manual m;m.on=res.action==tvsSizingDialog::Keep;if(m.on){m.a=res.size.a;m.b=res.size.b;}
+            int done=0;for(size_t k=0;k<d.ducts.size();++k)if(setManual(d.ducts[k],m))++done;
+            if(done<static_cast<int>(d.ducts.size()))acutPrintf(L"\nOznaka nije upisana u %d kanala (zaključan sloj?).",static_cast<int>(d.ducts.size())-done);
+            d.manual=m;describe(d,at+1,static_cast<int>(fast.size()),maximumVelocity());
+            if(res.action==tvsSizingDialog::Remove)continue;   // stays on the dionica, now with proposals
+            if(fast.size()==1)break;
+        }
+        if(res.action==tvsSizingDialog::Previous){at=at>0?at-1:static_cast<int>(fast.size())-1;continue;}
         at=(at+1)%static_cast<int>(fast.size());
     }
     acedSSSetFirst(NULL,NULL);
 }
-inline void execute(){
+inline void execute(UINT sizingDialog){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=0.1/f;
     ads_name picked;ads_point at;
@@ -227,12 +216,12 @@ inline void execute(){
     // what changes
     std::vector<int> change;
     for(size_t i=0;i<net.nodes.size();++i){const int o=net.owner[i];if(r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>1e-6)change.push_back(static_cast<int>(i));}
-    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");velocities(net,r,el,f);return;}
+    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");velocities(net,r,el,f,sizingDialog);return;}
     {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
      swprintf_s(prompt,120,L"\nUpisati protoke u %d elemenata? [Da/Ne] <Da>: ",static_cast<int>(change.size()));
      const int k=acedGetKword(prompt,kw,8);
      if(k==RTCAN)return;
-     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");velocities(net,r,el,f);return;}}
+     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");velocities(net,r,el,f,sizingDialog);return;}}
     std::set<AcDbObjectId> written;
     {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
@@ -247,6 +236,6 @@ inline void execute(){
     for(int k=0;k<net.labels.length();++k){AcDbObjectId linked;
         if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
     acutPrintf(L"\nTVS_PROTOK: upisan protok u %d elemenata; ažurirano oznaka %d.",static_cast<int>(written.size()),labels);
-    velocities(net,r,el,f);
+    velocities(net,r,el,f,sizingDialog);
 }
 }
