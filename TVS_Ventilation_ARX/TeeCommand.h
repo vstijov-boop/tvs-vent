@@ -17,6 +17,16 @@ inline bool askWidth(const wchar_t* prompt,double defaultMm,double& valueMm){
 }
 // Last type chosen (TVS_TK_TIP and the Racva option while drawing): default of the next prompt.
 inline int& lastType(){static int t=tvsTee::Straight;return t;}
+// Type prompts: the bracket list holds plain keywords only (AutoCAD offers them for a click and
+// for dynamic input; "Ogranak (TK-O)" was sent as "TK-O" and refused). TK-O / TK-G / SR5-3 typed
+// are taken too and mean Ogranak / Gacasti / Stucna.
+#define TVS_TEE_KEYWORDS L"Ogranak Gacasti Stucna Ravni TK-O TK-G SR5-3"
+inline void typeLegend(bool round){acutPrintf(round?L"\nStucna = SR5-3 (45), Ravni = obicni T komad.":L"\nOgranak = TK-O, Gacasti = TK-G, Stucna = SR5-3, Ravni = obicni T komad.");}
+inline void typeAlias(ACHAR* kw,size_t n){
+    if(_wcsicmp(kw,L"TK-O")==0)wcscpy_s(kw,n,L"Ogranak");
+    else if(_wcsicmp(kw,L"TK-G")==0)wcscpy_s(kw,n,L"Gacasti");
+    else if(_wcsicmp(kw,L"SR5-3")==0)wcscpy_s(kw,n,L"Stucna");
+}
 inline const wchar_t* typeKeyword(int t){return t==tvsTee::Branch?L"Ogranak":t==tvsTee::Pants?L"Gacasti":t==tvsTee::Tap?L"Stucna":L"Ravni";}
 // Stucna SR5-3: collar L = 0.25 x branch width, at least 75 mm (drawing units).
 inline double tapLength(double branch,double f){return tvsTee::tapLength(branch,tvsTeeData::tapMinimumMm()/f);}
@@ -63,12 +73,14 @@ inline bool chooseType(const AcDbObjectId& id){
         const int def=current.type?current.type:lastType();
         const int shown=round&&def!=tvsTee::Tap&&def!=tvsTee::Straight?tvsTee::Tap:def;
         wchar_t prompt[200];
-        if(round)swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna (45)/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
-        else swprintf_s(prompt,L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Stucna (SR5-3)/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
+        typeLegend(round);
+        if(round)swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
+        else swprintf_s(prompt,L"\nTip T komada [Ogranak/Gacasti/Stucna/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
         showNow(id);
         int rc;ACHAR kw[32]=L"";
         {tvsMove::StretchHighlight mark;mark.add(id);
-         acedInitGet(0,round?L"Stucna Ravni oKreni":L"Ogranak Gacasti Stucna Ravni oKreni");rc=acedGetKword(prompt,kw);}
+         acedInitGet(0,round?L"Stucna Ravni oKreni SR5-3":TVS_TEE_KEYWORDS L" oKreni");rc=acedGetKword(prompt,kw);}
+        if(rc==RTNORM)typeAlias(kw,32);
         if(rc==RTNONE)wcscpy_s(kw,typeKeyword(shown));else if(rc!=RTNORM)return false;
         if(_wcsicmp(kw,L"oKreni")==0||_wcsicmp(kw,L"Okreni")==0){if(flipById(id))acutPrintf(L"\nT komad je okrenut.");continue;}
         tvsTeeData::Record r;
@@ -127,17 +139,21 @@ inline void setType(){
 inline bool askType(int& type,double& second,double main,double branch,double f,bool roundBranch=false){
     if(roundBranch){   // okrugli ogranak na pravougaonom kanalu: stucna (iste mjere kao SR5-3) ili ravni T
         const int def=lastType()==tvsTee::Straight?tvsTee::Straight:tvsTee::Tap;
-        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna (45)/Ravni] <%ls>: ",typeKeyword(def));
-        acedInitGet(0,L"Stucna Ravni");ACHAR kw[32]=L"";
+        typeLegend(true);
+        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Ravni] <%ls>: ",typeKeyword(def));
+        acedInitGet(0,L"Stucna Ravni SR5-3");ACHAR kw[32]=L"";
         const int rc=acedGetKword(prompt,kw);
+        if(rc==RTNORM)typeAlias(kw,32);
         if(rc==RTNONE)wcscpy_s(kw,typeKeyword(def));else if(rc!=RTNORM)return false;
         type=_wcsicmp(kw,L"Stucna")==0?tvsTee::Tap:tvsTee::Straight;second=0;lastType()=type;return true;
     }
     for(;;){
         const int def=lastType();
-        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Stucna (SR5-3)/Ravni] <%ls>: ",typeKeyword(def));
-        acedInitGet(0,L"Ogranak Gacasti Stucna Ravni");ACHAR kw[32]=L"";
+        typeLegend(false);
+        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada [Ogranak/Gacasti/Stucna/Ravni] <%ls>: ",typeKeyword(def));
+        acedInitGet(0,TVS_TEE_KEYWORDS);ACHAR kw[32]=L"";
         const int rc=acedGetKword(prompt,kw);
+        if(rc==RTNORM)typeAlias(kw,32);
         if(rc==RTNONE)wcscpy_s(kw,typeKeyword(def));else if(rc!=RTNORM)return false;
         type=_wcsicmp(kw,L"Ogranak")==0?tvsTee::Branch:_wcsicmp(kw,L"Gacasti")==0?tvsTee::Pants:_wcsicmp(kw,L"Stucna")==0?tvsTee::Tap:tvsTee::Straight;
         second=0;if(type==tvsTee::Straight||type==tvsTee::Tap){lastType()=type;return true;}

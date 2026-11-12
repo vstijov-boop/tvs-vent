@@ -495,9 +495,11 @@
 		in.l = tvsTeeData::collarMm() / f; in.minimum = 50 / f;
 		const int last = tvsTeeCommand::lastType();
 		const int def = last == tvsTee::Pants || last == tvsTee::Tap ? last : tvsTee::Branch;
-		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak (TK-O)/Gacasti (TK-G)/Stucna (SR5-3)] <%ls>: ", tvsTeeCommand::typeKeyword(def));
-		acedInitGet(0, L"Ogranak Gacasti Stucna"); ACHAR kw[32] = L"";
+		acutPrintf(L"\nOgranak = TK-O, Gacasti = TK-G, Stucna = SR5-3.");
+		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak/Gacasti/Stucna] <%ls>: ", tvsTeeCommand::typeKeyword(def));
+		acedInitGet(0, L"Ogranak Gacasti Stucna TK-O TK-G SR5-3"); ACHAR kw[32] = L"";
 		const int rc = acedGetKword(prompt, kw);
+		if (rc == RTNORM) tvsTeeCommand::typeAlias(kw, 32);
 		if (rc != RTNORM && rc != RTNONE) return false;
 		in.type = rc == RTNONE ? def : (_wcsicmp(kw, L"Gacasti") == 0 ? tvsTee::Pants : _wcsicmp(kw, L"Stucna") == 0 ? tvsTee::Tap : tvsTee::Branch);
 		double w1 = 0, second = 0;
