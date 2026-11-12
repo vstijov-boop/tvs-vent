@@ -4,15 +4,16 @@
 // width : height <= 4:1; round ducts: diameters), the standard sizes around the limit with m/s
 // and Pa/m (too fast ones grey; a click copies the size into "Ručni unos") and the manual size
 // with its velocity while typing. Modal: the drawing zooms between two dionice, so the dialog
-// closes with an action and FlowCommand.h opens it again on the next one. Nothing is resized:
-// "Zadrži ručno" stores the size as the "ručno" mark of the dionica (xdata TVS_RUCNO).
+// closes with an action and FlowCommand.h opens it again on the next one. "Zadrži ručno" stores
+// the size as the "ručno" mark of the dionica (xdata TVS_RUCNO); "Primijeni" gives the size to
+// the dionica (FlowCommand.h applySize).
 #include "../geometry/DuctSizing.h"
 #include "adui.h"
 #include <afxcmn.h>
 #include <string>
 #include <vector>
 namespace tvsSizingDialog {
-enum Action {Close=0,Previous=1,Next=2,Keep=3,Remove=4};
+enum Action {Close=0,Previous=1,Next=2,Keep=3,Remove=4,Apply=5};
 struct Input {
     int index,count;double flow,a,b;bool round;   // present size (mm); b = 0 round
     bool manual;double manualA,manualB;int ducts;
@@ -24,7 +25,7 @@ inline CString number(double v,int digits){CString t;t.Format(digits==1?L"%.1f":
 class Dialog : public CAdUiBaseDialog {
 public:
     enum {IdNow=1601,IdLimit=1602,IdHeight=1603,IdRatio=1604,IdList=1605,IdManual=1606,IdManualInfo=1607,IdMark=1608,
-          IdPrevious=1609,IdNext=1610,IdRemove=1611,IdLimitLabel=1612,IdListLabel=1613,IdManualLabel=1614,IdRoundNote=1615};
+          IdPrevious=1609,IdNext=1610,IdRemove=1611,IdLimitLabel=1612,IdListLabel=1613,IdManualLabel=1614,IdRoundNote=1615,IdApply=1616};
     Input in;Result out;std::vector<tvsDuctSizing::Size> list;CListCtrl grid;bool loading,nowFast,manualFast;CFont bold,title;CBrush back,band,white;
     static CPoint& place(){static CPoint p(-1,-1);return p;}   // the dialog opens where it was left
     Dialog(const Input& i,const Result& r,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),in(i),out(r),loading(false),nowFast(false),manualFast(false){}
@@ -59,7 +60,7 @@ public:
         lf.lfWeight=FW_SEMIBOLD;bold.CreateFontIndirect(&lf);lf.lfHeight=lf.lfHeight*13/10;title.CreateFontIndirect(&lf);
         back.CreateSolidBrush(RGB(244,245,247));band.CreateSolidBrush(RGB(231,236,242));white.CreateSolidBrush(RGB(255,255,255));
         CString head;head.Format(L"TVS_PROTOK  ·  dionica %d / %d",in.index,in.count);SetWindowText(L"TVS_VENT – dimenzije dionice");
-        SetDlgItemText(IdListLabel,L"Prijedlog dimenzija (klik = u ručni unos)");
+        SetDlgItemText(IdListLabel,L"Prijedlog dimenzija (klik = u ručni unos)");SetDlgItemText(IdMark,L"");
         grid.SubclassDlgItem(IdList,this);
         grid.SetExtendedStyle(LVS_EX_FULLROWSELECT|LVS_EX_GRIDLINES|LVS_EX_DOUBLEBUFFER);
         CRect gr;grid.GetClientRect(&gr);const int w=gr.Width();
@@ -86,12 +87,19 @@ public:
         else if(!tvsDuctSizing::parse(std::wstring(t.GetString()),in.round,s)){SetDlgItemText(IdManualInfo,L"nije dimenzija – npr. 300x150, d200");GetDlgItem(IdManual)->SetFocus();return;}
         out.size=s;finish(Keep);
     }
+    void apply(){
+        CString t;GetDlgItemText(IdManual,t);t.Trim();tvsDuctSizing::Size s;
+        if(t.IsEmpty()||!tvsDuctSizing::parse(std::wstring(t.GetString()),in.round,s)){
+            SetDlgItemText(IdManualInfo,L"izaberite iz liste ili upišite dimenziju");GetDlgItem(IdManual)->SetFocus();return;}
+        out.size=s;finish(Apply);
+    }
     virtual void OnCancel(){finish(Close);}
     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
         const int id=LOWORD(wp),code=HIWORD(wp);
         if(id==IdPrevious&&code==BN_CLICKED){finish(Previous);return TRUE;}
         if(id==IdNext&&code==BN_CLICKED){finish(Next);return TRUE;}
         if(id==IdRemove&&code==BN_CLICKED){finish(Remove);return TRUE;}
+        if(id==IdApply&&code==BN_CLICKED){apply();return TRUE;}
         if((id==IdHeight||id==IdRatio)&&code==BN_CLICKED){refresh();return TRUE;}
         if(id==IdLimit&&code==EN_CHANGE&&!loading){refresh();return TRUE;}
         if(id==IdManual&&code==EN_CHANGE&&!loading){manualInfo();return TRUE;}
@@ -114,25 +122,25 @@ public:
     CRect du(int x,int y,int w,int h){CRect r(x,y,x+w,y+h);MapDialogRect(&r);return r;}
     void paintBack(CDC* dc){
         CRect all;GetClientRect(&all);dc->FillSolidRect(all,RGB(244,245,247));
-        const CRect head=du(0,0,280,22),foot=du(0,206,280,40);
+        const CRect head=du(0,0,320,22),foot=du(0,236,320,40);
         dc->FillSolidRect(CRect(all.left,all.top,all.right,head.bottom),RGB(231,236,242));dc->FillSolidRect(all.left,head.bottom,all.Width(),1,RGB(173,186,203));
         dc->FillSolidRect(CRect(all.left,foot.top,all.right,all.bottom),RGB(231,236,242));dc->FillSolidRect(all.left,foot.top,all.Width(),1,RGB(173,186,203));
         dc->SetBkMode(TRANSPARENT);
-        {CFont* of=dc->SelectObject(&title);dc->SetTextColor(RGB(0,26,45));CRect t=du(10,0,140,22);dc->DrawText(L"Dimenzije dionice",t,DT_LEFT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
-        {CFont* of=dc->SelectObject(GetFont());dc->SetTextColor(RGB(7,53,90));CRect t=du(140,0,130,22);dc->DrawText(headText,t,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
-        {CRect r=du(10,28,260,24);dc->FillSolidRect(r,RGB(255,255,255));dc->FillSolidRect(r.left,r.top,3,r.Height(),nowFast?RGB(200,60,50):RGB(38,117,174));}
+        {CFont* of=dc->SelectObject(&title);dc->SetTextColor(RGB(0,26,45));CRect t=du(10,0,160,22);dc->DrawText(L"Dimenzije dionice",t,DT_LEFT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
+        {CFont* of=dc->SelectObject(GetFont());dc->SetTextColor(RGB(7,53,90));CRect t=du(170,0,140,22);dc->DrawText(headText,t,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
+        {CRect r=du(10,28,300,24);dc->FillSolidRect(r,RGB(255,255,255));dc->FillSolidRect(r.left,r.top,3,r.Height(),nowFast?RGB(200,60,50):RGB(38,117,174));}
     }
     void drawButton(LPDRAWITEMSTRUCT it){
         CDC* dc=CDC::FromHandle(it->hDC);CRect r(it->rcItem);const bool down=(it->itemState&ODS_SELECTED)!=0;
         const COLORREF face=down?RGB(19,78,125):RGB(27,100,156);dc->FillSolidRect(r,face);
-        CString t;GetDlgItem(IDOK)->GetWindowText(t);CFont* of=dc->SelectObject(&bold);
+        CString t;GetDlgItem(IdApply)->GetWindowText(t);CFont* of=dc->SelectObject(&bold);
         dc->SetBkMode(TRANSPARENT);dc->SetTextColor(RGB(255,255,255));dc->DrawText(t,r,DT_CENTER|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);
         if(it->itemState&ODS_FOCUS){CRect f(r);f.DeflateRect(3,3);dc->DrawFocusRect(f);}
     }
     virtual LRESULT WindowProc(UINT msg,WPARAM wp,LPARAM lp){
         if(msg==WM_ACAD_KEEPFOCUS)return TRUE;
         if(msg==WM_ERASEBKGND){paintBack(CDC::FromHandle(reinterpret_cast<HDC>(wp)));return TRUE;}
-        if(msg==WM_DRAWITEM&&wp==IDOK){drawButton(reinterpret_cast<LPDRAWITEMSTRUCT>(lp));return TRUE;}
+        if(msg==WM_DRAWITEM&&wp==IdApply){drawButton(reinterpret_cast<LPDRAWITEMSTRUCT>(lp));return TRUE;}
         if(msg==WM_CTLCOLORSTATIC||msg==WM_CTLCOLORBTN){HWND h=reinterpret_cast<HWND>(lp);wchar_t cls[16]=L"";::GetClassNameW(h,cls,16);
             if(!_wcsicmp(cls,L"Static")||!_wcsicmp(cls,L"Button")){HDC dc=reinterpret_cast<HDC>(wp);const int id=::GetDlgCtrlID(h);::SetBkMode(dc,TRANSPARENT);
                 COLORREF c=RGB(49,90,128);

@@ -6,14 +6,21 @@
 // Nothing is written before the confirmation; TVS labels of changed elements are refreshed.
 // Then the velocities: dionice (chains between branchings) above a maximum velocity, listed with
 // the size proposals (geometry/DuctSizing.h), then the dialog "Dimenzije dionice" for each
-// (SizingDialog.h: m/s, Pa/m, own size) with a zoom between them. Nothing is resized; "Zadrži
-// ručno" marks the dionica (xdata TVS_RUCNO on its ducts, with the chosen size).
+// (SizingDialog.h: m/s, Pa/m, own size) with a zoom between them. "Zadrži ručno" marks the
+// dionica (xdata TVS_RUCNO on its ducts, with the chosen size). "Primijeni" gives the size to
+// the part of the dionica around its fastest duct (geometry/DionicaSegment.h: plain ducts and
+// plan elbows of that size; the elbows get the new radius as in TVS_DIM_PRATI) and puts the
+// joints right at its ends: a prelaz there takes the new size, a duct of another size gets a
+// prelaz in it, a TK-O / TK-G its prelaz on the port, anything else a prelaz in our duct.
+// Then the network is read again and the dialog goes on.
 #include "TVSMoveCommand.h"
 #include "CheckCommand.h"
 #include "../TVS_Ventilation_DBX/DuctCaption.h"
 #include "../geometry/FlowNetwork.h"
 #include "../geometry/DuctSizing.h"
 #include "SizingDialog.h"
+#include "SizeFollow.h"
+#include "../geometry/DionicaSegment.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -97,7 +104,7 @@ inline bool setManual(const AcDbObjectId& id,const Manual& m){
     resbuf* x=m.on?acutBuildList(1001,lockApp,1070,1,1040,m.a,1040,m.b,0):acutBuildList(1001,lockApp,0);if(!x)return false;
     const Acad::ErrorStatus es=e->setXData(x);acutRelRb(x);return es==Acad::eOk;
 }
-struct Dionica {std::vector<AcDbObjectId> ducts;int worst;double flow,v;bool round;Manual manual;double a,b;tvsDuctSizing::Size width,both;};
+struct Dionica {std::vector<AcDbObjectId> ducts,all;int worst;double flow,v;bool round;Manual manual;double a,b;tvsDuctSizing::Size width,both;};
 inline void sizeText(wchar_t* out,size_t n,bool round,double a,double b){
     if(round)swprintf_s(out,n,L"Ø%.0f",a);else swprintf_s(out,n,L"%.0f×%.0f",a,b);
 }
@@ -115,14 +122,17 @@ inline void describe(const Dionica& d,int k,int count,double vmax){
     if(d.both.ok){sizeText(h,32,false,d.both.a,d.both.b);acutPrintf(L"; š×v: %ls (%.2f m/s)",h,d.both.v);}
 }
 // Dionice of the network above vmax (manual ones too, marked), fastest first.
-inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f,UINT sizingDialog){
-    {acedInitGet(RSG_NOZERO|RSG_NONEG,L"Ne");double v=maximumVelocity();wchar_t prompt[120];
+struct ApplyRequest {std::vector<AcDbObjectId> group;AcDbObjectId worst;double a,b;bool round;int index;ApplyRequest():a(0),b(0),round(false),index(0){}};
+// true: "Primijeni" asked (request filled); the caller applies, reads the network again and calls again.
+inline bool velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f,UINT sizingDialog,bool ask,ApplyRequest& request,int startAt=0){
+    if(ask){acedInitGet(RSG_NOZERO|RSG_NONEG,L"Ne");double v=maximumVelocity();wchar_t prompt[120];
      swprintf_s(prompt,120,L"\nProvjera brzina – najveća brzina [m/s] ili [Ne] <%.1f>: ",maximumVelocity());
      const int g=acedGetReal(prompt,&v);
-     if(g==RTCAN||g==RTKWORD)return;if(g==RTNORM)maximumVelocity()=v;}
+     if(g==RTCAN||g==RTKWORD)return false;if(g==RTNORM)maximumVelocity()=v;}
     const double vmax=maximumVelocity();
     std::vector<int> group;const int count=tvsDuctSizing::dionice(r.parent,r.reached,group);
     std::vector<Dionica> all(count);for(int g=0;g<count;++g){all[g].worst=-1;all[g].v=0;}
+    for(size_t i=0;i<net.nodes.size();++i){const int o=net.owner[i];if(o>=0&&group[o]>=0)all[group[o]].all.push_back(net.nodes[i].id);}
     for(size_t i=0;i<net.nodes.size();++i){const tvsMove::Node& n=net.nodes[i];
         if(net.owner[i]!=static_cast<int>(i)||!net.members[i].empty()||n.kind!=1||n.flex||group[i]<0)continue;
         Dionica& d=all[group[i]];d.ducts.push_back(n.id);{const Manual m=manualOf(n.id);if(m.on&&!d.manual.on)d.manual=m;}
@@ -134,13 +144,13 @@ inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
         else{d.width=tvsDuctSizing::widthOnly(d.flow,d.b,vmax);d.both=tvsDuctSizing::widthHeight(d.flow,d.b,vmax);}
         fast.push_back(d);}
     std::sort(fast.begin(),fast.end(),[](const Dionica& x,const Dionica& y){return x.v>y.v;});
-    if(fast.empty()){acutPrintf(L"\nTVS_PROTOK: sve dionice su do %.1f m/s.",vmax);return;}
+    if(fast.empty()){acutPrintf(L"\nTVS_PROTOK: sve dionice su do %.1f m/s.",vmax);return false;}
     int manual=0;for(size_t k=0;k<fast.size();++k)if(fast[k].manual.on)++manual;
     acutPrintf(L"\nTVS_PROTOK: brzina iznad %.1f m/s u %d dionica (ručno: %d):",vmax,static_cast<int>(fast.size()),manual);
     for(size_t k=0;k<fast.size()&&k<50;++k)describe(fast[k],static_cast<int>(k)+1,static_cast<int>(fast.size()),vmax);
     if(fast.size()>50)acutPrintf(L"\n  ... još %d",static_cast<int>(fast.size())-50);
     // dialog per dionica (SizingDialog.h); between two the drawing zooms on the next one
-    int at=0;
+    int at=startAt>=0&&startAt<static_cast<int>(fast.size())?startAt:0;
     for(;;){Dionica& d=fast[at];
         const tvsFlowNetwork::Element& e=el[d.worst];tvsMoveGeometry::Point c(0,0,0);
         for(size_t p=0;p<e.ports.size();++p){c.x+=e.ports[p].x/e.ports.size();c.y+=e.ports[p].y/e.ports.size();}
@@ -151,6 +161,9 @@ inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
         const tvsSizingDialog::Result res=tvsSizingDialog::show(in,def,sizingDialog);
         if(res.vmax>0)maximumVelocity()=res.vmax;if(!d.round)sizingMode()=res.mode;
         if(res.action==tvsSizingDialog::Close)break;
+        if(res.action==tvsSizingDialog::Apply){
+            request.group=d.all;request.worst=net.nodes[d.worst].id;request.a=res.size.a;request.b=res.size.b;request.round=!(res.size.b>0);request.index=at;
+            acedSSSetFirst(NULL,NULL);return true;}
         if(res.action==tvsSizingDialog::Keep||res.action==tvsSizingDialog::Remove){
             Manual m;m.on=res.action==tvsSizingDialog::Keep;if(m.on){m.a=res.size.a;m.b=res.size.b;}
             int done=0;for(size_t k=0;k<d.ducts.size();++k)if(setManual(d.ducts[k],m))++done;
@@ -162,7 +175,105 @@ inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
         if(res.action==tvsSizingDialog::Previous){at=at>0?at-1:static_cast<int>(fast.size())-1;continue;}
         at=(at+1)%static_cast<int>(fast.size());
     }
-    acedSSSetFirst(NULL,NULL);
+    acedSSSetFirst(NULL,NULL);return false;
+}
+// "Primijeni": the new size (mm) on the part of the dionica around `worst`. false: nothing or
+// not all changed (reason printed; the command is one UNDO step).
+inline bool applySize(AcDbDatabase* db,const Net& net,double f,double tol,const ApplyRequest& q,std::set<AcDbObjectId>& written){
+    std::set<AcDbObjectId> group(q.group.begin(),q.group.end());
+    const size_t n=net.nodes.size();int start=-1;
+    std::vector<tvsDionicaSegment::Item> items(n);
+    for(size_t i=0;i<n;++i){tvsDionicaSegment::Item& it=items[i];const tvsMove::Node& nd=net.nodes[i];
+        if(net.owner[i]!=static_cast<int>(i))continue;   // member of an etaz / obilazak: no ports of its own
+        for(size_t p=0;p<net.bodies[i].ports.size();++p){const tvsMoveGeometry::Point& x=net.bodies[i].ports[p];it.ports.push_back(tvsFlowNetwork::P(x.x,x.y,x.z));}
+        it.group=group.count(nd.id)?0:1;it.a=nd.a;it.b=nd.b;it.round=nd.round;
+        if(net.members[i].empty()&&!nd.flex){AcDbObjectPointer<AcDbEntity> e(nd.id,AcDb::kForRead);
+            if(e.openStatus()==Acad::eOk){if(nd.kind==1&&tvsSizeFollow::plainDuct(e.object()))it.kind=tvsDionicaSegment::Duct;
+                else if(nd.kind==2&&tvsSizeFollow::plainElbow(e.object()))it.kind=tvsDionicaSegment::Elbow;}}
+        if(nd.id==q.worst)start=static_cast<int>(i);}
+    if(start<0){acutPrintf(L"\nPrimijeni: kanal dionice više nije u mreži.");return false;}
+    const tvsDionicaSegment::Result seg=tvsDionicaSegment::find(items,start,tol);
+    if(!seg.ok){acutPrintf(seg.ambiguous?L"\nPrimijeni: na dionici se sastaje više od dva kraja u jednoj tački (TVS_PROVJERA). Ništa nije promijenjeno.":L"\nPrimijeni: dionica nije prepoznata. Ništa nije promijenjeno.");return false;}
+    const double A=q.a/f,B=q.round?0:q.b/f,oldA=net.nodes[start].a,oldB=net.nodes[start].round?0:net.nodes[start].b;const bool oldRound=net.nodes[start].round;
+    if(q.round==oldRound&&std::fabs(A-oldA)<1e-6&&(q.round||std::fabs(B-oldB)<1e-6)){acutPrintf(L"\nPrimijeni: dionica već ima tu dimenziju.");return false;}
+    // everything that changes must be writable before the first change
+    {std::vector<AcDbObjectId> check;for(size_t m=0;m<seg.members.size();++m)check.push_back(net.nodes[seg.members[m]].id);
+     for(size_t k=0;k<seg.ends.size();++k)if(seg.ends[k].other>=0)check.push_back(net.nodes[seg.ends[k].other].id);
+     for(size_t k=0;k<check.size();++k){AcDbObjectPointer<AcDbEntity> e(check[k],AcDb::kForWrite);
+        if(e.openStatus()!=Acad::eOk){acutPrintf(L"\nPrimijeni: element dionice ili susjed se ne može mijenjati (%ls). Ništa nije promijenjeno.",acadErrorStatusText(e.openStatus()));return false;}}}
+    // elbows of the part must take the new radius (round elbow with a specific radius cannot)
+    for(size_t m=0;m<seg.members.size();++m){const int i=seg.members[m];if(items[i].kind!=tvsDionicaSegment::Elbow)continue;
+        AcDbObjectPointer<TVS_TAP> t(net.nodes[i].id,AcDb::kForRead);tvsMove::Point np[2];
+        if(t.openStatus()!=Acad::eOk||!tvsSizeFollow::elbowPortsFor(t.object(),A,q.round,np)){acutPrintf(L"\nPrimijeni: koljeno dionice se ne može preračunati za novu dimenziju (poluprečnik u TVS_SETTINGS). Ništa nije promijenjeno.");return false;}}
+    // the chosen duct first (applyRun reads the size from it), then the run with the elbows
+    {AcDbObjectPointer<TVS_Pipe> p(net.nodes[start].id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk)return false;
+     if(p->ThisRound!=q.round)p->put_ThisRound(q.round);p->put_SizeA(A);p->put_SizeB(B);p->recordGraphicsModified();}
+    tvsSizeFollow::Run run;int ducts=1,elbows=0;
+    for(size_t m=0;m<seg.members.size();++m){const int i=seg.members[m];if(i==start)continue;
+        if(items[i].kind==tvsDionicaSegment::Elbow){run.elbows.push_back(i);++elbows;}else{run.ducts.push_back(i);++ducts;}}
+    std::vector<AcDbObjectId> resized;tvsSizeFollow::Etazes none;
+    if(!tvsSizeFollow::applyRun(net.nodes,start,run,none,tol,resized)){   // nothing of the run written: the chosen duct back
+        AcDbObjectPointer<TVS_Pipe> p(net.nodes[start].id,AcDb::kForWrite);
+        if(p.openStatus()==Acad::eOk){if(p->ThisRound!=oldRound)p->put_ThisRound(oldRound);p->put_SizeA(oldA);p->put_SizeB(oldB);p->recordGraphicsModified();}
+        acutPrintf(L" Ništa nije promijenjeno.");return false;}
+    written.insert(net.nodes[start].id);for(size_t k=0;k<resized.size();++k)written.insert(resized[k]);
+    for(size_t m=0;m<seg.members.size();++m)written.insert(net.nodes[seg.members[m]].id);
+    // the joints at the ends of the part
+    int prelazi=0,adjusted=0,warnings=0;
+    for(size_t k=0;k<seg.ends.size();++k){const tvsDionicaSegment::End& e=seg.ends[k];if(e.other<0)continue;
+        const tvsFlowNetwork::P& x=items[e.element].ports[e.port];const AcGePoint3d at(x.x,x.y,x.z);
+        const AcDbObjectId ours=net.nodes[e.element].id,theirs=net.nodes[e.other].id;
+        const bool oursFirst=e.port==0;
+        int what=0;   // 0 prelaz in our duct, 1 prelaz takes the size, 2 prelaz in their duct, 3 TK-O / TK-G port
+        {AcDbObjectPointer<AcDbEntity> o(theirs,AcDb::kForRead);
+         if(o.openStatus()==Acad::eOk&&net.members[e.other].empty()){
+            if(const TVS_TRANS* t=TVS_TRANS::cast(o.object())){
+                // a prelaz aligned to one side moves its other end with a new width: a prelaz of our own instead
+                if(t->TransType==2||t->TransType==3)acutPrintf(L"\nNa kraju dionice: prelaz poravnat uz jednu stranu ostaje; umeće se novi prelaz u kanal dionice.");
+                else what=1;}
+            else if(tvsSizeFollow::plainDuct(o.object())&&!net.nodes[e.other].flex)what=2;
+            else if(const TVS_WYE* w=TVS_WYE::cast(o.object()))what=tvsTeePort::keeps(w)?3:0;}}
+        if(what==1){AcDbObjectPointer<TVS_TRANS> t(theirs,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk){++warnings;continue;}
+            t->assertWriteEnabled();
+            if(e.otherPort==0){t->SizeAp1=A;t->SizeBp1=B;t->ThisRoundp1=q.round;}else{t->SizeAp2=A;t->SizeBp2=B;t->ThisRoundp2=q.round;}
+            t->recordGraphicsModified();tvsSizeFollow::spiroLength(t.object(),e.otherPort,ours,f);++adjusted;written.insert(theirs);continue;}
+        if(what==2){bool theirFirst=true;
+            {AcDbObjectPointer<TVS_Pipe> d(theirs,AcDb::kForRead);if(d.openStatus()!=Acad::eOk){++warnings;continue;}
+             theirFirst=tvsTeeFit::planDistance(d->FirstPoint,at)<=tvsTeeFit::planDistance(d->LastPoint,at);}
+            if(tvsSizeFollow::prelazBehind(theirs,theirFirst,at,A,B,f,L"Na kraju dionice",q.round?1:0))++prelazi;else ++warnings;continue;}
+        if(what==3){int port=-1;double best=0;
+            {AcDbObjectPointer<TVS_WYE> w(theirs,AcDb::kForRead);if(w.openStatus()!=Acad::eOk){++warnings;continue;}
+             const tvsTeeFit::Ports ps=tvsTeeFit::ports(w.object());
+             if(ps.ok)for(int j=0;j<3;++j){const double dd=tvsTeeFit::planDistance(ps.p[j],at);if(port<0||dd<best){port=j;best=dd;}}}
+            if(port>=0&&tvsTeePort::ensure(theirs,port))++adjusted;else ++warnings;continue;}
+        if(tvsSizeFollow::prelazBehind(ours,oursFirst,at,oldA,oldB,f,L"Na kraju dionice",oldRound?1:0))++prelazi;else ++warnings;
+    }
+    // the size is now in the drawing: the "ručno" mark of these ducts goes
+    for(size_t m=0;m<seg.members.size();++m)if(items[seg.members[m]].kind==tvsDionicaSegment::Duct&&manualOf(net.nodes[seg.members[m]].id).on)setManual(net.nodes[seg.members[m]].id,Manual());
+    wchar_t from[32],to[32];sizeText(from,32,oldRound,oldA*f,oldB*f);sizeText(to,32,q.round,q.a,q.b);
+    acutPrintf(L"\nPrimijenjeno %ls → %ls: kanala %d, koljena %d; prelaza umetnuto %d, spojeva prilagođeno %d.%ls",from,to,ducts,elbows,prelazi,adjusted,
+               warnings?L" Neki spojevi nisu usklađeni (poruke iznad) – provjerite ih (TVS_PROVJERA); U vraća izmjenu.":L"");
+    return true;
+}
+// Velocities, with "Primijeni" applied and the network read again until the dialog is closed.
+inline void sizes(AcDbDatabase* db,Net& net,tvsFlowNetwork::Result& r,std::vector<tvsFlowNetwork::Element>& el,double f,double tol,UINT sizingDialog,
+                  const AcDbObjectId& rootId,const tvsFlowNetwork::P rootPoint){
+    ApplyRequest q;bool ask=true;int startAt=0;
+    while(velocities(net,r,el,f,sizingDialog,ask,q,startAt)){ask=false;startAt=q.index;
+        std::set<AcDbObjectId> written;applySize(db,net,f,tol,q,written);
+        if(!written.empty()){MleaderController controller;int labels=0;
+            for(int k=0;k<net.labels.length();++k){AcDbObjectId linked;
+                if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
+            if(labels)acutPrintf(L"\nAžurirano oznaka: %d.",labels);}
+        Net again;if(!read(db,tol,again)){acutPrintf(L"\nTVS_PROTOK: crtež se ne može ponovo pročitati.");return;}
+        net=again;int root=-1;for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==rootId)root=net.owner[i];
+        if(root<0){acutPrintf(L"\nTVS_PROTOK: početni element mreže više ne postoji.");return;}
+        int port=-1;double nearest=0;
+        for(size_t p=0;p<net.bodies[root].ports.size();++p){const tvsMoveGeometry::Point& x=net.bodies[root].ports[p];
+            const double d=std::hypot(x.x-rootPoint.x,x.y-rootPoint.y);if(port<0||d<nearest){port=static_cast<int>(p);nearest=d;}}
+        elements(net,el);r=tvsFlowNetwork::solve(el,root,port,tol);
+        if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
+    }
 }
 inline void execute(UINT sizingDialog){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
@@ -216,12 +327,12 @@ inline void execute(UINT sizingDialog){
     // what changes
     std::vector<int> change;
     for(size_t i=0;i<net.nodes.size();++i){const int o=net.owner[i];if(r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>1e-6)change.push_back(static_cast<int>(i));}
-    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");velocities(net,r,el,f,sizingDialog);return;}
+    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return;}
     {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
      swprintf_s(prompt,120,L"\nUpisati protoke u %d elemenata? [Da/Ne] <Da>: ",static_cast<int>(change.size()));
      const int k=acedGetKword(prompt,kw,8);
      if(k==RTCAN)return;
-     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");velocities(net,r,el,f,sizingDialog);return;}}
+     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return;}}
     std::set<AcDbObjectId> written;
     {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
@@ -236,6 +347,6 @@ inline void execute(UINT sizingDialog){
     for(int k=0;k<net.labels.length();++k){AcDbObjectId linked;
         if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
     acutPrintf(L"\nTVS_PROTOK: upisan protok u %d elemenata; ažurirano oznaka %d.",static_cast<int>(written.size()),labels);
-    velocities(net,r,el,f,sizingDialog);
+    sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);
 }
 }

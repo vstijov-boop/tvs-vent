@@ -9,7 +9,12 @@ class Flow(unittest.TestCase):
    subprocess.run(['g++','-std=c++14','-Wall','-Wextra','-Werror',str(ROOT/'tests/test_flow_network.cpp'),'-o',str(exe)],check=True)
    self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
  def test_ascii(self):
-  for h in ('FlowNetwork.h','DuctSizing.h'):(ROOT/'geometry'/h).read_bytes().decode('ascii')
+  for h in ('FlowNetwork.h','DuctSizing.h','DionicaSegment.h'):(ROOT/'geometry'/h).read_bytes().decode('ascii')
+ def test_segment_cpp(self):
+  with tempfile.TemporaryDirectory() as d:
+   exe=pathlib.Path(d)/'g'
+   subprocess.run(['g++','-std=c++14','-Wall','-Wextra','-Werror',str(ROOT/'tests/test_dionica_segment.cpp'),'-o',str(exe)],check=True)
+   self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
  def test_sizing_cpp(self):
   with tempfile.TemporaryDirectory() as d:
    exe=pathlib.Path(d)/'s'
@@ -17,10 +22,9 @@ class Flow(unittest.TestCase):
    self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
  def test_velocities(self):
   c=text('TVS_Ventilation_ARX/FlowCommand.h')
-  self.assertEqual(c.count('velocities(net,r,el,f,sizingDialog);'),3)          # posle upisa, bez izmjene i uz Ne
+  self.assertEqual(c.count('sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);'),3)          # posle upisa, bez izmjene i uz Ne
   self.assertIn('L"TVS_RUCNO"',c);self.assertIn('tvsSizingDialog::show(in,def,sizingDialog)',c);self.assertIn('L"CMDECHO"',text('TVS_Ventilation_ARX/CheckCommand.h'));self.assertIn('acdbRegApp(lockApp)',c)
   self.assertIn('tvsDuctSizing::widthOnly(',c);self.assertIn('tvsDuctSizing::widthHeight(',c);self.assertIn('tvsDuctSizing::diameter(',c)
-  self.assertNotIn('put_SizeA',c)
  def test_dialog(self):
   d=text('TVS_Ventilation_ARX/SizingDialog.h');self.assertTrue((ROOT/'TVS_Ventilation_ARX/SizingDialog.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   self.assertIn('tvsDuctSizing::candidates(',d);self.assertIn('tvsDuctSizing::friction(',d);self.assertIn('tvsDuctSizing::parse(',d)
