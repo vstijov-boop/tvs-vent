@@ -4,10 +4,15 @@
 // terminals behind it. Terminals keep their own flow; those without one can be entered here
 // (zoom on each). An etaz / obilazak counts as one element (TVS_MOVE bodies), flex too.
 // Nothing is written before the confirmation; TVS labels of changed elements are refreshed.
+// Then the velocities: dionice (chains between branchings) above a maximum velocity, with the
+// size proposals (geometry/DuctSizing.h), walked through with a zoom. Nothing is resized; a
+// dionica can be marked "ručno" (xdata TVS_RUCNO on its ducts): no proposal for it any more.
 #include "TVSMoveCommand.h"
 #include "CheckCommand.h"
 #include "../TVS_Ventilation_DBX/DuctCaption.h"
 #include "../geometry/FlowNetwork.h"
+#include "../geometry/DuctSizing.h"
+#include <algorithm>
 #include <cmath>
 #include <set>
 #include <vector>
@@ -71,6 +76,74 @@ inline void fastest(const Net& net,const tvsFlowNetwork::Result& r,double f){
     if(n.round)acutPrintf(L"\n  najveća brzina u kanalu: %.2f m/s (Ø%.0f, %.0f m³/h).",best,n.a*f,r.flow[net.owner[at]]);
     else acutPrintf(L"\n  najveća brzina u kanalu: %.2f m/s (%.0f×%.0f, %.0f m³/h).",best,n.a*f,n.b*f,r.flow[net.owner[at]]);
 }
+inline double& maximumVelocity(){static double v=5.0;return v;}
+const wchar_t* const lockApp=L"TVS_RUCNO";
+inline bool locked(const AcDbObjectId& id){
+    AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)return false;
+    resbuf* x=e->xData(lockApp);if(!x)return false;
+    bool on=false;for(resbuf* r=x;r;r=r->rbnext)if(r->restype==1070&&r->resval.rint==1)on=true;
+    acutRelRb(x);return on;
+}
+inline bool setLocked(const AcDbObjectId& id,bool on){
+    acdbRegApp(lockApp);
+    AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForWrite);if(e.openStatus()!=Acad::eOk)return false;
+    resbuf* x=on?acutBuildList(1001,lockApp,1070,1,0):acutBuildList(1001,lockApp,0);if(!x)return false;
+    const Acad::ErrorStatus es=e->setXData(x);acutRelRb(x);return es==Acad::eOk;
+}
+struct Dionica {std::vector<AcDbObjectId> ducts;int worst;double flow,v;bool round,manual;double a,b;tvsDuctSizing::Size width,both;};
+inline void sizeText(wchar_t* out,size_t n,bool round,double a,double b){
+    if(round)swprintf_s(out,n,L"Ø%.0f",a);else swprintf_s(out,n,L"%.0f×%.0f",a,b);
+}
+inline void describe(const Dionica& d,int k,int count){
+    wchar_t now[32],w[32],h[32];sizeText(now,32,d.round,d.a,d.b);
+    acutPrintf(L"\n  %d/%d: %ls, %.0f m³/h, %.2f m/s",k,count,now,d.flow,d.v);
+    if(d.manual){acutPrintf(L" – ručno, bez prijedloga");return;}
+    if(d.round){if(d.width.ok){sizeText(w,32,true,d.width.a,0);acutPrintf(L" → %ls (%.2f m/s)",w,d.width.v);}else acutPrintf(L" → nema standardnog prečnika");return;}
+    if(d.width.ok){sizeText(w,32,false,d.width.a,d.width.b);acutPrintf(L" → širina: %ls (%.2f m/s)",w,d.width.v);}else acutPrintf(L" → širina: nema do 3000 mm");
+    if(d.both.ok){sizeText(h,32,false,d.both.a,d.both.b);acutPrintf(L"; š×v: %ls (%.2f m/s)",h,d.both.v);}
+}
+// Dionice of the network above vmax (manual ones too, marked), fastest first.
+inline void velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f){
+    {acedInitGet(RSG_NOZERO|RSG_NONEG,L"Ne");double v=maximumVelocity();wchar_t prompt[120];
+     swprintf_s(prompt,120,L"\nProvjera brzina – najveća brzina [m/s] ili [Ne] <%.1f>: ",maximumVelocity());
+     const int g=acedGetReal(prompt,&v);
+     if(g==RTCAN||g==RTKWORD)return;if(g==RTNORM)maximumVelocity()=v;}
+    const double vmax=maximumVelocity();
+    std::vector<int> group;const int count=tvsDuctSizing::dionice(r.parent,r.reached,group);
+    std::vector<Dionica> all(count);for(int g=0;g<count;++g){all[g].worst=-1;all[g].v=0;all[g].manual=false;}
+    for(size_t i=0;i<net.nodes.size();++i){const tvsMove::Node& n=net.nodes[i];
+        if(net.owner[i]!=static_cast<int>(i)||!net.members[i].empty()||n.kind!=1||n.flex||group[i]<0)continue;
+        Dionica& d=all[group[i]];d.ducts.push_back(n.id);if(locked(n.id))d.manual=true;
+        const double v=tvsDuctSizing::velocity(r.flow[i],n.a*f,n.b*f,n.round);
+        if(d.worst<0||v>d.v){d.worst=static_cast<int>(i);d.v=v;d.flow=r.flow[i];d.round=n.round;d.a=n.a*f;d.b=n.round?0:n.b*f;}}
+    std::vector<Dionica> fast;
+    for(int g=0;g<count;++g){Dionica& d=all[g];if(d.worst<0||d.v<=vmax+1e-9)continue;
+        if(d.round)d.width=tvsDuctSizing::diameter(d.flow,vmax);
+        else{d.width=tvsDuctSizing::widthOnly(d.flow,d.b,vmax);d.both=tvsDuctSizing::widthHeight(d.flow,d.b,vmax);}
+        fast.push_back(d);}
+    std::sort(fast.begin(),fast.end(),[](const Dionica& x,const Dionica& y){return x.v>y.v;});
+    if(fast.empty()){acutPrintf(L"\nTVS_PROTOK: sve dionice su do %.1f m/s.",vmax);return;}
+    int manual=0;for(size_t k=0;k<fast.size();++k)if(fast[k].manual)++manual;
+    acutPrintf(L"\nTVS_PROTOK: brzina iznad %.1f m/s u %d dionica (ručno: %d):",vmax,static_cast<int>(fast.size()),manual);
+    for(size_t k=0;k<fast.size()&&k<50;++k)describe(fast[k],static_cast<int>(k)+1,static_cast<int>(fast.size()));
+    if(fast.size()>50)acutPrintf(L"\n  ... još %d",static_cast<int>(fast.size())-50);
+    int at=0;
+    for(;;){const Dionica& d=fast[at];
+        const tvsFlowNetwork::Element& e=el[d.worst];tvsMoveGeometry::Point c(0,0,0);
+        for(size_t p=0;p<e.ports.size();++p){c.x+=e.ports[p].x/e.ports.size();c.y+=e.ports[p].y/e.ports.size();}
+        tvsCheck::zoom(c.x,c.y,3000.0/f);tvsCheck::select(d.ducts);describe(d,at+1,static_cast<int>(fast.size()));
+        acedInitGet(0,L"Sljedeci Prethodni Rucno Kraj");ACHAR kw[32]=L"";
+        const int k=acedGetKword(d.manual?L"\nRucno = ukloni oznaku. [Sljedeci/Prethodni/Rucno/Kraj] <Sljedeci>: ":L"\nRucno = bez prijedloga za ovu dionicu. [Sljedeci/Prethodni/Rucno/Kraj] <Sljedeci>: ",kw,32);
+        if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Kraj")==0))break;
+        if(k==RTNORM&&_wcsicmp(kw,L"Rucno")==0){
+            const bool on=!d.manual;int done=0;for(size_t m=0;m<d.ducts.size();++m)if(setLocked(d.ducts[m],on))++done;
+            fast[at].manual=on;
+            acutPrintf(on?L"\nDionica označena „ručno“ (%d kanala): TVS_PROTOK je više ne predlaže.":L"\nOznaka „ručno“ uklonjena (%d kanala).",done);continue;}
+        if(k==RTNORM&&_wcsicmp(kw,L"Prethodni")==0){at=at>0?at-1:static_cast<int>(fast.size())-1;continue;}
+        at=(at+1)%static_cast<int>(fast.size());
+    }
+    acedSSSetFirst(NULL,NULL);
+}
 inline void execute(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=0.1/f;
@@ -123,11 +196,12 @@ inline void execute(){
     // what changes
     std::vector<int> change;
     for(size_t i=0;i<net.nodes.size();++i){const int o=net.owner[i];if(r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>1e-6)change.push_back(static_cast<int>(i));}
-    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");return;}
+    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");velocities(net,r,el,f);return;}
     {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
      swprintf_s(prompt,120,L"\nUpisati protoke u %d elemenata? [Da/Ne] <Da>: ",static_cast<int>(change.size()));
      const int k=acedGetKword(prompt,kw,8);
-     if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Ne")==0))return;}
+     if(k==RTCAN)return;
+     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");velocities(net,r,el,f);return;}}
     std::set<AcDbObjectId> written;
     {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
@@ -142,5 +216,6 @@ inline void execute(){
     for(int k=0;k<net.labels.length();++k){AcDbObjectId linked;
         if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
     acutPrintf(L"\nTVS_PROTOK: upisan protok u %d elemenata; ažurirano oznaka %d.",static_cast<int>(written.size()),labels);
+    velocities(net,r,el,f);
 }
 }

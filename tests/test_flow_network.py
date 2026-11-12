@@ -8,7 +8,19 @@ class Flow(unittest.TestCase):
    exe=pathlib.Path(d)/'t'
    subprocess.run(['g++','-std=c++14','-Wall','-Wextra','-Werror',str(ROOT/'tests/test_flow_network.cpp'),'-o',str(exe)],check=True)
    self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
- def test_ascii(self):(ROOT/'geometry/FlowNetwork.h').read_bytes().decode('ascii')
+ def test_ascii(self):
+  for h in ('FlowNetwork.h','DuctSizing.h'):(ROOT/'geometry'/h).read_bytes().decode('ascii')
+ def test_sizing_cpp(self):
+  with tempfile.TemporaryDirectory() as d:
+   exe=pathlib.Path(d)/'s'
+   subprocess.run(['g++','-std=c++14','-Wall','-Wextra','-Werror',str(ROOT/'tests/test_duct_sizing.cpp'),'-o',str(exe)],check=True)
+   self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
+ def test_velocities(self):
+  c=text('TVS_Ventilation_ARX/FlowCommand.h')
+  self.assertEqual(c.count('velocities(net,r,el,f);'),3)          # posle upisa, bez izmjene i uz Ne
+  self.assertIn('L"TVS_RUCNO"',c);self.assertIn('acdbRegApp(lockApp)',c)
+  self.assertIn('tvsDuctSizing::widthOnly(',c);self.assertIn('tvsDuctSizing::widthHeight(',c);self.assertIn('tvsDuctSizing::diameter(',c)
+  self.assertNotIn('put_SizeA',c)                                  # prijedlog, bez promjene dimenzija
  def test_command(self):
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/FlowCommand.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   c=text('TVS_Ventilation_ARX/FlowCommand.h')
