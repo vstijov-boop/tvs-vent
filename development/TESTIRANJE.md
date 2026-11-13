@@ -8,7 +8,7 @@
 
 ## TVS_SPOJ_TKG (novo, 13.11.) – testirati
 - Izbor: ulazni kanal, prvi ogranak, drugi ogranak (ogranci okomiti na ulaz, na suprotne strane, iste visine i kote kao ulaz, pravougaoni).
-- Ako ogranci nisu u istoj osi (novo): podrazumijevano se **ništa ne pomjera** – T komad ide na osu bližu ulazu, a dalji ogranak dobija duži **vrat** (pravi zid prije luka), pa oba lica padnu na postojeće ose. „[Da/Pomjeri/Ne]“: Pomjeri = kao ranije, ogranak u osu drugog (pa [Da/Vrat/Zamijeni/Ne]). Prevelika razlika osa za vrat → sam prelazi na Pomjeri.
+- Ako ogranci nisu u istoj osi (novo): podrazumijevano se **ništa ne pomjera** – T komad ide na osu bližu ulazu, a dalji ogranak dobija duži **vrat** (pravi zid prije luka), pa oba lica padnu na postojeće ose. „[Da/Pomjeri/Ne]“: Pomjeri = kao ranije, ogranak u osu drugog (pa [Da/Vrat/Zamijeni/Ne]). Vrat nije više ograničen: kad se vanjski lukovi ne sijeku, dalji ogranak ima cijeli luk, bliži luk staje na pravom zidu, a linija preko zatvara do zida ulaza (kao ručno crtano 13.11.).
 - Vrat se pamti u T komadu (TVS_TEE_V1, 6. podatak); stariji T komadi su kao i prije. TVS_TK_TIP ga zadržava (Okreni ga uklanja); SCALE / jedinice ga skaliraju. Provjeriti specifikaciju (površina lima) i TVS_MOVE / STRETCH na takvom T komadu.
 - TK-G se postavlja na presjek ose ulaza i ose ogranaka, ulaz se skraćuje (prava dužina se računa iz širina: okovratnik + veća širina ogranka), ogranci završavaju na licima T komada.
 - Rezultat se nacrta pa „Ovako spojiti? [Da/Zamijeni/Ne]“: Zamijeni = pomjeri drugi ogranak; Ne = sve nazad. Jedan U vraća spajanje.

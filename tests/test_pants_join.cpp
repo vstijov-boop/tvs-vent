@@ -49,5 +49,15 @@ int main(){
     // the shape with a vrat is a real TK-G (cusp found) and its ports match the plan
     {tvsTee::Tee t;t.type=tvsTee::Pants;t.A=400;t.w1=300;t.w2=200;t.R1=450;t.R2=300;t.l=100;t.e1=50;tvsTee::Shape s;assert(tvsTee::shape(t,s));
      const tvsTee::PantsFrame f=tvsTee::pantsFrame(t);assert(near1(f.d1,50)&&near1(f.d2,100));}
+    // long vrat: the outer arcs do not meet any more; drawn with the straight wall (13.11.), any length
+    for(double e:{150.0,400.0,1500.0}){
+        for(int side=0;side<2;++side){tvsTee::Tee t;t.type=tvsTee::Pants;t.A=400;t.w1=300;t.w2=250;t.R1=450;t.R2=375;t.l=25;
+            if(side)t.e2=e;else t.e1=e;tvsTee::Shape s;assert(tvsTee::shape(t,s));
+            // the straight wall is on x = s(a - w_far), from the nearer arc up to the farther centre height
+            bool wall=false;const double xs=side?-(200-250):(200-300);
+            for(size_t k=0;k<s.lines.size();++k)if(near1(s.lines[k].a.x,xs)&&near1(s.lines[k].b.x,xs))wall=true;
+            if(e>=400)assert(wall);}}
+    {Duct in=D(0,0,6000,0,400);Duct br[2]={D(6800,400,6800,3000,300),D(6250,-400,6250,-3000,250)};
+     Plan p=plan(in,br,l,minDuct,-1,true);assert(p.error==Ok&&near1(p.e[0],550));}
     std::puts("pants join OK");return 0;
 }

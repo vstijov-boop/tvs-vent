@@ -106,10 +106,26 @@ inline bool shape(const Tee& t,Shape& out){
             const double a1=std::atan2(k.y-c1.y,k.x-c1.x),a2=std::atan2(k.y-c2.y,k.x-c2.x);
             if(a1>=pi()/2-1e-9&&a1<=pi()+1e-9&&a2>=-1e-9&&a2<=pi()/2+1e-9){e1=a1;e2=a2;cusp=true;}
         }
+        // Long vrat (TVS_SPOJ_TKG): the outer arcs no longer meet. The farther branch keeps its
+        // whole outer quarter, ending at S = (s(a - w), its centre height); the nearer outer arc
+        // stops on the line x = S.x, a straight wall goes from there to S, and a line across at
+        // S's height closes to the inlet wall on the farther side (as drawn by hand, 13.11.).
+        std::vector<Seg> flat;
+        if(!cusp&&(t.e1>1e-9||t.e2>1e-9)){
+            const bool far1=t.e1>t.e2;const int sf=far1?1:-1;
+            const P cf=far1?c1:c2,cn=far1?c2:c1;const double wf=far1?t.w1:t.w2,Rn=far1?t.R2:t.R1;
+            const double xs=sf*(a-wf),q=(xs-cn.x)/Rn;
+            if(q>=-1&&q<=1){const double th=std::acos(q),yc=cn.y+Rn*std::sin(th);   // th in [0, pi]: upper half
+                const bool inRange=far1?(th<=pi()/2+1e-9):(th>=pi()/2-1e-9);         // nearer arc: s=-1 [0,pi/2], s=+1 [pi/2,pi]
+                if(inRange&&yc<=cf.y+1e-9){
+                    if(far1){e1=pi();e2=th;}else{e2=0;e1=th;}
+                    flat.push_back(Seg(P(xs,yc),P(xs,cf.y)));flat.push_back(Seg(P(xs,cf.y),P(sf*a,cf.y)));cusp=true;}}
+        }
         if(!cusp)return false;   // branches too narrow for the inlet: not a real TK-G
         out.axis.push_back(Seg(P(0,0),P(0,pf.Y+(t.e1>t.e2?t.e1:t.e2))));
         branchAt(out,a,l,pf.d1,t.w1,t.R1,a+ri1+l,f,+1,e1);
         branchAt(out,a,l,pf.d2,t.w2,t.R2,a+ri2+l,f,-1,e2);
+        for(size_t k=0;k<flat.size();++k)out.lines.push_back(flat[k]);
     }
     return true;
 }
