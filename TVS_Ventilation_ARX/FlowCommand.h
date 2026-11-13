@@ -7,9 +7,10 @@
 // Then the velocities: dionice (chains between branchings) above a maximum velocity, listed with
 // the size proposals (geometry/DuctSizing.h), then the dialog "Dimenzije dionice" for each
 // (SizingDialog.h: m/s, Pa/m, own size) with a zoom between them. "Zadrži ručno" marks the
-// dionica (xdata TVS_RUCNO on its ducts, with the chosen size). "Primijeni" gives the size to
-// the fastest duct of the dionica and lets TVS_DIM_PRATI follow, exactly as after a manual
-// change (run, elbows, T komad dialogs, prelazi). Then the network is read again.
+// dionica (xdata TVS_RUCNO on its ducts, with the chosen size). "Primijeni": the plan of every
+// edit (geometry/DionicaPlan.h), a preview with [Da/Ne], then the writes; T komad at the end of
+// the dionica: inlet takes the size and a prelaz goes behind the prolaz (TK-O / TK-G: their
+// dialog). Dionice are offered farthest from the unit first. Then the network is read again.
 #include "TVSMoveCommand.h"
 #include "CheckCommand.h"
 #include "../TVS_Ventilation_DBX/DuctCaption.h"
@@ -17,6 +18,7 @@
 #include "../geometry/DuctSizing.h"
 #include "SizingDialog.h"
 #include "SizeFollow.h"
+#include "../geometry/DionicaPlan.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -100,7 +102,7 @@ inline bool setManual(const AcDbObjectId& id,const Manual& m){
     resbuf* x=m.on?acutBuildList(1001,lockApp,1070,1,1040,m.a,1040,m.b,0):acutBuildList(1001,lockApp,0);if(!x)return false;
     const Acad::ErrorStatus es=e->setXData(x);acutRelRb(x);return es==Acad::eOk;
 }
-struct Dionica {std::vector<AcDbObjectId> ducts,all;int worst;double flow,v;bool round;Manual manual;double a,b;tvsDuctSizing::Size width,both;};
+struct Dionica {std::vector<AcDbObjectId> ducts,all;int worst,depth;double flow,v;bool round;Manual manual;double a,b;tvsDuctSizing::Size width,both;};
 inline void sizeText(wchar_t* out,size_t n,bool round,double a,double b){
     if(round)swprintf_s(out,n,L"Ø%.0f",a);else swprintf_s(out,n,L"%.0f×%.0f",a,b);
 }
@@ -117,8 +119,8 @@ inline void describe(const Dionica& d,int k,int count,double vmax){
     if(d.width.ok){sizeText(w,32,false,d.width.a,d.width.b);acutPrintf(L" → širina: %ls (%.2f m/s)",w,d.width.v);}else acutPrintf(L" → širina: nema do 3000 mm");
     if(d.both.ok){sizeText(h,32,false,d.both.a,d.both.b);acutPrintf(L"; š×v: %ls (%.2f m/s)",h,d.both.v);}
 }
-// Dionice of the network above vmax (manual ones too, marked), fastest first.
-struct ApplyRequest {std::vector<AcDbObjectId> group;AcDbObjectId worst;double a,b;bool round;int index;ApplyRequest():a(0),b(0),round(false),index(0){}};
+// Dionice of the network above vmax (manual ones too, marked), farthest from the unit first.
+struct ApplyRequest {std::vector<int> groups;AcDbObjectId worst;double a,b;bool round;int index;ApplyRequest():a(0),b(0),round(false),index(0){}};
 // true: "Primijeni" asked (request filled); the caller applies, reads the network again and calls again.
 inline bool velocities(const Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,double f,UINT sizingDialog,bool ask,ApplyRequest& request,int startAt=0){
     if(ask){acedInitGet(RSG_NOZERO|RSG_NONEG,L"Ne");double v=maximumVelocity();wchar_t prompt[120];
@@ -139,7 +141,9 @@ inline bool velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
         if(d.round)d.width=tvsDuctSizing::diameter(d.flow,vmax);
         else{d.width=tvsDuctSizing::widthOnly(d.flow,d.b,vmax);d.both=tvsDuctSizing::widthHeight(d.flow,d.b,vmax);}
         fast.push_back(d);}
-    std::sort(fast.begin(),fast.end(),[](const Dionica& x,const Dionica& y){return x.v>y.v;});
+    // farthest from the unit first (then fastest): a dionica is changed before the one feeding it
+    for(size_t k=0;k<fast.size();++k){int d=0;for(int i=fast[k].worst;i>=0&&d<100000;i=r.parent[i])++d;fast[k].depth=d;}
+    std::sort(fast.begin(),fast.end(),[](const Dionica& x,const Dionica& y){return x.depth!=y.depth?x.depth>y.depth:x.v>y.v;});
     if(fast.empty()){acutPrintf(L"\nTVS_PROTOK: sve dionice su do %.1f m/s.",vmax);return false;}
     int manual=0;for(size_t k=0;k<fast.size();++k)if(fast[k].manual.on)++manual;
     acutPrintf(L"\nTVS_PROTOK: brzina iznad %.1f m/s u %d dionica (ručno: %d):",vmax,static_cast<int>(fast.size()),manual);
@@ -158,7 +162,7 @@ inline bool velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
         if(res.vmax>0)maximumVelocity()=res.vmax;if(!d.round)sizingMode()=res.mode;
         if(res.action==tvsSizingDialog::Close)break;
         if(res.action==tvsSizingDialog::Apply){
-            request.group=d.all;request.worst=net.nodes[d.worst].id;request.a=res.size.a;request.b=res.size.b;request.round=!(res.size.b>0);request.index=at;
+            request.groups=group;request.worst=net.nodes[d.worst].id;request.a=res.size.a;request.b=res.size.b;request.round=!(res.size.b>0);request.index=at;
             acedSSSetFirst(NULL,NULL);return true;}
         if(res.action==tvsSizingDialog::Keep||res.action==tvsSizingDialog::Remove){
             Manual m;m.on=res.action==tvsSizingDialog::Keep;if(m.on){m.a=res.size.a;m.b=res.size.b;}
@@ -173,27 +177,167 @@ inline bool velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
     }
     acedSSSetFirst(NULL,NULL);return false;
 }
-// "Primijeni": the new size (mm) on the fastest duct of the dionica, then the same follow as after
-// a manual change of that duct (SizeFollow.h settle = TVS_DIM_PRATI: the run, elbows, T komadi
-// with their dialogs, prelazi). false: nothing changed (reason printed; one UNDO step).
-inline bool applySize(AcDbDatabase* db,const Net&,double f,double,const ApplyRequest& q,std::set<AcDbObjectId>& written){
-    const double A=q.a/f,B=q.round?0:q.b/f;
-    tvsSizeFollow::Sizes old;
-    {AcDbObjectPointer<TVS_Pipe> p(q.worst,AcDb::kForRead);
-     if(p.openStatus()!=Acad::eOk||!tvsSizeFollow::plainDuct(p.object())){acutPrintf(L"\nPrimijeni: kanal dionice se ne može pročitati.");return false;}
-     old.a[0]=old.a[1]=p->SizeA;old.b[0]=old.b[1]=p->ThisRound?0:p->SizeB;old.round[0]=old.round[1]=p->ThisRound;}
-    if(q.round==old.round[0]&&std::fabs(A-old.a[0])<1e-6&&(q.round||std::fabs(B-old.b[0])<1e-6)){acutPrintf(L"\nPrimijeni: dionica već ima tu dimenziju.");return false;}
-    {AcDbObjectPointer<TVS_Pipe> p(q.worst,AcDb::kForWrite);
-     if(p.openStatus()!=Acad::eOk){acutPrintf(L"\nPrimijeni: kanal se ne može mijenjati (%ls). Ništa nije promijenjeno.",acadErrorStatusText(p.openStatus()));return false;}
-     if(p->ThisRound!=q.round)p->put_ThisRound(q.round);p->put_SizeA(A);p->put_SizeB(B);p->recordGraphicsModified();}
-    written.insert(q.worst);
-    if(manualOf(q.worst).on)setManual(q.worst,Manual());   // the size is in the drawing now
-    wchar_t from[32],to[32];sizeText(from,32,old.round[0],old.a[0]*f,old.b[0]*f);sizeText(to,32,q.round,q.a,q.b);
-    acutPrintf(L"\nPrimijeni: %ls → %ls; ostatak dionice prati kao kod ručne izmjene (TVS_DIM_PRATI).",from,to);
-    tvsSizeFollow::previous()[q.worst]=old;std::map<AcDbObjectId,int> work;work[q.worst]=3;
-    tvsSizeFollow::settle(db,work);
-    tvsSizeFollow::previous().erase(q.worst);
-    tvsSizeFollow::refreshLabels(db);tvsSizeFollow::touched().clear();
+// "Primijeni" (design: Fable 5.2 review): geometry/DionicaPlan.h decides every edit from the
+// snapshot; here they are shown, confirmed and executed with the proven writers (elbow / T komad
+// fields as applyRun, tvsTeePort::ensure, prelazBehind, openArriving), then the joints are checked.
+// v1: width / diameter only (height and shape changes are refused), the part of the fastest size.
+namespace planUse {
+inline AcDbDatabase*& db(){static AcDbDatabase* d=NULL;return d;}
+inline double& factor(){static double f=1;return f;}
+inline double prelazLength(const tvsDionicaPlan::Section& a,const tvsDionicaPlan::Section& b){
+    tvsTeePort::Section x,y;x.a=a.a;x.b=a.b;x.round=a.round;y.a=b.a;y.b=b.b;y.round=b.round;
+    return tvsTeePort::prelazLength(db(),x,y,factor());
+}
+inline tvsDionicaPlan::P pt(const AcGePoint3d& p){return tvsDionicaPlan::P(p.x,p.y,p.z);}
+inline tvsDionicaPlan::P pt(const tvsMoveGeometry::Point& p){return tvsDionicaPlan::P(p.x,p.y,p.z);}
+inline tvsDionicaPlan::P unit(const AcGeVector3d& v){AcGeVector3d u=v;u.z=0;if(u.length()<1e-12)return tvsDionicaPlan::P();u.normalize();return tvsDionicaPlan::P(u.x,u.y,0);}
+}
+inline void planItems(const Net& net,const std::vector<int>& groups,double f,std::vector<tvsDionicaPlan::Item>& items){
+    using namespace tvsDionicaPlan;
+    const size_t n=net.nodes.size();items.assign(n,Item());
+    for(size_t i=0;i<n;++i){Item& it=items[i];const tvsMove::Node& nd=net.nodes[i];
+        if(net.owner[i]!=static_cast<int>(i))continue;   // member of an etaz / obilazak: no ports of its own
+        it.group=i<groups.size()?groups[i]:-1;
+        for(size_t p=0;p<net.bodies[i].ports.size();++p)it.ports.push_back(planUse::pt(net.bodies[i].ports[p]));
+        const Section own(nd.a,nd.round?0:nd.b,nd.round);
+        it.s.assign(it.ports.size(),own);
+        for(size_t p=0;p<nd.sections.size()&&p<it.s.size();++p)it.s[p]=Section(nd.sections[p].a,nd.sections[p].round?0:nd.sections[p].b,nd.sections[p].round);
+        if(!net.members[i].empty()){it.kind=Assembly;continue;}   // etaz / obilazak: boundary in v1
+        if(nd.flex)continue;
+        AcDbObjectPointer<AcDbEntity> e(nd.id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)continue;
+        if(nd.kind==1&&tvsSizeFollow::plainDuct(e.object())){it.kind=Duct;it.plain=it.ports.size()==2;}
+        else if(const TVS_TAP* t=TVS_TAP::cast(e.object())){
+            if(nd.kind!=2||!tvsSizeFollow::plainElbow(e.object())||it.ports.size()!=2)continue;
+            it.kind=Elbow;it.middle=planUse::pt(t->MiddlePoint);it.sweep=t->Swectangle;
+            const tvsSizeFollow::ElbowRule r=tvsSizeFollow::elbowRule(t,nd.round);
+            if(nd.round){if(r.typeRound==RadiusTypeRound_RadiusVariable){it.rule=Variable;it.k=r.k;it.plain=true;}
+                else if(r.typeRound==RadiusTypeRound_RadiusConstant){it.rule=Constant;it.k=r.constant;it.plain=true;}}
+            else{if(r.typeRect==RadiusTypeRect_RadiusVariable){it.rule=Variable;it.k=r.k;it.plain=true;}
+                else if(r.typeRect==RadiusTypeRect_RadiusConstant){it.rule=Constant;it.k=r.constant;it.plain=true;}
+                else if(r.typeRect!=RadiusTypeRect_RadiusSpecific){it.rule=Fixed;it.plain=true;}}}
+        else if(const TVS_TRANS* t=TVS_TRANS::cast(e.object())){
+            if(it.ports.size()!=2)continue;it.kind=Prelaz;
+            it.s[0]=Section(t->SizeAp1,t->ThisRoundp1?0:t->SizeBp1,t->ThisRoundp1);it.s[1]=Section(t->SizeAp2,t->ThisRoundp2?0:t->SizeBp2,t->ThisRoundp2);
+            it.aligned=t->TransType==2||t->TransType==3;}   // the far end moves with a new width
+        else if(const TVS_WYE* w=TVS_WYE::cast(e.object())){
+            const tvsTeeFit::Ports ps=tvsTeeFit::ports(w);if(!ps.ok)continue;
+            it.kind=Tee;it.ports.clear();it.s.clear();
+            for(int k=0;k<3;++k){it.ports.push_back(planUse::pt(ps.p[k]));tvsTeePort::Port q;
+                if(tvsTeePort::port(w,k,q))it.s.push_back(Section(q.s.a,q.s.b,q.s.round));else it.s.push_back(own);}
+            const int type=tvsTeePort::type(w);it.tee=type==tvsTee::Branch?Branch:type==tvsTee::Pants?Pants:type==tvsTee::Tap?Tap:Plain;
+            it.base=planUse::pt(w->Basepoint);it.u=planUse::unit(w->Vectpr);it.v=planUse::unit(w->Vectotv);it.lengthPl=w->LengthPl;it.tapMin=tvsTeeData::tapMinimumMm()/f;}
+    }
+}
+inline const wchar_t* issueText(int code){
+    using namespace tvsDionicaPlan;
+    switch(code){
+    case Ambiguous:return L"više od dva kraja u jednoj tački (TVS_PROVJERA)";
+    case NotDuct:return L"izabrani element nije običan kanal";
+    case SameAlready:return L"dionica već ima tu dimenziju";
+    case WorstTooShort:return L"kanal je prekratak za prelaze koji trebaju";
+    case ElbowKept:return L"koljeno ostaje staro (na njemu nije kanal dionice), prelaz ide u susjedni kanal";
+    case DuctKept:return L"kratak kanal ostaje star (nema mjesta za prelaz)";
+    case TeeKept:return L"T komad ostaje (iza njega nije kanal koji može da prati), prelaz ispred njega";
+    case AlignedPrelaz:return L"prelaz poravnat uz jednu stranu ostaje, umeće se novi prelaz";
+    case UnknownNeighbour:return L"susjed nepoznate dimenzije, provjerite spoj";
+    case PartLeft:return L"dio dionice druge dimenzije ostaje kakav je";
+    case DialogNoRoom:return L"za TK-O / TK-G možda nema mjesta za prelaz";
+    default:return L"";}
+}
+// Joints of the resized ducts that were joined before and are not now (plan, tol).
+inline int brokenJoints(AcDbDatabase* db,double tol,const std::vector<AcDbObjectId>& ids,const std::vector<int>& joinedBefore,tvsDionicaPlan::P& where){
+    Net net;if(!read(db,tol,net))return -1;std::vector<tvsFlowNetwork::Element> el;elements(net,el);
+    std::vector<std::vector<std::vector<std::pair<int,int> > > > c;tvsFlowNetwork::contacts(el,tol,c);
+    int broken=0;
+    for(size_t k=0;k<ids.size();++k){int i=-1;for(size_t j=0;j<net.nodes.size();++j)if(net.nodes[j].id==ids[k])i=static_cast<int>(j);if(i<0)continue;
+        int joined=0;for(size_t p=0;p<c[i].size();++p)if(!c[i][p].empty())++joined;else where=el[i].ports[p];
+        if(joined<joinedBefore[k])broken+=joinedBefore[k]-joined;}
+    return broken;
+}
+inline bool applySize(AcDbDatabase* db,const Net& net,double f,double tol,const ApplyRequest& q,std::set<AcDbObjectId>& written){
+    using namespace tvsDionicaPlan;
+    std::vector<Item> items;planItems(net,q.groups,f,items);
+    int worst=-1;for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==q.worst)worst=static_cast<int>(i);
+    if(worst<0||items[worst].kind!=Duct){acutPrintf(L"\nPrimijeni: kanal dionice nije prepoznat.");return false;}
+    const Section was=items[worst].s[0],S(q.a/f,q.round?0:q.b/f,q.round);
+    if(was.round!=S.round){acutPrintf(L"\nPrimijeni: promjena oblika (pravougaoni / okrugli) još nije podržana – Zadrži ručno i promijenite ručno.");return false;}
+    if(!S.round&&std::fabs(S.b-was.b)>1e-6){acutPrintf(L"\nPrimijeni: promjena visine (vrh ostaje) dolazi u sljedećoj verziji – izaberite H = const ili ručno.");return false;}
+    planUse::db()=db;planUse::factor()=f;
+    Request rq;rq.worst=worst;rq.size=S;rq.scope=SameSize;rq.tol=tol;rq.minDuct=50.0/f;rq.prelazLength=&planUse::prelazLength;
+    const Plan pl=plan(items,rq);
+    // preview
+    wchar_t from[32],to[32];sizeText(from,32,was.round,was.a*f,was.b*f);sizeText(to,32,S.round,S.a*f,S.b*f);
+    acutPrintf(L"\nPrimijeni %ls → %ls:",from,to);
+    for(size_t k=0;k<pl.issues.size();++k){const Issue& x=pl.issues[k];
+        acutPrintf(L"\n  %ls %ls (X=%.0f Y=%.0f)",x.level==Block?L"NE MOŽE:":x.level==Warning?L"pažnja:":L"–",issueText(x.code),x.at.x*f,x.at.y*f);}
+    if(!pl.ok){acutPrintf(L"\nNišta nije promijenjeno.");return false;}
+    acutPrintf(L"\n  kanala %d, koljena %d, T komad ulaz/ogranak %d, prelaza: novih %d, preuzima dimenziju %d, uklanja se %d; dijalog TK-O / TK-G %d.",
+               pl.count(DuctSize),pl.count(ElbowSize),pl.count(TeeMain)+pl.count(TeeBranch),pl.count(PrelazInsert),pl.count(PrelazEnd),pl.count(PrelazRemove),pl.count(TeeDialog));
+    {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";const int k=acedGetKword(L"\nPrimijeniti? [Da/Ne] <Da>: ",kw,8);
+     if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Ne")==0)){acutPrintf(L"\nNišta nije promijenjeno.");return false;}}
+    // joints of the resized ducts now, for the check afterwards
+    std::vector<AcDbObjectId> resizedIds;std::vector<int> joinedBefore;
+    {std::vector<tvsFlowNetwork::Element> el;elements(net,el);std::vector<std::vector<std::vector<std::pair<int,int> > > > c;tvsFlowNetwork::contacts(el,tol,c);
+     for(size_t k=0;k<pl.resized.size();++k){const int i=pl.resized[k];if(items[i].kind!=Duct)continue;resizedIds.push_back(net.nodes[i].id);
+        int j=0;for(size_t p=0;p<c[i].size();++p)if(!c[i][p].empty())++j;joinedBefore.push_back(j);}}
+    const bool wasApplying=tvsSizeFollow::applying();tvsSizeFollow::applying()=true;
+    tvsTeeDialog::FollowHook hook=tvsTeeDialog::followHook();tvsTeeDialog::followHook()=NULL;   // no run dialog from a T komad dialog here
+    std::vector<std::pair<tvsDionicaPlan::P,tvsDionicaPlan::P> > moves;   // ports of the rigid members: before -> after
+    int failed=0;
+    auto id=[&](int i){return net.nodes[i].id;};
+    for(size_t k=0;k<pl.edits.size();++k){const Edit& x=pl.edits[k];
+        switch(x.op){
+        case ElbowSize:{AcDbObjectPointer<TVS_TAP> t(id(x.item),AcDb::kForWrite);if(t.openStatus()!=Acad::eOk){++failed;break;}
+            t->put_SizeA(S.a);if(!S.round)t->put_SizeB(S.b);t->recordGraphicsModified();
+            tvsMove::Node after;if(tvsMove::describe(t.object(),after)&&after.ports.size()==2)
+                for(int m=0;m<2;++m)moves.push_back(std::make_pair(items[x.item].ports[m],planUse::pt(after.ports[m])));
+            written.insert(id(x.item));break;}
+        case TeeMain:case TeeBranch:{AcDbObjectPointer<TVS_WYE> w(id(x.item),AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){++failed;break;}
+            tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
+            w->assertWriteEnabled();
+            if(x.op==TeeMain){w->SizeApr=S.a;w->SizeBpr=S.round?0:S.b;}
+            else{w->SizeAotv=S.a;w->SizeBotv=S.round?0:S.b;if(typed&&r.type==tvsTee::Tap){r.l=tvsTeeCommand::tapLength(S.a,f);w->LengthPl=r.l;}}
+            if(typed)tvsTeeData::write(w.object(),r);
+            w->recordGraphicsModified();
+            const tvsTeeFit::Ports ps=tvsTeeFit::ports(w.object());
+            if(ps.ok)for(int m=0;m<3;++m)moves.push_back(std::make_pair(items[x.item].ports[m],planUse::pt(ps.p[m])));
+            written.insert(id(x.item));break;}
+        case DuctSize:{AcDbObjectPointer<TVS_Pipe> p(id(x.item),AcDb::kForWrite);if(p.openStatus()!=Acad::eOk){++failed;break;}
+            p->put_SizeA(S.a);p->put_SizeB(S.round?0:S.b);p->recordGraphicsModified();written.insert(id(x.item));break;}
+        case DuctEnd:{tvsDionicaPlan::P target=x.to;const tvsDionicaPlan::P& now=items[x.item].ports[x.port];
+            for(size_t m=0;m<moves.size();++m)if(dist(moves[m].first,now)<=tol){target=moves[m].second;break;}   // the real port, not the plan's
+            AcDbObjectPointer<TVS_Pipe> p(id(x.item),AcDb::kForWrite);if(p.openStatus()!=Acad::eOk){++failed;break;}
+            AcGePoint3d e=x.port==0?p->FirstPoint:p->LastPoint;e.x=target.x;e.y=target.y;
+            if((x.port==0?p->put_FirstPoint(e):p->put_Lastpoint(e))!=Acad::eOk)++failed;p->recordGraphicsModified();written.insert(id(x.item));break;}
+        case PrelazEnd:{AcDbObjectPointer<TVS_TRANS> t(id(x.item),AcDb::kForWrite);if(t.openStatus()!=Acad::eOk){++failed;break;}
+            t->assertWriteEnabled();
+            if(x.port==0){t->SizeAp1=S.a;t->SizeBp1=S.round?0:S.b;}else{t->SizeAp2=S.a;t->SizeBp2=S.round?0:S.b;}
+            t->recordGraphicsModified();written.insert(id(x.item));break;}
+        case PrelazRemove:{
+            {AcDbObjectPointer<TVS_TRANS> t(id(x.item),AcDb::kForWrite);if(t.openStatus()!=Acad::eOk||t->erase()!=Acad::eOk){++failed;break;}}
+            AcDbObjectPointer<TVS_Pipe> p(id(x.other),AcDb::kForWrite);if(p.openStatus()!=Acad::eOk){++failed;break;}
+            AcGePoint3d e=x.otherPort==0?p->FirstPoint:p->LastPoint;e.x=x.to.x;e.y=x.to.y;
+            if((x.otherPort==0?p->put_FirstPoint(e):p->put_Lastpoint(e))!=Acad::eOk)++failed;p->recordGraphicsModified();written.insert(id(x.other));break;}
+        case PrelazInsert:{
+            if(x.other>=0){if(!tvsTeePort::ensure(id(x.other),x.otherPort))++failed;written.insert(id(x.item));break;}
+            AcGePoint3d at;{AcDbObjectPointer<TVS_Pipe> p(id(x.item),AcDb::kForRead);if(p.openStatus()!=Acad::eOk){++failed;break;}at=x.port==0?p->FirstPoint:p->LastPoint;}
+            if(!tvsSizeFollow::prelazBehind(id(x.item),x.port==0,at,x.from.a,x.from.b,f,L"Primijeni",x.from.round?1:0))++failed;
+            written.insert(id(x.item));break;}
+        default:break;}
+    }
+    // TK-O / TK-G of the dionica: their own dialog with the new size on the port (cancel: prelaz there)
+    for(size_t k=0;k<pl.edits.size();++k){const Edit& x=pl.edits[k];if(x.op!=TeeDialog)continue;
+        tvsTeePort::Section in;in.a=S.a;in.b=S.round?0:S.b;in.round=S.round;
+        if(!tvsTeeDialog::openArriving(id(x.item),tvsSizeFollow::ids().tee,x.port,in)){
+            acutPrintf(L"\nT komad nije mijenjan: na priključku se umeće prelaz.");if(!tvsTeePort::ensure(id(x.item),x.port))++failed;}
+        written.insert(id(x.item));}
+    tvsTeeDialog::followHook()=hook;tvsSizeFollow::applying()=wasApplying;
+    for(size_t k=0;k<resizedIds.size();++k)if(manualOf(resizedIds[k]).on)setManual(resizedIds[k],Manual());   // the size is in the drawing now
+    tvsDionicaPlan::P where;const int broken=brokenJoints(db,tol,resizedIds,joinedBefore,where);
+    if(failed||broken>0){
+        acutPrintf(L"\nPrimijeni: %d izmjena nije uspjela, razdvojenih spojeva %d%ls. Provjerite (TVS_PROVJERA) ili vratite sa U.",failed,broken>0?broken:0,L"");
+        if(broken>0){acutPrintf(L" Spoj kod X=%.0f Y=%.0f.",where.x*f,where.y*f);tvsCheck::zoom(where.x,where.y,3000.0/f);}}
+    else acutPrintf(L"\nPrimijenjeno %ls → %ls. U vraća cijelu komandu.",from,to);
     return true;
 }
 // Velocities, with "Primijeni" applied and the network read again until the dialog is closed.

@@ -23,8 +23,16 @@
   - „Ručni unos“: 300x150 / d200, brzina i Pa/m dok se kuca;
   - ◀ Prethodna / Sljedeća ▶ (zum na drugu dionicu, dijalog se ponovo otvara na istom mjestu), „Ukloni oznaku“, „Zatvori“, „Zadrži ručno“ (Enter; prazan unos = ručno sa sadašnjom dimenzijom).
 - Provjeriti Pa/m na poznatom primjeru (npr. 400×200, 2880 m³/h: oko 4,2 Pa/m).
-- **Primijeni** (dimenzija iz liste ili ručnog unosa): najbrži kanal dionice dobija tu dimenziju, a dalje ide isto kao kad ručno promijenite kanal – TVS_DIM_PRATI (dionica, koljena, T komad i njegov dijalog, prelazi; dijalog dionice ako je uključen u TVS_SETTINGS). Mreža se zatim čita ponovo i dijalog nastavlja na istoj dionici; U vraća cijelu komandu.
-- Probati iste slučajeve kao ručno: dionica do običnog T komada (ulaz), do TK-O / TK-G, dionica sa koljenom, između dva prelaza.
+- Dionice se nude od najudaljenije od jedinice prema jedinici (pa po brzini).
+- **Primijeni** (v1, plan po prijedlogu Fable 5.2): mijenja se samo širina / prečnik (promjena visine i oblika se odbija), dio dionice iste dimenzije kao najbrži kanal. Prije upisa ispis: šta se mijenja (kanala, koljena, T komad, prelazi, dijalog TK) i upozorenja sa koordinatama, pa „Primijeniti? [Da/Ne]“.
+  - kanali i koljena dionice dobiju širinu; koljeno sa nove poluprečnikom pomjera krajeve susjednih kanala;
+  - T komad na kraju dionice (dionica ulazi u njega): ulaz (glavni vod) dobija širinu, iza prolaza se umeće prelaz na staru dimenziju, kanal ogranka prati za pola razlike; ako iza prolaza nije kanal (koljeno, drugi T...) T komad ostaje i prelaz ide ispred njega;
+  - TK-O / TK-G: njihov dijalog sa novom dimenzijom na ulazu (Odustani = prelaz na priključku);
+  - T komad na početku dionice (ona izlazi iz njega): ostaje, prelaz na njegovom priključku;
+  - postojeći prelaz preuzima dimenziju (ili se uklanja kad više nema razlike); poravnat uz stranu ostaje + novi prelaz;
+  - koljeno direktno na T komadu / etaž / obilazak / flex: ostaju, prelaz u susjedni kanal;
+  - poslije upisa provjera spojeva: razdvojen spoj → poruka sa zumom (U vraća).
+- Probati: dionica između dva T komada, dionica do običnog T komada sa kanalom iza prolaza, do TK-O, dionica sa koljenom u sredini, kratak kanal uz T komad.
 - Izgled: lista viša (6 prijedloga bez skrolovanja), dugmad „Zadrži ručno“ i „Primijeni“ šira.
 - TVS_ALIGN: opcije reference sada [Izabrana/Druga/Osa] (klik radi).
 
