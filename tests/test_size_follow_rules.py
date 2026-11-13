@@ -33,7 +33,7 @@ class Rules(unittest.TestCase):
   self.assertIn('if(d.newInlet&&(d.choice==Pants)==(d.inletChoice==Pants))',t)
  def test_tee_follow(self):
   t=text('TVS_Ventilation_ARX/TeeTypeDialog.h');s=text('TVS_Ventilation_ARX/SizeFollow.h')
-  self.assertIn('if(!followHook()(follow[k].duct,follow[k].was,s.id))tvsTeeFit::farEnd(',t)   # TVS_TK_TIP: dionica iza kanala nove dimenzije
+  self.assertIn('if(!followHook()||!followHook()(follow[k].duct,follow[k].was,s.id))tvsTeeFit::farEnd(',t)   # TVS_TK_TIP: dionica iza kanala nove dimenzije
   self.assertIn('inline bool followFromTee(',s);self.assertIn('tvsTeeDialog::followHook()=&followFromTee;',s)
   self.assertIn('const bool wasApplying=applying();',s);self.assertIn('applying()=wasApplying;',s)   # ugnijezdeno: dijalog T komada iz dionice
   self.assertIn('tvsSizeFollow::enableTeeFollow(IDD_RUN, IDD_TEETYPE);',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))

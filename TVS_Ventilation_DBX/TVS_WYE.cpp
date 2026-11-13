@@ -795,7 +795,7 @@ Acad::ErrorStatus TVS_WYE::subTransformBy(const AcGeMatrix3d & xform)
 		tvsTransform::scaleCommon(this, scale); SizeApr *= scale; SizeBpr *= scale; SizeAotv *= scale; SizeBotv *= scale; LengthPl *= scale;
 		Vectpr /= scale; Vectotv /= scale;   // directions keep their length
 		tvsTeeData::Record r;   // TK-O / TK-G: collar, second width and radius are lengths too
-		if (tvsTeeData::read(this, r)) { r.l *= scale; r.second *= scale; r.radius2 *= scale; tvsTeeData::write(this, r); }
+		if (tvsTeeData::read(this, r)) { r.l *= scale; r.second *= scale; r.radius2 *= scale; r.neck *= scale; tvsTeeData::write(this, r); }
 	}
 
 
@@ -1198,6 +1198,7 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 		double rc1 = rc1d < avail ? rc1d : avail, rc2 = rc2d < avail ? rc2d : avail;
 		if ((rc1 > rc2 ? rc1 : rc2) < avail) { if (rc1d >= rc2d) rc1 = avail; else rc2 = avail; }
 		tee.R1 = rc1 + tee.w1 / 2; tee.R2 = rc2 + tee.w2 / 2;
+		if (r.neck > 0) tee.e2 = r.neck; else if (r.neck < 0) tee.e1 = -r.neck;   // vrat (TVS_SPOJ_TKG)
 		origin = Basepoint + v * (SizeApr / 2 + LengthPl); ey = -v; ex = u;
 	}
 	origin.z = Basepoint.z;
@@ -1218,8 +1219,8 @@ bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
 	}
 	else {   // +u = first branch (w1), -u = left branch (w2); fixed collars l
 		const double a = tee.A / 2;
-		ports[1] = Basepoint + u * (a + tee.R1 - tee.w1 + tee.l);
-		ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);
+		ports[1] = Basepoint + u * (a + tee.R1 - tee.w1 + tee.l) - v * tee.e1;   // vrat: the axis farther from the inlet
+		ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l) - v * tee.e2;
 		widths[0] = tee.w2; widths[1] = tee.w1; widths[2] = tee.A;
 	}
 	return true;

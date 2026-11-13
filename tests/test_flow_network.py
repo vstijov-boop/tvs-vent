@@ -30,6 +30,11 @@ class Flow(unittest.TestCase):
   self.assertIn('const bool duct=d.neighbour==1||d.neighbour==2;',t);self.assertIn('enable(IdDuctB,(d.neighbour==1||d.neighbour==2)&&!d.duct.round);',t)
   self.assertIn('if(x.neighbour==2&&!tvsTeePort::same(x.duct,x.ductWas,1e-9)){',t)
   self.assertLess(t.index('if(x.neighbour==2&&!tvsTeePort::same'),t.index('        tvsTeePort::ensure(s.id,x.k,x.lengthMm);'))
+ def test_tee_dialog_common_height(self):   # PLAN 22: visina TK-O / TK-G otkljucana, ulazni kanal je preuzima
+  t=text('TVS_Ventilation_ARX/TeeTypeDialog.h')
+  self.assertIn('enable(IdTeeB,!d.tee.round);',t);self.assertIn('if(d.lockB){heightNew=v/f;',t)
+  self.assertIn('if(heightChanged){',t);self.assertIn('p->put_SizeB(d.heightNew);',t)
+  self.assertLess(t.index('w->SizeBotv=d.heightNew;else w->SizeBpr=d.heightNew;'),t.index('if(d.choice==Branch){w->SizeAotv=b.tee.a;w->SizeBotv=w->SizeBpr;'))
  def test_dialog(self):
   d=text('TVS_Ventilation_ARX/SizingDialog.h');self.assertTrue((ROOT/'TVS_Ventilation_ARX/SizingDialog.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   self.assertIn('tvsDuctSizing::candidates(',d);self.assertIn('tvsDuctSizing::friction(',d);self.assertIn('tvsDuctSizing::parse(',d)

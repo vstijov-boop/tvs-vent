@@ -29,7 +29,7 @@ class TeeContract(unittest.TestCase):
   self.assertIn('tvsTee::pantsLengthPl(r.l,w1,w2)',a)
   # Faza 3: drawn TK ports feed the move/offset port model; connected ducts follow the ports.
   self.assertIn('bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const',w)
-  self.assertIn('ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l);',w,'TK-G left face with fixed collar')
+  self.assertIn('ports[0] = Basepoint - u * (a + tee.R2 - tee.w2 + tee.l) - v * tee.e2;',w,'TK-G left face with fixed collar (+ vrat)')
   m=text('TVS_Ventilation_ARX/TVSMoveCommand.h');self.assertIn('if(p->teePorts(teePort,teeWidth))',m)
   n=text('TVS_Ventilation_ARX/TeeNeighbours.h');self.assertIn('es=ends[0].first?p->put_FirstPoint(to):p->put_Lastpoint(to);',n);self.assertIn('es=p->put_SizeA(after.w[k]);',n)
   e2=entry_source();i=e2.index('static bool ConnectWithWye(');j=e2.index('#pragma region linear',i)

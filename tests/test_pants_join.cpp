@@ -35,5 +35,19 @@ int main(){
     // ends given the other way round
     {Duct in=D(6000,0,0,0,400);Duct br[2]={D(6300,3000,6300,400,300),D(6300,-3000,6300,-400,200)};
      Plan p=plan(in,br,l,minDuct);assert(p.error==Ok&&p.inletNear==0&&p.branchNear[0]==1&&p.branchNear[1]==1&&p.moved==-1);}
+    // Vrat: nothing moves, the T komad on the axis nearer the inlet, the farther branch gets e
+    {Duct in=D(0,0,6000,0,400);Duct br[2]={D(6300,400,6300,3000,300),D(6250,-400,6250,-3000,200)};
+     Plan p=plan(in,br,l,minDuct,-1,true);assert(p.error==Ok&&p.moved==-1&&near1(p.base.x,6250));
+     assert(near1(p.e[0],50)&&near1(p.e[1],0)&&near1(p.neck,-50));
+     assert(near1(p.port[0].x,6300)&&near1(p.port[1].x,6250));          // both faces on their own axes
+     assert(near1(p.inletPort.x,6250-(l+300)));
+     // both branches joined further on: Vrat is the way
+     br[0].farJoined=br[1].farJoined=true;p=plan(in,br,l,minDuct,-1,true);assert(p.error==Ok&&near1(p.e[0],50));
+     // the other way round: branch 1 farther
+     Duct b2[2]={D(6250,400,6250,3000,300),D(6300,-400,6300,-3000,200)};p=plan(in,b2,l,minDuct,-1,true);
+     assert(p.error==Ok&&near1(p.e[1],50)&&near1(p.neck,50)&&near1(p.base.x,6250));}
+    // the shape with a vrat is a real TK-G (cusp found) and its ports match the plan
+    {tvsTee::Tee t;t.type=tvsTee::Pants;t.A=400;t.w1=300;t.w2=200;t.R1=450;t.R2=300;t.l=100;t.e1=50;tvsTee::Shape s;assert(tvsTee::shape(t,s));
+     const tvsTee::PantsFrame f=tvsTee::pantsFrame(t);assert(near1(f.d1,50)&&near1(f.d2,100));}
     std::puts("pants join OK");return 0;
 }

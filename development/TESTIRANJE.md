@@ -8,10 +8,14 @@
 
 ## TVS_SPOJ_TKG (novo, 13.11.) – testirati
 - Izbor: ulazni kanal, prvi ogranak, drugi ogranak (ogranci okomiti na ulaz, na suprotne strane, iste visine i kote kao ulaz, pravougaoni).
-- Ako ogranci nisu u istoj osi: pomjera se onaj čiji je daleki kraj slobodan (oba slobodna: uži). Oba dalje spojena i neporavnata → odbija.
+- Ako ogranci nisu u istoj osi (novo): podrazumijevano se **ništa ne pomjera** – T komad ide na osu bližu ulazu, a dalji ogranak dobija duži **vrat** (pravi zid prije luka), pa oba lica padnu na postojeće ose. „[Da/Pomjeri/Ne]“: Pomjeri = kao ranije, ogranak u osu drugog (pa [Da/Vrat/Zamijeni/Ne]). Prevelika razlika osa za vrat → sam prelazi na Pomjeri.
+- Vrat se pamti u T komadu (TVS_TEE_V1, 6. podatak); stariji T komadi su kao i prije. TVS_TK_TIP ga zadržava (Okreni ga uklanja); SCALE / jedinice ga skaliraju. Provjeriti specifikaciju (površina lima) i TVS_MOVE / STRETCH na takvom T komadu.
 - TK-G se postavlja na presjek ose ulaza i ose ogranaka, ulaz se skraćuje (prava dužina se računa iz širina: okovratnik + veća širina ogranka), ogranci završavaju na licima T komada.
 - Rezultat se nacrta pa „Ovako spojiti? [Da/Zamijeni/Ne]“: Zamijeni = pomjeri drugi ogranak; Ne = sve nazad. Jedan U vraća spajanje.
 - Odbija: okrugli, različite visine / kote, preuski ogranci (TK-G nemoguć), prekratak ulaz / ogranak, kraj kod račve već spojen.
+
+## TVS_TK_TIP: visina TK-O / TK-G otključana (13.11.) – testirati
+- „Na T komadu“ B je sada otključan: to je visina svih priključaka i ulaza. Nova visina → T komad je dobija, **ulazni kanal je preuzima** (širina ostaje; dalje TVS_DIM_PRATI / prelaz na dalekom kraju); na ograncima prelaz ako kanal ima drugu visinu (ili promijenite „Kanal u nastavku“ B). Osa (Elev) ostaje.
 
 ## TVS_TK_TIP: „Kanal u nastavku“ i iza prelaza (13.11.) – testirati
 - Priključak sa prelazom pa kanalom (kao na slici TK-G, Ogranak C): Oblik, A i B kanala u nastavku su sada otključani. Nova dimenzija → prelaz je dobija na drugom kraju, kanal iza njega takođe (i dalje TVS_DIM_PRATI kao kod kanala direktno na priključku). Ako je nova dimenzija ista kao na T komadu, prelaz se uklanja i kanal ide do priključka.

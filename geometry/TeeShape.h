@@ -19,8 +19,8 @@ struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
 struct Shape {std::vector<Seg> lines;std::vector<Arc> arcs;std::vector<Seg> axis;};
-struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange;
-    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0){}};
+struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2;   // e1 / e2: TK-G "vrat", extra straight inlet wall
+    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0){}};   // before branch 1 / 2 (its axis that much farther)
 inline double pi(){return 3.14159265358979323846;}
 inline double defaultRadius(double w){return 1.5*w;}           // outer radius: centre line R - w/2 = w
 inline double lengthPl(double l,double R,double w){return l+R-w;} // TVS_WYE equivalent
@@ -54,7 +54,7 @@ inline void branchAt(Shape& out,double a,double l,double d,double w,double R,dou
 struct PantsFrame {double Y,X,d1,d2;};
 inline PantsFrame pantsFrame(const Tee& t){
     PantsFrame p;const double a=t.A/2,rc1=t.R1-t.w1/2,rc2=t.R2-t.w2/2;
-    p.Y=t.l+(rc1>rc2?rc1:rc2);p.d1=p.Y-t.l-rc1;p.d2=p.Y-t.l-rc2;p.X=a+p.Y-t.w1/2;return p;
+    p.Y=t.l+(rc1>rc2?rc1:rc2);p.d1=p.Y-t.l-rc1+t.e1;p.d2=p.Y-t.l-rc2+t.e2;p.X=a+p.Y-t.w1/2;return p;   // Y: axis line without vrat
 }
 inline double pantsLengthPl(double l,double w1,double w2){return l+(w1>w2?w1:w2)-w1/2;} // defaults Rc = w
 inline bool shape(const Tee& t,Shape& out);
@@ -107,7 +107,7 @@ inline bool shape(const Tee& t,Shape& out){
             if(a1>=pi()/2-1e-9&&a1<=pi()+1e-9&&a2>=-1e-9&&a2<=pi()/2+1e-9){e1=a1;e2=a2;cusp=true;}
         }
         if(!cusp)return false;   // branches too narrow for the inlet: not a real TK-G
-        out.axis.push_back(Seg(P(0,0),P(0,pf.Y)));
+        out.axis.push_back(Seg(P(0,0),P(0,pf.Y+(t.e1>t.e2?t.e1:t.e2))));
         branchAt(out,a,l,pf.d1,t.w1,t.R1,a+ri1+l,f,+1,e1);
         branchAt(out,a,l,pf.d2,t.w2,t.R2,a+ri2+l,f,-1,e2);
     }

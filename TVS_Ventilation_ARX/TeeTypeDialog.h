@@ -1,7 +1,8 @@
 ﻿#pragma once
 // TVS_TK_TIP dialog (IDD_TEETYPE), layout and sketch after TVS_TK_TIP_mockup.html: type of the T komad
 // (TK-O, TK-G, stucna, TK0) and Okreni; per port (Ogranak B / Prolaz C, TK-G Ogranak C):
-//   Na T komadu          shape (stucna / TK0 branch), A, B (TK-O / TK-G: B = inlet height, locked);
+//   Na T komadu          shape (stucna / TK0 branch), A, B (TK-O / TK-G: B = height of all ports and
+//                        of the inlet; a new one is taken by the inlet duct, TVS_DIM_PRATI beyond it);
 //   Odmah iza prikljucka elbow 30 / 45 / 60 / 90 deg, Desno / Lijevo (plan) or Gore / Dolje (vertical);
 //   Kanal u nastavku     shape and size of the connected duct (also behind a prelaz on the port: the
 //                        prelaz takes it at its far end), order elbow -> prelaz or prelaz -> elbow,
@@ -64,16 +65,18 @@ public:
           IdElbow=1321,IdTurn=1322,IdTurnLabel=1325,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
     Source src;int choice;bool flipped;Side side[2];int current;bool loading,valid;CString problem;
+    double heightNew;   // TK-O / TK-G: height typed in B (all ports and the inlet duct), 0 = as it is
     bool newInlet;Section inletNew;int inletChoice;   // TVS_DIM_PRATI: the run arrived on the inlet with this section (openArriving)
     int arriveK;Section arrive;                       // ... or on port arriveK (ogranak / prolaz): that port starts with its width
     CFont bold,title;CBrush back,white,band;
-    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false),newInlet(false),inletChoice(choiceOf(s.type)),arriveK(-1){}
+    Dialog(const Source& s,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),src(s),choice(choiceOf(s.type)),flipped(false),current(0),loading(false),valid(false),heightNew(0),newInlet(false),inletChoice(choiceOf(s.type)),arriveK(-1){}
 
     // ---------------------------------------------------------------- model
     bool rectTee()const{return !src.roundPr&&src.Bpr>0;}
     Section inlet()const{Section s;
         if(choice==Pants){s.a=src.Aotv;s.round=src.roundOtv;s.b=s.round?0:src.Botv;}
-        else{s.a=src.Apr;s.round=src.roundPr;s.b=s.round?0:src.Bpr;}return s;}
+        else{s.a=src.Apr;s.round=src.roundPr;s.b=s.round?0:src.Bpr;}
+        if(heightNew>0&&!s.round&&(choice==Pants||choice==Branch))s.b=heightNew;return s;}
     int place(int k)const{return flipped&&k<2?1-k:k;}
     void neighbourOf(Side& d)const{
         d.neighbour=0;d.ductId=AcDbObjectId::kNull;d.farFree=false;d.ductLength=0;
@@ -130,7 +133,7 @@ public:
     void shapes(){
         const Side& d=side[current];
         SetDlgItemText(IdTeeALabel,d.tee.round?L"Ø [mm]":L"A [mm]");show(IdTeeB,!d.tee.round);show(IdTeeBLabel,!d.tee.round);
-        enable(IdTeeB,!d.tee.round&&!d.lockB);
+        enable(IdTeeB,!d.tee.round);   // TK-O / TK-G: the common height (inlet too)
         SetDlgItemText(IdDuctALabel,d.duct.round?L"Ø [mm]":L"A [mm]");show(IdDuctB,!d.duct.round);show(IdDuctBLabel,!d.duct.round);
         enable(IdDuctB,(d.neighbour==1||d.neighbour==2)&&!d.duct.round);
     }
@@ -156,7 +159,8 @@ public:
             if(round!=d.tee.round){d.tee.round=round;d.tee.b=round?0:(src.Botv>0?src.Botv:d.tee.a);
                 loading=true;if(!round)setNumber(IdTeeB,d.tee.b*f);shapes();loading=false;}}
         if(number(GetDlgItem(IdTeeA),v))d.tee.a=v/f;
-        if(!d.tee.round&&!d.lockB&&number(GetDlgItem(IdTeeB),v))d.tee.b=v/f;
+        if(!d.tee.round&&number(GetDlgItem(IdTeeB),v)){d.tee.b=v/f;
+            if(d.lockB){heightNew=v/f;for(int i=0;i<2;++i)if(side[i].used&&side[i].lockB)side[i].tee.b=v/f;}}
         d.elbow=elbowDeg(sel(IdElbow));if(sel(IdTurn)>=0)d.turn=sel(IdTurn);if(sel(IdOrder)>=0)d.order=sel(IdOrder);
         if(d.neighbour==1||d.neighbour==2){
             const bool round=sel(IdDuctShape)==1;
@@ -419,13 +423,19 @@ inline void chain(const Dialog& dg,const Side& d,double tol){
 typedef bool (*FollowHook)(const AcDbObjectId& duct,const Section& was,const AcDbObjectId& tee);
 inline FollowHook& followHook(){static FollowHook h=NULL;return h;}
 inline void apply(const Dialog& d){
-    const Source& s=d.src;const double f=s.f;tvsTeeFit::Ports before,after;
+    const Source& s=d.src;const double f=s.f;tvsTeeFit::Ports before,after;bool heightChanged=false;
     {AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk){acutPrintf(L"\nT komad nije dostupan (zaključan sloj?).");return;}
      before=tvsTeeFit::ports(w.object());w->assertWriteEnabled();
      if(d.newInlet&&(d.choice==Pants)==(d.inletChoice==Pants)){   // inlet takes the size of the run that arrived (TVS_DIM_PRATI)
         if(d.choice==Pants){w->SizeAotv=d.inletNew.a;w->SizeBotv=d.inletNew.round?0:d.inletNew.b;}
         else{w->SizeApr=d.inletNew.a;w->SizeBpr=d.inletNew.round?0:d.inletNew.b;}}
+     const double was=d.choice==Pants?w->SizeBotv:w->SizeBpr;
+     if(d.heightNew>0&&(d.choice==Pants||d.choice==Branch)){if(d.choice==Pants)w->SizeBotv=d.heightNew;else w->SizeBpr=d.heightNew;}
+     heightChanged=d.heightNew>0&&std::fabs(d.heightNew-was)>1e-9;
      tvsTeeData::Record r;r.type=teeType(d.choice);r.l=tvsTeeData::collarMm()/f;
+     {tvsTeeData::Record old;   // TK-G vrat (TVS_SPOJ_TKG) stays; with Okreni the branches change sides: dropped
+      if(d.choice==Pants&&tvsTeeData::read(w.object(),old)&&old.type==tvsTee::Pants&&old.neck!=0){
+        if(d.flipped)acutPrintf(L"\nTK-G: vrat ogranka uklonjen (Okreni); ogranci su ponovo u istoj osi.");else r.neck=old.neck;}}
      const Side& b=d.side[0];const Side& c=d.side[1];
      if(d.choice==Branch){w->SizeAotv=b.tee.a;w->SizeBotv=w->SizeBpr;r.second=c.tee.a;
         w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w->SizeAotv),w->SizeAotv);}
@@ -493,8 +503,20 @@ inline void apply(const Dialog& d){
         }
         tvsTeePort::ensure(s.id,x.k,x.lengthMm);
     }
+    if(heightChanged){   // the inlet duct takes the height of the T komad (its width stays)
+        const int inletPort=d.choice==Pants?2:0;
+        AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForRead);
+        if(w.openStatus()==Acad::eOk){const AcGePoint3d at=after.ok?after.p[inletPort]:before.p[inletPort];
+            const tvsTeePort::Neighbour n=tvsTeePort::at(w.object(),at,tol);w.close();
+            if(n.kind==1){Section was;bool first=n.end==0;
+                {AcDbObjectPointer<TVS_Pipe> p(n.id,AcDb::kForWrite);
+                 if(p.openStatus()==Acad::eOk&&!p->ThisRound){was.a=p->SizeA;was.b=p->SizeB;was.round=false;
+                    p->put_SizeB(d.heightNew);p->recordGraphicsModified();
+                    wchar_t t[32];Section now=was;now.b=d.heightNew;tvsTeePort::sizeText(t,32,now,f);acutPrintf(L"\nUlazni kanal je sada %ls mm.",t);
+                    Follow fw={n.id,was,first};follow.push_back(fw);}}}}
+    }
     // the run beyond the resized ducts, after the T komad and its prelazi are written
-    for(size_t k=0;k<follow.size();++k)if(!followHook()(follow[k].duct,follow[k].was,s.id))tvsTeeFit::farEnd(s.id,follow[k].duct,follow[k].first,tol,f);
+    for(size_t k=0;k<follow.size();++k)if(!followHook()||!followHook()(follow[k].duct,follow[k].was,s.id))tvsTeeFit::farEnd(s.id,follow[k].duct,follow[k].first,tol,f);
     {const int inletPort=d.choice==Pants?2:0;tvsTeePort::ensure(s.id,inletPort);}
     acutPrintf(L"\nT komad: %ls.",d.choice==Branch?L"TK-O sa ogrankom":d.choice==Pants?L"TK-G sa dva ogranka":d.choice==Tap?L"štucna":L"TK0");
 }

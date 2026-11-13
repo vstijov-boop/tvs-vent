@@ -2,8 +2,10 @@
 // TVS_SPOJ_TKG: inlet duct + two branch ducts (opposite, at right angles to the inlet) joined by
 // a TK-G (gaćasti T komad). Plan: geometry/PantsJoin.h. One branch is moved onto the other's
 // axis (the one with a free far end), the inlet duct is shortened to the T komad, the branch
-// ducts end on its faces. The result is drawn first and confirmed: [Da/Zamijeni/Ne] (Zamijeni:
-// the other branch moves; Ne: everything back). One command = one UNDO step.
+// ducts end on its faces. Branches not on one axis: by default nothing moves, the farther branch
+// gets a longer straight inlet wall ("vrat", record neck); Pomjeri = one branch moved onto the
+// other's axis instead (Zamijeni: the other one). The result is drawn first and confirmed;
+// Ne: everything back. One command = one UNDO step.
 #include "TVSMoveCommand.h"
 #include "SizeFollow.h"
 #include "../geometry/PantsJoin.h"
@@ -34,6 +36,7 @@ inline const wchar_t* errorText(int e){
     case tvsPantsJoin::InletShort:return L"ulazni kanal je prekratak za T komad";
     case tvsPantsJoin::BranchShort:return L"ogranak je prekratak (lice T komada bi bilo iza njegovog kraja)";
     case tvsPantsJoin::NearJoined:return L"kraj kanala kod račve je već spojen sa drugim elementom";
+    case tvsPantsJoin::NeckShape:return L"razlika osa ogranaka je prevelika za vrat (TK-G se ne može nacrtati) – izaberite Pomjeri";
     default:return L"kanali nisu prepoznati";}
 }
 struct Saved {AcDbObjectId id;AcGePoint3d first,last;};
@@ -61,7 +64,7 @@ inline bool draw(const Pick& in,const Pick br[2],const tvsPantsJoin::Plan& p,dou
     {AcDbObjectPointer<TVS_WYE> o(tee,AcDb::kForWrite);if(o.openStatus()!=Acad::eOk){restore(saved,tee);return false;}
      {AcDbObjectPointer<TVS_Pipe> d(in.id,AcDb::kForRead);if(d.openStatus()==Acad::eOk){o->setPropertiesFrom(d.object());o->put_Flow(d->get_Flow());}}
      o->put_Elevation(in.elev);
-     tvsTeeData::Record r;r.type=tvsTee::Pants;r.l=l;r.second=p.w2;r.radius2=tvsTee::defaultRadius(p.w2);
+     tvsTeeData::Record r;r.type=tvsTee::Pants;r.l=l;r.second=p.w2;r.radius2=tvsTee::defaultRadius(p.w2);r.neck=p.neck;
      if(tvsTeeData::write(o.object(),r)!=Acad::eOk){acutPrintf(L"\nTVS_SPOJ_TKG: tip T komada nije upisan.");o.close();restore(saved,tee);return false;}
      o->recordGraphicsModified();ports=tvsTeeFit::ports(o.object());}
     if(!ports.ok){acutPrintf(L"\nTVS_SPOJ_TKG: TK-G nije moguć za ove širine (%.0f / %.0f / %.0f mm).",A*f,p.w1*f,p.w2*f);restore(saved,tee);return false;}
@@ -96,8 +99,10 @@ inline void execute(){
      for(int k=0;k<2;++k){const AcGePoint3d n=p.branchNear[k]==0?br[k].first:br[k].last,fr=p.branchNear[k]==0?br[k].last:br[k].first;
         dbr[k].nearJoined=joinedAt(nodes,br[k].id,n,tol);dbr[k].farJoined=joinedAt(nodes,br[k].id,fr,tol);}}
     int prefer=-1;
+    bool neck=true;   // nothing moves unless asked (Pomjeri)
     for(;;){
-        p=tvsPantsJoin::plan(din,dbr,l,50.0/f,prefer);
+        p=tvsPantsJoin::plan(din,dbr,l,50.0/f,prefer,neck);
+        if(neck&&p.error==tvsPantsJoin::NeckShape){acutPrintf(L"\nTVS_SPOJ_TKG: %ls.",errorText(p.error));neck=false;continue;}
         if(p.error!=tvsPantsJoin::Ok){acutPrintf(L"\nTVS_SPOJ_TKG: %ls.",errorText(p.error));return;}
         std::vector<Saved> saved;
         {const Pick* all[3]={&in,&br[0],&br[1]};for(int k=0;k<3;++k){Saved s;s.id=all[k]->id;s.first=all[k]->first;s.last=all[k]->last;saved.push_back(s);}}
@@ -105,12 +110,19 @@ inline void execute(){
         {tvsSizeFollow::applying()=true;const bool ok=draw(in,br,p,l,saved,tee);tvsSizeFollow::applying()=false;if(!ok)return;}
         acedUpdateDisplay();
         if(p.moved>=0)acutPrintf(L"\nOgranak %d pomjeren u osu drugog za %.0f mm.",p.moved+1,std::hypot(p.shift.x,p.shift.y)*f);
+        const bool offset=std::fabs(p.e[0])+std::fabs(p.e[1])>1e-9;
+        if(offset)acutPrintf(L"\nOgranci ostaju na mjestu; ogranak %d ima duži vrat za %.0f mm.",p.e[0]>0?1:2,(p.e[0]>0?p.e[0]:p.e[1])*f);
         acutPrintf(L"\nTK-G: ulaz %.0f×%.0f, ogranci %.0f / %.0f mm, ulazni kanal skraćen do T komada.",in.a*f,in.b*f,p.w1*f,p.w2*f);
         const bool canSwap=p.moved>=0&&!dbr[1-p.moved].farJoined;
-        acedInitGet(0,canSwap?L"Da Zamijeni Ne":L"Da Ne");ACHAR kw[16]=L"";
-        const int k=acedGetKword(canSwap?L"\nOvako spojiti? Zamijeni = pomjeri drugi ogranak. [Da/Zamijeni/Ne] <Da>: ":L"\nOvako spojiti? [Da/Ne] <Da>: ",kw,16);
+        ACHAR kw[16]=L"";int k=RTNONE;
+        if(offset){acedInitGet(0,L"Da Pomjeri Ne");k=acedGetKword(L"\nOvako spojiti? Pomjeri = ogranak u osu drugog. [Da/Pomjeri/Ne] <Da>: ",kw,16);}
+        else if(p.moved>=0){acedInitGet(0,canSwap?L"Da Vrat Zamijeni Ne":L"Da Vrat Ne");
+            k=acedGetKword(canSwap?L"\nOvako spojiti? Vrat = ogranci ostaju, Zamijeni = pomjeri drugi. [Da/Vrat/Zamijeni/Ne] <Da>: ":L"\nOvako spojiti? Vrat = ogranci ostaju. [Da/Vrat/Ne] <Da>: ",kw,16);}
+        else{acedInitGet(0,L"Da Ne");k=acedGetKword(L"\nOvako spojiti? [Da/Ne] <Da>: ",kw,16);}
         if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Da")==0)){acutPrintf(L"\nTVS_SPOJ_TKG: spojeno (U vraća).");return;}
         tvsSizeFollow::applying()=true;restore(saved,tee);tvsSizeFollow::applying()=false;
+        if(k==RTNORM&&_wcsicmp(kw,L"Pomjeri")==0){neck=false;prefer=-1;continue;}
+        if(k==RTNORM&&_wcsicmp(kw,L"Vrat")==0){neck=true;continue;}
         if(k==RTNORM&&_wcsicmp(kw,L"Zamijeni")==0){prefer=1-p.moved;continue;}
         acutPrintf(L"\nTVS_SPOJ_TKG: ništa nije promijenjeno.");return;
     }
