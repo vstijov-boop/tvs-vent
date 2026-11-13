@@ -7,7 +7,7 @@
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
 ## TVS_SPOJ_TKO (novo, 13.11.) – testirati
-- Izbor: ulazni kanal, prolazni kanal (paralelan, u nastavku), ogranak (okomit). Pravougaoni, iste visine i kote; prolaz i ogranak ne širi od ulaza.
+- Izbor: ulazni kanal, prolazni kanal (paralelan, u nastavku), ogranak (okomit). Pravougaoni, iste kote; prolaz i ogranak ne širi od ulaza. Visine mogu biti različite: T komad ima visinu ulaza na svim priključcima, a poslije „Da“ na prolazu / ogranku druge visine umeće se prelaz (isto i u TVS_SPOJ_TKG).
 - TK-O se postavlja na presjek ose ulaza i ose ogranka; ulaz, prolaz i ogranak se skraćuju / produžuju do lica T komada.
 - „Ivica“: prolaz u osi ulaza (prolazni kanal se pomjeri poprijeko ako nije) / prolaz poravnat uz ivicu ulaza **nasuprot ogranku** / **na strani ogranka** (jedan zid T komada ide ravno). Podrazumijevano ono što crtež već ima (kao na slici: desne ivice u liniji → nasuprot ogranku), inače osa.
 - Rezultat se nacrta pa „[Da/Ivica/Ne]“; Ivica prelazi na sljedeće poravnanje, Ne vraća sve. Prolaz dalje spojen i treba ga pomjeriti → nudi se poravnanje bez pomjeranja.

@@ -55,8 +55,6 @@ inline void execute(){
     if(!tvsPantsJoinCmd::pick(L"\nIzaberite ogranak: ",br))return;
     if(in.id==pr.id||in.id==br.id||pr.id==br.id){acutPrintf(L"\nTVS_SPOJ_TKO: izaberite tri različita kanala.");return;}
     if(in.round||pr.round||br.round){acutPrintf(L"\nTVS_SPOJ_TKO: TK-O je za pravougaone kanale (okrugli ogranak: TVS_TK_TIP, štucna).");return;}
-    if(std::fabs(pr.b-in.b)>1e-6||std::fabs(br.b-in.b)>1e-6){
-        acutPrintf(L"\nTVS_SPOJ_TKO: visina prolaza i ogranka (%.0f / %.0f) mora biti kao visina ulaza (%.0f mm).",pr.b*f,br.b*f,in.b*f);return;}
     if(std::fabs(pr.elev-in.elev)>1.0/f||std::fabs(br.elev-in.elev)>1.0/f){acutPrintf(L"\nTVS_SPOJ_TKO: kanali nisu na istoj koti (TVS_PROVJERA / Svojstva).");return;}
     if(pr.a>in.a+1e-9){acutPrintf(L"\nTVS_SPOJ_TKO: prolaz (%.0f) je širi od ulaza (%.0f mm) – zamijenite ulaz i prolaz.",pr.a*f,in.a*f);return;}
     if(br.a>in.a+1e-9){acutPrintf(L"\nTVS_SPOJ_TKO: ogranak (%.0f) je širi od ulaza (%.0f mm).",br.a*f,in.a*f);return;}
@@ -81,10 +79,16 @@ inline void execute(){
         {tvsSizeFollow::applying()=true;const bool ok=draw(in,pr,br,p,l,saved,tee);tvsSizeFollow::applying()=false;if(!ok)return;}
         acedUpdateDisplay();
         if(p.moved)acutPrintf(L"\nProlazni kanal pomjeren za %.0f mm.",std::hypot(p.shift.x,p.shift.y)*f);
-        acutPrintf(L"\nTK-O: ulaz %.0f, prolaz %.0f, ogranak %.0f mm; %ls.",in.a*f,pr.a*f,br.a*f,alignName(align));
+        acutPrintf(L"\nTK-O: ulaz %.0f, prolaz %.0f, ogranak %.0f mm, visina %.0f; %ls.",in.a*f,pr.a*f,br.a*f,in.b*f,alignName(align));
+        if(std::fabs(pr.b-in.b)>1e-6)acutPrintf(L"\n  prolaz: visina %.0f – poslije potvrde prelaz %.0f → %.0f.",pr.b*f,in.b*f,pr.b*f);
+        if(std::fabs(br.b-in.b)>1e-6)acutPrintf(L"\n  ogranak: visina %.0f – poslije potvrde prelaz %.0f → %.0f.",br.b*f,in.b*f,br.b*f);
         acedInitGet(0,L"Da Ivica Ne");ACHAR kw[16]=L"";
         const int k=acedGetKword(L"\nOvako spojiti? Ivica = osa / ivica nasuprot ogranku / ivica na strani ogranka. [Da/Ivica/Ne] <Da>: ",kw,16);
-        if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Da")==0)){acutPrintf(L"\nTVS_SPOJ_TKO: spojeno (U vraća).");return;}
+        if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Da")==0)){
+            // the T komad has the inlet height on every port: prelaz to a duct of another height
+            if(std::fabs(pr.b-in.b)>1e-6&&!tvsTeePort::ensure(tee,1))acutPrintf(L"\nProlaz: prelaz nije umetnut (prekratak kanal?).");
+            if(std::fabs(br.b-in.b)>1e-6&&!tvsTeePort::ensure(tee,2))acutPrintf(L"\nOgranak: prelaz nije umetnut (prekratak kanal?).");
+            acutPrintf(L"\nTVS_SPOJ_TKO: spojeno (U vraća).");return;}
         tvsSizeFollow::applying()=true;tvsPantsJoinCmd::restore(saved,tee);tvsSizeFollow::applying()=false;
         if(k==RTNORM&&_wcsicmp(kw,L"Ivica")==0){align=(align+1)%3;tries=0;continue;}
         acutPrintf(L"\nTVS_SPOJ_TKO: ništa nije promijenjeno.");return;

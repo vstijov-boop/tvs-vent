@@ -83,8 +83,6 @@ inline void execute(){
     if(!pick(L"\nIzaberite drugi ogranak: ",br[1]))return;
     if(br[0].id==br[1].id||br[0].id==in.id||br[1].id==in.id){acutPrintf(L"\nTVS_SPOJ_TKG: izaberite tri različita kanala.");return;}
     if(in.round||br[0].round||br[1].round){acutPrintf(L"\nTVS_SPOJ_TKG: TK-G je za pravougaone kanale.");return;}
-    if(std::fabs(br[0].b-in.b)>1e-6||std::fabs(br[1].b-in.b)>1e-6){
-        acutPrintf(L"\nTVS_SPOJ_TKG: visina ogranaka (%.0f / %.0f) mora biti kao visina ulaza (%.0f mm).",br[0].b*f,br[1].b*f,in.b*f);return;}
     if(std::fabs(br[0].elev-in.elev)>1.0/f||std::fabs(br[1].elev-in.elev)>1.0/f){acutPrintf(L"\nTVS_SPOJ_TKG: kanali nisu na istoj koti (TVS_PROVJERA / Svojstva).");return;}
     if(!tvsTee::pantsFeasible(in.a,br[0].a,br[1].a,l)){acutPrintf(L"\nTVS_SPOJ_TKG: ogranci su preuski za ulaz %.0f mm (TK-G nije moguć).",in.a*f);return;}
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
@@ -119,7 +117,16 @@ inline void execute(){
         else if(p.moved>=0){acedInitGet(0,canSwap?L"Da Vrat Zamijeni Ne":L"Da Vrat Ne");
             k=acedGetKword(canSwap?L"\nOvako spojiti? Vrat = ogranci ostaju, Zamijeni = pomjeri drugi. [Da/Vrat/Zamijeni/Ne] <Da>: ":L"\nOvako spojiti? Vrat = ogranci ostaju. [Da/Vrat/Ne] <Da>: ",kw,16);}
         else{acedInitGet(0,L"Da Ne");k=acedGetKword(L"\nOvako spojiti? [Da/Ne] <Da>: ",kw,16);}
-        if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Da")==0)){acutPrintf(L"\nTVS_SPOJ_TKG: spojeno (U vraća).");return;}
+        if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Da")==0)){
+            // the T komad has the inlet height on every port: prelaz to a branch of another height
+            {int portOf[2]={-1,-1};
+             {AcDbObjectPointer<TVS_WYE> w(tee,AcDb::kForRead);
+              if(w.openStatus()==Acad::eOk){const tvsTeeFit::Ports ps=tvsTeeFit::ports(w.object());
+                for(int j=0;j<2&&ps.ok;++j){const tvsTeePort::Neighbour n=tvsTeePort::at(w.object(),ps.p[j],tol);
+                    for(int b=0;b<2;++b)if(n.kind==1&&n.id==br[b].id)portOf[b]=j;}}}
+             for(int b=0;b<2;++b){if(std::fabs(br[b].b-in.b)<=1e-6)continue;
+                if(portOf[b]<0||!tvsTeePort::ensure(tee,portOf[b]))acutPrintf(L"\nOgranak %d: prelaz nije umetnut (prekratak kanal?).",b+1);}}
+            acutPrintf(L"\nTVS_SPOJ_TKG: spojeno (U vraća).");return;}
         tvsSizeFollow::applying()=true;restore(saved,tee);tvsSizeFollow::applying()=false;
         if(k==RTNORM&&_wcsicmp(kw,L"Pomjeri")==0){neck=false;prefer=-1;continue;}
         if(k==RTNORM&&_wcsicmp(kw,L"Vrat")==0){neck=true;continue;}
