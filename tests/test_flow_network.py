@@ -9,12 +9,7 @@ class Flow(unittest.TestCase):
    subprocess.run(['g++','-std=c++14','-Wall','-Wextra','-Werror',str(ROOT/'tests/test_flow_network.cpp'),'-o',str(exe)],check=True)
    self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
  def test_ascii(self):
-  for h in ('FlowNetwork.h','DuctSizing.h','DionicaSegment.h'):(ROOT/'geometry'/h).read_bytes().decode('ascii')
- def test_segment_cpp(self):
-  with tempfile.TemporaryDirectory() as d:
-   exe=pathlib.Path(d)/'g'
-   subprocess.run(['g++','-std=c++14','-Wall','-Wextra','-Werror',str(ROOT/'tests/test_dionica_segment.cpp'),'-o',str(exe)],check=True)
-   self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
+  for h in ('FlowNetwork.h','DuctSizing.h'):(ROOT/'geometry'/h).read_bytes().decode('ascii')
  def test_sizing_cpp(self):
   with tempfile.TemporaryDirectory() as d:
    exe=pathlib.Path(d)/'s'

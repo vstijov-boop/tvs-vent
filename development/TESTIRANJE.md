@@ -23,14 +23,8 @@
   - „Ručni unos“: 300x150 / d200, brzina i Pa/m dok se kuca;
   - ◀ Prethodna / Sljedeća ▶ (zum na drugu dionicu, dijalog se ponovo otvara na istom mjestu), „Ukloni oznaku“, „Zatvori“, „Zadrži ručno“ (Enter; prazan unos = ručno sa sadašnjom dimenzijom).
 - Provjeriti Pa/m na poznatom primjeru (npr. 400×200, 2880 m³/h: oko 4,2 Pa/m).
-- **Primijeni** (dimenzija iz liste ili ručnog unosa): mijenja dio dionice oko najbržeg kanala – prave kanale i koljena u osnovi iste dimenzije (koljena dobiju novi poluprečnik kao u TVS_DIM_PRATI; koljeno na samom kraju dijela ostaje staro). Na krajevima tog dijela:
-  - postojeći prelaz preuzme novu dimenziju na svom kraju (spiro: dužina po katalogu); prelaz poravnat uz jednu stranu ostaje, a u kanal se umeće novi;
-  - kanal druge dimenzije: u njega se umeće prelaz nova → njegova;
-  - TK-O / TK-G: prelaz na priključku (kao TVS_TK_TIP);
-  - sve ostalo (obični T komad, koljeno, etaž, flex...): prelaz u kanal dionice, stara → nova;
-  - slobodan kraj: ništa.
-- Prije prve izmjene provjera da se svi elementi i susjedi mogu mijenjati (zaključan sloj → ništa). Poruka „Primijenjeno 200×150 → 300×150: kanala N, koljena M; prelaza umetnuto K...“. Mreža se zatim čita ponovo i dijalog nastavlja na istoj dionici; U vraća cijelu komandu.
-- Probati: dionica sa koljenom u sredini; dionica koja završava na T komadu TK0 i na TK-O; dionica između dva prelaza; kratak kanal na kraju (prekratak za prelaz → poruka).
+- **Primijeni** (dimenzija iz liste ili ručnog unosa): najbrži kanal dionice dobija tu dimenziju, a dalje ide isto kao kad ručno promijenite kanal – TVS_DIM_PRATI (dionica, koljena, T komad i njegov dijalog, prelazi; dijalog dionice ako je uključen u TVS_SETTINGS). Mreža se zatim čita ponovo i dijalog nastavlja na istoj dionici; U vraća cijelu komandu.
+- Probati iste slučajeve kao ručno: dionica do običnog T komada (ulaz), do TK-O / TK-G, dionica sa koljenom, između dva prelaza.
 - Izgled: lista viša (6 prijedloga bez skrolovanja), dugmad „Zadrži ručno“ i „Primijeni“ šira.
 - TVS_ALIGN: opcije reference sada [Izabrana/Druga/Osa] (klik radi).
 
