@@ -35,6 +35,6 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–6 su urađene i na masteru; u 7
 22. **Zaključana polja u dijalozima (TVS_TK_TIP i dr.)** *(prijavljeno 10. 11.; dogovoreno 10. 11.; za povratak na TVS_DIM_PRATI)* – danas su u dijalogu T komada ulaz i „Kanal u nastavku“ (kad na priključku već postoji prelaz) zaključani. Dogovoreno pravilo:
     - **Ulaz:** širina i visina se mijenjaju u dijalogu; promjena visine mijenja visinu svih priključaka (TK-O / TK-G).
     - **Ogranci / prolaz:** mijenja se samo širina; visina ostaje visina ulaza (zaključano, prikazano kao posljedica).
-    - **Kanal u nastavku:** može se mijenjati i kad je iza prelaza; prelaz se prilagodi ili ukloni ako više ne treba.
+    - **Kanal u nastavku:** može se mijenjati i kad je iza prelaza; prelaz se prilagodi ili ukloni ako više ne treba. *(urađeno 13. 11., grana razvoj-protoci)*
     - Redoslijed: prvo pouzdan dijalog T komada (cijeli čvor na jednom mjestu), tek onda ponovo dijalog dionice (stavka 14) – njegovi problemi (stajanje na koljenu, oblik koljena, redukcija na ogranku) su u logici obilaska, ne samo u zaključanim poljima.
     - Pregledati i ostale dijaloge (Svojstva, Etaž) na ista ograničenja.

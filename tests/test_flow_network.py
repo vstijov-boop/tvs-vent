@@ -25,6 +25,11 @@ class Flow(unittest.TestCase):
   self.assertEqual(c.count('sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);'),3)          # posle upisa, bez izmjene i uz Ne
   self.assertIn('L"TVS_RUCNO"',c);self.assertIn('tvsSizingDialog::show(in,def,sizingDialog)',c);self.assertIn('L"CMDECHO"',text('TVS_Ventilation_ARX/CheckCommand.h'));self.assertIn('acdbRegApp(lockApp)',c)
   self.assertIn('tvsDuctSizing::widthOnly(',c);self.assertIn('tvsDuctSizing::widthHeight(',c);self.assertIn('tvsDuctSizing::diameter(',c)
+ def test_tee_dialog_duct_behind_prelaz(self):   # PLAN 22: Kanal u nastavku otkljucan i iza prelaza
+  t=text('TVS_Ventilation_ARX/TeeTypeDialog.h')
+  self.assertIn('const bool duct=d.neighbour==1||d.neighbour==2;',t);self.assertIn('enable(IdDuctB,(d.neighbour==1||d.neighbour==2)&&!d.duct.round);',t)
+  self.assertIn('if(x.neighbour==2&&!tvsTeePort::same(x.duct,x.ductWas,1e-9)){',t)
+  self.assertLess(t.index('if(x.neighbour==2&&!tvsTeePort::same'),t.index('        tvsTeePort::ensure(s.id,x.k,x.lengthMm);'))
  def test_dialog(self):
   d=text('TVS_Ventilation_ARX/SizingDialog.h');self.assertTrue((ROOT/'TVS_Ventilation_ARX/SizingDialog.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   self.assertIn('tvsDuctSizing::candidates(',d);self.assertIn('tvsDuctSizing::friction(',d);self.assertIn('tvsDuctSizing::parse(',d)

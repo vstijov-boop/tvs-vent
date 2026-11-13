@@ -3,7 +3,8 @@
 // (TK-O, TK-G, stucna, TK0) and Okreni; per port (Ogranak B / Prolaz C, TK-G Ogranak C):
 //   Na T komadu          shape (stucna / TK0 branch), A, B (TK-O / TK-G: B = inlet height, locked);
 //   Odmah iza prikljucka elbow 30 / 45 / 60 / 90 deg, Desno / Lijevo (plan) or Gore / Dolje (vertical);
-//   Kanal u nastavku     shape and size of the connected duct, order elbow -> prelaz or prelaz -> elbow,
+//   Kanal u nastavku     shape and size of the connected duct (also behind a prelaz on the port: the
+//                        prelaz takes it at its far end), order elbow -> prelaz or prelaz -> elbow,
 //                        prelaz length (spiro: catalogue, read only).
 // TK-O / TK-G keep their sizes; a duct of another size or shape on a port gets a prelaz at the port
 // (TeePort.h). An elbow needs a free port or a duct whose far end is free (that duct is carried
@@ -131,7 +132,7 @@ public:
         SetDlgItemText(IdTeeALabel,d.tee.round?L"Ø [mm]":L"A [mm]");show(IdTeeB,!d.tee.round);show(IdTeeBLabel,!d.tee.round);
         enable(IdTeeB,!d.tee.round&&!d.lockB);
         SetDlgItemText(IdDuctALabel,d.duct.round?L"Ø [mm]":L"A [mm]");show(IdDuctB,!d.duct.round);show(IdDuctBLabel,!d.duct.round);
-        enable(IdDuctB,d.neighbour==1&&!d.duct.round);
+        enable(IdDuctB,(d.neighbour==1||d.neighbour==2)&&!d.duct.round);
     }
     void load(){   // the whole side into the fields (tab, type, Okreni)
         loading=true;const Side& d=side[current];const double f=src.f;
@@ -141,7 +142,7 @@ public:
         SetDlgItemText(IdTeeA,L"");setNumber(IdTeeA,d.tee.a*f);
         if(!d.tee.round)setNumber(IdTeeB,d.tee.b*f);
         setSel(IdElbow,elbowIndex(d.elbow));setSel(IdTurn,d.turn);
-        const bool duct=d.neighbour==1;
+        const bool duct=d.neighbour==1||d.neighbour==2;   // a prelaz on the port: the duct behind it
         setSel(IdDuctShape,d.duct.round?1:0);enable(IdDuctShape,duct);enable(IdDuctA,duct);
         if(hasDuct(d)){setNumber(IdDuctA,d.duct.a*f);if(!d.duct.round)setNumber(IdDuctB,d.duct.b*f);}
         else{SetDlgItemText(IdDuctA,L"");SetDlgItemText(IdDuctB,L"");}
@@ -157,7 +158,7 @@ public:
         if(number(GetDlgItem(IdTeeA),v))d.tee.a=v/f;
         if(!d.tee.round&&!d.lockB&&number(GetDlgItem(IdTeeB),v))d.tee.b=v/f;
         d.elbow=elbowDeg(sel(IdElbow));if(sel(IdTurn)>=0)d.turn=sel(IdTurn);if(sel(IdOrder)>=0)d.order=sel(IdOrder);
-        if(d.neighbour==1){
+        if(d.neighbour==1||d.neighbour==2){
             const bool round=sel(IdDuctShape)==1;
             if(round!=d.duct.round){d.duct.round=round;d.duct.b=round?0:(d.ductWas.b>0?d.ductWas.b:d.tee.b);
                 loading=true;if(!round)setNumber(IdDuctB,d.duct.b*f);shapes();loading=false;}
@@ -171,7 +172,7 @@ public:
         if(!rectTee()&&choice!=Plain){why=L"TK-O, TK-G i štucna su za pravougaoni glavni kanal.";return false;}
         if(src.roundOtv&&(choice==Branch||choice==Pants)){why=L"Okrugli ogranak: izaberite štucnu ili TK0.";return false;}
         for(int i=0;i<2;++i){const Side& d=side[i];if(!d.used)continue;
-            if(!(d.tee.a>0)||(!d.tee.round&&!(d.tee.b>0))||(d.neighbour==1&&(!(d.duct.a>0)||(!d.duct.round&&!(d.duct.b>0))))){why=L"Unesite pozitivne dimenzije.";return false;}
+            if(!(d.tee.a>0)||(!d.tee.round&&!(d.tee.b>0))||((d.neighbour==1||d.neighbour==2)&&(!(d.duct.a>0)||(!d.duct.round&&!(d.duct.b>0))))){why=L"Unesite pozitivne dimenzije.";return false;}
             if(d.elbow){
                 if(d.neighbour==2||d.neighbour==3){why.Format(L"%ls: na priključku je prelaz ili drugi element - koljeno nije moguće.",tabName(i));return false;}
                 if(d.neighbour==1&&!d.farFree){why.Format(L"%ls: iza kanala je mreža - koljeno bi pomjerilo cijelu mrežu.",tabName(i));return false;}
@@ -465,6 +466,31 @@ inline void apply(const Dialog& d){
             wchar_t t[32];tvsTeePort::sizeText(t,32,x.duct,f);acutPrintf(L"\nKanal na priključku je sada %ls mm.",t);
                         Follow fw={x.ductId,x.ductWas,first};
             if(followHook())follow.push_back(fw);else tvsTeeFit::farEnd(s.id,x.ductId,first,tol,f);}
+        if(x.neighbour==2&&!tvsTeePort::same(x.duct,x.ductWas,1e-9)){   // prelaz on the port: its far end and the duct behind it
+            AcGePoint3d beyond;int farEnd=-1;
+            {AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)continue;
+             const AcGePoint3d at=after.ok?after.p[d.place(x.k)]:before.p[d.place(x.k)];
+             const tvsTeePort::Neighbour n=tvsTeePort::at(w.object(),at,tol);
+             if(n.kind==2){farEnd=1-n.end;tvsMove::Node tn;AcDbObjectPointer<TVS_TRANS> t(n.id,AcDb::kForRead);
+                if(t.openStatus()==Acad::eOk&&tvsMove::describe(t.object(),tn)&&tn.ports.size()==2)beyond=tvsMove::acad(tn.ports[farEnd]);else farEnd=-1;}}
+            if(farEnd>=0){
+                {AcDbObjectPointer<TVS_TRANS> t(x.ductId,AcDb::kForWrite);
+                 if(t.openStatus()==Acad::eOk){t->assertWriteEnabled();
+                    if(farEnd==0){t->SizeAp1=x.duct.a;t->SizeBp1=x.duct.round?0:x.duct.b;t->ThisRoundp1=x.duct.round;}
+                    else{t->SizeAp2=x.duct.a;t->SizeBp2=x.duct.round?0:x.duct.b;t->ThisRoundp2=x.duct.round;}
+                    t->recordGraphicsModified();}}
+                AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForRead);
+                const tvsTeePort::Neighbour q=w.openStatus()==Acad::eOk?tvsTeePort::at(w.object(),beyond,tol):tvsTeePort::Neighbour();w.close();
+                wchar_t t[32];tvsTeePort::sizeText(t,32,x.duct,f);
+                if(q.kind==1){Section was;bool first=q.end==0;
+                    {AcDbObjectPointer<TVS_Pipe> p(q.id,AcDb::kForWrite);
+                     if(p.openStatus()==Acad::eOk){was.a=p->SizeA;was.round=p->ThisRound;was.b=p->ThisRound?0:p->SizeB;
+                        p->assertWriteEnabled();p->ThisRound=x.duct.round;p->put_SizeA(x.duct.a);p->put_SizeB(x.duct.round?0:x.duct.b);p->recordGraphicsModified();}}
+                    acutPrintf(L"\nPrelaz i kanal iza njega su sada %ls mm.",t);
+                    Follow fw={q.id,was,first};
+                    if(followHook())follow.push_back(fw);else tvsTeeFit::farEnd(s.id,q.id,first,tol,f);}
+                else acutPrintf(L"\nPrelaz na priključku je sada %ls mm na drugom kraju (iza njega nije kanal).",t);}
+        }
         tvsTeePort::ensure(s.id,x.k,x.lengthMm);
     }
     // the run beyond the resized ducts, after the T komad and its prelazi are written

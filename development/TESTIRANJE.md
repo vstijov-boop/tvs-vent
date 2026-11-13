@@ -6,6 +6,10 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## TVS_TK_TIP: „Kanal u nastavku“ i iza prelaza (13.11.) – testirati
+- Priključak sa prelazom pa kanalom (kao na slici TK-G, Ogranak C): Oblik, A i B kanala u nastavku su sada otključani. Nova dimenzija → prelaz je dobija na drugom kraju, kanal iza njega takođe (i dalje TVS_DIM_PRATI kao kod kanala direktno na priključku). Ako je nova dimenzija ista kao na T komadu, prelaz se uklanja i kanal ide do priključka.
+- „Redoslijed“ ostaje zaključan dok nije izabrano koljeno (bez koljena nema šta da se redoslijed).
+
 ## TVS_PROTOK (novo, grana razvoj-protoci) – testirati
 - Klik na kanal kod jedinice, blizu njegovog slobodnog kraja (taj kraj ne smije biti spojen). Svi elementi od tog kraja dalje dobiju zbir protoka krajnjih elemenata iza sebe; krajnji elementi (ništa dalje spojeno) zadržavaju svoj protok.
 - Ispis: broj elemenata mreže, krajnjih elemenata (bez protoka), ukupno m³/h, slobodni priključci na fitinzima (npr. otvoren ogranak T komada), najveća brzina u kanalu.
