@@ -6,6 +6,13 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## TVS_SPOJ_TKG (novo, 13.11.) – testirati
+- Izbor: ulazni kanal, prvi ogranak, drugi ogranak (ogranci okomiti na ulaz, na suprotne strane, iste visine i kote kao ulaz, pravougaoni).
+- Ako ogranci nisu u istoj osi: pomjera se onaj čiji je daleki kraj slobodan (oba slobodna: uži). Oba dalje spojena i neporavnata → odbija.
+- TK-G se postavlja na presjek ose ulaza i ose ogranaka, ulaz se skraćuje (prava dužina se računa iz širina: okovratnik + veća širina ogranka), ogranci završavaju na licima T komada.
+- Rezultat se nacrta pa „Ovako spojiti? [Da/Zamijeni/Ne]“: Zamijeni = pomjeri drugi ogranak; Ne = sve nazad. Jedan U vraća spajanje.
+- Odbija: okrugli, različite visine / kote, preuski ogranci (TK-G nemoguć), prekratak ulaz / ogranak, kraj kod račve već spojen.
+
 ## TVS_TK_TIP: „Kanal u nastavku“ i iza prelaza (13.11.) – testirati
 - Priključak sa prelazom pa kanalom (kao na slici TK-G, Ogranak C): Oblik, A i B kanala u nastavku su sada otključani. Nova dimenzija → prelaz je dobija na drugom kraju, kanal iza njega takođe (i dalje TVS_DIM_PRATI kao kod kanala direktno na priključku). Ako je nova dimenzija ista kao na T komadu, prelaz se uklanja i kanal ide do priključka.
 - „Redoslijed“ ostaje zaključan dok nije izabrano koljeno (bez koljena nema šta da se redoslijed).

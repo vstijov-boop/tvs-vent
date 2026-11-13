@@ -107,6 +107,13 @@
         syncTVSGlobalUnits();
         tvsCheck::execute();
     }
+    // TVS_SPOJ_TKG: inlet + two branch ducts joined by a TK-G (PantsJoinCommand.h).
+    static void Ventilation_ARXTVS_SPOJ_TKG(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsPantsJoinCmd::execute();
+    }
     // TVS_PROTOK: flows from the terminals summed to the unit (FlowCommand.h).
     static void Ventilation_ARXTVS_PROTOK(void)
     {
