@@ -38,11 +38,11 @@ inline Plan plan(const Duct& in,const Duct br[2],double l,double minDuct,int pre
     // the branch ends nearest the inlet axis, the inlet end nearest the branches
     const V mid=(br[0].a+br[0].b+br[1].a+br[1].b)*0.25;
     p.inletNear=len(in.a-mid)<=len(in.b-mid)?0:1;
-    const V near=p.inletNear==0?in.a:in.b,farIn=p.inletNear==0?in.b:in.a,d=unit(near-farIn);   // towards the branches
+    const V inNear=p.inletNear==0?in.a:in.b,farIn=p.inletNear==0?in.b:in.a,d=unit(inNear-farIn);   // towards the branches
     const V n(-d.y,d.x);   // across the inlet
     V o[2],bn[2];
     for(int k=0;k<2;++k){
-        const double da=std::fabs(dot(br[k].a-near,n)),db=std::fabs(dot(br[k].b-near,n));
+        const double da=std::fabs(dot(br[k].a-inNear,n)),db=std::fabs(dot(br[k].b-inNear,n));
         p.branchNear[k]=da<=db?0:1;bn[k]=p.branchNear[k]==0?br[k].a:br[k].b;
         const V f=p.branchNear[k]==0?br[k].b:br[k].a;o[k]=unit(f-bn[k]);
         if(std::fabs(dot(o[k],d))>0.02){p.error=NotPerpendicular;return p;}
@@ -59,8 +59,8 @@ inline Plan plan(const Duct& in,const Duct br[2],double l,double minDuct,int pre
         p.moved=m;p.shift=d*(m==0?offset:-offset);
     }
     const int keep=p.moved==0?1:0;
-    const double t=dot(bn[keep]-near,d);
-    p.base=near+d*t;p.v=d*-1;
+    const double t=dot(bn[keep]-inNear,d);
+    p.base=inNear+d*t;p.v=d*-1;
     p.branchOnU=0;p.u=o[0];p.w1=br[0].width;p.w2=br[1].width;
     const double a=in.width/2,Y=l+(p.w1>p.w2?p.w1:p.w2);
     p.inletPort=p.base+p.v*Y;

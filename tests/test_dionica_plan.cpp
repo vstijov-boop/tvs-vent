@@ -18,7 +18,7 @@ static Item elbow(double mx,double my,Section s,double k,int g){Item e;e.kind=El
 static const Edit* find(const Plan& p,int op,int item=-1){for(size_t i=0;i<p.edits.size();++i)if(p.edits[i].op==op&&(item<0||p.edits[i].item==item))return &p.edits[i];return 0;}
 static Request request(int worst,Section s,int scope=Whole){Request r;r.worst=worst;r.size=s;r.scope=scope;return r;}
 int main(){
-    const Section o(400,300),big(600,300),nw(500,300),small(300,300);
+    const Section o(400,300),big(600,300),nw(500,300),narrow(300,300);
     {   // 1. user's case: upstream T (branch outlet) - duct - downstream plain T (main inlet), ducts behind it
         std::vector<Item> v;
         v.push_back(tee(0,0,600,300,400,300,100,0));                  // 0 upstream: branch port at (0,400)
@@ -26,7 +26,7 @@ int main(){
         Item t=tee(0,3300,400,300,300,300,100,1);t.u=P(0,1,0);t.v=P(1,0,0);P p[3];teePorts(t,400,300,p);for(int k=0;k<3;++k)t.ports[k]=p[k];   // main along +y: inlet (0,3050)
         v[1].ports[1]=p[0];v.push_back(t);                            // 2 downstream T
         v.push_back(duct(p[1].x,p[1].y,0,6000,o,2));                  // 3 behind the prolaz
-        v.push_back(duct(p[2].x,p[2].y,3000,3300,small,3));           // 4 branch duct
+        v.push_back(duct(p[2].x,p[2].y,3000,3300,narrow,3));           // 4 branch duct
         const Plan r=plan(v,request(1,nw));
         CHECK(r.ok);CHECK(r.resized.size()==1&&r.resized[0]==1);
         CHECK(find(r,TeeMain,2)&&same(find(r,TeeMain,2)->s,nw));     // the T komad inlet takes the size

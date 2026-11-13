@@ -52,9 +52,12 @@ class Release(unittest.TestCase):
  def test_no_windows_macro_identifiers(self):
   # near / far / small are Windows macros (MSVC): not as names of parameters or variables
   import glob,re
-  pat=re.compile(r'\b(double|int|bool|float|auto|const)\s+(near|far|small)\b')
-  for f in glob.glob(str(ROOT/'TVS_Ventilation_ARX/*.h'))+glob.glob(str(ROOT/'TVS_Ventilation_ARX/commands/*.inl'))+glob.glob(str(ROOT/'TVS_Ventilation_DBX/*.h'))+glob.glob(str(ROOT/'geometry/*.h')):
-   self.assertIsNone(pat.search(pathlib.Path(f).read_text(encoding='utf-8-sig',errors='ignore')),f)
+  # any declaration: a type (also user types like V) then the name, also in a list (V a=..,near=..)
+  pat=re.compile(r'(\b[A-Za-z_][\w:<>]*[\s*&]+|,\s*)(near|far|small)\s*[=,;)\[]')
+  for f in glob.glob(str(ROOT/'TVS_Ventilation_ARX/*.h'))+glob.glob(str(ROOT/'TVS_Ventilation_ARX/commands/*.inl'))+glob.glob(str(ROOT/'TVS_Ventilation_DBX/*.h'))+glob.glob(str(ROOT/'geometry/*.h'))+glob.glob(str(ROOT/'tests/*.cpp')):
+   code=re.sub(r'//.*','',pathlib.Path(f).read_text(encoding='utf-8-sig',errors='ignore'))
+   code=re.sub(r'L?"(?:[^"\\\n]|\\.)*"','""',code)
+   m=pat.search(code);self.assertIsNone(m,(f,m.group(0) if m else ''))
  def test_no_broken_string_literals(self):
   # a raw newline inside L"..." (python escapes written into C++) does not compile
   import glob
