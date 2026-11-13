@@ -6,6 +6,14 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## TVS_OZNAKE (novo, 13.11.) – testirati
+- TVS_OZNAKE: [Ukljuci/Iskljuci/Polozaj/Razmjera/Pojedinacno]. Uključivanje pravi sloj i stil teksta AT-DIM_KANAL (romans.shx, faktor širine 0,7).
+- Oznaka na svakom pravom kanalu dužem od teksta: `400x150/1150` (okrugli `%%c250/500`, bez protoka samo dimenzija), bez jedinica; visina 2,5 mm × razmjera (prvi put iz podešavanja TVS oznaka, npr. 1:50 → 125 mm).
+- Crta je sam kanal na sloju AT-DIM_KANAL (boja ByLayer), **štampa se**; isključen / zamrznut sloj je sakriva. Mijenja se sama sa dimenzijom, protokom (TVS_PROTOK), pomjeranjem i STRETCH-om.
+- Polozaj: podrazumijevano iznad / na sredini / ispod kanala (čitljivo odozdo / zdesna). Pojedinacno: izabrani kanali [Iznad/Sredina/Ispod/Podrazumijevano].
+- TVS_RAZBIJ / TVS_IZVOZ: oznaka postaje TEXT na sloju AT-DIM_KANAL.
+- Provjeriti štampu (PLOT / PDF) i brzinu crteža sa puno kanala.
+
 ## TVS_SPOJ_TKO (novo, 13.11.) – testirati
 - Izbor: ulazni kanal, prolazni kanal (paralelan, u nastavku), ogranak (okomit). Pravougaoni, iste kote; prolaz i ogranak ne širi od ulaza. Visine mogu biti različite: T komad ima visinu ulaza na svim priključcima, a poslije „Da“ na prolazu / ogranku druge visine umeće se prelaz (isto i u TVS_SPOJ_TKG).
 - TK-O se postavlja na presjek ose ulaza i ose ogranka; ulaz, prolaz i ogranak se skraćuju / produžuju do lica T komada.

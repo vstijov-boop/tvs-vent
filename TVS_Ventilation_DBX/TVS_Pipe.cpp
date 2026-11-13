@@ -26,6 +26,7 @@
 #include "TransformGuard.h"
 #include "LevelLabels.h"
 #include "DuctCaption.h"
+#include "DuctLabel.h"
 #ifdef TVS_OFFSET_INTEGRATION
 #include "OffsetAssemblyData.h"
 #include "../geometry/SlopeProjection.h"
@@ -298,6 +299,7 @@ Adesk::Boolean TVS_Pipe::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
 	tvsLevelLabels::draw(mode, database(), FirstPoint + (LastPoint - FirstPoint) / 2, LastPoint - FirstPoint, Elev, SizeA, SizeB);   // TVS_KOTE
 	tvsDuctCaption::draw(mode, database(), FirstPoint, LastPoint, SizeA, SizeB, ThisRound, Flow);   // TVS_NATPIS
+	tvsDuctLabel::draw(mode, this, FirstPoint, LastPoint, SizeA, SizeB, ThisRound, Flow);   // TVS_OZNAKE
 	ClearEntitylist();
 	Length=(sqrt((FirstPoint.x-LastPoint.x)*(FirstPoint.x-LastPoint.x)+
 		(FirstPoint.y-LastPoint.y)*
@@ -1339,6 +1341,7 @@ Acad::ErrorStatus TVS_Pipe::subExplode(AcDbVoidPtrArray & entitySet) const
 		if(clonedEntity) entitySet.append(clonedEntity);
 		//entitySet.append(var);
 	}
+	if (AcDbText* label = tvsDuctLabel::entity(this, FirstPoint, LastPoint, SizeA, SizeB, ThisRound, Flow)) entitySet.append(label);   // TVS_OZNAKE
 
 	
 	return Acad::eOk;

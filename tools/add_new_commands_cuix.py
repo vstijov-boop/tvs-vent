@@ -29,6 +29,7 @@ CMDS = [
  ('PROTOK', 'Protoci mreže', 'Sabira protoke krajnjih elemenata do jedinice (izbor kraja mreže kod jedinice); krajnjim elementima bez protoka unosi se protok; prikazuje najveću brzinu.', 'Crtanje kanala', 'Crtanje kanala', 'PT'),
  ('SPOJ_TKG', 'Spoj gaćastim T komadom', 'Spaja ulazni kanal i dva suprotna ogranka TK-G T komadom: jedan ogranak se pomjera u osu drugog, ulaz se skraćuje; prikaz prije potvrde.', 'Crtanje kanala', 'Crtanje kanala', 'TG'),
  ('SPOJ_TKO', 'Spoj T komadom sa ogrankom', 'Spaja ulazni, prolazni kanal i ogranak TK-O T komadom: prolaz u osi ulaza ili poravnat uz ivicu ulaza; prikaz prije potvrde.', 'Crtanje kanala', 'Crtanje kanala', 'TO'),
+ ('OZNAKE', 'Oznake kanala', 'Oznake dimenzija/protok na pravim kanalima (sloj AT-DIM_KANAL, štampaju se, prate izmjene): uključi / isključi, položaj, razmjera, pojedinačni natpisi.', 'Crtanje kanala', 'Crtanje kanala', 'OZ'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)

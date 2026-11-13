@@ -76,6 +76,7 @@
 #include "FlowCommand.h"
 #include "PantsJoinCommand.h"
 #include "BranchJoinCommand.h"
+#include "LabelCommand.h"
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 
@@ -394,6 +395,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PROVJER
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PROTOK, TVS_PROTOK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SPOJ_TKG, TVS_SPOJ_TKG, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SPOJ_TKO, TVS_SPOJ_TKO, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OZNAKE, TVS_OZNAKE, ACRX_CMD_MODAL, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_MODAL, NULL)

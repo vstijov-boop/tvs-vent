@@ -107,6 +107,13 @@
         syncTVSGlobalUnits();
         tvsCheck::execute();
     }
+    // TVS_OZNAKE: printed duct labels size/flow on layer AT-DIM_KANAL (LabelCommand.h).
+    static void Ventilation_ARXTVS_OZNAKE(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsLabelCmd::execute();
+    }
     // TVS_SPOJ_TKO: inlet, prolaz and branch duct joined by a TK-O (BranchJoinCommand.h).
     static void Ventilation_ARXTVS_SPOJ_TKO(void)
     {
