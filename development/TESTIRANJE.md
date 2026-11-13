@@ -6,6 +6,13 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## TVS_SPOJ_TKO (novo, 13.11.) – testirati
+- Izbor: ulazni kanal, prolazni kanal (paralelan, u nastavku), ogranak (okomit). Pravougaoni, iste visine i kote; prolaz i ogranak ne širi od ulaza.
+- TK-O se postavlja na presjek ose ulaza i ose ogranka; ulaz, prolaz i ogranak se skraćuju / produžuju do lica T komada.
+- „Ivica“: prolaz u osi ulaza (prolazni kanal se pomjeri poprijeko ako nije) / prolaz poravnat uz ivicu ulaza **nasuprot ogranku** / **na strani ogranka** (jedan zid T komada ide ravno). Podrazumijevano ono što crtež već ima (kao na slici: desne ivice u liniji → nasuprot ogranku), inače osa.
+- Rezultat se nacrta pa „[Da/Ivica/Ne]“; Ivica prelazi na sljedeće poravnanje, Ne vraća sve. Prolaz dalje spojen i treba ga pomjeriti → nudi se poravnanje bez pomjeranja.
+- TK-O sa pomjerenim prolazom pamti pomak u zapisu (kao vrat kod TK-G); TVS_TK_TIP ga zadržava, Okreni ga uklanja. Provjeriti specifikaciju i TVS_MOVE / STRETCH na njemu.
+
 ## TVS_SPOJ_TKG (novo, 13.11.) – testirati
 - Izbor: ulazni kanal, prvi ogranak, drugi ogranak (ogranci okomiti na ulaz, na suprotne strane, iste visine i kote kao ulaz, pravougaoni).
 - Ako ogranci nisu u istoj osi (novo): podrazumijevano se **ništa ne pomjera** – T komad ide na osu bližu ulazu, a dalji ogranak dobija duži **vrat** (pravi zid prije luka), pa oba lica padnu na postojeće ose. „[Da/Pomjeri/Ne]“: Pomjeri = kao ranije, ogranak u osu drugog (pa [Da/Vrat/Zamijeni/Ne]). Vrat nije više ograničen: kad se vanjski lukovi ne sijeku, dalji ogranak ima cijeli luk, bliži luk staje na pravom zidu, a linija preko zatvara do zida ulaza (kao ručno crtano 13.11.).

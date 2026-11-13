@@ -4,6 +4,7 @@
 // (40 second radius) [(40 vrat)], drawing units. No record = existing straight TVS_WYE (TK0).
 // vrat (TK-G, optional, older records have none): axis of branch 2 minus axis of branch 1, away
 // from the inlet; > 0: branch 2 has that much more straight inlet wall (e2), < 0: branch 1 (e1).
+// TK-O: the same item is the prolaz axis offset across the run (+ = branch side; TVS_SPOJ_TKO).
 // The first branch radius is not stored: R1 = LengthPl - l + w1, so ports, Properties
 // "Length" and the drawing always agree (TVS_WYE port model, geometry/TeeShape.h).
 #include "dbxrecrd.h"
@@ -48,7 +49,7 @@ inline Acad::ErrorStatus write(AcDbObject* o,const Record& r){
         else{rec=new AcDbXrecord();es=dict->setAt(key(),rec,id);if(es!=Acad::eOk){delete rec;rec=NULL;}else if(managed)es=tm->addNewlyCreatedDBRObject(rec,true);}
         if(es==Acad::eOk&&rec){resbuf n[6]={};n[0].restype=1;n[0].resval.rstring=const_cast<ACHAR*>(L"TVS_TEE/1");
             n[1].restype=70;n[1].resval.rint=static_cast<short>(r.type);n[2].restype=40;n[2].resval.rreal=r.l;n[3].restype=40;n[3].resval.rreal=r.second;n[4].restype=40;n[4].resval.rreal=r.radius2;
-            n[5].restype=40;n[5].resval.rreal=r.neck;const int last=r.type==tvsTee::Pants&&r.neck!=0?5:4;   // no vrat: the old 5 items
+            n[5].restype=40;n[5].resval.rreal=r.neck;const int last=r.neck!=0?5:4;   // no vrat / offset: the old 5 items
             for(int j=0;j<last;++j)n[j].rbnext=&n[j+1];n[last].rbnext=NULL;es=rec->setFromRbChain(n[0]);}
         if(!managed&&rec)rec->close();}
     if(!managed)dict->close();

@@ -107,6 +107,13 @@
         syncTVSGlobalUnits();
         tvsCheck::execute();
     }
+    // TVS_SPOJ_TKO: inlet, prolaz and branch duct joined by a TK-O (BranchJoinCommand.h).
+    static void Ventilation_ARXTVS_SPOJ_TKO(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsBranchJoinCmd::execute();
+    }
     // TVS_SPOJ_TKG: inlet + two branch ducts joined by a TK-G (PantsJoinCommand.h).
     static void Ventilation_ARXTVS_SPOJ_TKG(void)
     {

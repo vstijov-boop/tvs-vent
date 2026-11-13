@@ -28,6 +28,7 @@ CMDS = [
  ('PROVJERA', 'Provjera mreže', 'Spojevi različitih dimenzija / kota bez prelaza, promašeni priključci, kraj kanala usred kanala, uglovi koljena, kratki kanali; zum na svaki problem.', 'Crtanje kanala', 'Crtanje kanala', 'PV'),
  ('PROTOK', 'Protoci mreže', 'Sabira protoke krajnjih elemenata do jedinice (izbor kraja mreže kod jedinice); krajnjim elementima bez protoka unosi se protok; prikazuje najveću brzinu.', 'Crtanje kanala', 'Crtanje kanala', 'PT'),
  ('SPOJ_TKG', 'Spoj gaćastim T komadom', 'Spaja ulazni kanal i dva suprotna ogranka TK-G T komadom: jedan ogranak se pomjera u osu drugog, ulaz se skraćuje; prikaz prije potvrde.', 'Crtanje kanala', 'Crtanje kanala', 'TG'),
+ ('SPOJ_TKO', 'Spoj T komadom sa ogrankom', 'Spaja ulazni, prolazni kanal i ogranak TK-O T komadom: prolaz u osi ulaza ili poravnat uz ivicu ulaza; prikaz prije potvrde.', 'Crtanje kanala', 'Crtanje kanala', 'TO'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)

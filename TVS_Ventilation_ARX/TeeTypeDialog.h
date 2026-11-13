@@ -434,8 +434,9 @@ inline void apply(const Dialog& d){
      heightChanged=d.heightNew>0&&std::fabs(d.heightNew-was)>1e-9;
      tvsTeeData::Record r;r.type=teeType(d.choice);r.l=tvsTeeData::collarMm()/f;
      {tvsTeeData::Record old;   // TK-G vrat (TVS_SPOJ_TKG) stays; with Okreni the branches change sides: dropped
-      if(d.choice==Pants&&tvsTeeData::read(w.object(),old)&&old.type==tvsTee::Pants&&old.neck!=0){
-        if(d.flipped)acutPrintf(L"\nTK-G: vrat ogranka uklonjen (Okreni); ogranci su ponovo u istoj osi.");else r.neck=old.neck;}}
+      if((d.choice==Pants||d.choice==Branch)&&tvsTeeData::read(w.object(),old)&&old.type==teeType(d.choice)&&old.neck!=0){
+        if(d.flipped)acutPrintf(d.choice==Pants?L"\nTK-G: vrat ogranka uklonjen (Okreni); ogranci su ponovo u istoj osi.":L"\nTK-O: pomak prolaza uklonjen (Okreni); prolaz je ponovo u osi ulaza.");
+        else r.neck=old.neck;}}
      const Side& b=d.side[0];const Side& c=d.side[1];
      if(d.choice==Branch){w->SizeAotv=b.tee.a;w->SizeBotv=w->SizeBpr;r.second=c.tee.a;
         w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w->SizeAotv),w->SizeAotv);}

@@ -1186,6 +1186,7 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 	else if (r.type == tvsTee::Branch) {
 		tee.A = SizeApr; tee.w1 = SizeAotv; tee.C = r.second > 0 ? r.second : SizeApr;
 		tee.R1 = LengthPl - r.l + tee.w1;
+		tee.xo = r.neck;   // prolaz offset across the run (TVS_SPOJ_TKO: an edge in line with the inlet)
 		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
 	}
 	else {
@@ -1214,7 +1215,7 @@ bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
 	ports[2] = Basepoint + v * (SizeApr / 2 + LengthPl);
 	if (tee.type == tvsTee::Branch || tee.type == tvsTee::Tap) {
 		const double half = LengthPl + SizeAotv / 2;
-		ports[0] = Basepoint - u * half; ports[1] = Basepoint + u * half;
+		ports[0] = Basepoint - u * half; ports[1] = Basepoint + u * half + v * tee.xo;
 		widths[0] = tee.A; widths[1] = tee.C; widths[2] = tee.w1;
 	}
 	else {   // +u = first branch (w1), -u = left branch (w2); fixed collars l

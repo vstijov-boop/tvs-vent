@@ -11,7 +11,7 @@ class Pants(unittest.TestCase):
  def test_ascii(self):(ROOT/'geometry/PantsJoin.h').read_bytes().decode('ascii')
  def test_neck_record(self):   # vrat: optional 6th item, older records (5 items) still read; ports and shape use e1 / e2
   d=text('TVS_Ventilation_DBX/TeeData.h');self.assertIn('if(ok&&p&&p->restype==40)r.neck=p->resval.rreal;',d)
-  self.assertIn('const int last=r.type==tvsTee::Pants&&r.neck!=0?5:4;',d)
+  self.assertIn('const int last=r.neck!=0?5:4;',d)
   w=text('TVS_Ventilation_DBX/TVS_WYE.cpp');self.assertIn('if (r.neck > 0) tee.e2 = r.neck; else if (r.neck < 0) tee.e1 = -r.neck;',w)
   self.assertIn('r.neck *= scale;',w)
  def test_command(self):

@@ -19,8 +19,9 @@ struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
 struct Shape {std::vector<Seg> lines;std::vector<Arc> arcs;std::vector<Seg> axis;};
-struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2;   // e1 / e2: TK-G "vrat", extra straight inlet wall
-    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0){}};   // before branch 1 / 2 (its axis that much farther)
+struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;   // e1 / e2: TK-G "vrat", extra straight inlet wall
+    // xo: TK-O prolaz axis across the run (+x = branch side; prolaz edge in line with the inlet: +-(a - c))
+    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0){}};   // before branch 1 / 2 (its axis that much farther)
 inline double pi(){return 3.14159265358979323846;}
 inline double defaultRadius(double w){return 1.5*w;}           // outer radius: centre line R - w/2 = w
 inline double lengthPl(double l,double R,double w){return l+R-w;} // TVS_WYE equivalent
@@ -80,16 +81,16 @@ inline bool shape(const Tee& t,Shape& out){
     out.lines.push_back(Seg(P(-a,0),P(-a,l)));out.lines.push_back(Seg(P(a,0),P(a,l)));
     out.lines.push_back(Seg(P(-a,l),P(a,l)));out.lines.push_back(Seg(P(-a-f,0),P(a+f,0)));
     if(t.type==Branch){
-        const double L=runLength(t),c=t.C/2;
-        // Outer branch arc meets the branch-side run wall (a,l)->(c,L-l) at t; that wall is
+        const double L=runLength(t),c=t.C/2,o=t.xo,cl=o-c,cr=o+c;   // prolaz walls x = cl / cr
+        // Outer branch arc meets the branch-side run wall (a,l)->(cr,L-l) at t; that wall is
         // open from the inner arc (a,l) up to there.
-        const double Ri=t.R1-t.w1,dx=c-a,dy=L-2*l,qa=dx*dx+dy*dy,qb=-2*Ri*dx,qc=Ri*Ri-t.R1*t.R1;
+        const double Ri=t.R1-t.w1,dx=cr-a,dy=L-2*l,qa=dx*dx+dy*dy,qb=-2*Ri*dx,qc=Ri*Ri-t.R1*t.R1;
         double u=(-qb+std::sqrt(qb*qb-4*qa*qc))/(2*qa);if(u>1)u=1;
         const P q(a+u*dx,l+u*dy);double end=std::atan2(q.y-l,q.x-(a+Ri));if(end<pi()/2)end=pi()/2;
-        out.lines.push_back(Seg(P(-a,l),P(-c,L-l)));out.lines.push_back(Seg(q,P(c,L-l)));   // run walls (taper A->C)
-        out.lines.push_back(Seg(P(-c,L-l),P(-c,L)));out.lines.push_back(Seg(P(c,L-l),P(c,L)));
-        out.lines.push_back(Seg(P(-c,L-l),P(c,L-l)));out.lines.push_back(Seg(P(-c-f,L),P(c+f,L)));
-        out.axis.push_back(Seg(P(0,0),P(0,L)));
+        out.lines.push_back(Seg(P(-a,l),P(cl,L-l)));out.lines.push_back(Seg(q,P(cr,L-l)));   // run walls (taper A->C; xo: one may be straight)
+        out.lines.push_back(Seg(P(cl,L-l),P(cl,L)));out.lines.push_back(Seg(P(cr,L-l),P(cr,L)));
+        out.lines.push_back(Seg(P(cl,L-l),P(cr,L-l)));out.lines.push_back(Seg(P(cl-f,L),P(cr+f,L)));
+        out.axis.push_back(Seg(P(0,0),P(o,L)));
         branchAt(out,a,l,0,t.w1,t.R1,a+(t.R1-t.w1)+l,f,+1,end);
     }else{
         const PantsFrame pf=pantsFrame(t);
