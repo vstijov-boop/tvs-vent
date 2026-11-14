@@ -16,7 +16,7 @@
 //   SR4-1 (one side kept) / SR4-2 / SD4-1 / SR4-3 round->rect / SD4-2 rect->round; exhaust ER4-1 /
 //   ER4-2 / ED4-1 / ED4-2 / ER4-3. T komad (common = the port towards the unit; branch = port 2):
 //   supply TK0 SR5-5, TK-O SR5-1, stucna SR5-13 (user 2026-11-14), round branch SR5-11, TK-G SR5-14, round main SD5-9;
-//   exhaust ER5-1, round branch ER5-2, TK-G ER5-4, round main ED5-3. The branch loss goes to the
+//   exhaust ER5-1, stucna ER5-3, round branch ER5-2, TK-G ER5-4, round main ED5-3. The branch loss goes to the
 //   dionica of the branch, the straight (main) loss to the dionica of the prolaz. Every loss is
 //   given as zeta on the pd of its dionica (zeta = dp / pd), so Z = sum(zeta) * pd in the sheet.
 #include "AshraeEngine.h"
@@ -97,7 +97,7 @@ inline std::string junctionKey(bool exhaust,int tee,const Section& common,const 
     if(common.round)return branch.round?(exhaust?"ED5-3":"SD5-9"):std::string();
     if(tee==TeePants)return exhaust?"ER5-4":"SR5-14";
     if(branch.round)return exhaust?"ER5-2":"SR5-11";
-    if(exhaust)return "ER5-1";
+    if(exhaust)return tee==TeeTap?"ER5-3":"ER5-1";   // stucna: 45 deg entry branch (ASHRAE: Ab/Ac = 0.5, As = Ac)
     return tee==TeePlain?"SR5-5":tee==TeeBranch?"SR5-1":"SR5-13";   // TK0 plain tee, TK-O smooth radius, stucna 45 deg entry
 }
 // ---- ASHRAE inputs (as DuctPressDrop services/ashrae/seeding.py) ----
@@ -209,6 +209,10 @@ private:
         if(key.empty()){f.note+=note.empty()?L"nema ASHRAE komada \u2013 unesite \u03B6":L"; nema ASHRAE komada \u2013 unesite \u03B6";r.f.push_back(f);return;}
         if(!eng_||!eng_->loaded()||!eng_->has(key)){f.note+=(f.note.empty()?L"":L"; ")+std::wstring(L"ASHRAE podaci nisu u\u010Ditani \u2013 unesite \u03B6");r.f.push_back(f);return;}
         std::vector<std::string> w;const tvsAshrae::Engine::Loss l=eng_->loss(key,in,main,&w);
+        if(key=="ER5-2"||key=="ER5-3"){   // tables for one geometry only: Ab / Ac = 0.5
+            const double ac=(in.count("H")?in.at("H"):0)*(in.count("W")?in.at("W"):0);
+            const double ab=in.count("Db")?3.14159265358979323846*in.at("Db")*in.at("Db")/4:(in.count("Hb")?in.at("Hb"):0)*(in.count("Wb")?in.at("Wb"):0);
+            if(ac>0&&ab>0&&std::fabs(ab/ac/0.5-1)>0.25){wchar_t t[120];swprintf(t,120,L" va\u017Ei za Ab/Ac = 0,5, ovdje %.2f \u2013 C nije pouzdan",ab/ac);f.note+=(f.note.empty()?L"":L"; ")+wide(key)+std::wstring(t);}}
         f.c=l.c;f.dp=pvOwn>0?l.c*pvOwn:l.dp;f.ok=std::isfinite(f.dp);
         const double pd=r.d[dionica].pd;f.zeta=pd>0&&f.ok?f.dp/pd:0;
         const std::wstring extra=notes(w);if(!extra.empty())f.note+=(f.note.empty()?L"":L"; ")+extra;

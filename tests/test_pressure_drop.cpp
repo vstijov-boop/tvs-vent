@@ -96,6 +96,7 @@ int main(int argc,char** argv){
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");
     yes(junctionKey(false,TeePlain,Section(600,300,false),Section(300,300,false))=="SR5-5"&&junctionKey(false,TeeBranch,Section(600,300,false),Section(300,300,false))=="SR5-1"&&junctionKey(false,TeeTap,Section(600,300,false),Section(300,300,false))=="SR5-13","tee keys");
     yes(junctionKey(false,TeePants,Section(600,300,false),Section(300,300,false))=="SR5-14"&&junctionKey(true,TeePlain,Section(600,300,false),Section(200,0,true))=="ER5-2","junction keys");
+    yes(junctionKey(true,TeeTap,Section(400,200,false),Section(500,150,false))=="ER5-3"&&junctionKey(true,TeeBranch,Section(400,200,false),Section(300,200,false))=="ER5-1","exhaust stucna ER5-3");
     yes(elbowKey(Section(200,0,true),90)=="CD3-2"&&elbowKey(Section(315,0,true),90)=="CD3-21"&&elbowKey(Section(200,0,true),45)=="CD3-4"&&elbowKey(Section(315,0,true),45).empty(),"elbow keys");
     // no engine: fittings listed for the user
     {Calculator none(nullptr,o);Result x=none.run(net,0);yes(x.f.size()==4,"listed without data");for(size_t k=0;k<x.f.size();++k)yes(!x.f[k].ok&&x.f[k].note.find(L"unesite")!=std::wstring::npos,"typed by the user");}
