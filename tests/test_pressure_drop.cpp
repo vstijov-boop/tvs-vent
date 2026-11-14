@@ -89,7 +89,7 @@ int main(int argc,char** argv){
         Part st;st.kind=Tee;st.tee=TeeBranch;st.sections={Section(400,200,false),Section(400,200,false),Section(300,200,false)};st.line={XY(3000,0),XY(3400,0)};
         n2.push_back(one(st,500,0,0,1,{XY(3000,0),XY(3400,0),XY(3200,-300)}));
         Result t=calc.run(n2,0);yes(t.d.size()==1&&t.d[0].terminal,"one dionica, terminal");
-        yes(t.f.size()==1&&t.f[0].ok&&t.f[0].what.find(L"ogranak")!=std::wstring::npos&&t.f[0].note.find(L"\u010Dep")!=std::wstring::npos,"capped stucna computed");
+        yes(t.d[0].to==L"T1","terminal stucna is a T node");yes(t.f.size()==1&&t.f[0].ok&&t.f[0].what.find(L"ogranak")!=std::wstring::npos&&t.f[0].note.find(L"\u010Dep")!=std::wstring::npos,"capped stucna computed");
         if(!t.f.empty())eq(t.f[0].dp,0.9*(500/3.6)/100,"Qb = the whole flow");}
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");

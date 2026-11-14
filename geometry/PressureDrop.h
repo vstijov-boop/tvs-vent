@@ -4,7 +4,7 @@
 // (geometry/AshraeEngine.h). A free T komad port at the end of the network counts as capped (cep):
 // a T komad / stucna with nothing on it is a terminal, the air leaves through its ogranak. Pure C++14, sizes in mm, flows in m3/h. tests/test_pressure_drop.cpp.
 //   Dionica: a chain of elements with the same flow, section and duct kind; a new one starts at
-//   the unit, after a branching (T komad), after a prelaz (it ends the dionica before), at a
+//   the unit, after a T komad (also one with a capped port), after a prelaz (it ends the dionica before), at a
 //   change between flex and rigid duct and where the section changes without a prelaz.
 //   Numbered from the unit, level by level (larger flow first). Nodes: J the unit, T T komad,
 //   P a change of section / kind, K a terminal end.
@@ -176,9 +176,10 @@ private:
     tvsAshrae::Engine* eng_;Options o_;
     static bool flexOf(const Element& x){return !x.parts.empty()&&x.parts[0].flex;}
     static bool isTransition(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Transition;}
+    static bool isTee(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Tee;}
     static const Section& port(const Element& x,int p){static const Section none;return p>=0&&p<static_cast<int>(x.ports.size())?x.ports[p]:none;}
     static bool startsNew(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,int p,int c){
-        if(kids[p].size()>1||isTransition(e[p])||flexOf(e[p])!=flexOf(e[c]))return true;
+        if(kids[p].size()>1||isTee(e[p])||isTransition(e[p])||flexOf(e[p])!=flexOf(e[c]))return true;   // a T komad is always a node, also with one free port (cep)
         const Section& a=port(e[p],e[c].via);const Section& b=port(e[c],e[c].entry);
         return a.a>0&&b.a>0&&!same(a,b);
     }
@@ -195,8 +196,8 @@ private:
     void nodes(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,Result& r)const{
         int t=0,p=0,k=0;
         for(size_t q=0;q<r.d.size();++q){Dionica& d=r.d[q];const int last=d.elements.back();const Element& x=e[last];wchar_t name[16];
-            if(d.children.empty()){swprintf(name,16,L"K%d",++k);for(size_t j=0;j<x.at.size();++j)if(static_cast<int>(j)!=x.entry){d.toAt=x.at[j];break;}}
-            else if(kids[last].size()>1){swprintf(name,16,L"T%d",++t);XY c;for(size_t j=0;j<x.at.size();++j){c.x+=x.at[j].x/x.at.size();c.y+=x.at[j].y/x.at.size();}d.toAt=c;}
+            if(d.children.empty()&&!isTee(x)){swprintf(name,16,L"K%d",++k);for(size_t j=0;j<x.at.size();++j)if(static_cast<int>(j)!=x.entry){d.toAt=x.at[j];break;}}
+            else if(kids[last].size()>1||isTee(x)){swprintf(name,16,L"T%d",++t);XY c;for(size_t j=0;j<x.at.size();++j){c.x+=x.at[j].x/x.at.size();c.y+=x.at[j].y/x.at.size();}d.toAt=c;}
             else{swprintf(name,16,L"P%d",++p);const Element& y=e[kids[last][0]];if(y.entry>=0&&y.entry<static_cast<int>(y.at.size()))d.toAt=y.at[y.entry];}
             d.to=name;}
         for(size_t q=0;q<r.d.size();++q){Dionica& d=r.d[q];
