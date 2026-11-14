@@ -90,9 +90,12 @@ inline bool write(const tvsSheet::Workbook& wb){
     Var books=get(app,L"Workbooks");Var book=call(books.disp(),L"Add");
     if(old.v.vt!=VT_EMPTY)put(app,L"SheetsInNewWorkbook",old);
     Var sheets=get(book.disp(),L"Worksheets");
+    put(app,L"DisplayAlerts",Var(false));
+    // every sheet named first: a formula on Dionice that refers to Fitinzi before it exists makes
+    // Excel ask for an external file ("Update Values: Fitinzi")
+    for(size_t i=0;i<wb.sheets.size();++i){Var sheet=get(sheets.disp(),L"Item",std::vector<Var>(1,Var(static_cast<long>(i+1))));if(sheet.disp())put(sheet.disp(),L"Name",Var(wb.sheets[i].name));}
     for(size_t i=0;i<wb.sheets.size();++i){const tvsSheet::Sheet& s=wb.sheets[i];
         Var sheet=get(sheets.disp(),L"Item",std::vector<Var>(1,Var(static_cast<long>(i+1))));IDispatch* d=sheet.disp();if(!d)continue;
-        put(d,L"Name",Var(s.name));
         cells(d,s);
         for(size_t k=0;k<s.formats.size();++k)formatRange(d,s.formats[k]);
         for(size_t k=0;k<s.widths.size();++k){Var c=get(d,L"Columns",std::vector<Var>(1,Var(static_cast<long>(k+1))));put(c.disp(),L"ColumnWidth",Var(s.widths[k]));}
@@ -105,7 +108,7 @@ inline bool write(const tvsSheet::Workbook& wb){
         if(!s.freeze.empty()){call(d,L"Activate");Var c=range(d,s.freeze);call(c.disp(),L"Select");Var w=get(app,L"ActiveWindow");put(w.disp(),L"FreezePanes",Var(true));}
     }
     Var first=get(sheets.disp(),L"Item",std::vector<Var>(1,Var(1L)));call(first.disp(),L"Activate");
-    put(app,L"ScreenUpdating",Var(true));put(app,L"Visible",Var(true));put(app,L"UserControl",Var(true));
+    put(app,L"DisplayAlerts",Var(true));put(app,L"ScreenUpdating",Var(true));put(app,L"Visible",Var(true));put(app,L"UserControl",Var(true));
     }
     app->Release();
     if(SUCCEEDED(init))CoUninitialize();

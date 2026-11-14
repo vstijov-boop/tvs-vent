@@ -26,5 +26,6 @@ class Pressure(unittest.TestCase):
  def test_excel_writer(self):
   x=text('TVS_Ventilation_ARX/ExcelWriter.h')
   self.assertIn('L"Formula",arr',x);self.assertIn('L"FormatConditions"',x);self.assertIn('L"AddLine"',x);self.assertIn('CoUninitialize',x);self.assertIn('Invoke(id,IID_NULL,0x0409,',x);self.assertNotIn('LOCALE_USER_DEFAULT',x)
+  self.assertLess(x.index('every sheet named first'),x.index('cells(d,s);'))
   self.assertLess(x.index('every Var released before CoUninitialize'),x.index('app->Release();'))
 if __name__=='__main__':unittest.main()
