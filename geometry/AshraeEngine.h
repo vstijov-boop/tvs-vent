@@ -213,13 +213,15 @@ inline bool singular(const std::vector<double>& x,const Rows& z){
     double m1=largest(c1);if(m1<1e-9)m1=1e-9;
     return largest(c0)/m1*x[0]/x[1]>=3.0;
 }
+struct Param {std::string var,unit;double def,lo,hi;Param():def(0),lo(0),hi(0){}};   // Input.csv (SI)
+inline bool isFlow(const Param& p){return p.unit.find("L/s")!=std::string::npos||(!p.var.empty()&&(p.var[0]=='Q'||p.var[0]=='q'));}
 class Engine {
 public:
     bool clamp,pv;   // engine.py EKSTRAPOLACIJA "clamp", INTERPOLACIJA "pv"
     Engine():clamp(true),pv(true),loaded_(false){}
     // false: Constants / Equation / Output missing
     bool load(const Reader& reader){
-        reader_=reader;loaded_=false;constants_.clear();equations_.clear();outputs_.clear();tables_.clear();pvTables_.clear();
+        reader_=reader;loaded_=false;constants_.clear();equations_.clear();outputs_.clear();params_.clear();tables_.clear();pvTables_.clear();
         std::string t;
         if(!reader_("Constants.csv",t))return false;
         {const std::vector<Row> rows=csv(t);for(size_t i=0;i<rows.size();++i){const std::string v=trim(field(rows[i],"Variable"));double x;if(!v.empty()&&number(field(rows[i],"SIValue"),x))constants_[v]=x;}}
@@ -235,8 +237,16 @@ public:
             for(auto& kv:by){std::vector<std::pair<double,std::string> >& v=kv.second;
                 for(size_t i=1;i<v.size();++i){std::pair<double,std::string> x=v[i];size_t j=i;while(j>0&&v[j-1].first>x.first){v[j]=v[j-1];--j;}v[j]=x;}
                 std::vector<std::string>& o=outputs_[kv.first];for(size_t i=0;i<v.size();++i)if(!v[i].second.empty())o.push_back(v[i].second);}}
+        if(reader_("Input.csv",t)){const std::vector<Row> rows=csv(t);std::map<std::string,std::vector<std::pair<double,Param> > > by;   // optional: defaults
+            for(size_t i=0;i<rows.size();++i){const std::string k=trim(field(rows[i],"Key"));Param p;p.var=trim(field(rows[i],"Variable"));if(k.empty()||p.var.empty())continue;
+                p.unit=field(rows[i],"SIUnitID");if(!number(field(rows[i],"SIDefault"),p.def))p.def=0;if(!number(field(rows[i],"SIMinimum"),p.lo))p.lo=0;if(!number(field(rows[i],"SIMaximum"),p.hi))p.hi=0;
+                double o;if(!number(field(rows[i],"Order"),o))o=0;by[k].push_back(std::make_pair(o,p));}
+            for(auto& kv:by){std::vector<std::pair<double,Param> >& v=kv.second;
+                for(size_t i=1;i<v.size();++i){std::pair<double,Param> x=v[i];size_t j=i;while(j>0&&v[j-1].first>x.first){v[j]=v[j-1];--j;}v[j]=x;}
+                std::vector<Param>& o=params_[kv.first];for(size_t i=0;i<v.size();++i)o.push_back(v[i].second);}}
         loaded_=true;return true;
     }
+    const std::vector<Param>& params(const std::string& key)const{static const std::vector<Param> none;auto i=params_.find(key);return i==params_.end()?none:i->second;}
     bool loaded()const{return loaded_;}
     bool has(const std::string& key)const{return equations_.count(key)!=0;}
     const std::vector<std::string>& resultVars(const std::string& key)const{static const std::vector<std::string> none;auto i=outputs_.find(key);return i==outputs_.end()?none:i->second;}
@@ -314,6 +324,7 @@ private:
     std::map<std::string,double> constants_;
     std::map<std::string,std::vector<std::pair<double,std::string> > > equations_;
     std::map<std::string,std::vector<std::string> > outputs_;
+    std::map<std::string,std::vector<Param> > params_;
     std::map<std::string,std::vector<Rows> > tables_;std::set<std::string> missing_;
     std::map<std::string,std::set<int> > pvTables_;
     const std::vector<Rows>* tableOf(const std::string& key){

@@ -6,6 +6,14 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## TVS_PAD (novo, 14.11.) – testirati
+- Prvi put: opcija „Podaci“ (ili pitanje na početku) → izaberite `Equation.csv` u folderu `ashrae_data` instalacije DuctPressDrop. Folder se pamti (registry `Software\TVS_Vent`, `AshraeData`). ASHRAE tabele nisu u TVS_VENT-u.
+- Izbor kraja mreže kod jedinice (kao TVS_PROTOK; protoci se sabiraju, u crtež se ništa ne upisuje) → `Sistem [Dovod/Odvod/Podaci]`.
+- Excel (otvoren, nesačuvan), list **Dionice**: dionica = isti protok, presjek i vrsta kanala (nova poslije T komada, poslije prelaza, na prelazu lim/fleks); brojevi od jedinice; Od/Do: J, T (T komad), P (promjena), K (kraj). v, pd, R, Z, Δp su formule; Re skrivena kolona; žute ćelije Δp krajnjih elemenata unosite sami → kritična grana (crveno, ✓) i „Višak Pa“ (za prigušiti na T komadu) se preračunavaju.
+- List **Fitinzi**: koljena CR3-1 / CD3-2 / CD3-21 / CD3-4, prelazi SR4-1 / SR4-2 / SD4-1 / SR4-3 / SD4-2 (odvod ER4 / ED4), T komadi SR5-13 (TK0, TK-O, štucna), SR5-11 (okrugli ogranak), SR5-14 (TK-G), SD5-9 (okrugli); odvod ER5-1 / ER5-2 / ER5-4 / ED5-3. ζ je sveden na pd svoje dionice i može se ispraviti; žuto = nema ASHRAE komada (npr. okruglo koljeno 30°), ζ unosite sami.
+- List **Šema**: jednolinijska osnova, fleks isprekidano, broj dionice, čvorovi; kritična grana pri izvozu crveno.
+- Provjeriti: T komad ulazom kroz ogranak (napomena „nestandardno“), etaž / obilazak (koljena unutra se broje), fleks na kraju (k = 3 mm), mreža bez ASHRAE foldera (samo trenje).
+
 ## TVS_OZNAKE (novo, 13.11.) – testirati
 - TVS_OZNAKE: [Ukljuci/Iskljuci/Polozaj/Razmjera/Pojedinacno]. Uključivanje pravi sloj i stil teksta AT-DIM_KANAL (romans.shx, faktor širine 0,7).
 - Oznaka na svakom pravom kanalu dužem od teksta: `400x150/1150` (okrugli `%%c250/500`, bez protoka samo dimenzija), bez jedinica; visina 2,5 mm × razmjera (prvi put iz podešavanja TVS oznaka, npr. 1:50 → 125 mm).

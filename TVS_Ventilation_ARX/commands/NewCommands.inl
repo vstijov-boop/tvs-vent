@@ -114,6 +114,13 @@
         syncTVSGlobalUnits();
         tvsLabelCmd::execute();
     }
+    // TVS_PAD: pad pritiska po dionicama u Excel, ASHRAE fitinzi (PressureCommand.h).
+    static void Ventilation_ARXTVS_PAD(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsPad::execute();
+    }
     // TVS_SPOJ_TKO: inlet, prolaz and branch duct joined by a TK-O (BranchJoinCommand.h).
     static void Ventilation_ARXTVS_SPOJ_TKO(void)
     {

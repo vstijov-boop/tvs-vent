@@ -22,6 +22,9 @@ struct Result {
     std::vector<double> flow;     // per element (unreached: its own flow)
     std::vector<char> reached;
     std::vector<int> parent;      // element towards the unit, -1 for the root / unreached
+    std::vector<int> entry;       // port of the element towards the unit (root: rootPort), -1 unreached
+    std::vector<int> via;         // port of the parent this element is joined to, -1 root / unreached
+    std::vector<int> order;       // reached elements, walking order from the unit
     std::vector<int> terminals;   // reached elements with nothing further on
     std::vector<std::pair<int,int> > open;   // free ports (element, port) of elements that go on
     double total;
@@ -48,7 +51,7 @@ inline void contacts(const std::vector<Element>& e,double tol,std::vector<std::v
 inline Result solve(const std::vector<Element>& e,int root,int rootPort,double tol){
     Result r;const size_t n=e.size();
     r.flow.resize(n);for(size_t i=0;i<n;++i)r.flow[i]=e[i].flow;
-    r.reached.assign(n,0);r.parent.assign(n,-1);
+    r.reached.assign(n,0);r.parent.assign(n,-1);r.entry.assign(n,-1);r.via.assign(n,-1);
     if(root<0||root>=static_cast<int>(n)||rootPort<0||rootPort>=static_cast<int>(e[root].ports.size())){r.error=BadRoot;return r;}
     std::vector<std::vector<std::vector<std::pair<int,int> > > > c;contacts(e,tol,c);
     if(!c[root][rootPort].empty()){r.error=RootJoined;r.problem=root;r.where=e[root].ports[rootPort];return r;}
@@ -62,7 +65,7 @@ inline Result solve(const std::vector<Element>& e,int root,int rootPort,double t
             const int j=at[0].first,q=at[0].second;
             if(c[j][q].size()>1){r.error=Ambiguous;r.problem=j;r.where=e[j].ports[q];return r;}
             if(r.reached[j]){r.error=Cycle;r.problem=j;r.where=e[i].ports[p];return r;}
-            r.reached[j]=1;entry[j]=q;r.parent[j]=i;children[i].push_back(j);order.push_back(j);
+            r.reached[j]=1;entry[j]=q;r.via[j]=static_cast<int>(p);r.parent[j]=i;children[i].push_back(j);order.push_back(j);
         }
     }
     for(size_t k=order.size();k-->0;){const int i=order[k];
@@ -73,7 +76,8 @@ inline Result solve(const std::vector<Element>& e,int root,int rootPort,double t
     }
     // terminals in walking order (nearest to the unit first)
     std::vector<int> t;for(size_t k=0;k<order.size();++k)if(children[order[k]].empty())t.push_back(order[k]);
-    r.terminals=t;r.total=r.flow[root];
+    r.terminals=t;r.total=r.flow[root];r.order=order;
+    for(size_t k=0;k<order.size();++k)r.entry[order[k]]=entry[order[k]];
     return r;
 }
 }
