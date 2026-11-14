@@ -55,11 +55,11 @@ int main(int argc,char** argv){
     files["Equation.csv"]="Key;Order;Equation;Input;Value\n"
         "CR3-1;1;Pv=(Q/1000/(W*H/1000000)/VPC)^2;;\nCR3-1;2;Co=0.2*Theta/90+RR/100;;\nCR3-1;3;Po=Co*Pv;;\n"
         "SR4-1;1;Co=0.01*H1/Ho;;\nSR4-1;2;Po=Co*10;;\n"
-        "SR5-13;1;Cb=0.9;;\nSR5-13;2;Pob=Cb*Qb/100;;\nSR5-13;3;Cs=0.05;;\nSR5-13;4;Pos=Cs*Hs*Ws/10000;;\n";
+        "SR5-1;1;Cb=0.9;;\nSR5-1;2;Pob=Cb*Qb/100;;\nSR5-1;3;Cs=0.05;;\nSR5-1;4;Pos=Cs*Hs*Ws/10000;;\n";
     files["Input.csv"]="Key;Order;Prompt;Variable;IPUnitID;IPDecimals;IPMinimum;IPMaximum;IPDefault;SIUnitID;SIDecimals;SIMinimum;SIMaximum;SIDefault\n"
         "CR3-1;0;W;W;;;;;;(W, mm);0;25;2500;300\nCR3-1;1;H;H;;;;;;(H, mm);0;25;2500;300\nCR3-1;2;RR;RR;;;;;;(r/W);2;0.5;2;1.5\nCR3-1;3;T;Theta;;;;;;(Theta, deg.);0;0;180;90\nCR3-1;4;Q;Q;;;;;;(Q, L/s);0;0;1;700\n"
         "SR4-1;0;Ho;Ho;;;;;;(Ho, mm);0;0;1;300\nSR4-1;1;W;W;;;;;;(W, mm);0;0;1;400\nSR4-1;2;H1;H1;;;;;;(H1, mm);0;0;1;600\nSR4-1;3;L;L;;;;;;(L, mm);0;0;1;600\nSR4-1;4;Q;Q;;;;;;(Q, L/s);0;0;1;1650\n"
-        "SR5-13;0;H;H;;;;;;(H, mm);0;0;1;300\nSR5-13;1;W;W;;;;;;(W, mm);0;0;1;300\nSR5-13;2;Hs;Hs;;;;;;(Hs, mm);0;0;1;300\nSR5-13;3;Ws;Ws;;;;;;(Ws, mm);0;0;1;250\nSR5-13;4;Qc;Qc;;;;;;(Qc, L/s);0;0;1;750\nSR5-13;5;Qb;Qb;;;;;;(Qb, L/s);0;0;1;150\nSR5-13;6;Hb;Hb;;;;;;(Hb, mm);0;0;1;150\nSR5-13;7;Wb;Wb;;;;;;(Wb, mm);0;0;1;150\n";
+        "SR5-1;0;H;H;;;;;;(H, mm);0;0;1;300\nSR5-1;1;W;W;;;;;;(W, mm);0;0;1;300\nSR5-1;2;Hs;Hs;;;;;;(Hs, mm);0;0;1;300\nSR5-1;3;Ws;Ws;;;;;;(Ws, mm);0;0;1;250\nSR5-1;4;Qc;Qc;;;;;;(Qc, L/s);0;0;1;750\nSR5-1;5;Qb;Qb;;;;;;(Qb, L/s);0;0;1;150\nSR5-1;6;Hb;Hb;;;;;;(Hb, mm);0;0;1;150\nSR5-1;7;Wb;Wb;;;;;;(Wb, mm);0;0;1;150\n";
     files["Output.csv"]="Key;Order;Prompt;Variable;IPUnitID;IPDecimals;SIUnitID;SIDecimals\n";
     tvsAshrae::Reader fake=[&](const std::string& f,std::string& t){auto i=files.find(f);if(i==files.end())return false;t=i->second;return true;};
     tvsAshrae::Engine e;yes(e.load(fake),"load");
@@ -82,11 +82,12 @@ int main(int argc,char** argv){
     for(size_t k=0;k<r.f.size();++k){const Fitting& f=r.f[k];yes(f.ok,"computed");
         if(f.key==L"CR3-1"){yes(f.dionica==0,"elbow on 1");const double pv=std::pow(1000/0.18/1000/1.291,2);eq(f.dp,(0.2+1.0/100)*pv,"elbow dp (r/W 1.0)");eq(f.zeta,f.dp/r.d[0].pd,"zeta on pd");}
         if(f.key==L"SR4-1"){yes(f.dionica==1,"prelaz on 2");eq(f.c,0.01*500/400,"SR4-1: the width changes -> H1 500, Ho 400");}
-        if(f.key==L"SR5-13"&&f.what.find(L"ogranak")!=std::wstring::npos){yes(f.dionica==2,"branch on 3");eq(f.dp,0.9*(1200/3.6)/100,"branch Qb");}
-        if(f.key==L"SR5-13"&&f.what.find(L"prolaz")!=std::wstring::npos){yes(f.dionica==1,"main on 2");eq(f.dp,0.05*300*500/10000.0,"main Hs Ws");}}
+        if(f.key==L"SR5-1"&&f.what.find(L"ogranak")!=std::wstring::npos){yes(f.dionica==2,"branch on 3");eq(f.dp,0.9*(1200/3.6)/100,"branch Qb");}
+        if(f.key==L"SR5-1"&&f.what.find(L"prolaz")!=std::wstring::npos){yes(f.dionica==1,"main on 2");eq(f.dp,0.05*300*500/10000.0,"main Hs Ws");}}
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");
+    yes(junctionKey(false,TeePlain,Section(600,300,false),Section(300,300,false))=="SR5-5"&&junctionKey(false,TeeBranch,Section(600,300,false),Section(300,300,false))=="SR5-1"&&junctionKey(false,TeeTap,Section(600,300,false),Section(300,300,false))=="SR5-13","tee keys");
     yes(junctionKey(false,TeePants,Section(600,300,false),Section(300,300,false))=="SR5-14"&&junctionKey(true,TeePlain,Section(600,300,false),Section(200,0,true))=="ER5-2","junction keys");
     yes(elbowKey(Section(200,0,true),90)=="CD3-2"&&elbowKey(Section(315,0,true),90)=="CD3-21"&&elbowKey(Section(200,0,true),45)=="CD3-4"&&elbowKey(Section(315,0,true),45).empty(),"elbow keys");
     // no engine: fittings listed for the user

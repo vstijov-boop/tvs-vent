@@ -21,16 +21,17 @@ public:
     ~Var(){VariantClear(&v);}
     IDispatch* disp()const{return v.vt==VT_DISPATCH?v.pdispVal:NULL;}
 };
-// args in the natural order (reversed for DISPPARAMS)
+// args in the natural order (reversed for DISPPARAMS). LCID en-US (0x0409): Excel reads Formula and
+// numbers in the locale of the call, so a user locale with ';' / ',' would reject IF(a,b,c).
 inline HRESULT invoke(IDispatch* d,const wchar_t* name,WORD type,Var* result,const std::vector<Var>& args=std::vector<Var>()){
     if(!d)return E_POINTER;
     DISPID id;LPOLESTR n=const_cast<LPOLESTR>(name);
-    HRESULT hr=d->GetIDsOfNames(IID_NULL,&n,1,LOCALE_USER_DEFAULT,&id);if(FAILED(hr))return hr;
+    HRESULT hr=d->GetIDsOfNames(IID_NULL,&n,1,0x0409,&id);if(FAILED(hr))return hr;
     std::vector<VARIANT> a(args.size());for(size_t i=0;i<args.size();++i)a[i]=args[args.size()-1-i].v;
     DISPPARAMS dp={a.empty()?NULL:&a[0],NULL,static_cast<UINT>(a.size()),0};DISPID put=DISPID_PROPERTYPUT;
     if(type&(DISPATCH_PROPERTYPUT|DISPATCH_PROPERTYPUTREF)){dp.cNamedArgs=1;dp.rgdispidNamedArgs=&put;}
     VARIANT out;VariantInit(&out);
-    hr=d->Invoke(id,IID_NULL,LOCALE_USER_DEFAULT,type,&dp,&out,NULL,NULL);
+    hr=d->Invoke(id,IID_NULL,0x0409,type,&dp,&out,NULL,NULL);
     if(result){VariantClear(&result->v);result->v=out;}else VariantClear(&out);
     return hr;
 }
@@ -56,7 +57,11 @@ inline void cells(IDispatch* sheet,const tvsSheet::Sheet& s){
     for(long r=1;r<=rows;++r)for(long c=1;c<=cols;++c){const std::wstring t=s.at(r,c);if(t.empty())continue;
         Var x(t);long idx[2]={r,c};SafeArrayPutElement(a,idx,&x.v);}
     Var arr;arr.v.vt=VT_ARRAY|VT_VARIANT;arr.v.parray=a;
-    Var r=range(sheet,L"A1:"+tvsSheet::cell(cols,rows));put(r.disp(),L"Formula",arr);
+    Var r=range(sheet,L"A1:"+tvsSheet::cell(cols,rows));
+    if(SUCCEEDED(put(r.disp(),L"Formula",arr)))return;
+    // a refused cell stops the array: cell by cell, a bad one as text
+    for(long row=1;row<=rows;++row)for(long c=1;c<=cols;++c){const std::wstring t=s.at(row,c);if(t.empty())continue;
+        Var one=range(sheet,tvsSheet::cell(c,row));if(FAILED(put(one.disp(),L"Formula",Var(t))))put(one.disp(),L"Formula",Var(L"'"+t));}
 }
 inline void shapes(IDispatch* sheet,const tvsSheet::Sheet& s){
     if(s.strokes.empty()&&s.labels.empty())return;

@@ -25,6 +25,6 @@ class Pressure(unittest.TestCase):
   for s in (16,32):self.assertTrue((ROOT/('Installer/TVS_VENT/icons/TVS_PAD_%d.png'%s)).exists())
  def test_excel_writer(self):
   x=text('TVS_Ventilation_ARX/ExcelWriter.h')
-  self.assertIn('L"Formula",arr',x);self.assertIn('L"FormatConditions"',x);self.assertIn('L"AddLine"',x);self.assertIn('CoUninitialize',x)
+  self.assertIn('L"Formula",arr',x);self.assertIn('L"FormatConditions"',x);self.assertIn('L"AddLine"',x);self.assertIn('CoUninitialize',x);self.assertIn('Invoke(id,IID_NULL,0x0409,',x);self.assertNotIn('LOCALE_USER_DEFAULT',x)
   self.assertLess(x.index('every Var released before CoUninitialize'),x.index('app->Release();'))
 if __name__=='__main__':unittest.main()
