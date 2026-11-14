@@ -1,7 +1,8 @@
 #pragma once
 // Pad pritiska po dionicama (TVS_PAD): the flow network of TVS_PROTOK (geometry/FlowNetwork.h)
 // split into dionice, friction per dionica and the fittings with ASHRAE coefficients
-// (geometry/AshraeEngine.h). Pure C++14, sizes in mm, flows in m3/h. tests/test_pressure_drop.cpp.
+// (geometry/AshraeEngine.h). A free T komad port at the end of the network counts as capped (cep):
+// a T komad / stucna with nothing on it is a terminal, the air leaves through its ogranak. Pure C++14, sizes in mm, flows in m3/h. tests/test_pressure_drop.cpp.
 //   Dionica: a chain of elements with the same flow, section and duct kind; a new one starts at
 //   the unit, after a branching (T komad), after a prelaz (it ends the dionica before), at a
 //   change between flex and rigid duct and where the section changes without a prelaz.
@@ -244,17 +245,23 @@ private:
         int branchPort=2,straightPort=x.entry==0?1:0;if(pants){branchPort=0;straightPort=1;}
         double q[3]={0,0,0};int child[3]={-1,-1,-1};
         for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];if(e[c].via>=0&&e[c].via<3){q[e[c].via]=e[c].flow;child[e[c].via]=c;}}
+        // a free port at the end of the network is closed (cep); a T komad / stucna with nothing on it
+        // at all is a terminal: the air leaves through the ogranak (resetka), the prolaz is capped
+        std::wstring capped;
+        if(!pants&&kids[i].empty()){q[branchPort]=x.flow;child[branchPort]=i;capped=L", kraj mre\u017Ee: izlaz kroz ogranak, prolaz zatvoren (\u010Dep)";}
+        else if(!pants&&child[straightPort]<0&&child[branchPort]>=0)capped=L", prolaz zatvoren (\u010Dep)";
+        else if(!pants&&child[branchPort]<0&&child[straightPort]>=0)capped=L", ogranak zatvoren (\u010Dep)";
         const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,branchPort));
         for(int leg=0;leg<3;++leg){const int c=child[leg];if(c<0)continue;
             const bool main=!pants&&leg==straightPort;
-            std::map<std::string,double> in;double pv=0;std::wstring note=type+(main?L", prolaz":L", ogranak");
+            std::map<std::string,double> in;double pv=0;std::wstring note=type+(main?L", prolaz":L", ogranak")+capped;
             if(eng_&&!key.empty()&&eng_->has(key)){
                 if(pants){   // dovetail: C of this branch's Ab / Ac, on this branch's own pd (ASHRAE: equal split)
                     in=seedJunction(eng_->params(key),common,port(x,leg),port(x,leg),x.flow,q[leg],q[leg]);
                     const double s=area(port(x,leg)),v=s>0?q[leg]/3600.0/s:0;pv=o_.rho*v*v/2;
                     if(x.flow>0&&std::fabs(q[leg]/x.flow-0.5)>0.1)note+=L", ASHRAE pretpostavlja jednaku podjelu protoka";}
                 else in=seedJunction(eng_->params(key),common,port(x,branchPort),port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}
-            add(r,of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv);}
+            add(r,c==i?of[i]:of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv);}
     }
 };
 }

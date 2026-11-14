@@ -12,6 +12,7 @@
 - Excel (otvoren, nesačuvan), list **Dionice**: dionica = isti protok, presjek i vrsta kanala (nova poslije T komada, poslije prelaza, na prelazu lim/fleks); brojevi od jedinice; Od/Do: J, T (T komad), P (promjena), K (kraj). v, pd, R, Z, Δp su formule; Re skrivena kolona; žute ćelije Δp krajnjih elemenata unosite sami → kritična grana (crveno, ✓) i „Višak Pa“ (za prigušiti na T komadu) se preračunavaju.
 - List **Fitinzi**: koljena CR3-1 / CD3-2 / CD3-21 / CD3-4, prelazi SR4-1 / SR4-2 / SD4-1 / SR4-3 / SD4-2 (odvod ER4 / ED4), T komadi SR5-5 (TK0), SR5-1 (TK-O), SR5-13 (štucna), SR5-11 (okrugli ogranak), SR5-14 (TK-G), SD5-9 (okrugli); odvod ER5-1 / ER5-2 / ER5-4 / ED5-3. ζ je sveden na pd svoje dionice i može se ispraviti; žuto = nema ASHRAE komada (npr. okruglo koljeno 30°), ζ unosite sami.
 - List **Šema**: jednolinijska osnova, fleks isprekidano, broj dionice, čvorovi; kritična grana pri izvozu crveno.
+- Slobodan priključak T komada / štucne na kraju mreže = zatvoren (čep): štucna bez ičega na sebi je krajnji element, vazduh izlazi kroz ogranak (rešetka), prolaz je zatvoren – računa se ASHRAE sa Qb = Q, napomena „čep“.
 - Provjeriti: T komad ulazom kroz ogranak (napomena „nestandardno“), etaž / obilazak (koljena unutra se broje), fleks na kraju (k = 3 mm), mreža bez ASHRAE foldera (samo trenje).
 
 ## TVS_OZNAKE (novo, 13.11.) – testirati

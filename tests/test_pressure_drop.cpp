@@ -84,6 +84,13 @@ int main(int argc,char** argv){
         if(f.key==L"SR4-1"){yes(f.dionica==1,"prelaz on 2");eq(f.c,0.01*500/400,"SR4-1: the width changes -> H1 500, Ho 400");}
         if(f.key==L"SR5-1"&&f.what.find(L"ogranak")!=std::wstring::npos){yes(f.dionica==2,"branch on 3");eq(f.dp,0.9*(1200/3.6)/100,"branch Qb");}
         if(f.key==L"SR5-1"&&f.what.find(L"prolaz")!=std::wstring::npos){yes(f.dionica==1,"main on 2");eq(f.dp,0.05*300*500/10000.0,"main Hs Ws");}}
+    {   // terminal stucna (resetka on the ogranak, prolaz end open in the drawing = cep)
+        std::vector<Element> n2;n2.push_back(one(duct(400,200,false,3000,XY(0,0),XY(3000,0)),500,-1,0,-1,{XY(0,0),XY(3000,0)}));
+        Part st;st.kind=Tee;st.tee=TeeBranch;st.sections={Section(400,200,false),Section(400,200,false),Section(300,200,false)};st.line={XY(3000,0),XY(3400,0)};
+        n2.push_back(one(st,500,0,0,1,{XY(3000,0),XY(3400,0),XY(3200,-300)}));
+        Result t=calc.run(n2,0);yes(t.d.size()==1&&t.d[0].terminal,"one dionica, terminal");
+        yes(t.f.size()==1&&t.f[0].ok&&t.f[0].what.find(L"ogranak")!=std::wstring::npos&&t.f[0].note.find(L"\u010Dep")!=std::wstring::npos,"capped stucna computed");
+        if(!t.f.empty())eq(t.f[0].dp,0.9*(500/3.6)/100,"Qb = the whole flow");}
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");
