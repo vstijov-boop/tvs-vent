@@ -218,7 +218,7 @@ private:
             for(size_t p=0;p<x.parts.size();++p){const Part& t=x.parts[p];
                 if(t.kind==Elbow&&!t.sections.empty()&&t.angle>=1){const Section& s=t.sections[0];wchar_t note[64];
                     const double rc=t.radius,rr=s.a>0?rc/s.a:0;
-                    if(s.round)swprintf(note,64,L"%.0f\u00B0, r/D = %.2f",t.angle,rr);else swprintf(note,64,L"%.0f\u00B0, r/W = %.2f",t.angle,rr);
+                    if(s.round)swprintf(note,64,L"%.0f\u00B0, r/D = %.2f",t.angle,rr);else swprintf(note,64,L"%.0f\u00B0, r/W = %.2f",t.angle,rr);for(wchar_t* c=note;*c;++c)if(*c==L'.')*c=L',';
                     const std::string key=elbowKey(s,t.angle);std::map<std::string,double> in;
                     if(!key.empty()&&eng_&&eng_->has(key)){in=seed(eng_->params(key),s,nullptr,x.flow/3.6,0);if(in.count("RR"))in["RR"]=rr;if(in.count("Theta"))in["Theta"]=t.angle;}
                     add(r,q,i,t.flex?L"Fleks koljeno":L"Koljeno",note,s,key,in,false,0);}

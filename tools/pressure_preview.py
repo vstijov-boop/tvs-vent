@@ -54,5 +54,5 @@ for name,(st,lb) in shapes.items():
     p='/tmp/claude-0/pad/sema_%s.png'%abs(hash(name));im.save(p)
     img=Image(p);img.width,img.height=W,H;wb[name].add_image(img,'A4')
 for s in wb.worksheets:
-    s.page_setup.orientation='landscape';s.sheet_properties.pageSetUpPr.fitToPage=True;s.page_setup.fitToWidth=1;s.page_setup.fitToHeight=0
+    s.page_setup.orientation='landscape';s.sheet_properties.pageSetUpPr.fitToPage=True;s.page_setup.fitToWidth=1;s.page_setup.fitToHeight=1 if shapes.get(s.title,([],[]))[0] else 0
 wb.save(sys.argv[2])

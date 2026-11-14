@@ -96,7 +96,7 @@ inline bool write(const tvsSheet::Workbook& wb){
             std::vector<Var> a;a.push_back(Var(2L));a.push_back(Var::missing());a.push_back(Var(s.conditions[k].formula));
             Var fc=call(fcs.disp(),L"Add",a);Var in=get(fc.disp(),L"Interior");put(in.disp(),L"Color",Var(s.conditions[k].fill));}
         shapes(d,s);
-        Var ps=get(d,L"PageSetup");put(ps.disp(),L"Orientation",Var(2L));put(ps.disp(),L"Zoom",Var(false));put(ps.disp(),L"FitToPagesWide",Var(1L));put(ps.disp(),L"FitToPagesTall",Var(false));
+        Var ps=get(d,L"PageSetup");put(ps.disp(),L"Orientation",Var(2L));put(ps.disp(),L"Zoom",Var(false));put(ps.disp(),L"FitToPagesWide",Var(1L));if(s.onePage)put(ps.disp(),L"FitToPagesTall",Var(1L));else put(ps.disp(),L"FitToPagesTall",Var(false));
         if(!s.freeze.empty()){call(d,L"Activate");Var c=range(d,s.freeze);call(c.disp(),L"Select");Var w=get(app,L"ActiveWindow");put(w.disp(),L"FreezePanes",Var(true));}
     }
     Var first=get(sheets.disp(),L"Item",std::vector<Var>(1,Var(1L)));call(first.disp(),L"Activate");
