@@ -7,7 +7,7 @@
 //   change between flex and rigid duct and where the section changes without a prelaz.
 //   Numbered from the unit, level by level (larger flow first). Nodes: J the unit, T T komad,
 //   P a change of section / kind, K a terminal end.
-//   L: duct lengths + elbow axis arcs + prelaz lengths. R: Darcy-Weisbach, lambda Colebrook-White,
+//   L: the drawn duct lengths only (rigid and flex; fittings are in their C, user 2026-11-14). R: Darcy-Weisbach, lambda Colebrook-White,
 //   air rho 1.2 kg/m3, nu 15.1e-6 m2/s; k = 0.15 mm sheet metal, 3.0 mm flex (ASHRAE, extended).
 //   Fittings (ASHRAE DFDB, user's choice 2026-11-14): elbow rectangular CR3-1 (W in the bend
 //   plane = SizeA, r/W of the axis, angle); round 90 deg CD3-2 (D <= 250) / CD3-21, 45 deg CD3-4
@@ -186,8 +186,7 @@ private:
         bool found=false;double mm=0;
         for(size_t k=0;k<d.elements.size();++k)for(size_t p=0;p<e[d.elements[k]].parts.size();++p){const Part& t=e[d.elements[k]].parts[p];
             if(t.kind==Duct){mm+=t.length;if(!found&&!t.sections.empty()){d.s=t.sections[0];found=true;}}
-            else if(t.kind==Elbow)mm+=t.length>0?t.length:t.radius*t.angle*3.14159265358979323846/180;
-            else if(t.kind==Transition)mm+=t.length;}
+}
         if(!found)d.s=port(first,first.entry);
         d.length=mm/1000.0;d.terminal=kids[d.elements.back()].empty();
         hydraulics(d,o_);

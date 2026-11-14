@@ -72,7 +72,7 @@ int main(int argc,char** argv){
         yes(r.d[0].from==L"J"&&r.d[0].to==L"T1","1 J-T1");yes(r.d[1].from==L"T1"&&r.d[1].to==L"P1"&&r.d[1].flow==2400,"2 prolaz to the prelaz");
         yes(r.d[2].flow==1200&&r.d[2].to==L"P2","3 ogranak to the flex");yes(r.d[3].to==L"K1"&&r.d[3].terminal&&r.d[3].s.a==400,"4 after the prelaz");
         yes(r.d[4].flex&&r.d[4].terminal&&r.d[4].to==L"K2","5 flex");
-        eq(r.d[0].length,(5000+4000+600*3.14159265358979/2)/1000,"L with the elbow arc");eq(r.d[1].length,3.3,"L with the prelaz");
+        eq(r.d[0].length,9.0,"L: ducts only, no elbow arc");eq(r.d[1].length,3.0,"L: no prelaz");
         eq(r.d[4].rough,3.0,"flex roughness");eq(r.d[0].rough,0.15,"sheet roughness");
         yes(r.d[1].parent==0&&r.d[3].parent==1&&r.d[4].parent==2,"parents");
         const double v=3600/3600.0/0.18;eq(r.d[0].v,v,"v");eq(r.d[0].pd,0.6*v*v,"pd");
