@@ -130,13 +130,33 @@ inline std::map<std::string,double> seedJunction(const std::vector<tvsAshrae::Pa
         in[p.var]=v;}
     return in;
 }
-// Idelchik, converging sharp 90 deg T, As = Ac (Handbook of Hydraulic Resistance, ch. 7; C on Vc):
-// q = Qb/Qc, beta = Ab/Ac
-inline double idelchikBranch(double q,double beta){
-    const double k=beta<=0.35?1.0:(q<=0.4?0.9*(1-q):0.55);
-    return k*(1+(q/beta)*(q/beta)-2*(1-q)*(1-q));
+// Idelchik, converging sharp 90 deg T, As = Ac (Handbook of Hydraulic Resistance, ch. 7; C on Vc),
+// tabulated as in the user's KanCalc base (hanKanCalc.mdb, LOCalc 1.7 branch / 1.6 straight; user
+// 2026-11-15: the table, not the approximation K[1 + (q/beta)^2 - 2(1-q)^2]). q = Qb/Qc, beta = Ab/Ac;
+// bilinear, clamped to the table (beta 0.1..1.0, q 0..1).
+inline double idelchikLerp(const double* x,int n,double v,int& i,double& t){
+    if(v<=x[0]){i=0;t=0;return 0;}if(v>=x[n-1]){i=n-2;t=1;return 0;}
+    i=0;while(i<n-2&&v>x[i+1])++i;t=(v-x[i])/(x[i+1]-x[i]);return 0;
 }
-inline double idelchikStraight(double q){return 1.55*q-q*q;}
+inline double idelchikBranch(double q,double beta){
+    static const double B[7]={0.1,0.2,0.3,0.4,0.6,0.8,1.0};
+    static const double Q[11]={0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};
+    static const double C[7][11]={
+        {-1.0,0.4,3.8,9.2,16.0,26.0,37.0,43.0,65.0,82.0,101.0},
+        {-1.0,-0.37,0.72,2.3,4.3,6.8,9.7,13.0,17.0,21.0,26.0},
+        {-1.0,-0.51,0.17,1.0,2.1,3.2,4.7,6.3,7.9,9.7,12.0},
+        {-0.9,-0.46,-0.02,0.44,0.94,1.1,1.6,2.1,2.7,3.4,4.0},
+        {-0.9,-0.5,-0.14,0.21,0.54,0.66,0.92,1.2,1.5,1.8,2.1},
+        {-0.9,-0.51,-0.18,0.11,0.4,0.49,0.69,0.88,1.1,1.2,1.4},
+        {-0.9,-0.52,-0.24,-0.08,0.32,0.42,0.57,0.72,0.86,0.99,1.1}};
+    int i,j;double u,v;idelchikLerp(B,7,beta,i,u);idelchikLerp(Q,11,q,j,v);
+    return C[i][j]*(1-u)*(1-v)+C[i][j+1]*(1-u)*v+C[i+1][j]*u*(1-v)+C[i+1][j+1]*u*v;
+}
+inline double idelchikStraight(double q){
+    static const double Q[11]={0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};
+    static const double C[11]={0.0,0.16,0.27,0.38,0.46,0.53,0.57,0.59,0.6,0.59,0.55};
+    int j;double v;idelchikLerp(Q,11,q,j,v);return C[j]*(1-v)+C[j+1]*v;
+}
 inline std::wstring wide(const std::string& s){return std::wstring(s.begin(),s.end());}
 inline std::wstring notes(const std::vector<std::string>& w){   // engine warnings are UTF-8
     std::wstring o;
@@ -281,7 +301,8 @@ private:
                 Fitting f;f.dionica=c==i?of[i]:of[c];f.element=i;f.what=main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak";f.dim=dimText(port(x,leg));
                 f.key=L"Idelchik";f.c=cc;f.dp=cc*pvc;f.ok=std::isfinite(f.dp);const double pd=r.d[f.dionica].pd;f.zeta=pd>0&&f.ok?f.dp/pd:0;
                 wchar_t t2[96];swprintf(t2,96,L", Ab/Ac = %.2f, Qb/Qc = %.2f",beta,q2);for(wchar_t* z=t2;*z;++z)if(*z==L'.')*z=L',';
-                f.note=type+(main?L", prolaz":L", ogranak")+capped+t2+L"; Idelchik o\u0161tar T (As = Ac), C na Vc \u2013 za pravougaoni spoj vjerovatno potcijenjeno (SMACNA pri Ab/Ac 0,5 daje 30\u201350 % vi\u0161e)";
+                f.note=type+(main?L", prolaz":L", ogranak")+capped+t2+L"; Idelchik o\u0161tar T (As = Ac, tabela kao KanCalc 1.7 / 1.6), C na Vc \u2013 za pravougaoni spoj vjerovatno potcijenjeno (SMACNA pri Ab/Ac 0,5 daje 30\u201350 % vi\u0161e)";
+                if(beta<0.1||beta>1.0)f.note+=L"; Ab/Ac van tabele 0,1\u20131,0 \u2013 uzeta granica";
                 if(ac>0&&std::fabs(as/ac-1)>0.05)f.note+=L"; As \u2260 Ac \u2013 izvan formule, ra\u010Dunato kao As = Ac";
                 r.f.push_back(f);}
             return;}}
@@ -293,7 +314,9 @@ private:
                     in=seedJunction(eng_->params(key),common,port(x,leg),port(x,leg),x.flow,q[leg],q[leg]);
                     const double s=area(port(x,leg)),v=s>0?q[leg]/3600.0/s:0;pv=o_.rho*v*v/2;
                     if(x.flow>0&&std::fabs(q[leg]/x.flow-0.5)>0.1)note+=L", ASHRAE pretpostavlja jednaku podjelu protoka";}
-                else in=seedJunction(eng_->params(key),common,port(x,branchPort),port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}
+                else{Section bs=port(x,branchPort);
+                    if(key=="SR5-5"&&!bs.round&&common.b>0&&std::fabs(bs.b-common.b)>=0.5){bs=Section(bs.a*bs.b/common.b,common.b,false);note+=L", ogranak druge visine: SR5-5 sa istom povr\u0161inom (Wb = Ab / H)";}
+                    in=seedJunction(eng_->params(key),common,bs,port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}}
             add(r,c==i?of[i]:of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv,!capped.empty());}
     }
 };
