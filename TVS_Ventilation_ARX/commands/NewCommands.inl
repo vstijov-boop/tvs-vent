@@ -16,6 +16,7 @@
     static void Ventilation_ARXTVS_FLEX_MANZETNE(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();   // N3: jedinice ovog crteža
         tvsFlexCuffCommand::run();
     }
     // T komad TK-O / TK-G (faza 1: type of an existing TVS T-komad).
@@ -24,6 +25,7 @@
     static void Ventilation_ARXTVS_IZVOZ(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();   // N3: jedinice ovog crteža
         tvsExport::run();
     }
     // TVS_LEAD_AUTO: TVS labels of elements changed by a command get their text again after it
@@ -42,6 +44,7 @@
     static void Ventilation_ARXTVS_DIM_PRATI(void)
     {
         if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();   // N3: jedinice ovog crteža
         tvsSizeFollow::run(IDD_RUN, IDD_TEETYPE);
     }
     static void Ventilation_ARXTVS_PRELAZ_KOTA(void)

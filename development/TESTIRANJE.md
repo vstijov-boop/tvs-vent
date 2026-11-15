@@ -6,6 +6,13 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## Sitne ispravke iz pregleda (15.11.) – testirati
+- TVS_SPEC / TVS_EXCELSPEC: blok sa atributima na zaključanom sloju je u specifikaciji (ranije tiho izostavljen).
+- Fleks koljeno: dužina u specifikaciji = luk ose (npr. Ø200, 90°, k = 0,5 → ≈ 0,31 m, ranije 0,08 m).
+- Izvoz specifikacije u Excel: količine, površine i mase su brojevi (i u Excelu sa decimalnim zarezom; ranije tekst).
+- TVS_OFFSET / Z: poslije dijaloga Enter primjenjuje etaž (`<Primijeni>`), poruka u mm.
+- Dva crteža različitih jedinica: TVS_DIM_PRATI / TVS_FLEX_MANZETNE / TVS_IZVOZ koriste jedinice aktivnog crteža; zatvaranje crteža dok čeka TVS_ETAZ_KOTA ne blokira i ne ruši.
+
 ## Okrugla štucna: valjkasta / konusna (novo, 15.11.) – testirati
 - Okrugli ogranak na pravougaonom kanalu (TVS_TK_TIP komandna linija, Račva, TVS_CONNECTW): `[Stucna/Konusna/Ravni]`. Stucna = valjkasta (ASHRAE SR5-11, L = 0,25 D, min. 75 mm), Konusna = konusna (SR5-12, L = 100 mm, baza konusa D + 2·L·tan 15° ≈ D + 54 mm). Kucano SR5-11 / SR5-12 radi isto.
 - Kraći glavni dio štucne (sve štucne, i pravougaone): kanal štucne ide samo 25 mm preko njenog otiska na kanalu (pravougaona: kosi ulaz + širina ogranka; okrugla: D ili baza konusa). Nove štucne ga dobijaju odmah; postojeće: ponovo izabrati tip Stucna / Konusna (TVS_TK_TIP), susjedni kanali se produže.

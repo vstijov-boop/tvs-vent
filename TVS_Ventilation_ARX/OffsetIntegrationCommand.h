@@ -87,14 +87,14 @@ inline Outcome interact(const AcDbObjectId& source,tvsOffsetOperation::End end,d
 #ifdef TVS_DEV
     acutPrintf(L"\nDEV preview: zelena osa/spojevi u osnovi; zute oznake su apsolutne fizicke kote, nisu WCS Z.");
 #endif
-    acutPrintf(L"\nDva glatka pravougaona koljena: Ri=%.3f, ugao=%.3f; A x B=%.3f x %.3f mm.",request.ri,request.angleDegrees,snapshot.physical.a*snapshot.physical.factor,snapshot.physical.b*snapshot.physical.factor);
-    acutPrintf(L"\nZ %.3f -> %.3f mm; P=%.6f, rise=%.6f, L=%.6f mm; izlazni nastavak 300 mm.",
-        snapshot.physical.elevation*snapshot.physical.factor,plan.acceptedElevation*snapshot.physical.factor,
-        plan.geometry.projectedLength,plan.geometry.axis[2].z-plan.geometry.axis[1].z,plan.geometry.straightLength);
+    acutPrintf(L"\nEtaz: dva koljena Ri = %.0f, ugao %.1f\u00B0, %.0f x %.0f mm; kota %.0f -> %.0f mm, kosi dio L = %.0f mm.",
+        request.ri,request.angleDegrees,snapshot.physical.a*snapshot.physical.factor,snapshot.physical.b*snapshot.physical.factor,
+        snapshot.physical.elevation*snapshot.physical.factor,plan.acceptedElevation*snapshot.physical.factor,plan.geometry.straightLength);   // ri, L: mm already
     int answer;ACHAR value[32]=L"";
     {Preview preview;if(!preview.show(snapshot,plan))return Failed;
-        acedInitGet(0,L"Primijeni Otkazi");answer=acedGetKword(L"\nPotvrda offset-a [Primijeni/Otkazi] <Otkazi>: ",value);}
-    if(answer!=RTNORM||_wcsicmp(value,L"Primijeni"))return Cancelled;
+        acedInitGet(0,L"Primijeni Otkazi");answer=acedGetKword(L"\nPotvrda etaza [Primijeni/Otkazi] <Primijeni>: ",value);}   // N8: Enter after the dialog applies
+    if(answer==RTNONE)wcscpy_s(value,L"Primijeni");
+    if((answer!=RTNORM&&answer!=RTNONE)||_wcsicmp(value,L"Primijeni"))return Cancelled;
     return tvsOffsetService::write(snapshot,request,plan,output);
 }
 inline Outcome execute(TVS_Pipe*& current,double& acceptedElevation,double& acceptedAngle){

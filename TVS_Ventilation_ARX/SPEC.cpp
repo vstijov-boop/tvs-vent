@@ -183,7 +183,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 					setName(_T("Fleksibilni kanal"));
 					setLable(d);
 					appendLable(SizeA);
-					Length=M_PI*tvsUnits::mm(pTap->Radius, pTap)*pTap->Swectangle/2/M_PI/1000;
+					Length=tvsUnits::mm(pTap->Radius + pTap->SizeA / 2, pTap)*pTap->Swectangle/1000;   // N10: axis arc (drawn at Radius + A/2), was Radius*angle/2
 					Area=Length*M_PI*SizeA/1000;
 
 					setParam1(Length, TypeDouble1);
@@ -535,7 +535,7 @@ bool SPEC::GetAtt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 	ACHAR* pName;
 
 
-	if (acdbOpenAcDbEntity(pEnt,pEnt->id(),AcDb::kForWrite)==eOk)
+	if (acdbOpenAcDbEntity(pEnt,pEnt->id(),AcDb::kForRead)==eOk)   // N7: only reads (a block on a locked layer was dropped)
 
 	{
 		if ( (br = AcDbBlockReference::cast(pEnt)) != NULL )
@@ -555,13 +555,10 @@ bool SPEC::GetAtt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 						//
 
 						if (wcscmp(tag,pAttr->tagConst())==0) {
-							//	pAttDef->close();
+							wcscpy_s(pVal,512,pAttr->textStringConst());   // before close (was read after it)
 							pAttr->close();
+							delete pAttrIter;
 							pEnt->close();
-							//acutPrintf(_T("\nАтрибут: Tag=%s Value=%s "),
-							//	LPCTSTR(pAttr->tagConst()),LPCTSTR(pAttr->textStringConst()));
-
-							wcscpy_s(pVal,512,pAttr->textStringConst());
 							return true;
 						}
 
@@ -570,6 +567,7 @@ bool SPEC::GetAtt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 						acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
 					}
 				}
+				delete pAttrIter;
 			}
 		}
 		pEnt->close();

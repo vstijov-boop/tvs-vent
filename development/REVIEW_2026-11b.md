@@ -1,4 +1,4 @@
-# TVS_VENT – drugi, nezavisni pregled koda (novembar 2026, b)
+﻿# TVS_VENT – drugi, nezavisni pregled koda (novembar 2026, b)
 
 Grana `razvoj-tkomad`, HEAD `66e1950`. Pregled čitanjem koda; ništa nije mijenjano, ništa nije pokretano u AutoCAD-u.
 **[kod]** = vidi se u kodu, **[provjeriti]** = treba potvrditi u AutoCAD-u.
@@ -208,4 +208,5 @@ Popravka: pod `TVS_DEV` (dodati u `tests/test_release_commands.py`).
 - Urađeno: N1, N2 (korak 1 i 2), N6 (TVS_HEATFLOOR pod TVS_DEV), V1 (TVS_BYPASS_PREVIEW, TVS_OFFSET_STATUS / POLICY pod TVS_DEV; DEV poruke iz TVS_OFFSET i COPY/WBLOCK obilaska uklonjene), fault injection van izdanja, prijedlog 1 (TVS_PROVJERA).
 - N5: prije brisanja starog obilaska provjerava se da su svi članovi, ulaz i izlaz upisivi – ništa se ne briše ako jedan nije; ako novi obilazak ne uspije, poruka upućuje na UNDO (komanda je jedna UNDO grupa).
 - V7: TVS_ERASE / TVS_RAZBIJ preskače članove etaža / obilaska (poruka sa brojem, upućuje na TVS_IZVOZ); original se briše tek kad su dijelovi dodati u prostor.
-- Ostaje: N3, N4, N7, N8, N9, K4/K5/V12 ostaci, TVS_OFFSET_PROOF razdvajanje i dev build, D1–D8, prijedlozi 2–5.
+- 15.11.: N3 (TVS_DIM_PRATI, TVS_FLEX_MANZETNE, TVS_IZVOZ usklađuju jedinice; ostale su već), N4 (OffsetRefit po crtežu, istek 5 s, zatvoren crtež se zaboravlja), N7 (GetAtt čita, ne otvara za upis; vrijednost se kopira prije zatvaranja), N8 (etaž: Enter = Primijeni, poruka u mm bez DEV brojeva), N10 (fleks koljeno: luk ose (R + A/2)·ugao), S-11 (Excel: broj kao broj).
+- Ostaje: N9, K4/K5/V12 ostaci, TVS_OFFSET_PROOF razdvajanje i dev build, D1–D8, prijedlozi 2–5.

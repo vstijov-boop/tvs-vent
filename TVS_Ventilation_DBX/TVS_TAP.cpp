@@ -2215,7 +2215,7 @@ void TVS_TAP::getCount(double &count)
 
 	if (DuctType == DuctTypeFlex)
 	{
-		count = tvsUnits::metres(M_PI*Radius*Swectangle / 2 / M_PI, this);
+		count = tvsUnits::metres((Radius + SizeA / 2)*Swectangle, this);   // N10: axis arc, as drawn
 	}
 	else {
 

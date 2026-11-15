@@ -429,6 +429,23 @@ HRESULT CMSExcel::SetExcelFont(LPCTSTR szRange, LPCTSTR szName, int nSize, COLOR
 	return m_hr;
 }
 
+// "-12.50": optional sign, digits, optional '.' and digits (no exponent, no thousands); parsed by hand,
+// independent of the C locale.
+static bool plainNumber(LPCTSTR t, double& out)
+{
+	if (!t) return false;
+	size_t i = 0; bool neg = false;
+	if (t[i] == L'-' || t[i] == L'+') { neg = t[i] == L'-'; ++i; }
+	double v = 0, scale = 1; int digits = 0; bool dot = false;
+	for (; t[i]; ++i) {
+		if (t[i] >= L'0' && t[i] <= L'9') { if (dot) { scale /= 10; v += (t[i] - L'0') * scale; } else v = v * 10 + (t[i] - L'0'); ++digits; }
+		else if (t[i] == L'.' && !dot) dot = true;
+		else return false;
+	}
+	if (!digits || digits > 15) return false;
+	if (digits > 1 && !dot && t[neg || t[0] == L'+' ? 1 : 0] == L'0') return false;   // "007": a code, keep as text
+	out = neg ? -v : v; return true;
+}
 HRESULT CMSExcel::SetExcelValue(LPCTSTR szRange, LPCTSTR szValue, bool bAutoFit, int nAlignment)
 {
 	if (!m_pEApp) return E_FAIL;
@@ -462,8 +479,16 @@ HRESULT CMSExcel::SetExcelValue(LPCTSTR szRange, LPCTSTR szValue, bool bAutoFit,
 	}
 
 	{
-		COleVariant oleValue(szValue);
-		m_hr = OLEMethod(DISPATCH_PROPERTYPUT, NULL, pRange, L"Value", 1, oleValue.Detach());
+		// S-11 (review 2026-11b): a number ("12.50", "-3") goes in as a number; as text with '.' it was
+		// not a number in an Excel with a decimal comma.
+		double number = 0;
+		if (plainNumber(szValue, number)) {
+			COleVariant oleValue(number);
+			m_hr = OLEMethod(DISPATCH_PROPERTYPUT, NULL, pRange, L"Value", 1, oleValue.Detach());
+		} else {
+			COleVariant oleValue(szValue);
+			m_hr = OLEMethod(DISPATCH_PROPERTYPUT, NULL, pRange, L"Value", 1, oleValue.Detach());
+		}
 	}
 
 	if (bAutoFit)

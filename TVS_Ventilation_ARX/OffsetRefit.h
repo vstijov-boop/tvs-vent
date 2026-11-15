@@ -14,6 +14,7 @@
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "acdocman.h"
 #include "dbtrans.h"
+#include <chrono>
 #include <map>
 #include <set>
 #include <vector>
@@ -22,10 +23,19 @@ namespace tvsOffsetRefit {
 inline std::vector<AcDbObjectId>& pending(){static std::vector<AcDbObjectId> p;return p;}
 inline std::map<AcDbObjectId,double>& opened(){static std::map<AcDbObjectId,double> m;return m;}
 inline bool& posted(){static bool b=false;return b;}
+// N4 (review 2026-11b): like SizeFollow - a posted run that never came (drawing closed) does not
+// block for ever, ids of a closing drawing are dropped, TVS_ETAZ_KOTA takes only its own drawing's.
+inline unsigned long long nowMs(){return static_cast<unsigned long long>(std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count());}
+inline unsigned long long& postedAt(){static unsigned long long t=0;return t;}
 inline void post(){
-    if(posted()||pending().empty())return;
+    if(pending().empty())return;
+    if(posted()&&nowMs()-postedAt()<5000)return;
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc)return;
-    posted()=true;acDocManager->sendStringToExecute(doc,L"_TVS_ETAZ_KOTA\n",false,true,false);
+    posted()=true;postedAt()=nowMs();acDocManager->sendStringToExecute(doc,L"_TVS_ETAZ_KOTA\n",false,true,false);
+}
+inline void forget(const AcDbDatabase* db){
+    std::vector<AcDbObjectId> keep;for(size_t i=0;i<pending().size();++i)if(pending()[i].database()!=db)keep.push_back(pending()[i]);pending().swap(keep);
+    for(std::map<AcDbObjectId,double>::iterator it=opened().begin();it!=opened().end();){if(it->first.database()==db)opened().erase(it++);else ++it;}
 }
 inline bool plainDuct(const AcDbObject* o){return o&&o->isA()==TVS_Pipe::desc()&&!tvsOffsetData::marked(o);}
 class DbReactor : public AcDbDatabaseReactor {
@@ -49,7 +59,7 @@ public:
 };
 inline DbReactor& dbReactor(){static DbReactor r;return r;}
 inline std::set<AcDbDatabase*>& attached(){static std::set<AcDbDatabase*> s;return s;}
-inline void DbReactor::goodbye(const AcDbDatabase* db){attached().erase(const_cast<AcDbDatabase*>(db));}
+inline void DbReactor::goodbye(const AcDbDatabase* db){forget(db);attached().erase(const_cast<AcDbDatabase*>(db));}
 inline void attach(AcDbDatabase* db){if(db&&attached().insert(db).second)db->addReactor(&dbReactor());}
 inline void attachAll(){
     if(!acDocManager)return;AcApDocumentIterator* it=acDocManager->newAcApDocumentIterator();if(!it)return;
@@ -64,7 +74,7 @@ inline void detachAll(){
 inline void commandEnded(const ACHAR* command){
     if(!command)return;
     if(_wcsicmp(command,L"TVS_ETAZ_KOTA")==0||_wcsicmp(command,L"U")==0||_wcsicmp(command,L"UNDO")==0||_wcsicmp(command,L"REDO")==0||_wcsicmp(command,L"MREDO")==0){
-        if(_wcsicmp(command,L"TVS_ETAZ_KOTA")!=0)pending().clear();return;}
+        if(_wcsicmp(command,L"TVS_ETAZ_KOTA")!=0)forget(acdbHostApplicationServices()->workingDatabase());return;}   // UNDO: this drawing only
     post();
 }
 // --- geometry ---
@@ -188,15 +198,17 @@ inline bool step(AcDbDatabase* db,const AcDbObjectId& duct,std::vector<Assembly>
 // TVS_ETAZ_KOTA: settle the queued ducts.
 inline void run(){
     posted()=false;
-    std::vector<AcDbObjectId> work;work.swap(pending());
-    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db||work.empty())return;
+    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
+    std::vector<AcDbObjectId> work,other;   // this drawing's ducts; another drawing's wait for it
+    for(size_t i=0;i<pending().size();++i)(pending()[i].database()==db?work:other).push_back(pending()[i]);
+    pending().swap(other);if(work.empty())return;
     const double f=tvsUnits::factor(db),tol=1.0/f;
     std::vector<Assembly> all;if(!assemblies(db,all)||all.empty())return;
     for(size_t i=0;i<work.size();++i){
         std::set<std::pair<int,int> > declined;int guard=0;
         while(step(db,work[i],all,declined,f,tol)&&++guard<8)declined.clear();   // both ends may join an etaz
     }
-    pending().clear();   // own edits of this command do not queue a new round
+    forget(db);   // own edits of this command do not queue a new round
 }
 }
 #endif
