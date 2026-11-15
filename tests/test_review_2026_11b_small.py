@@ -15,7 +15,7 @@ class Small(unittest.TestCase):
  def test_n7_read_only(self):
   s=text('TVS_Ventilation_ARX/SPEC.cpp');g=s[s.index('bool SPEC::GetAtt'):s.index('bool SPEC::addBlock')]
   self.assertIn('kForRead',g);self.assertNotIn('kForWrite',g)
-  self.assertLess(g.index('wcscpy_s(pVal'),g.index('pAttr->close();'))
+  self.assertLess(g.index('wcsncpy_s(pVal'),g.index('pAttr->close();'))
  def test_n8_default_applies(self):
   s=text('TVS_Ventilation_ARX/OffsetIntegrationCommand.h')
   self.assertIn('[Primijeni/Otkazi] <Primijeni>',s);self.assertNotIn('<Otkazi>',s);self.assertNotIn('rise=%',s)
