@@ -11,6 +11,7 @@
 - Crtež: bez kosog ulaza od 45°; valjkasta = dva paralelna zida, konusna = zidovi od baze na kanalu do ogranka. Nema pitanja „strana kosog ulaza“.
 - Promjena prečnika ogranka (TVS_DIM_PRATI, TVS_PROTOK Primijeni, dijalog TVS_TK_TIP): konusna ostaje konusna (nova baza), valjkasta dobija novi L.
 - Specifikacija: „Valjkasta štucna SR5-11“ / „Konusna štucna SR5-12“; TVS_PAD: SR5-11 / SR5-12 (dovod), ER5-2 (odvod).
+- TVS_PAD: T komad sa ulazom kroz ogranak (vazduh ide na obje strane) = bullhead: ASHRAE SR5-15 / ER5-5 (pravougaoni), SD5-19 / ED5-4 (okrugli); C na brzinu svakog kraka.
 - TVS_PAD dovod: TK0 čiji je ogranak druge visine od voda → Idelchik razdvajanje (tabela kao KanCalc 0.7 / 0.6), iste visine → SR5-5.
 
 ## TVS_PAD (novo, 14.11.) – testirati

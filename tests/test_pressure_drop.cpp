@@ -55,7 +55,7 @@ int main(int argc,char** argv){
     files["Equation.csv"]="Key;Order;Equation;Input;Value\n"
         "CR3-1;1;Pv=(Q/1000/(W*H/1000000)/VPC)^2;;\nCR3-1;2;Co=0.2*Theta/90+RR/100;;\nCR3-1;3;Po=Co*Pv;;\n"
         "SR4-1;1;Co=0.01*H1/Ho;;\nSR4-1;2;Po=Co*10;;\n"
-        "SR5-1;1;Cb=0.9;;\nSR5-1;2;Pob=Cb*Qb/100;;\nSR5-1;3;Cs=0.05;;\nSR5-1;4;Pos=Cs*Hs*Ws/10000;;\n";
+        "SR5-15;1;Cb1=0.3+Qb1/Qc;;\nSR5-15;2;Pob1=Cb1*10;;\nSR5-15;3;Cb2=0.7*Wb2/Wc;;\nSR5-15;4;Pob2=Cb2*20;;\nSR5-1;1;Cb=0.9;;\nSR5-1;2;Pob=Cb*Qb/100;;\nSR5-1;3;Cs=0.05;;\nSR5-1;4;Pos=Cs*Hs*Ws/10000;;\n";
     files["Input.csv"]="Key;Order;Prompt;Variable;IPUnitID;IPDecimals;IPMinimum;IPMaximum;IPDefault;SIUnitID;SIDecimals;SIMinimum;SIMaximum;SIDefault\n"
         "CR3-1;0;W;W;;;;;;(W, mm);0;25;2500;300\nCR3-1;1;H;H;;;;;;(H, mm);0;25;2500;300\nCR3-1;2;RR;RR;;;;;;(r/W);2;0.5;2;1.5\nCR3-1;3;T;Theta;;;;;;(Theta, deg.);0;0;180;90\nCR3-1;4;Q;Q;;;;;;(Q, L/s);0;0;1;700\n"
         "SR4-1;0;Ho;Ho;;;;;;(Ho, mm);0;0;1;300\nSR4-1;1;W;W;;;;;;(W, mm);0;0;1;400\nSR4-1;2;H1;H1;;;;;;(H1, mm);0;0;1;600\nSR4-1;3;L;L;;;;;;(L, mm);0;0;1;600\nSR4-1;4;Q;Q;;;;;;(Q, L/s);0;0;1;1650\n"
@@ -108,6 +108,16 @@ int main(int argc,char** argv){
             if(t.f[k].what.find(L"ogranak")!=std::wstring::npos)eq(t.f[k].dp,idelchikDivBranch(1.0/3,0.06/0.18)*pvc,"div branch dp");
             else eq(t.f[k].dp,idelchikDivStraight((2400/3600.0/0.15)/vc)*pvc,"div main dp");}
         yes(idel==2,"two KanCalc legs");}
+    {   // bullhead: unit duct on the ogranak, run both ways
+        std::vector<Element> n5;n5.push_back(one(duct(600,600,false,2000,XY(-2000,0),XY(0,0)),3000,-1,0,-1,{XY(-2000,0),XY(0,0)}));
+        Part bh;bh.kind=Tee;bh.tee=TeePlain;bh.sections={Section(600,600,false),Section(500,600,false),Section(600,600,false)};bh.line={XY(300,-300),XY(300,300)};
+        n5.push_back(one(bh,3000,0,2,1,{XY(300,-300),XY(300,300),XY(0,0)}));
+        n5.push_back(one(duct(600,600,false,2000,XY(300,-300),XY(300,-2300)),1000,1,0,0,{XY(300,-300),XY(300,-2300)}));
+        n5.push_back(one(duct(500,600,false,2000,XY(300,300),XY(300,2300)),2000,1,0,1,{XY(300,300),XY(300,2300)}));
+        Result t=calc.run(n5,0);int legs=0;
+        for(size_t k=0;k<t.f.size();++k)if(t.f[k].key==L"SR5-15"){++legs;yes(t.f[k].ok&&t.f[k].note.find(L"bullhead")!=std::wstring::npos,"bullhead computed");
+            if(t.f[k].note.find(L"krak 1")!=std::wstring::npos)eq(t.f[k].dp,(0.3+1000.0/3000)*10,"krak 1 Qb1");else eq(t.f[k].dp,0.7*500/600*20,"krak 2 Wb2");}
+        yes(legs==2,"two bullhead legs");}
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");

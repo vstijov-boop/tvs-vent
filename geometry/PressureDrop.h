@@ -1,7 +1,8 @@
 #pragma once
 // Pad pritiska po dionicama (TVS_PAD): the flow network of TVS_PROTOK (geometry/FlowNetwork.h)
 // split into dionice, friction per dionica and the fittings with ASHRAE coefficients
-// (geometry/AshraeEngine.h). A free T komad port at the end of the network counts as capped (cep):
+// (geometry/AshraeEngine.h). Air in through a T komad's ogranak and out both run ends = bullhead
+// (SR5-15 / ER5-5, SD5-19 / ED5-4). A free T komad port at the end of the network counts as capped (cep):
 // a T komad / stucna with nothing on it is a terminal, the air leaves through its ogranak. Pure C++14, sizes in mm, flows in m3/h. tests/test_pressure_drop.cpp.
 //   Dionica: a chain of elements with the same flow, section and duct kind; a new one starts at
 //   the unit, after a T komad (also one with a capped port), after a prelaz (it ends the dionica before), at a
@@ -291,10 +292,38 @@ private:
                 else if(t.kind==Tee&&x.parts.size()==1)junction(e,kids,of,r,i);
                 else if(t.kind==Other)r.warnings.push_back(L"element bez prora\u010Duna (dionica "+std::to_wstring(d.number)+L")");}}
     }
+    // Bullhead (ASHRAE SR5-15 / ER5-5 rectangular, SD5-19 / ED5-4 round): the common duct on the
+    // T komad's ogranak, the two run ends are branches b1 (port 0) and b2 (port 1); C on each Vb.
+    void bullhead(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,const std::vector<int>& of,Result& r,int i,const std::wstring& type){
+        const Element& x=e[i];const Section& c=port(x,2);const Section& b1=port(x,0);const Section& b2=port(x,1);
+        double q[2]={0,0};int child[2]={-1,-1};
+        for(size_t k=0;k<kids[i].size();++k){const int ch=kids[i][k];if(e[ch].via==0||e[ch].via==1){q[e[ch].via]=e[ch].flow;child[e[ch].via]=ch;}}
+        const bool round=c.round&&b1.round&&b2.round,rect=!c.round&&!b1.round&&!b2.round;
+        const std::string key=round?(o_.exhaust?"ED5-4":"SD5-19"):rect?(o_.exhaust?"ER5-5":"SR5-15"):std::string();
+        std::map<std::string,double> in;
+        if(rect){in["H"]=c.b;in["Wc"]=c.a;in["Wb1"]=b1.a;in["Wb2"]=b2.a;}
+        else if(round){in["Dc"]=c.a;in["Db1"]=b1.a;in["Db2"]=b2.a;}
+        in["Qc"]=x.flow/3.6;in["Qb1"]=q[0]/3.6;
+        std::vector<std::string> w;std::map<std::string,double> cv;const bool have=!key.empty()&&eng_&&eng_->loaded()&&eng_->has(key);
+        if(have)cv=eng_->calculate(key,in,&w);
+        std::vector<std::string> keep;for(size_t k=0;k<w.size();++k)if(w[k].find("=0 van")==std::string::npos)keep.push_back(w[k]);
+        for(int leg=0;leg<2;++leg){const int ch=child[leg];if(ch<0)continue;
+            Fitting f;f.dionica=of[ch];f.element=i;f.what=L"T komad \u2013 ogranak";f.dim=dimText(port(x,leg));f.key=wide(key);
+            f.note=type+L", ulaz kroz ogranak (bullhead), "+(leg==0?L"krak 1":L"krak 2");
+            if(rect&&(std::fabs(b1.b-c.b)>=0.5||std::fabs(b2.b-c.b)>=0.5))f.note+=L"; ASHRAE pretpostavlja istu visinu svih krakova";
+            if(key.empty())f.note+=L"; nema ASHRAE komada \u2013 unesite \u03B6";
+            else if(!have)f.note+=L"; ASHRAE podaci nisu u\u010Ditani \u2013 unesite \u03B6";
+            else{const char* cn=leg==0?"Cb1":"Cb2";const char* pn=leg==0?"Pob1":"Pob2";
+                auto ic=cv.find(cn),ip=cv.find(pn);
+                if(ic!=cv.end()&&ip!=cv.end()&&std::isfinite(ip->second)){f.c=ic->second;f.dp=ip->second;f.ok=true;const double pd=r.d[f.dionica].pd;f.zeta=pd>0?f.dp/pd:0;}
+                const std::wstring extra=notes(keep);if(!extra.empty())f.note+=L"; "+extra;}
+            r.f.push_back(f);}
+    }
     void junction(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,const std::vector<int>& of,Result& r,int i){
         const Element& x=e[i];const Part& t=x.parts[0];if(x.ports.size()<3)return;
         const bool pants=t.tee==TeePants;
         static const wchar_t* names[]={L"TK0",L"TK-O",L"TK-G",L"\u0161tucna"};const std::wstring type=t.tee>=0&&t.tee<=3?names[t.tee]:L"T";
+        if(!pants&&x.entry==2){bullhead(e,kids,of,r,i,type);return;}   // air in through the ogranak, out both ways
         if(pants?x.entry!=2:x.entry==2){
             for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];
                 add(r,of[c],i,L"T komad",type+L", ulaz kroz "+(pants?L"krak":L"ogranak")+L" \u2013 nestandardno",port(x,e[c].via),std::string(),std::map<std::string,double>(),false,0);}
