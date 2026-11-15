@@ -555,7 +555,7 @@ bool SPEC::GetAtt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 						//
 
 						if (wcscmp(tag,pAttr->tagConst())==0) {
-							wcscpy_s(pVal,512,pAttr->textStringConst());   // before close (was read after it)
+							wcsncpy_s(pVal,512,pAttr->textStringConst(),_TRUNCATE);   // K5: long attribute truncated, not a crash   // before close (was read after it)
 							pAttr->close();
 							delete pAttrIter;
 							pEnt->close();
@@ -564,7 +564,7 @@ bool SPEC::GetAtt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 
 						pAttr->close();
 					} else {
-						acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
+						acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s"), acadErrorStatusText(es));
 					}
 				}
 				delete pAttrIter;
@@ -602,9 +602,9 @@ bool SPEC::addBlock(AcDbEntity * pEnt)
 		wcscpy_s(sMass,_T(""));
 		wcscpy_s(sCommit,_T(""));
 
-		if (wcscmp(sType,_T(""))!=0) wcscpy_s(sTypeSize,sType);
-		if ((wcscmp(sType,_T(""))!=0)&&(wcscmp(sSize,_T(""))!=0)) wcscat_s(sTypeSize,_T("-"));
-		if (wcscmp(sSize,_T(""))!=0) wcscat_s(sTypeSize,sSize);
+		if (wcscmp(sType,_T(""))!=0) wcsncpy_s(sTypeSize,sType,_TRUNCATE);
+		if ((wcscmp(sType,_T(""))!=0)&&(wcscmp(sSize,_T(""))!=0)) wcsncat_s(sTypeSize,_T("-"),_TRUNCATE);
+		if (wcscmp(sSize,_T(""))!=0) wcsncat_s(sTypeSize,sSize,_TRUNCATE);
 
 		GetAtt(pEnt,TagPos,sPos);
 		GetAtt(pEnt,TagManufacture,sManufacture);
@@ -652,18 +652,18 @@ bool SPEC::setAtribToEnt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 					//
 
 					if (wcscmp(tag,pAttr->tagConst())==0) {
-
-
 						pAttr->setTextString(pVal);
+						delete pAttrIter;
 						return true;
 					}
 
 				} else {
-					acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s", LPCTSTR(acadErrorStatusText(es))));
+					acutPrintf(_T("\nNije moguće otvoriti atribut bloka! Greška: %s"), acadErrorStatusText(es));
 				}
 			}
+			delete pAttrIter;
 		}
-
+		return false;   // no attribute with this tag (V12: there was no return on this path)
 	}
 
 
@@ -686,11 +686,15 @@ bool SPEC::setAtribListToEnt()
 
 bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 {
+	return pEnt ? getBlockName(pEnt->objectId(), pName) : false;
+}
+bool SPEC::getBlockName(const AcDbObjectId& id , ACHAR *pName)
+{
 
 	Acad::ErrorStatus es;
 
 
-	AcDbObjectPointer<AcDbBlockReference> pBlkRef(pEnt->id(),AcDb::kForRead);
+	AcDbObjectPointer<AcDbBlockReference> pBlkRef(id,AcDb::kForRead);
 	if ((es = pBlkRef.openStatus()) != Acad::eOk) {
 		acutPrintf(_T("\nGreška pri otvaranju BlockReference: %s"), acadErrorStatusText(es)); return false;
 	}
@@ -699,7 +703,7 @@ bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 		acutPrintf(_T("\nGreška pri otvaranju BlockTableRecord: %s"), acadErrorStatusText(es)); return false;
 	}
 	const ACHAR* sBTRName = NULL; pBTR->getName(sBTRName); 
-	if (sBTRName) wcscpy_s(pName,512,sBTRName);
+	if (sBTRName) wcsncpy_s(pName,512,sBTRName,_TRUNCATE);
 
 	
 	///DynBlock
@@ -707,7 +711,7 @@ bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 	
 
 
-	AcDbDynBlockReference dynblkRef(pEnt->id());
+	AcDbDynBlockReference dynblkRef(id);
 	if (!dynblkRef.isDynamicBlock()) {
 
 		acutPrintf(_T("\nOvo nije dinamički blok!")); return true;
@@ -724,7 +728,7 @@ bool SPEC::getBlockName(AcDbEntity* pEnt , ACHAR *pName)
 
 	const ACHAR* sDynBTRName = NULL; pDynBTR->getName(sDynBTRName); 
 
-	if (sDynBTRName) wcscpy_s(pName,512,sDynBTRName);
+	if (sDynBTRName) wcsncpy_s(pName,512,sDynBTRName,_TRUNCATE);
 
 
 

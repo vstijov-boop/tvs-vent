@@ -998,7 +998,7 @@ HRESULT CMSExcel::printExelText(const ACHAR *pColumn, long pRow, const ACHAR *pT
 
 	wcscat_s(cellname, stringconst);
 	wcscpy_s(achText, _T(""));
-	wcscat_s(achText, pText);
+	wcsncat_s(achText, pText, _TRUNCATE);   // K5: long text truncated, not a crash
 	return SetExcelValue(cellname, achText, true, 1);
 }
 

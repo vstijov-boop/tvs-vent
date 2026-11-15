@@ -209,4 +209,5 @@ Popravka: pod `TVS_DEV` (dodati u `tests/test_release_commands.py`).
 - N5: prije brisanja starog obilaska provjerava se da su svi članovi, ulaz i izlaz upisivi – ništa se ne briše ako jedan nije; ako novi obilazak ne uspije, poruka upućuje na UNDO (komanda je jedna UNDO grupa).
 - V7: TVS_ERASE / TVS_RAZBIJ preskače članove etaža / obilaska (poruka sa brojem, upućuje na TVS_IZVOZ); original se briše tek kad su dijelovi dodati u prostor.
 - 15.11.: N3 (TVS_DIM_PRATI, TVS_FLEX_MANZETNE, TVS_IZVOZ usklađuju jedinice; ostale su već), N4 (OffsetRefit po crtežu, istek 5 s, zatvoren crtež se zaboravlja), N7 (GetAtt čita, ne otvara za upis; vrijednost se kopira prije zatvaranja), N8 (etaž: Enter = Primijeni, poruka u mm bez DEV brojeva), N10 (fleks koljeno: luk ose (R + A/2)·ugao), S-11 (Excel: broj kao broj).
-- Ostaje: N9, K4/K5/V12 ostaci, TVS_OFFSET_PROOF razdvajanje i dev build, D1–D8, prijedlozi 2–5.
+- 15.11.: K5 (atributi / tekst duži od bafera se skraćuju umjesto pada: SPEC.cpp, MSExcel.cpp), V12 (Misc.inl zatvaranje bloka, `_T("…%s", arg)` u SPEC.cpp, iterator atributa, `setAtribToEnt` bez return), K4 dio: `getBlockName` po id-ju.
+- Ostaje: N9, K4 (Connect.inl: zatvoreni pEnt1/pEnt2 u ConnectWithTap/Wye, addTrans, nextpipe), TVS_OFFSET_PROOF razdvajanje i dev build, D1–D8, prijedlozi 2–5.

@@ -114,6 +114,7 @@ bool addBlock(AcDbEntity * pEnt);
 bool setAtribToEnt(AcDbEntity* pEnt, ACHAR* tag, ACHAR *pVal);
 bool setAtribListToEnt();
 static bool getBlockName(AcDbEntity* pEnt , ACHAR *pName);
+static bool getBlockName(const AcDbObjectId& id , ACHAR *pName);
 };
 
 class SPEClist

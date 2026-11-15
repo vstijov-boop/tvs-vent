@@ -24,4 +24,12 @@ class Small(unittest.TestCase):
   self.assertIn('count = tvsUnits::metres((Radius + SizeA / 2)*Swectangle, this);',text('TVS_Ventilation_DBX/TVS_TAP.cpp'))
  def test_s11_numbers(self):
   s=text('TVS_Ventilation_ARX/MSExcel.cpp');self.assertIn('static bool plainNumber(LPCTSTR t, double& out)',s);self.assertIn('COleVariant oleValue(number);',s)
+class Leftovers(unittest.TestCase):
+ def test_k5_truncate(self):
+  s=text('TVS_Ventilation_ARX/SPEC.cpp');self.assertNotIn('wcscpy_s(pVal,512',s);self.assertNotIn('wcscat_s(sTypeSize',s)
+  self.assertIn('wcsncat_s(achText, pText, _TRUNCATE);',text('TVS_Ventilation_ARX/MSExcel.cpp'))
+ def test_v12(self):
+  s=text('TVS_Ventilation_ARX/SPEC.cpp');self.assertNotIn('%s", LPCTSTR(',s)
+  seg=s[s.index('bool SPEC::setAtribToEnt'):s.index('bool SPEC::setAtribListToEnt')];self.assertEqual(seg.count('delete pAttrIter;'),2);self.assertIn('return false;',seg)
+  m=text('TVS_Ventilation_ARX/commands/Misc.inl');self.assertNotIn('pBlkRef->close();',m);self.assertIn('SPEC::getBlockName(idBlkRef, pName)',m)
 if __name__=='__main__':unittest.main()

@@ -116,9 +116,9 @@
 
 
 				ACHAR pName[512];
-				pBlkRef->close();
+				pBlkRef.close();   // V12: closed through the smart pointer (no use after close, no double close)
 
-				if (SPEC::getBlockName(pBlkRef, pName))
+				if (SPEC::getBlockName(idBlkRef, pName))
 				{
 					if (CheckAtt(pName, TagPos))
 					{
