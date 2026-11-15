@@ -1,7 +1,7 @@
 #pragma once
 #if defined(TVS_BYPASS_PREVIEW) && defined(TVS_OFFSET_INTEGRATION)
 #include "TVSMoveCommand.h"
-#include "TVSTestOffset.h"
+#include "BuildTransaction.h"
 #include "OffsetService.h"
 #include "BypassAssemblyData.h"
 #include "HiddenSpanData.h"

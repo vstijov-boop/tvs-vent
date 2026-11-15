@@ -32,4 +32,22 @@ class Leftovers(unittest.TestCase):
   s=text('TVS_Ventilation_ARX/SPEC.cpp');self.assertNotIn('%s", LPCTSTR(',s)
   seg=s[s.index('bool SPEC::setAtribToEnt'):s.index('bool SPEC::setAtribListToEnt')];self.assertEqual(seg.count('delete pAttrIter;'),2);self.assertIn('return false;',seg)
   m=text('TVS_Ventilation_ARX/commands/Misc.inl');self.assertNotIn('pBlkRef->close();',m);self.assertIn('SPEC::getBlockName(idBlkRef, pName)',m)
+class OffsetProofSplit(unittest.TestCase):
+ def test_helpers_out_of_test_header(self):
+  b=text('TVS_Ventilation_ARX/BuildTransaction.h');t=text('TVS_Ventilation_ARX/TVSTestOffset.h')
+  for d in ('inline AcGePoint3d pt(','inline AcDbObjectId modelId(','class BuildTransaction','inline void initialize('):
+   self.assertIn(d,b);self.assertNotIn(d,t)
+  for h in ('OffsetService.h','SizeFollow.h','OffsetRefit.h','BypassService.h','OffsetIntegrationCommand.h'):
+   self.assertIn('#include "BuildTransaction.h"',text('TVS_Ventilation_ARX/'+h),h)
+ def test_test_offset_only_in_dev(self):
+  e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp');i=e.index('#include "TVSTestOffset.h"')
+  self.assertIn('#if defined(TVS_OFFSET_PROOF)&&defined(TVS_DEV)',e[i-60:i])
+  n=text('TVS_Ventilation_ARX/commands/NewCommands.inl');i=n.index('tvsOffsetProof::create()')
+  self.assertIn('#if defined(TVS_OFFSET_PROOF)&&defined(TVS_DEV)',n[:i]);self.assertNotIn('#ifdef TVS_OFFSET_PROOF',n)
+ def test_release_without_proof(self):
+  for y in ('2020','2022'):
+   w=text('.github/workflows/build-autocad-%s.yml'%y);self.assertNotIn('TVSOffsetProof',w);self.assertNotIn('TVSDev',w)
+   v=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX%s.vcxproj'%y)
+   self.assertIn("Condition=\"'$(TVSDev)'=='true'\"",v);self.assertIn('<PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;%(',v)
+  self.assertIn('/p:TVSDev=true',text('.github/workflows/dev-tvs-dev.yml'))
 if __name__=='__main__':unittest.main()

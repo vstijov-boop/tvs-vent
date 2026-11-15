@@ -1,5 +1,6 @@
 ﻿#pragma once
 #ifdef TVS_OFFSET_INTEGRATION
+#include "BuildTransaction.h"
 #include "OffsetService.h"
 #include "acgiTransient.h"
 #include "dbpl.h"

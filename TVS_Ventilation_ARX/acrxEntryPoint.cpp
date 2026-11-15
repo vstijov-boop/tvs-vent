@@ -30,7 +30,8 @@
 #include "CoordinateInput.h"
 #include "TVSMoveCommand.h"
 #include "AlignCommand.h"
-#ifdef TVS_OFFSET_PROOF
+#include "BuildTransaction.h"   // production helpers (pt, modelId, BuildTransaction)
+#if defined(TVS_OFFSET_PROOF)&&defined(TVS_DEV)
 #include "TVSTestOffset.h"
 #endif
 #include "tdbl.h"

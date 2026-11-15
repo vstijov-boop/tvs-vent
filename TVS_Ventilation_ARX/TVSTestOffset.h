@@ -2,7 +2,7 @@
 #ifndef TVS_OFFSET_PROOF
 #error TVSTestOffset is restricted to explicit development builds
 #endif
-#include "../geometry/OffsetAdapter.h"
+#include "BuildTransaction.h"   // the production part (pt, modelId, BuildTransaction, initialize)
 #include <dbents.h>
 #include <actrans.h>
 #include <vector>
@@ -11,12 +11,7 @@ namespace tvsOffsetProof {
 struct Sample {AcDbObjectId id;AcGePoint3d ma,mc;double f;int number,elbow;};
 struct Session {AcDbDatabase* db;std::vector<Sample> samples;AcDbObjectIdArray created;Session():db(NULL){}};
 inline Session& session(){static Session s;return s;}
-inline AcGePoint3d pt(const tvsOffset::WorldPoint& p){return AcGePoint3d(p.x,p.y,p.z);}
 inline void warning(){acutPrintf(L"\nRazvojni geometrijski test — fizički obračun nagibnog segmenta još nije integrisan. Rezultat nije za specifikaciju.");}
-inline AcDbObjectId modelId(AcDbDatabase* db){
-    AcDbObjectId id;AcDbObjectPointer<AcDbBlockTable> table(db->blockTableId(),AcDb::kForRead);
-    if(table.openStatus()==Acad::eOk)table->getAt(ACDB_MODEL_SPACE,id);return id;
-}
 inline bool emptyModel(AcDbDatabase* db){
     if(db->currentSpaceId()!=modelId(db))return false;
     AcDbObjectPointer<AcDbBlockTableRecord> space(modelId(db),AcDb::kForRead);
@@ -24,30 +19,6 @@ inline bool emptyModel(AcDbDatabase* db){
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return false;
     bool empty=it->done();delete it;return empty;
 }
-class BuildTransaction {
-    AcTransactionManager* manager;bool active;
-public:
-    AcDbBlockTableRecord* space;
-    Acad::ErrorStatus status; // last SDK status on a failed step (diagnostics only)
-    BuildTransaction(AcDbDatabase* db):manager(actrTransactionManager),active(false),space(NULL),status(Acad::eOk){
-        if(!manager||!manager->startTransaction())return;active=true;
-        AcDbObject* object=NULL;
-        status=manager->getObject(object,modelId(db),AcDb::kForWrite);
-        if(status==Acad::eOk)
-            space=AcDbBlockTableRecord::cast(object);
-    }
-    ~BuildTransaction(){if(active)manager->abortTransaction();}
-    bool append(AcDbEntity* entity,AcDbObjectId& id){
-        if(!space){delete entity;return false;}
-        status=space->appendAcDbEntity(id,entity);
-        if(status!=Acad::eOk){delete entity;return false;}
-        status=manager->addNewlyCreatedDBRObject(entity,true);
-        if(status!=Acad::eOk){
-            entity->erase();entity->close();return false;}
-        return true;
-    }
-    bool commit(){if(!active||!space)return false;status=manager->endTransaction();if(status!=Acad::eOk)return false;active=false;return true;}
-};
 inline bool add(BuildTransaction& tx,AcDbEntity* e,Session& s){AcDbObjectId id;
     if(!tx.append(e,id))return false;s.created.append(id);return true;}
 inline bool label(BuildTransaction& tx,Session& s,const AcGePoint3d& p,const CString& text,double f){
@@ -58,11 +29,6 @@ inline bool marker(BuildTransaction& tx,Session& s,const AcGePoint3d& p,int n,in
     AcDbLine* a=new AcDbLine(p-x,p+x);a->setColorIndex(1);if(!add(tx,a,s))return false;
     AcDbLine* b=new AcDbLine(p-y,p+y);b->setColorIndex(1);if(!add(tx,b,s))return false;
     CString text;text.Format(L"C%d P%d",n,port);return label(tx,s,p+AcGeVector3d(45/f,80/f,0),text,f);
-}
-inline void initialize(TVS_Entity* e){
-    e->Direct=0;e->Param=0;e->IsPipe=false;e->ShowText=false;e->Axis=0;
-    e->Form=0;e->activeStatus=false;e->Tag1=NULL;e->Tag2=NULL;
-    e->Type1=0;e->Type2=0;e->connectorInteractionStatus=false;e->connectorCounts=0;
 }
 inline bool pipe(BuildTransaction& tx,Session& s,const AcGePoint3d& a,const AcGePoint3d& b,double f,double elevation,bool wipe,bool axis){
     TVS_Pipe* p=new TVS_Pipe();initialize(p);p->setDatabaseDefaults();p->FirstPoint=a;p->LastPoint=b;

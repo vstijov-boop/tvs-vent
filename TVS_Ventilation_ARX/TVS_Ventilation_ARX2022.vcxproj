@@ -163,12 +163,15 @@
       <ExceptionHandling>Sync</ExceptionHandling>
     </ClCompile>
   </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(TVSDev)'=='true'">   <!-- development build: /p:TVSDev=true (dev-tvs-dev.yml) -->
+    <ClCompile><PreprocessorDefinitions>TVS_DEV;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(TVSOffsetProof)'=='true'">
     <ClCompile><PreprocessorDefinitions>TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
-  <ItemGroup><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="OffsetIntegrationCommand.h" /><ClInclude Include="OffsetService.h" /><ClInclude Include="BypassService.h" /><ClInclude Include="..\geometry\OffsetOperation.h" /><ClInclude Include="OffsetIntegrationReactor.h" /><ClInclude Include="OffsetIntegrationDiagnostics.h" /><ClInclude Include="OffsetSessionState.h" /><ClInclude Include="OffsetSelectionCheck.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
+  <ItemGroup><ClInclude Include="BuildTransaction.h" /><ClInclude Include="TVSTestOffset.h" /><ClInclude Include="OffsetIntegrationCommand.h" /><ClInclude Include="OffsetService.h" /><ClInclude Include="BypassService.h" /><ClInclude Include="..\geometry\OffsetOperation.h" /><ClInclude Include="OffsetIntegrationReactor.h" /><ClInclude Include="OffsetIntegrationDiagnostics.h" /><ClInclude Include="OffsetSessionState.h" /><ClInclude Include="OffsetSelectionCheck.h" /><ClInclude Include="..\geometry\OffsetGeometry.h" /><ClInclude Include="..\geometry\OffsetAdapter.h" /></ItemGroup>
   <ItemDefinitionGroup Condition="'$(TVSOffsetIntegration)'=='true'">
-    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;TVS_OFFSET_PROOF;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+    <ClCompile><PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\GridCtrl_src\GridCell.cpp" />

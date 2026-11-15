@@ -1,5 +1,6 @@
 #pragma once
 #ifdef TVS_OFFSET_INTEGRATION
+#include "BuildTransaction.h"
 #include "OffsetAssemblyData.h"
 #include "TVSMoveCommand.h"
 #include "../geometry/OffsetOperation.h"

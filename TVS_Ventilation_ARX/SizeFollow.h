@@ -11,6 +11,7 @@
 // (new radius, the duct ends follow the elbow ports along their axes). It stops at an etaz,
 // obilazak, T komad, vertical or round elbow it cannot recompute, or an element of another
 // size, and says where.
+#include "BuildTransaction.h"
 #include "TVSMoveCommand.h"
 #include "TransAlignCommand.h"
 #include "TeeCommand.h"

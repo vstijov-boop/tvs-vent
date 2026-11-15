@@ -1,5 +1,4 @@
-﻿#ifdef TVS_OFFSET_PROOF
-#ifdef TVS_OFFSET_INTEGRATION
+﻿#ifdef TVS_OFFSET_INTEGRATION
     static void Ventilation_ARXTVS_OFFSET(){syncTVSGlobalUnits();tvsOffsetIntegration::standalone();}   // jedinice ovog crteža
     // TVS_ETAZ_KOTA: etaz follows a changed duct elevation (run automatically, OffsetRefit.h).
     static void Ventilation_ARXTVS_ETAZ_KOTA(){if(ActivationErrorMessage()!=pError_Ok)return;syncTVSGlobalUnits();tvsOffsetRefit::run();}
@@ -8,6 +7,7 @@
     static void Ventilation_ARXTVS_OFFSET_POLICY(){tvsOffsetDiagnostics::policy();}
     static void Ventilation_ARXTVS_OFFSET_TEST_BAD(){tvsOffsetDiagnostics::corruptTest();}
 #endif
+#if defined(TVS_OFFSET_PROOF)&&defined(TVS_DEV)   // development geometry test (TVSTestOffset.h)
     static void Ventilation_ARXTVS_TEST_OFFSET(){tvsOffsetProof::create();}
     static void Ventilation_ARXTVS_TEST_OFFSET_CHECK(){tvsOffsetProof::check();}
     static void Ventilation_ARXTVS_TEST_OFFSET_FAIL(){tvsOffsetProof::create(true);}
