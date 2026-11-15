@@ -18,4 +18,17 @@ inline bool spansMeet(double c1,double h1,double c2,double h2,double tol){
 inline bool joined(int othersAtPoint,double c1,double h1,double c2,double h2,double tol){
     return othersAtPoint<=1||spansMeet(c1,h1,c2,h2,tol);
 }
+// Neighbour of a port (TVS_DIM_PRATI walk and joints, review D1). Contacts: elements with a port
+// on the same plan point. One contact: a fitting is taken whatever its level (old drawings), a
+// duct only when it meets in height. Several: the one that meets in height.
+// Returns the contact index, FreeEnd, Several (more than one meets) or LevelGap (none meets).
+struct Contact {double level,height;bool fitting;};
+enum {FreeEnd=-1,Several=-2,LevelGap=-3};
+inline int neighbour(const Contact* c,int n,double level,double height,double tol){
+    if(n<=0)return FreeEnd;
+    if(n==1)return (c[0].fitting||spansMeet(level,height,c[0].level,c[0].height,tol))?0:LevelGap;
+    int found=-1,meet=0;
+    for(int i=0;i<n;++i)if(spansMeet(level,height,c[i].level,c[i].height,tol)){found=i;++meet;}
+    return meet==1?found:meet==0?LevelGap:Several;
+}
 }

@@ -41,7 +41,9 @@ class Rules(unittest.TestCase):
   s=text('TVS_Ventilation_ARX/SizeFollow.h')
   self.assertIn('||now.round[k]!=was.round[k])ends|=1<<k;',s)                      # promjena oblika se prati
   self.assertIn('const bool round=old.round[0],reshape=nodes[start].round!=round;',s)
-  self.assertEqual(s.count('if(reshape){stop('),3)                                 # T komad, etaz, obilazak ostaju
+  self.assertEqual(s.count('if(reshape){stop('),2)                                 # etaz, obilazak ostaju
+  self.assertIn('if(reshape&&!(branch&&(r.type==tvsTee::Tap||r.type==tvsTee::Straight))){stop(',s)   # D5b: ogranak stucne / TK0 preuzima oblik
+  self.assertIn('w->ThisRoundotv=round;',s)
   self.assertIn('if(r.convert){t->put_ThisRound(round);',s)                        # koljeno mijenja oblik
   self.assertIn('(end==0?t->ThisRoundp1:t->ThisRoundp2)=round;',s)                 # prelaz na kraju preuzima oblik
  def test_whole_run_setting(self):
@@ -59,4 +61,16 @@ class Rules(unittest.TestCase):
    subprocess.run([str(exe),d],check=True)
    svg=(pathlib.Path(d)/'run1.svg').read_text()
    self.assertIn('#1B6CA5',svg);self.assertIn('#FFE9BF',svg);self.assertIn('T komad',svg)   # izabrani kanal, T komad sa dijalogom, oznaka granice
+class Review2026_11bD(unittest.TestCase):
+ def test_d1_d4_d7_d8(self):
+  s=text('TVS_Ventilation_ARX/SizeFollow.h')
+  self.assertEqual(s.count('neighbourAt(nodes,'),2)                                # D1: walk i joints, isto pravilo
+  self.assertNotIn('std::fabs(nodes[k].elevation-',s)
+  self.assertIn('stop(L"razlika kota")',s)
+  self.assertIn('convertibleElbow(e.object(),nodes[start].a,nodes[start].round)',s)   # D3
+  self.assertIn('// D4: nothing to follow',s)
+  self.assertIn('Dionica nije promijenjena: element dionice je na zaključanom sloju',s)   # D7
+  self.assertLess(s.index('// D7:'),s.index('// write: etazi, elbows'))
+  self.assertIn('stop(L"fleksibilno crijevo")',s)                                 # D8
+  self.assertEqual(s.count('{'),s.count('}'))
 if __name__=='__main__':unittest.main()
