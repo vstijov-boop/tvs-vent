@@ -444,7 +444,7 @@ inline void apply(const Dialog& d){
         w->LengthPl=tvsTee::pantsLengthPl(r.l,w->SizeApr,r.second);}
      else{w->ThisRoundotv=b.tee.round;w->SizeAotv=b.tee.a;w->SizeBotv=b.tee.round?0:b.tee.b;
         if(d.choice==Tap){tvsTeeData::Record was;const bool cone=b.tee.round&&tvsTeeData::read(w.object(),was)&&tvsTeeCommand::conicalOf(was);   // konusna stays konusna
-            tvsTeeCommand::tapRecord(r,w->SizeAotv,b.tee.round,cone,f);w->LengthPl=r.l;}else r.type=0;}
+            tvsTeeCommand::tapRecord(r,w->SizeAotv,b.tee.round,cone,f);r.radius2=tvsTeeCommand::tapMargin(f);w->LengthPl=r.l;}else r.type=0;}
      if(d.flipped)w->Vectpr=-w->Vectpr;
      const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
      if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return;}

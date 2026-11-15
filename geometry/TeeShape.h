@@ -18,17 +18,27 @@ enum Type {Straight=0,Branch=1,Pants=2,Tap=3};   // 0 = existing TVS_WYE drawing
 // Round branch (round = true): cylindrical tap (ASHRAE SR5-11), collar L as above, or conical
 // (cone > 0, SR5-12): cone base diameter `cone` on the main, L = 100 mm (coneLengthMm), sides
 // at 15 deg (coneBase). Record: TVS_TEE_V1 "second" = cone base (0 = cylindrical).
+// margin (record radius2, user 2026-11-15): the main of the stucna reaches only `margin` (25 mm)
+// beyond its footprint on the main (rect: 45 deg entry + w, round: cone base / D); 0 = the old
+// run 2 L + w. TVS_WYE: Basepoint on the branch axis, run ends `before` upstream / `after` down.
 struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
 struct Shape {std::vector<Seg> lines;std::vector<Arc> arcs;std::vector<Seg> axis;};
-struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone;   // round / cone: stucna with a round branch   // e1 / e2: TK-G "vrat", extra straight inlet wall
+struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone,margin;   // round / cone: stucna with a round branch; margin: short run   // e1 / e2: TK-G "vrat", extra straight inlet wall
     // xo: TK-O prolaz axis across the run (+x = branch side; prolaz edge in line with the inlet: +-(a - c))
-    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0),round(false),cone(0){}};   // before branch 1 / 2 (its axis that much farther)
+    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0),round(false),cone(0),margin(0){}};   // before branch 1 / 2 (its axis that much farther)
 inline double pi(){return 3.14159265358979323846;}
 inline double defaultRadius(double w){return 1.5*w;}           // outer radius: centre line R - w/2 = w
 inline double lengthPl(double l,double R,double w){return l+R-w;} // TVS_WYE equivalent
-inline double runLength(const Tee& t){return t.type==Tap?2*t.l+t.w1:2*lengthPl(t.l,t.R1,t.w1)+t.w1;} // inlet->outlet
+inline double tapMarginMm(){return 25;}
+// Stucna run from the branch axis: upstream (before) and downstream (after).
+inline void tapRun(const Tee& t,double& before,double& after){
+    if(t.margin>0){if(t.round){const double h=(t.cone>0?t.cone:t.w1)/2;before=after=t.margin+h;}
+        else{before=t.margin+t.l+t.w1/2;after=t.margin+t.w1/2;}}
+    else before=after=t.l+t.w1/2;
+}
+inline double runLength(const Tee& t){if(t.type==Tap){double b,a;tapRun(t,b,a);return b+a;}return 2*lengthPl(t.l,t.R1,t.w1)+t.w1;} // inlet->outlet
 inline double tapLength(double w,double minimum){return 0.25*w>minimum?0.25*w:minimum;} // SR5-3: L = 0.25 w, >= 75 mm
 inline double coneLengthMm(){return 100;}                        // SR5-12: L = 4 in (100 mm)
 inline double coneBase(double d,double l){return d+2*l*0.26794919243112270;}   // sides at 15 deg
@@ -76,14 +86,14 @@ inline bool shape(const Tee& t,Shape& out){
         // The main looks continuous (SR5-3 sits on an unbroken duct): both walls y = 0..2L+w,
         // no end lines, nothing inside the main. On it the stucna only: 45 deg entry
         // (a,0) -> (a+L,L) upstream, downstream wall at y = L + w, face x = a + L.
-        const double w=t.w1,Lr=2*l+w;
+        const double w=t.w1;double before,after;tapRun(t,before,after);const double Lr=before+after,yc=before,y0=yc-w/2,y1=yc+w/2;
         out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,0),P(a,Lr)));
         if(t.round){   // round branch: cylinder (SR5-11) or cone (SR5-12) from the main wall to the face
-            const double yc=l+w/2,h=t.cone>0?t.cone/2:w/2;
-            out.lines.push_back(Seg(P(a,yc-h),P(a+l,l)));out.lines.push_back(Seg(P(a,yc+h),P(a+l,l+w)));
+            const double h=t.cone>0?t.cone/2:w/2;
+            out.lines.push_back(Seg(P(a,yc-h),P(a+l,y0)));out.lines.push_back(Seg(P(a,yc+h),P(a+l,y1)));
             out.axis.push_back(Seg(P(a,yc),P(a+l,yc)));
-        }else{out.lines.push_back(Seg(P(a,0),P(a+l,l)));out.lines.push_back(Seg(P(a,l+w),P(a+l,l+w)));}
-        out.lines.push_back(Seg(P(a+l,l-f),P(a+l,l+w+f)));
+        }else{out.lines.push_back(Seg(P(a,y0-l),P(a+l,y0)));out.lines.push_back(Seg(P(a,y1),P(a+l,y1)));}
+        out.lines.push_back(Seg(P(a+l,y0-f),P(a+l,y1+f)));
         return true;
     }
     // inlet collar and flange

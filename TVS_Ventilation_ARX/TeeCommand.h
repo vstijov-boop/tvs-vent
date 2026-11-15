@@ -41,6 +41,8 @@ inline void tapRecord(tvsTeeData::Record& r,double branch,bool round,bool conica
     else{r.l=tapLength(branch,f);r.second=0;}
 }
 inline bool conicalOf(const tvsTeeData::Record& r){return r.type==tvsTee::Tap&&r.second>0;}
+// Stucna run margin (record radius2): 25 mm beyond the footprint on the main.
+inline double tapMargin(double f){return tvsTee::tapMarginMm()/f;}
 // Reverse the run direction (TK-O: inlet A <-> outlet C side; TK-G: left <-> right branch).
 // Ports are matched by place, so the duct on each end takes the width of the end now there.
 inline void flip(TVS_WYE* w){
@@ -106,7 +108,7 @@ inline bool chooseType(const AcDbObjectId& id){
         }
         if(_wcsicmp(kw,L"Stucna")==0||(round&&_wcsicmp(kw,L"Konusna")==0)){
             const bool cone=round&&_wcsicmp(kw,L"Konusna")==0;
-            r.type=tvsTee::Tap;tapRecord(r,sizeAotv,round,cone,f);const double L=r.l;
+            r.type=tvsTee::Tap;tapRecord(r,sizeAotv,round,cone,f);r.radius2=tapMargin(f);const double L=r.l;
             {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)return false;
              const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
              w->LengthPl=L;coneLast()=cone;
@@ -195,7 +197,7 @@ inline void applyType(const AcDbObjectId& id,int type,double second,const AcGeVe
      const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
      tvsTeeData::Record r;r.type=type;r.l=tvsTeeData::collarMm()/f;r.second=second;r.radius2=pants?tvsTee::defaultRadius(second):0;
      const double w1=pants?w->SizeApr:w->SizeAotv;
-     if(tap)tapRecord(r,w1,round,second<0,f);
+     if(tap){tapRecord(r,w1,round,second<0,f);r.radius2=tapMargin(f);}
      w->LengthPl=tap?r.l:pants?tvsTee::pantsLengthPl(r.l,w1,second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
      if(tvsTeeData::write(w.object(),r)!=Acad::eOk)return;
      w->recordGraphicsModified();lastType()=type;L=r.l;

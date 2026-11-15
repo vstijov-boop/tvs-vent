@@ -8,6 +8,7 @@
 
 ## Okrugla štucna: valjkasta / konusna (novo, 15.11.) – testirati
 - Okrugli ogranak na pravougaonom kanalu (TVS_TK_TIP komandna linija, Račva, TVS_CONNECTW): `[Stucna/Konusna/Ravni]`. Stucna = valjkasta (ASHRAE SR5-11, L = 0,25 D, min. 75 mm), Konusna = konusna (SR5-12, L = 100 mm, baza konusa D + 2·L·tan 15° ≈ D + 54 mm). Kucano SR5-11 / SR5-12 radi isto.
+- Kraći glavni dio štucne (sve štucne, i pravougaone): kanal štucne ide samo 25 mm preko njenog otiska na kanalu (pravougaona: kosi ulaz + širina ogranka; okrugla: D ili baza konusa). Nove štucne ga dobijaju odmah; postojeće: ponovo izabrati tip Stucna / Konusna (TVS_TK_TIP), susjedni kanali se produže.
 - Crtež: bez kosog ulaza od 45°; valjkasta = dva paralelna zida, konusna = zidovi od baze na kanalu do ogranka. Nema pitanja „strana kosog ulaza“.
 - Promjena prečnika ogranka (TVS_DIM_PRATI, TVS_PROTOK Primijeni, dijalog TVS_TK_TIP): konusna ostaje konusna (nova baza), valjkasta dobija novi L.
 - Specifikacija: „Valjkasta štucna SR5-11“ / „Konusna štucna SR5-12“; TVS_PAD: SR5-11 / SR5-12 (dovod), ER5-2 (odvod).

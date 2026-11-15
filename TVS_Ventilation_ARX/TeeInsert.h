@@ -17,6 +17,8 @@ struct Input {
     int type;                // tvsTee::Branch, tvsTee::Pants or tvsTee::Tap (stucna: l = L)
     double w1,second,l;      // TK-O: branch w1, outlet C; TK-G: right w1, left second; collar l
     double minimum;          // shortest duct that stays before the T komad
+    double margin;           // stucna: run 25 mm beyond its footprint (record radius2), 0 = old 2 L + w
+    Input():A(0),B(0),type(0),w1(0),second(0),l(0),minimum(0),margin(0){}
 };
 struct Plan {
     bool ok;int side;double t;
@@ -42,9 +44,10 @@ inline bool plan(const Input& in,const AcGePoint3d& cursor,Plan& p){
         p.side=c.dotProduct(left)>=0?1:-1;const AcGeVector3d n=p.side>0?left:right;
         t.w1=in.w1;t.C=!tap&&in.second>0?in.second:in.A;t.R1=tvsTee::defaultRadius(in.w1);
         p.SizeApr=in.A;p.SizeAotv=in.w1;p.LengthPl=tap?in.l:tvsTee::lengthPl(in.l,t.R1,in.w1);
-        p.Vectpr=d;p.Vectotv=n;p.Basepoint=p.face+d*(p.LengthPl+in.w1/2);
+        double before=p.LengthPl+in.w1/2,after=before;if(tap){t.margin=in.margin;tvsTee::tapRun(t,before,after);}   // stucna: short run
+        p.Vectpr=d;p.Vectotv=n;p.Basepoint=p.face+d*before;
         p.ey=d;p.ex=n;
-        p.port[0]=p.face+d*(2*p.LengthPl+in.w1);p.portDir[0]=d;p.portWidth[0]=t.C;
+        p.port[0]=p.face+d*(before+after);p.portDir[0]=d;p.portWidth[0]=t.C;
         p.port[1]=p.Basepoint+n*(in.A/2+p.LengthPl);p.portDir[1]=n;p.portWidth[1]=in.w1;
     }else{
         t.w1=in.w1;t.w2=in.second>0?in.second:in.w1;t.R1=tvsTee::defaultRadius(t.w1);t.R2=tvsTee::defaultRadius(t.w2);

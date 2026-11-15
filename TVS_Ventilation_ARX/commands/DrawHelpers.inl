@@ -507,7 +507,7 @@
 		if (!tvsTeeCommand::askWidth(pants ? L"\nSirina desnog ogranka, mm" : L"\nSirina ogranka, mm", in.A * f, w1)) return false;
 		if (!tap && !tvsTeeCommand::askWidth(pants ? L"\nSirina lijevog ogranka, mm" : L"\nSirina izlaza prolaza C, mm", (pants ? w1 / f : in.A) * f, second)) return false;
 		in.w1 = w1 / f; in.second = second / f;
-		if (tap) { in.l = tvsTeeCommand::tapLength(in.w1, f); in.second = 0; }
+		if (tap) { in.l = tvsTeeCommand::tapLength(in.w1, f); in.second = 0; in.margin = tvsTeeCommand::tapMargin(f); }
 		if (pants && !tvsTee::pantsFeasible(in.A, in.w1, in.second, in.l)) {
 			acutPrintf(L"\nGacasti T komad nije moguc: ogranci su preuski za ulaz %.0f mm (potrebno priblizno lijevi + desni >= ulaz).", in.A * f);
 			return false;
@@ -536,7 +536,7 @@
 			AcDbObjectPointer<TVS_WYE> w(wyeId, AcDb::kForWrite);
 			if (w.openStatus() == Acad::eOk) {
 				tvsTeeData::Record r; r.type = in.type; r.l = in.l; r.second = pants ? plan.tee.w2 : tap ? 0 : plan.tee.C;
-				r.radius2 = pants ? tvsTee::defaultRadius(r.second) : 0;
+				r.radius2 = pants ? tvsTee::defaultRadius(r.second) : tap ? in.margin : 0;
 				if (tvsTeeData::write(w.object(), r) == Acad::eOk) w->recordGraphicsModified();
 			}
 		}

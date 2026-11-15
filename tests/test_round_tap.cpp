@@ -23,5 +23,13 @@ int main(){
     yes(base,"cone wall from the base on the main to the branch face");
     yes(area(c,200,0)>0&&area(k,200,0)>area(c,200,0)-1,"areas");
     Tee bad=k;bad.round=false;yes(!valid(bad),"cone only for a round branch");
+    // short run (margin 25): rect stucna 300 wide, L 75 -> before 25+75+150, after 25+150
+    Tee m;m.type=Tap;m.A=400;m.w1=300;m.l=75;m.margin=25;double be=0,af=0;tapRun(m,be,af);
+    yes(eqd(be,250)&&eqd(af,175)&&eqd(runLength(m),425),"rect margin run");
+    Shape ms;yes(shape(m,ms),"rect margin drawn");bool entry=false;
+    for(size_t j=0;j<ms.lines.size();++j){const Seg& g=ms.lines[j];if(eqd(g.a.x,200)&&eqd(g.a.y,25)&&eqd(g.b.x,275)&&eqd(g.b.y,100))entry=true;}
+    yes(entry,"45 deg entry starts 25 mm after the run start");
+    Tee mk=k;mk.margin=25;tapRun(mk,be,af);yes(eqd(be,25+mk.cone/2)&&eqd(af,be),"round margin run symmetric");
+    Tee old=c;tapRun(old,be,af);yes(eqd(be,c.l+c.w1/2)&&eqd(af,be),"old run unchanged");
     if(fails)return 1;std::printf("OK\n");return 0;
 }
