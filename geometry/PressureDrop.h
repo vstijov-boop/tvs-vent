@@ -48,7 +48,7 @@ struct Element {
     double flow;int parent,entry,via; // FlowNetwork: parent, own port to the unit, parent's port
     Element():flow(0),parent(-1),entry(-1),via(-1){}
 };
-struct Options {bool exhaust;double rough,flexRough,rho,nu;Options():exhaust(false),rough(0.15),flexRough(3.0),rho(1.2),nu(15.1e-6){}};
+struct Options {bool exhaust;double rough,flexRough,rho,nu,temperature;Options():exhaust(false),rough(0.15),flexRough(3.0),rho(1.2),nu(15.1e-6),temperature(20){}};   // temperature: the Excel default
 struct Fitting {
     int dionica,element;
     std::wstring what,note,dim,key;   // Element, opis / napomena, dimenzija, ASHRAE key ("" none)
@@ -69,12 +69,13 @@ inline bool same(const Section& x,const Section& y){return x.round==y.round&&std
 inline std::wstring dimText(const Section& s){wchar_t t[48];if(s.round)swprintf(t,48,L"\u00D8%.0f",s.a);else swprintf(t,48,L"%.0fx%.0f",s.a,s.b);return t;}
 inline double area(const Section& s){const double pi=3.14159265358979323846;return s.round?pi*s.a*s.a/4e6:s.a*s.b/1e6;}
 inline double hydraulic(const Section& s){return s.round?s.a:(s.a+s.b>0?2*s.a*s.b/(s.a+s.b):0);}
-// lambda: laminar 64/Re, else Colebrook-White (as tvsDuctSizing::friction)
+// lambda: laminar 64/Re, else Colebrook-White (Serghides explicit; within 1e-4 of the iterated tvsDuctSizing::friction)
 inline double lambdaOf(double re,double roughMm,double dhMm){
     if(!(re>0)||!(dhMm>0))return 0;if(re<2300)return 64/re;
-    const double k=roughMm/1000.0,dh=dhMm/1000.0;double x=1/std::sqrt(0.02);
-    for(int i=0;i<50;++i){const double n=-2*std::log10(k/(3.71*dh)+2.51*x/re);if(std::fabs(n-x)<1e-12){x=n;break;}x=n;}
-    return 1/(x*x);
+    // Colebrook-White by Serghides (1984), the same expression as the sheet's lambda formula
+    const double e=roughMm/(3.7*dhMm);
+    const double A=-2*std::log10(e+12/re),B=-2*std::log10(e+2.51*A/re),C=-2*std::log10(e+2.51*B/re);
+    const double x=A-(B-A)*(B-A)/(C-2*B+A);return 1/(x*x);
 }
 inline void hydraulics(Dionica& d,const Options& o){
     d.rough=d.flex?o.flexRough:o.rough;d.dh=hydraulic(d.s);const double s=area(d.s);

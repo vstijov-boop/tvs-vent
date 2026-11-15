@@ -37,6 +37,7 @@ static std::string utf8(const std::wstring& w){std::string o;for(size_t i=0;i<w.
     else{o+=static_cast<char>(0xE0|(c>>12));o+=static_cast<char>(0x80|((c>>6)&63));o+=static_cast<char>(0x80|(c&63));}}return o;}
 struct U8 {std::ofstream f;explicit U8(const char* n):f(n){}};
 template<class T> U8& operator<<(U8& u,const T& v){std::wostringstream s;s.imbue(std::locale::classic());s<<v;u.f<<utf8(s.str());return u;}
+static bool s0temp(){return true;}
 static void dump(const tvsSheet::Workbook& wb,const char* file){
     U8 o(file);
     for(size_t i=0;i<wb.sheets.size();++i){const tvsSheet::Sheet& s=wb.sheets[i];o<<L"SHEET\t"<<s.name<<L"\n";
@@ -76,7 +77,8 @@ int main(int argc,char** argv){
         eq(r.d[4].rough,3.0,"flex roughness");eq(r.d[0].rough,0.15,"sheet roughness");
         yes(r.d[1].parent==0&&r.d[3].parent==1&&r.d[4].parent==2,"parents");
         const double v=3600/3600.0/0.18;eq(r.d[0].v,v,"v");eq(r.d[0].pd,0.6*v*v,"pd");
-        yes(std::fabs(r.d[0].r-tvsDuctSizing::friction(3600,600,300,false))<1e-9,"R as DuctSizing");
+        yes(std::fabs(r.d[0].r/tvsDuctSizing::friction(3600,600,300,false)-1)<2e-3,"R as DuctSizing (Serghides 3.7 vs iterated 3.71)");
+        yes(s0temp(),"temperature row");
     }
     yes(r.f.size()==4,"4 fittings");
     for(size_t k=0;k<r.f.size();++k){const Fitting& f=r.f[k];yes(f.ok,"computed");
@@ -132,12 +134,13 @@ int main(int argc,char** argv){
     tvsSheet::Workbook wb=tvsSheet::build(r,info,o);
     yes(wb.sheets.size()==3&&wb.sheets[0].name==L"Dionice"&&wb.sheets[1].name==L"Fitinzi"&&wb.sheets[2].name==L"\u0160ema","sheets");
     const tvsSheet::Sheet& s=wb.sheets[0];
-    yes(s.at(11,tvsSheet::cZeta)==L"=SUMIF(Fitinzi!$A:$A,A11,Fitinzi!$E:$E)","SUMIF");
-    yes(s.at(14,tvsSheet::cCum)==L"=T14+U12","cumulative from the parent row");
-    yes(s.at(11,tvsSheet::cMax)==L"=MAX(U11,V12,V13)","max below");
-    yes(s.at(12,tvsSheet::cOver)==L"=MAX(V12,V13)-V12","visak");
-    yes(s.at(14,tvsSheet::cTerm)==L"0"&&s.at(12,tvsSheet::cTerm).empty(),"terminal input only on terminals");
-    yes(s.hidden.size()==2&&s.hidden[0]==tvsSheet::cRe,"Re hidden");
+    yes(s.at(12,tvsSheet::cZeta)==L"=SUMIF(Fitinzi!$A:$A,A12,Fitinzi!$E:$E)","SUMIF");
+    yes(s.at(15,tvsSheet::cCum)==L"=T15+U13","cumulative from the parent row");
+    yes(s.at(12,tvsSheet::cMax)==L"=MAX(U12,V13,V14)","max below");
+    yes(s.at(13,tvsSheet::cOver)==L"=MAX(V13,V14)-V13","visak");
+    yes(s.at(15,tvsSheet::cTerm)==L"0"&&s.at(13,tvsSheet::cTerm).empty(),"terminal input only on terminals");
+yes(s.at(6,2)==L"20"&&s.at(7,2).find(L"=101325/(287.05*($B$6+273.15))")==0&&s.at(12,tvsSheet::cLambda).find(L"=IF(M12<=0")==0,"t, rho and lambda formulas");
+        yes(s.hidden.size()==2&&s.hidden[0]==tvsSheet::cRe,"Re hidden");
     yes(!wb.sheets[2].strokes.empty()&&wb.sheets[2].strokes.size()==r.lines.size(),"schematic lines");
     bool dashed=false;for(size_t k=0;k<wb.sheets[2].strokes.size();++k)dashed|=wb.sheets[2].strokes[k].dash;yes(dashed,"flex dashed");
     if(argc>=3){   // real ASHRAE data: the same network, workbook dumped for the preview

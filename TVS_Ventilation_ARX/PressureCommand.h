@@ -52,13 +52,13 @@ inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
     if(TVS_Pipe* p=TVS_Pipe::cast(e.object())){t.kind=tvsPressure::Duct;t.flex=p->DuctType==DuctTypeFlex;
         t.length=n.ports.size()==2?(n.ports[1]-n.ports[0]).length()*f:0;return true;}
     if(TVS_TAP* p=TVS_TAP::cast(e.object())){
-        double radius=p->Radius;const int type=static_cast<int>(p->ThisRound?p->RadiusTypeRound:p->RadiusTypeRect);
-        if(p->ThisRound?type==RadiusTypeRound_RadiusVariable:type==RadiusTypeRect_RadiusVariable)radius=p->SizeA*p->RadiusVariableParameter;
-        if(p->ThisRound?type==RadiusTypeRound_RadiusConstant:type==RadiusTypeRect_RadiusConstant)radius=p->RadiusConst;
-        if(p->ThisRound?type==RadiusTypeRound_RadiusSpecific:type==RadiusTypeRect_RadiusSpecific)radius=tvsUnits::mm(p->SizeA,p)<355?p->SizeA:p->SizeA/2;
-        t.radius=(radius+p->SizeA/2)*f;t.angle=std::fabs(p->Swectangle)*180.0/3.14159265358979323846;
+        // koljeno gore / dolje (Form_Up / Form_Down): the bend is in the vertical plane, so the side in
+        // it (ASHRAE W) is the height SizeB; get_radius() already takes that side (TVS_TAP.cpp)
+        const bool vertical=!p->ThisRound&&(p->get_Form()==Form_Up||p->get_Form()==Form_Down);
+        const double bend=vertical?p->SizeB:p->SizeA,across=vertical?p->SizeA:p->SizeB;
+        t.radius=(p->get_radius()+bend/2)*f;t.angle=std::fabs(p->Swectangle)*180.0/3.14159265358979323846;
         t.length=t.radius*std::fabs(p->Swectangle);
-        t.sections.assign(2,tvsPressure::Section(p->SizeA*f,p->ThisRound?0:p->SizeB*f,p->ThisRound!=0));
+        t.sections.assign(2,tvsPressure::Section(bend*f,p->ThisRound?0:across*f,p->ThisRound!=0));
         if(n.ports.size()==2){t.line.clear();t.line.push_back(xy(n.ports[0],f));t.line.push_back(tvsPressure::XY(p->MiddlePoint.x*f,p->MiddlePoint.y*f));t.line.push_back(xy(n.ports[1],f));}
         if(p->DuctType==DuctTypeFlex){t.kind=tvsPressure::Duct;t.flex=true;}else t.kind=tvsPressure::Elbow;
         return true;}
@@ -87,6 +87,15 @@ inline void execute(){
     int port=-1;double nearest=0;
     for(size_t p=0;p<net.bodies[root].ports.size();++p){const double d=std::hypot(net.bodies[root].ports[p].x-w[0],net.bodies[root].ports[p].y-w[1]);if(port<0||d<nearest){port=static_cast<int>(p);nearest=d;}}
     std::vector<tvsFlowNetwork::Element> el;tvsFlow::elements(net,el);
+    // koljeno gore / dolje: its ports carry the elevation in z, the duct ends often do not; joined
+    // when they meet in plan (only these elbows, only for this calculation)
+    for(size_t i=0;i<net.bodies.size()&&i<el.size();++i){
+        int only=-1,count=0;for(size_t j=0;j<net.nodes.size();++j)if(net.owner[j]==static_cast<int>(i)){only=static_cast<int>(j);++count;}
+        if(count!=1)continue;
+        {AcDbObjectPointer<TVS_TAP> t(net.nodes[only].id,AcDb::kForRead);if(t.openStatus()!=Acad::eOk||t->get_Form()==Form_Direct)continue;}
+        for(size_t p=0;p<el[i].ports.size();++p){bool done=false;
+            for(size_t k=0;k<el.size()&&!done;++k){if(k==i)continue;
+                for(size_t q=0;q<el[k].ports.size();++q){if(std::hypot(el[k].ports[q].x-el[i].ports[p].x,el[k].ports[q].y-el[i].ports[p].y)<=tol&&std::fabs(el[k].ports[q].z-el[i].ports[p].z)>tol){el[i].ports[p].z=el[k].ports[q].z;done=true;break;}}}}}
     const tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}
     int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;

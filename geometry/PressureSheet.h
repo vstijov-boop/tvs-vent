@@ -36,6 +36,14 @@ inline std::wstring cell(int c,int r){return col(c)+std::to_wstring(r);}
 inline std::wstring text(const std::wstring& s){return L"'"+s;}
 inline std::wstring num(double v,int decimals){wchar_t b[64];swprintf(b,64,L"%.*f",decimals,v);std::wstring s=b;if(s==L"-0"||s.compare(0,3,L"-0.")==0){bool zero=true;for(size_t i=1;i<s.size();++i)if(s[i]!=L'0'&&s[i]!=L'.')zero=false;if(zero)s.erase(0,1);}return s;}
 struct Info {std::wstring project,system,date,source;};
+// lambda in Excel: laminar 64/Re, else Colebrook-White by Serghides (1984) explicit form (as lambdaOf)
+inline std::wstring lambdaFormula(const std::wstring& re,const std::wstring& k,const std::wstring& dh){
+    const std::wstring e=L"("+k+L"/(3.7*"+dh+L"))";
+    const std::wstring A=L"(-2*LOG10("+e+L"+12/"+re+L"))";
+    const std::wstring B=L"(-2*LOG10("+e+L"+2.51*"+A+L"/"+re+L"))";
+    const std::wstring C=L"(-2*LOG10("+e+L"+2.51*"+B+L"/"+re+L"))";
+    return L"=IF("+re+L"<=0,0,IF("+re+L"<2300,64/"+re+L",1/("+A+L"-("+B+L"-"+A+L")^2/("+C+L"-2*"+B+L"+"+A+L"))^2))";
+}
 // columns of "Dionice"
 enum {cNo=1,cFrom,cTo,cQ,cDim,cA,cB,cDh,cL,cK,cV,cPd,cRe,cLambda,cR,cRL,cZeta,cZ,cTerm,cDp,cCum,cMax,cOver,cCrit,cLast=cCrit};
 inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPressure::Options& o){
@@ -44,14 +52,19 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
     // ---- Dionice ----
     Sheet& s=wb.sheets[0];s.name=L"Dionice";
     s.put(1,1,text(L"TVS_VENT \u00B7 Pad pritiska po dionicama"));{Format f;f.range=L"A1";f.bold=true;f.size=14;f.font=navy;s.format(f);}
-    const int rhoRow=6,nuRow=7;
+    const int tRow=6,rhoRow=7,nuRow=8;   // t typed by the user (smoke extraction: hot gas); rho, nu from t
     const std::wstring infoRows[][2]={{L"Projekat",info.project},{L"Sistem",info.system},{L"Datum",info.date}};
     for(int i=0;i<3;++i){s.put(3+i,1,text(infoRows[i][0]));s.put(3+i,2,text(infoRows[i][1]));}
-    s.put(rhoRow,1,text(L"\u03C1, kg/m\u00B3"));s.put(rhoRow,2,num(o.rho,3));
-    s.put(nuRow,1,text(L"\u03BD, 10\u207B\u2076 m\u00B2/s"));s.put(nuRow,2,num(o.nu*1e6,2));{Format f;f.range=cell(2,nuRow);f.number=L"0.0";f.align=-1;s.format(f);}{Format f;f.range=cell(2,rhoRow);f.number=L"0.00";f.align=-1;s.format(f);}
-    s.put(8,1,text(L"Prora\u010Dun"));s.put(8,2,text(L"R: Darcy-Weisbach + Colebrook (k lim "+num(o.rough,2)+L" mm, fleks "+num(o.flexRough,1)+L" mm); Z = \u03A3\u03B6 \u00B7 pd; \u03B6: ASHRAE DFDB"+(info.source.empty()?L"":L" ("+info.source+L")")));
-    {Format f;f.range=L"A3:A8";f.bold=true;f.size=10;f.font=blue;s.format(f);}
-    const int h=10,first=h+1,last=h+static_cast<int>(r.d.size());
+    const std::wstring T=L"($B$"+std::to_wstring(tRow)+L"+273.15)";
+    s.put(tRow,1,text(L"t vazduha, \u00B0C"));s.put(tRow,2,num(o.temperature,0));s.put(tRow,3,text(L"\u2190 upi\u0161ite (odimljavanje: temperatura dima); \u03C1 i \u03BD se ra\u010Dunaju, Q je pri toj temperaturi"));
+    s.put(rhoRow,1,text(L"\u03C1, kg/m\u00B3"));s.put(rhoRow,2,L"=101325/(287.05*"+T+L")");
+    s.put(nuRow,1,text(L"\u03BD, 10\u207B\u2076 m\u00B2/s"));s.put(nuRow,2,L"=1.458E-6*"+T+L"^1.5/("+T+L"+110.4)/$B$"+std::to_wstring(rhoRow)+L"*1E6");
+    {Format f;f.range=cell(2,tRow);f.number=L"0";f.align=-1;f.fill=yellow;f.bold=true;s.format(f);}
+    {Format f;f.range=cell(3,tRow);f.italic=true;f.size=9;f.font=grey;s.format(f);}
+    {Format f;f.range=cell(2,nuRow);f.number=L"0.00";f.align=-1;s.format(f);}{Format f;f.range=cell(2,rhoRow);f.number=L"0.000";f.align=-1;s.format(f);}
+    s.put(9,1,text(L"Prora\u010Dun"));s.put(9,2,text(L"R: Darcy-Weisbach, \u03BB Colebrook (Serghides); \u03C1 = p/(R\u00B7T), \u03BC Sutherland (k lim "+num(o.rough,2)+L" mm, fleks "+num(o.flexRough,1)+L" mm); Z = \u03A3\u03B6 \u00B7 pd; \u03B6: ASHRAE DFDB"+(info.source.empty()?L"":L" ("+info.source+L")")));
+    {Format f;f.range=L"A3:A9";f.bold=true;f.size=10;f.font=blue;s.format(f);}
+    const int h=11,first=h+1,last=h+static_cast<int>(r.d.size());
     const wchar_t* head[]={L"Dionica",L"Od",L"Do",L"Q\nm\u00B3/h",L"Dimenzija\nmm",L"a\nmm",L"b\nmm",L"Dh\nmm",L"L\nm",L"k\nmm",L"v\nm/s",L"pd\nPa",L"Re",L"\u03BB",L"R\nPa/m",L"R\u00B7L\nPa",L"\u03A3\u03B6",L"Z\nPa",L"\u0394p kraj.\nelem. Pa",L"\u0394p\ndionice Pa",L"\u0394p od\njedinice Pa",L"max\nispod",L"Vi\u0161ak\nPa",L"Kriti\u010Dna"};
     for(int c=cNo;c<=cLast;++c)s.put(h,c,text(head[c-1]));
     {Format f;f.range=cell(cNo,h)+L":"+cell(cLast,h);f.bold=true;f.font=rgb(255,255,255);f.fill=navy;f.align=1;f.wrap=true;f.border=true;f.size=10;s.format(f);}
@@ -69,7 +82,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         s.put(row,cV,d.s.round?L"="+cell(cQ,row)+L"/3600/(PI()*"+cell(cA,row)+L"^2/4000000)":L"="+cell(cQ,row)+L"/3600/("+cell(cA,row)+L"*"+cell(cB,row)+L"/1000000)");
         s.put(row,cPd,L"=$B$"+std::to_wstring(rhoRow)+L"/2*"+cell(cV,row)+L"^2");
         s.put(row,cRe,L"="+cell(cV,row)+L"*"+cell(cDh,row)+L"/1000/($B$"+std::to_wstring(nuRow)+L"*1E-6)");
-        s.put(row,cLambda,num(d.lambda,5));
+        s.put(row,cLambda,lambdaFormula(cell(cRe,row),cell(cK,row),cell(cDh,row)));   // follows t (Re)
         s.put(row,cR,L"=IF("+cell(cDh,row)+L">0,"+cell(cLambda,row)+L"/("+cell(cDh,row)+L"/1000)*"+cell(cPd,row)+L",0)");
         s.put(row,cRL,L"="+cell(cR,row)+L"*"+cell(cL,row));
         s.put(row,cZeta,L"=SUMIF(Fitinzi!$A:$A,"+cell(cNo,row)+L",Fitinzi!$E:$E)");
