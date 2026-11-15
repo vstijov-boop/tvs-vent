@@ -125,7 +125,7 @@ inline std::map<std::string,double> seedJunction(const std::vector<tvsAshrae::Pa
     for(size_t i=0;i<ps.size();++i){const tvsAshrae::Param& p=ps[i];double v=p.def;
         const char role=p.var.size()>1?static_cast<char>(lower(p.var.substr(1,1))[0]):'c';
         const Section& sec=role=='b'?b:role=='s'?s:c;const double q=role=='b'?qb:role=='s'?qs:qc;
-        if(tvsAshrae::isFlow(p)){if(q>0)v=q/3.6;}
+        if(tvsAshrae::isFlow(p))v=q>0?q/3.6:0;   // a closed leg is Q = 0, not the default
         else{const char first=p.var[0];const double x=dimOf(sec,first);if(x>0)v=x;}
         in[p.var]=v;}
     return in;
@@ -204,11 +204,18 @@ private:
             if(d.parent<0){d.from=L"J";const Element& x=e[d.elements[0]];if(x.entry>=0&&x.entry<static_cast<int>(x.at.size()))d.fromAt=x.at[x.entry];}
             else{d.from=r.d[d.parent].to;d.fromAt=r.d[d.parent].toAt;}}
     }
-    void add(Result& r,int dionica,int element,const std::wstring& what,const std::wstring& note,const Section& s,const std::string& key,const std::map<std::string,double>& in,bool main,double pvOwn){
+    void add(Result& r,int dionica,int element,const std::wstring& what,const std::wstring& note,const Section& s,const std::string& key,std::map<std::string,double> in,bool main,double pvOwn,bool capped=false){
         Fitting f;f.dionica=dionica;f.element=element;f.what=what;f.note=note;f.dim=dimText(s);f.key=wide(key);
         if(key.empty()){f.note+=note.empty()?L"nema ASHRAE komada \u2013 unesite \u03B6":L"; nema ASHRAE komada \u2013 unesite \u03B6";r.f.push_back(f);return;}
         if(!eng_||!eng_->loaded()||!eng_->has(key)){f.note+=(f.note.empty()?L"":L"; ")+std::wstring(L"ASHRAE podaci nisu u\u010Ditani \u2013 unesite \u03B6");r.f.push_back(f);return;}
-        std::vector<std::string> w;const tvsAshrae::Engine::Loss l=eng_->loss(key,in,main,&w);
+        std::vector<std::string> w;tvsAshrae::Engine::Loss l=eng_->loss(key,in,main,&w);
+        if(capped){   // the closed leg has Q = 0: below the first table column (0.01), not a real warning
+            std::vector<std::string> keep;for(size_t k=0;k<w.size();++k)if(w[k].find("=0 van")==std::string::npos)keep.push_back(w[k]);w.swap(keep);
+            if(!std::isfinite(l.c)||std::fabs(l.c)>20){   // some tables (ED5-3) are unusable at Qb/Qc = 1: take 0.9
+                double top=0;const std::vector<tvsAshrae::Param>& ps=eng_->params(key);
+                for(size_t k=0;k<ps.size();++k)if(tvsAshrae::isFlow(ps[k])&&in.count(ps[k].var)&&in[ps[k].var]>top)top=in[ps[k].var];
+                for(size_t k=0;k<ps.size();++k)if(tvsAshrae::isFlow(ps[k])&&in.count(ps[k].var)&&!(in[ps[k].var]>0))in[ps[k].var]=top/9;
+                w.clear();l=eng_->loss(key,in,main,&w);f.note+=L"; ASHRAE tabela na Qb/Qc = 1 nije upotrebljiva \u2013 uzeto Qb/Qc = 0,9";}}
         if(key=="ER5-2"||key=="ER5-3"){   // tables for one geometry only: Ab / Ac = 0.5
             const double ac=(in.count("H")?in.at("H"):0)*(in.count("W")?in.at("W"):0);
             const double ab=in.count("Db")?3.14159265358979323846*in.at("Db")*in.at("Db")/4:(in.count("Hb")?in.at("Hb"):0)*(in.count("Wb")?in.at("Wb"):0);
@@ -266,7 +273,7 @@ private:
                     const double s=area(port(x,leg)),v=s>0?q[leg]/3600.0/s:0;pv=o_.rho*v*v/2;
                     if(x.flow>0&&std::fabs(q[leg]/x.flow-0.5)>0.1)note+=L", ASHRAE pretpostavlja jednaku podjelu protoka";}
                 else in=seedJunction(eng_->params(key),common,port(x,branchPort),port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}
-            add(r,c==i?of[i]:of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv);}
+            add(r,c==i?of[i]:of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv,!capped.empty());}
     }
 };
 }

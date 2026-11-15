@@ -158,7 +158,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         for(size_t i=0;i<r.d.size();++i){const tvsPressure::Dionica& d=r.d[i];
             const std::wstring names[2]={d.from,d.to};const tvsPressure::XY at[2]={d.fromAt,d.toAt};
             for(int k=0;k<2;++k){bool dup=false;for(size_t j=0;j<seen.size();++j)if(seen[j]==names[k])dup=true;if(dup)continue;seen.push_back(names[k]);
-                Label t;t.x=X(at[k].x)+3;t.y=Y(at[k].y)+2;t.text=names[k];t.size=8;t.color=grey;t.bold=false;g.labels.push_back(t);}}
+                Label t;t.x=X(at[k].x)+4;t.y=Y(at[k].y)-13;t.text=names[k];t.size=8;t.color=grey;t.bold=false;g.labels.push_back(t);}}
     }
     return wb;
 }
