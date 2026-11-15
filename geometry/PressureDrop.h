@@ -16,7 +16,7 @@
 //   SR4-1 (one side kept) / SR4-2 / SD4-1 / SR4-3 round->rect / SD4-2 rect->round; exhaust ER4-1 /
 //   ER4-2 / ED4-1 / ED4-2 / ER4-3. T komad (common = the port towards the unit; branch = port 2):
 //   supply TK0 SR5-5, TK-O SR5-1, stucna SR5-13 (user 2026-11-14), round branch SR5-11, TK-G SR5-14, round main SD5-9;
-//   exhaust ER5-1, stucna ER5-3, round branch ER5-2, TK-G ER5-4, round main ED5-3. The branch loss goes to the
+//   exhaust ER5-1 (TK-O), TK0 and stucna outside Ab/Ac 0.4..0.6 Idelchik (sharp T), stucna ER5-3, round branch ER5-2, TK-G ER5-4, round main ED5-3. The branch loss goes to the
 //   dionica of the branch, the straight (main) loss to the dionica of the prolaz. Every loss is
 //   given as zeta on the pd of its dionica (zeta = dp / pd), so Z = sum(zeta) * pd in the sheet.
 #include "AshraeEngine.h"
@@ -130,6 +130,13 @@ inline std::map<std::string,double> seedJunction(const std::vector<tvsAshrae::Pa
         in[p.var]=v;}
     return in;
 }
+// Idelchik, converging sharp 90 deg T, As = Ac (Handbook of Hydraulic Resistance, ch. 7; C on Vc):
+// q = Qb/Qc, beta = Ab/Ac
+inline double idelchikBranch(double q,double beta){
+    const double k=beta<=0.35?1.0:(q<=0.4?0.9*(1-q):0.55);
+    return k*(1+(q/beta)*(q/beta)-2*(1-q)*(1-q));
+}
+inline double idelchikStraight(double q){return 1.55*q-q*q;}
 inline std::wstring wide(const std::string& s){return std::wstring(s.begin(),s.end());}
 inline std::wstring notes(const std::vector<std::string>& w){   // engine warnings are UTF-8
     std::wstring o;
@@ -264,6 +271,20 @@ private:
         else if(!pants&&child[straightPort]<0&&child[branchPort]>=0)capped=L", prolaz zatvoren (\u010Dep)";
         else if(!pants&&child[branchPort]<0&&child[straightPort]>=0)capped=L", ogranak zatvoren (\u010Dep)";
         const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,branchPort));
+        // exhaust, rectangular, TK0 / stucna outside ER5-3 (Ab/Ac 0.4..0.6): Idelchik, sharp T (user 2026-11-15)
+        {const Section& br=port(x,branchPort);const double ac=area(common),beta=ac>0?area(br)/ac:0;
+         if(o_.exhaust&&!pants&&!common.round&&!br.round&&beta>0&&(t.tee==TeePlain||(t.tee==TeeTap&&(beta<0.4||beta>0.6)))){
+            const double vc=ac>0?x.flow/3600.0/ac:0,pvc=o_.rho*vc*vc/2,q2=x.flow>0?q[branchPort]/x.flow:0;
+            const double as=area(port(x,straightPort));
+            for(int leg=0;leg<3;++leg){const int c=child[leg];if(c<0)continue;const bool main=leg==straightPort;
+                const double cc=main?idelchikStraight(q2):idelchikBranch(q2,beta);
+                Fitting f;f.dionica=c==i?of[i]:of[c];f.element=i;f.what=main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak";f.dim=dimText(port(x,leg));
+                f.key=L"Idelchik";f.c=cc;f.dp=cc*pvc;f.ok=std::isfinite(f.dp);const double pd=r.d[f.dionica].pd;f.zeta=pd>0&&f.ok?f.dp/pd:0;
+                wchar_t t2[96];swprintf(t2,96,L", Ab/Ac = %.2f, Qb/Qc = %.2f",beta,q2);for(wchar_t* z=t2;*z;++z)if(*z==L'.')*z=L',';
+                f.note=type+(main?L", prolaz":L", ogranak")+capped+t2+L"; Idelchik o\u0161tar T (As = Ac), C na Vc \u2013 za pravougaoni spoj vjerovatno potcijenjeno (SMACNA pri Ab/Ac 0,5 daje 30\u201350 % vi\u0161e)";
+                if(ac>0&&std::fabs(as/ac-1)>0.05)f.note+=L"; As \u2260 Ac \u2013 izvan formule, ra\u010Dunato kao As = Ac";
+                r.f.push_back(f);}
+            return;}}
         for(int leg=0;leg<3;++leg){const int c=child[leg];if(c<0)continue;
             const bool main=!pants&&leg==straightPort;
             std::map<std::string,double> in;double pv=0;std::wstring note=type+(main?L", prolaz":L", ogranak")+capped;

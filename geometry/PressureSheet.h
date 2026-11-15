@@ -114,14 +114,14 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
     s.widths.assign(widths,widths+cLast);s.hidden.push_back(cRe);s.hidden.push_back(cMax);s.freeze=cell(2,first);
     // ---- Fitinzi ----
     Sheet& f=wb.sheets[1];f.name=L"Fitinzi";
-    const wchar_t* fh[]={L"Dionica",L"Element",L"Opis",L"Dimenzija",L"\u03B6 (pd dionice)",L"Izvor",L"C ASHRAE",L"\u0394p, Pa",L"Napomena"};
+    const wchar_t* fh[]={L"Dionica",L"Element",L"Opis",L"Dimenzija",L"\u03B6 (pd dionice)",L"Izvor",L"C (izvor)",L"\u0394p, Pa",L"Napomena"};
     for(int c=1;c<=9;++c)f.put(1,c,text(fh[c-1]));
     {Format x;x.range=L"A1:I1";x.bold=true;x.font=rgb(255,255,255);x.fill=navy;x.align=1;x.border=true;x.size=10;x.wrap=true;f.format(x);}
     std::vector<size_t> order;for(size_t k=0;k<r.f.size();++k)order.push_back(k);
     for(size_t a=1;a<order.size();++a){const size_t x=order[a];size_t j=a;while(j>0&&r.d[r.f[order[j-1]].dionica].number>r.d[r.f[x].dionica].number){order[j]=order[j-1];--j;}order[j]=x;}
     for(size_t k=0;k<order.size();++k){const tvsPressure::Fitting& x=r.f[order[k]];const int row=2+static_cast<int>(k);
         f.put(row,1,num(r.d[x.dionica].number,0));f.put(row,2,text(x.what));f.put(row,3,text(x.note.empty()?std::wstring():x.note));f.put(row,4,text(x.dim));
-        f.put(row,5,num(x.zeta,4));f.put(row,6,text(x.key.empty()?std::wstring(L"\u2013"):L"ASHRAE "+x.key));
+        f.put(row,5,num(x.zeta,4));f.put(row,6,text(x.key.empty()?std::wstring(L"\u2013"):(x.key==L"Idelchik"?x.key:L"ASHRAE "+x.key)));
         if(x.ok)f.put(row,7,num(x.c,4));
         f.put(row,8,L"=E"+std::to_wstring(row)+L"*INDEX(Dionice!$"+col(cPd)+L":$"+col(cPd)+L",MATCH(A"+std::to_wstring(row)+L",Dionice!$A:$A,0))");
         if(!x.ok){Format y;y.range=L"E"+std::to_wstring(row);y.fill=yellow;f.format(y);}}

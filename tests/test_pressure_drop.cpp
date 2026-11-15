@@ -91,6 +91,13 @@ int main(int argc,char** argv){
         Result t=calc.run(n2,0);yes(t.d.size()==1&&t.d[0].terminal,"one dionica, terminal");
         yes(t.d[0].to==L"T1","terminal stucna is a T node");yes(t.f.size()==1&&t.f[0].ok&&t.f[0].what.find(L"ogranak")!=std::wstring::npos&&t.f[0].note.find(L"\u010Dep")!=std::wstring::npos,"capped stucna computed");
         if(!t.f.empty())eq(t.f[0].dp,0.9*(500/3.6)/100,"Qb = the whole flow");}
+    {   // exhaust TK0: Idelchik sharp T (C on Vc)
+        eq(idelchikBranch(0.3,0.2),2.27,"Idelchik Cb beta 0.2");eq(idelchikStraight(0.3),0.375,"Idelchik Cs");eq(idelchikBranch(0.5,0.5),0.825,"Idelchik K 0.55");
+        std::vector<Element> n3=network();n3[3].parts[0].tee=TeePlain;Options ox;ox.exhaust=true;Calculator cx(&e,ox);Result t=cx.run(n3,0);
+        int idel=0;for(size_t k=0;k<t.f.size();++k)if(t.f[k].key==L"Idelchik"){++idel;yes(t.f[k].ok&&t.f[k].note.find(L"potcijenjeno")!=std::wstring::npos,"Idelchik note");
+            const double q=1200/3600.0,beta=0.09/0.18,vc=1.0/0.18,pvc=0.6*vc*vc;
+            if(t.f[k].what.find(L"ogranak")!=std::wstring::npos)eq(t.f[k].dp,idelchikBranch(q,beta)*pvc,"Idelchik branch dp");else eq(t.f[k].dp,idelchikStraight(q)*pvc,"Idelchik main dp");}
+        yes(idel==2,"two Idelchik legs");}
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");
