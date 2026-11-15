@@ -15,7 +15,7 @@
 //   (D <= 250), other round angles: no ASHRAE piece (zeta typed by the user). Prelaz: supply
 //   SR4-1 (one side kept) / SR4-2 / SD4-1 / SR4-3 round->rect / SD4-2 rect->round; exhaust ER4-1 /
 //   ER4-2 / ED4-1 / ED4-2 / ER4-3. T komad (common = the port towards the unit; branch = port 2):
-//   supply TK0 SR5-5, TK-O SR5-1, stucna SR5-13 (user 2026-11-14), round branch SR5-11, TK-G SR5-14, round main SD5-9;
+//   supply TK0 SR5-5 (branch of another height: KanCalc 0.7 / 0.6, below), round stucna SR5-11 / conical SR5-12, TK-O SR5-1, stucna SR5-13 (user 2026-11-14), round branch SR5-11, TK-G SR5-14, round main SD5-9;
 //   exhaust ER5-1 (TK-O), TK0 and stucna outside Ab/Ac 0.4..0.6 Idelchik (sharp T), stucna ER5-3, round branch ER5-2, TK-G ER5-4, round main ED5-3. The branch loss goes to the
 //   dionica of the branch, the straight (main) loss to the dionica of the prolaz. Every loss is
 //   given as zeta on the pd of its dionica (zeta = dp / pd), so Z = sum(zeta) * pd in the sheet.
@@ -35,9 +35,10 @@ struct Part {
     double length;        // mm: duct, prelaz; elbow: the axis arc (computed when 0)
     double angle,radius;  // elbow: deflection (deg), axis radius (mm)
     int tee;              // TeeType
+    bool cone;            // stucna with a round conical branch (SR5-12)
     std::vector<Section> sections;   // per port (a single part: the element's ports)
     std::vector<XY> line;            // plan polyline for the schematic, mm
-    Part():kind(Other),flex(false),length(0),angle(0),radius(0),tee(TeePlain){}
+    Part():kind(Other),flex(false),length(0),angle(0),radius(0),tee(TeePlain),cone(false){}
 };
 struct Element {
     std::vector<Part> parts;          // one, or the members of an etaz / obilazak
@@ -93,10 +94,10 @@ inline std::string transitionKey(bool exhaust,const Section& up,const Section& d
     const bool oneSide=std::fabs(up.a-down.a)<0.5||std::fabs(up.b-down.b)<0.5;
     return exhaust?(oneSide?"ER4-1":"ER4-2"):(oneSide?"SR4-1":"SR4-2");
 }
-inline std::string junctionKey(bool exhaust,int tee,const Section& common,const Section& branch){
+inline std::string junctionKey(bool exhaust,int tee,const Section& common,const Section& branch,bool cone=false){
     if(common.round)return branch.round?(exhaust?"ED5-3":"SD5-9"):std::string();
     if(tee==TeePants)return exhaust?"ER5-4":"SR5-14";
-    if(branch.round)return exhaust?"ER5-2":"SR5-11";
+    if(branch.round)return exhaust?"ER5-2":cone?"SR5-12":"SR5-11";   // round tap: cylindrical / conical
     if(exhaust)return tee==TeeTap?"ER5-3":"ER5-1";   // stucna: 45 deg entry branch (ASHRAE: Ab/Ac = 0.5, As = Ac)
     return tee==TeePlain?"SR5-5":tee==TeeBranch?"SR5-1":"SR5-13";   // TK0 plain tee, TK-O smooth radius, stucna 45 deg entry
 }
@@ -156,6 +157,24 @@ inline double idelchikStraight(double q){
     static const double Q[11]={0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0};
     static const double C[11]={0.0,0.16,0.27,0.38,0.46,0.53,0.57,0.59,0.6,0.59,0.55};
     int j;double v;idelchikLerp(Q,11,q,j,v);return C[j]*(1-v)+C[j+1]*v;
+}
+// Idelchik, diverging sharp 90 deg T (KanCalc LOCalc 0.7 branch: beta = Ab/Ac 0.1..0.8, q = Qb/Qc
+// 0.1..0.9; 0.6 straight: Vs/Vc 0..1); C on Vc, bilinear, clamped.
+inline double idelchikDivBranch(double q,double beta){
+    static const double B[8]={0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8};
+    static const double Q[9]={0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9};
+    static const double C[8][9]={
+        {2.1,4.8,8.9,14.0,14.0,14.0,14.0,14.0,14.0},{1.3,1.9,2.9,4.1,6.2,8.5,11.0,11.0,11.0},
+        {1.1,1.4,1.8,2.3,3.2,4.3,5.5,6.9,8.5},{0.99,1.1,1.3,1.5,1.7,2.0,2.4,3.0,3.6},
+        {0.97,1.0,1.1,1.2,1.4,1.5,1.8,2.1,2.5},{0.96,0.97,1.0,1.1,1.1,1.2,1.4,1.7,2.0},
+        {0.95,0.94,0.95,0.98,1.0,1.1,1.2,1.4,1.9},{0.95,0.92,0.92,0.93,0.94,0.95,1.1,1.2,1.4}};
+    int i,j;double u,v;idelchikLerp(B,8,beta,i,u);idelchikLerp(Q,9,q,j,v);
+    return C[i][j]*(1-u)*(1-v)+C[i][j+1]*(1-u)*v+C[i+1][j]*u*(1-v)+C[i+1][j+1]*u*v;
+}
+inline double idelchikDivStraight(double vsvc){
+    static const double X[9]={0,0.1,0.2,0.3,0.4,0.5,0.6,0.8,1.0};
+    static const double C[9]={0.4,0.32,0.26,0.2,0.14,0.1,0.06,0.02,0.0};
+    int j;double v;idelchikLerp(X,9,vsvc,j,v);return C[j]*(1-v)+C[j+1]*v;
 }
 inline std::wstring wide(const std::string& s){return std::wstring(s.begin(),s.end());}
 inline std::wstring notes(const std::vector<std::string>& w){   // engine warnings are UTF-8
@@ -290,19 +309,22 @@ private:
         if(!pants&&kids[i].empty()){q[branchPort]=x.flow;child[branchPort]=i;capped=L", kraj mre\u017Ee: izlaz kroz ogranak, prolaz zatvoren (\u010Dep)";}
         else if(!pants&&child[straightPort]<0&&child[branchPort]>=0)capped=L", prolaz zatvoren (\u010Dep)";
         else if(!pants&&child[branchPort]<0&&child[straightPort]>=0)capped=L", ogranak zatvoren (\u010Dep)";
-        const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,branchPort));
+        const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,branchPort),t.cone);
         // exhaust, rectangular, TK0 / stucna outside ER5-3 (Ab/Ac 0.4..0.6): Idelchik, sharp T (user 2026-11-15)
         {const Section& br=port(x,branchPort);const double ac=area(common),beta=ac>0?area(br)/ac:0;
-         if(o_.exhaust&&!pants&&!common.round&&!br.round&&beta>0&&(t.tee==TeePlain||(t.tee==TeeTap&&(beta<0.4||beta>0.6)))){
+         // supply TK0 whose branch height differs from the run: SR5-5 assumes Hb = H -> KanCalc 0.7 / 0.6
+         const bool divIdel=!o_.exhaust&&!pants&&t.tee==TeePlain&&!common.round&&!br.round&&beta>0&&std::fabs(br.b-common.b)>=0.5;
+         if(divIdel||(o_.exhaust&&!pants&&!common.round&&!br.round&&beta>0&&(t.tee==TeePlain||(t.tee==TeeTap&&(beta<0.4||beta>0.6))))){
             const double vc=ac>0?x.flow/3600.0/ac:0,pvc=o_.rho*vc*vc/2,q2=x.flow>0?q[branchPort]/x.flow:0;
-            const double as=area(port(x,straightPort));
+            const double as=area(port(x,straightPort)),vs=as>0?q[straightPort]/3600.0/as:0,vsvc=vc>0?vs/vc:0;
             for(int leg=0;leg<3;++leg){const int c=child[leg];if(c<0)continue;const bool main=leg==straightPort;
-                const double cc=main?idelchikStraight(q2):idelchikBranch(q2,beta);
+                const double cc=divIdel?(main?idelchikDivStraight(vsvc):idelchikDivBranch(q2,beta)):(main?idelchikStraight(q2):idelchikBranch(q2,beta));
                 Fitting f;f.dionica=c==i?of[i]:of[c];f.element=i;f.what=main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak";f.dim=dimText(port(x,leg));
                 f.key=L"Idelchik";f.c=cc;f.dp=cc*pvc;f.ok=std::isfinite(f.dp);const double pd=r.d[f.dionica].pd;f.zeta=pd>0&&f.ok?f.dp/pd:0;
                 wchar_t t2[96];swprintf(t2,96,L", Ab/Ac = %.2f, Qb/Qc = %.2f",beta,q2);for(wchar_t* z=t2;*z;++z)if(*z==L'.')*z=L',';
-                f.note=type+(main?L", prolaz":L", ogranak")+capped+t2+L"; Idelchik o\u0161tar T (As = Ac, tabela kao KanCalc 1.7 / 1.6), C na Vc \u2013 za pravougaoni spoj vjerovatno potcijenjeno (SMACNA pri Ab/Ac 0,5 daje 30\u201350 % vi\u0161e)";
-                if(beta<0.1||beta>1.0)f.note+=L"; Ab/Ac van tabele 0,1\u20131,0 \u2013 uzeta granica";
+                if(divIdel)f.note=type+(main?L", prolaz":L", ogranak")+capped+t2+L"; ogranak druge visine \u2013 Idelchik o\u0161tar T, razdvajanje (tabela kao KanCalc 0.7 / 0.6), C na Vc";
+                else f.note=type+(main?L", prolaz":L", ogranak")+capped+t2+L"; Idelchik o\u0161tar T (As = Ac, tabela kao KanCalc 1.7 / 1.6), C na Vc \u2013 za pravougaoni spoj vjerovatno potcijenjeno (SMACNA pri Ab/Ac 0,5 daje 30\u201350 % vi\u0161e)";
+                if(beta<0.1||beta>(divIdel?0.8:1.0))f.note+=divIdel?L"; Ab/Ac van tabele 0,1\u20130,8 \u2013 uzeta granica":L"; Ab/Ac van tabele 0,1\u20131,0 \u2013 uzeta granica";
                 if(ac>0&&std::fabs(as/ac-1)>0.05)f.note+=L"; As \u2260 Ac \u2013 izvan formule, ra\u010Dunato kao As = Ac";
                 r.f.push_back(f);}
             return;}}
@@ -314,9 +336,7 @@ private:
                     in=seedJunction(eng_->params(key),common,port(x,leg),port(x,leg),x.flow,q[leg],q[leg]);
                     const double s=area(port(x,leg)),v=s>0?q[leg]/3600.0/s:0;pv=o_.rho*v*v/2;
                     if(x.flow>0&&std::fabs(q[leg]/x.flow-0.5)>0.1)note+=L", ASHRAE pretpostavlja jednaku podjelu protoka";}
-                else{Section bs=port(x,branchPort);
-                    if(key=="SR5-5"&&!bs.round&&common.b>0&&std::fabs(bs.b-common.b)>=0.5){bs=Section(bs.a*bs.b/common.b,common.b,false);note+=L", ogranak druge visine: SR5-5 sa istom povr\u0161inom (Wb = Ab / H)";}
-                    in=seedJunction(eng_->params(key),common,bs,port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}}
+                else in=seedJunction(eng_->params(key),common,port(x,branchPort),port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}
             add(r,c==i?of[i]:of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv,!capped.empty());}
     }
 };

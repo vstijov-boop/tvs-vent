@@ -17,19 +17,30 @@ inline bool askWidth(const wchar_t* prompt,double defaultMm,double& valueMm){
 }
 // Last type chosen (TVS_TK_TIP and the Racva option while drawing): default of the next prompt.
 inline int& lastType(){static int t=tvsTee::Straight;return t;}
+inline bool& coneLast(){static bool c=false;return c;}   // round stucna: last one conical
 // Type prompts: the bracket list holds plain keywords only (AutoCAD offers them for a click and
 // for dynamic input; "Ogranak (TK-O)" was sent as "TK-O" and refused). TK-O / TK-G / SR5-3 typed
 // are taken too and mean Ogranak / Gacasti / Stucna.
 #define TVS_TEE_KEYWORDS L"Ogranak Gacasti Stucna Ravni TK-O TK-G SR5-3"
-inline void typeLegend(bool round){acutPrintf(round?L"\nStucna = SR5-3 (45), Ravni = obicni T komad.":L"\nOgranak = TK-O, Gacasti = TK-G, Stucna = SR5-3, Ravni = obicni T komad.");}
+inline void typeLegend(bool round){acutPrintf(round?L"\nStucna = valjkasta (SR5-11), Konusna = konusna (SR5-12, L = 100 mm), Ravni = obicni T komad.":L"\nOgranak = TK-O, Gacasti = TK-G, Stucna = SR5-3, Ravni = obicni T komad.");}
+// Round branch: Stucna (cylinder), Konusna (cone), Ravni; SR5-11 / SR5-12 typed mean the same.
+#define TVS_ROUND_TAP_KEYWORDS L"Stucna Konusna Ravni SR5-11 SR5-12 SR5-3"
 inline void typeAlias(ACHAR* kw,size_t n){
     if(_wcsicmp(kw,L"TK-O")==0)wcscpy_s(kw,n,L"Ogranak");
     else if(_wcsicmp(kw,L"TK-G")==0)wcscpy_s(kw,n,L"Gacasti");
-    else if(_wcsicmp(kw,L"SR5-3")==0)wcscpy_s(kw,n,L"Stucna");
+    else if(_wcsicmp(kw,L"SR5-3")==0||_wcsicmp(kw,L"SR5-11")==0)wcscpy_s(kw,n,L"Stucna");
+    else if(_wcsicmp(kw,L"SR5-12")==0)wcscpy_s(kw,n,L"Konusna");
 }
 inline const wchar_t* typeKeyword(int t){return t==tvsTee::Branch?L"Ogranak":t==tvsTee::Pants?L"Gacasti":t==tvsTee::Tap?L"Stucna":L"Ravni";}
 // Stucna SR5-3: collar L = 0.25 x branch width, at least 75 mm (drawing units).
 inline double tapLength(double branch,double f){return tvsTee::tapLength(branch,tvsTeeData::tapMinimumMm()/f);}
+// Stucna record for branch size `branch` (drawing units): a conical one (round, second > 0) keeps
+// L = 100 mm and gets the cone base of the new diameter; otherwise L = tapLength, no cone.
+inline void tapRecord(tvsTeeData::Record& r,double branch,bool round,bool conical,double f){
+    if(round&&conical){r.l=tvsTee::coneLengthMm()/f;r.second=tvsTee::coneBase(branch,r.l);}
+    else{r.l=tapLength(branch,f);r.second=0;}
+}
+inline bool conicalOf(const tvsTeeData::Record& r){return r.type==tvsTee::Tap&&r.second>0;}
 // Reverse the run direction (TK-O: inlet A <-> outlet C side; TK-G: left <-> right branch).
 // Ports are matched by place, so the duct on each end takes the width of the end now there.
 inline void flip(TVS_WYE* w){
@@ -72,16 +83,17 @@ inline bool chooseType(const AcDbObjectId& id){
         {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)return false;tvsTeeData::read(w.object(),current);}
         const int def=current.type?current.type:lastType();
         const int shown=round&&def!=tvsTee::Tap&&def!=tvsTee::Straight?tvsTee::Tap:def;
+        const bool coneNow=conicalOf(current)||(current.type==0&&coneLast());
         wchar_t prompt[200];
         typeLegend(round);
-        if(round)swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
+        if(round)swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Konusna/Ravni/oKreni] <%ls>: ",shown==tvsTee::Tap&&coneNow?L"Konusna":typeKeyword(shown));
         else swprintf_s(prompt,L"\nTip T komada [Ogranak/Gacasti/Stucna/Ravni/oKreni] <%ls>: ",typeKeyword(shown));
         showNow(id);
         int rc;ACHAR kw[32]=L"";
         {tvsMove::StretchHighlight mark;mark.add(id);
-         acedInitGet(0,round?L"Stucna Ravni oKreni SR5-3":TVS_TEE_KEYWORDS L" oKreni");rc=acedGetKword(prompt,kw);}
+         acedInitGet(0,round?TVS_ROUND_TAP_KEYWORDS L" oKreni":TVS_TEE_KEYWORDS L" oKreni");rc=acedGetKword(prompt,kw);}
         if(rc==RTNORM)typeAlias(kw,32);
-        if(rc==RTNONE)wcscpy_s(kw,typeKeyword(shown));else if(rc!=RTNORM)return false;
+        if(rc==RTNONE)wcscpy_s(kw,round&&shown==tvsTee::Tap&&coneNow?L"Konusna":typeKeyword(shown));else if(rc!=RTNORM)return false;
         if(_wcsicmp(kw,L"oKreni")==0||_wcsicmp(kw,L"Okreni")==0){if(flipById(id))acutPrintf(L"\nT komad je okrenut.");continue;}
         tvsTeeData::Record r;
         if(_wcsicmp(kw,L"Ravni")==0){
@@ -92,17 +104,20 @@ inline bool chooseType(const AcDbObjectId& id){
             if(tvsTeeData::write(w.object(),r)==Acad::eOk){acutPrintf(L"\nT-komad je ponovo obican (TK0).");w->recordGraphicsModified();tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));}
             return true;
         }
-        if(_wcsicmp(kw,L"Stucna")==0){
-            const double L=tapLength(sizeAotv,f);
+        if(_wcsicmp(kw,L"Stucna")==0||(round&&_wcsicmp(kw,L"Konusna")==0)){
+            const bool cone=round&&_wcsicmp(kw,L"Konusna")==0;
+            r.type=tvsTee::Tap;tapRecord(r,sizeAotv,round,cone,f);const double L=r.l;
             {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)return false;
              const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
-             r.type=tvsTee::Tap;r.l=L;w->LengthPl=L;
+             w->LengthPl=L;coneLast()=cone;
              const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);
              if(es!=Acad::eOk){acutPrintf(L"\nTip T komada nije upisan (%ls).",acadErrorStatusText(es));return true;}
              w->recordGraphicsModified();lastType()=r.type;
              tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));}
-            acutPrintf(round?L"\nStucna 45, okrugli ogranak: L = %.0f mm (0.25 x D %.0f, min. %.0f).":L"\nStucna 45 SR5-3: L = %.0f mm (0.25 x %.0f, min. %.0f).",L*f,sizeAotv*f,tvsTeeData::tapMinimumMm());
-            orient(id,L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ",L"\nStucna je okrenuta.");
+            if(cone)acutPrintf(L"\nKonusna stucna SR5-12: L = %.0f mm, baza konusa D %.0f mm (ogranak D %.0f).",L*f,r.second*f,sizeAotv*f);
+            else if(round)acutPrintf(L"\nValjkasta stucna SR5-11: L = %.0f mm (0.25 x D %.0f, min. %.0f).",L*f,sizeAotv*f,tvsTeeData::tapMinimumMm());
+            else{acutPrintf(L"\nStucna 45 SR5-3: L = %.0f mm (0.25 x %.0f, min. %.0f).",L*f,sizeAotv*f,tvsTeeData::tapMinimumMm());
+                orient(id,L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ",L"\nStucna je okrenuta.");}   // a round one has no sides
             return true;
         }
         const bool pants=_wcsicmp(kw,L"Gacasti")==0;
@@ -139,13 +154,16 @@ inline void setType(){
 inline bool askType(int& type,double& second,double main,double branch,double f,bool roundBranch=false){
     if(roundBranch){   // okrugli ogranak na pravougaonom kanalu: stucna (iste mjere kao SR5-3) ili ravni T
         const int def=lastType()==tvsTee::Straight?tvsTee::Straight:tvsTee::Tap;
+        const wchar_t* defKw=def==tvsTee::Tap&&coneLast()?L"Konusna":typeKeyword(def);
         typeLegend(true);
-        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Ravni] <%ls>: ",typeKeyword(def));
-        acedInitGet(0,L"Stucna Ravni SR5-3");ACHAR kw[32]=L"";
+        wchar_t prompt[200];swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Konusna/Ravni] <%ls>: ",defKw);
+        acedInitGet(0,TVS_ROUND_TAP_KEYWORDS);ACHAR kw[32]=L"";
         const int rc=acedGetKword(prompt,kw);
         if(rc==RTNORM)typeAlias(kw,32);
-        if(rc==RTNONE)wcscpy_s(kw,typeKeyword(def));else if(rc!=RTNORM)return false;
-        type=_wcsicmp(kw,L"Stucna")==0?tvsTee::Tap:tvsTee::Straight;second=0;lastType()=type;return true;
+        if(rc==RTNONE)wcscpy_s(kw,defKw);else if(rc!=RTNORM)return false;
+        const bool cone=_wcsicmp(kw,L"Konusna")==0;
+        type=cone||_wcsicmp(kw,L"Stucna")==0?tvsTee::Tap:tvsTee::Straight;second=cone?-1:0;   // -1: conical (applyType)
+        lastType()=type;if(type==tvsTee::Tap)coneLast()=cone;return true;
     }
     for(;;){
         const int def=lastType();
@@ -177,13 +195,14 @@ inline void applyType(const AcDbObjectId& id,int type,double second,const AcGeVe
      const tvsTeeFit::Ports before=tvsTeeFit::ports(w.object());
      tvsTeeData::Record r;r.type=type;r.l=tvsTeeData::collarMm()/f;r.second=second;r.radius2=pants?tvsTee::defaultRadius(second):0;
      const double w1=pants?w->SizeApr:w->SizeAotv;
-     if(tap){r.l=tapLength(w1,f);r.second=0;}
+     if(tap)tapRecord(r,w1,round,second<0,f);
      w->LengthPl=tap?r.l:pants?tvsTee::pantsLengthPl(r.l,w1,second):tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1);
      if(tvsTeeData::write(w.object(),r)!=Acad::eOk)return;
      w->recordGraphicsModified();lastType()=type;L=r.l;
      tvsTeeFit::fit(w.object(),before,tvsTeeFit::ports(w.object()));
      if(tap&&!flow.isZeroLength()){AcGeVector3d u=w->Vectpr,d=flow;u.z=d.z=0;if(u.dotProduct(d)<0)flip(w.object());}}
-    if(tap)acutPrintf(round?L"\nStucna 45, okrugli ogranak: L = %.0f mm.":L"\nStucna 45 SR5-3: L = %.0f mm.",L*f);
+    if(tap&&round){acutPrintf(second<0?L"\nKonusna stucna SR5-12: L = %.0f mm.":L"\nValjkasta stucna SR5-11: L = %.0f mm.",L*f);return;}   // no sides to choose
+    if(tap)acutPrintf(L"\nStucna 45 SR5-3: L = %.0f mm.",L*f);
     orient(id,tap?L"\nStrana kosog ulaza (uzvodno) [oKreni] <Gotovo>: ":L"\n[oKreni] <Gotovo>: ",L"\nT komad je okrenut.");
 }
 }

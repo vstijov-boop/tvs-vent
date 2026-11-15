@@ -15,20 +15,25 @@ namespace tvsTee {
 enum Type {Straight=0,Branch=1,Pants=2,Tap=3};   // 0 = existing TVS_WYE drawing
 // Tap = stucna, ASHRAE SR5-3: rectangular branch on a straight main with a 45 deg entry on the
 // upstream side; collar L = 0.25 w (branch width), at least 75 mm. TVS_WYE LengthPl = L.
+// Round branch (round = true): cylindrical tap (ASHRAE SR5-11), collar L as above, or conical
+// (cone > 0, SR5-12): cone base diameter `cone` on the main, L = 100 mm (coneLengthMm), sides
+// at 15 deg (coneBase). Record: TVS_TEE_V1 "second" = cone base (0 = cylindrical).
 struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
 struct Shape {std::vector<Seg> lines;std::vector<Arc> arcs;std::vector<Seg> axis;};
-struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;   // e1 / e2: TK-G "vrat", extra straight inlet wall
+struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone;   // round / cone: stucna with a round branch   // e1 / e2: TK-G "vrat", extra straight inlet wall
     // xo: TK-O prolaz axis across the run (+x = branch side; prolaz edge in line with the inlet: +-(a - c))
-    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0){}};   // before branch 1 / 2 (its axis that much farther)
+    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0),round(false),cone(0){}};   // before branch 1 / 2 (its axis that much farther)
 inline double pi(){return 3.14159265358979323846;}
 inline double defaultRadius(double w){return 1.5*w;}           // outer radius: centre line R - w/2 = w
 inline double lengthPl(double l,double R,double w){return l+R-w;} // TVS_WYE equivalent
 inline double runLength(const Tee& t){return t.type==Tap?2*t.l+t.w1:2*lengthPl(t.l,t.R1,t.w1)+t.w1;} // inlet->outlet
 inline double tapLength(double w,double minimum){return 0.25*w>minimum?0.25*w:minimum;} // SR5-3: L = 0.25 w, >= 75 mm
+inline double coneLengthMm(){return 100;}                        // SR5-12: L = 4 in (100 mm)
+inline double coneBase(double d,double l){return d+2*l*0.26794919243112270;}   // sides at 15 deg
 inline bool valid(const Tee& t){
-    if(t.type==Tap)return t.A>0&&t.w1>0&&t.l>0;
+    if(t.type==Tap)return t.A>0&&t.w1>0&&t.l>0&&(!(t.cone>0)||(t.round&&t.cone>t.w1&&t.cone<=t.w1+2*t.l));
     if(!(t.A>0)||!(t.w1>0)||!(t.l>0)||!(t.R1>t.w1))return false;
     if(t.type==Branch&&!(t.C>0))return false;
     if(t.type==Pants&&(!(t.w2>0)||!(t.R2>t.w2)))return false;
@@ -73,7 +78,11 @@ inline bool shape(const Tee& t,Shape& out){
         // (a,0) -> (a+L,L) upstream, downstream wall at y = L + w, face x = a + L.
         const double w=t.w1,Lr=2*l+w;
         out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,0),P(a,Lr)));
-        out.lines.push_back(Seg(P(a,0),P(a+l,l)));out.lines.push_back(Seg(P(a,l+w),P(a+l,l+w)));
+        if(t.round){   // round branch: cylinder (SR5-11) or cone (SR5-12) from the main wall to the face
+            const double yc=l+w/2,h=t.cone>0?t.cone/2:w/2;
+            out.lines.push_back(Seg(P(a,yc-h),P(a+l,l)));out.lines.push_back(Seg(P(a,yc+h),P(a+l,l+w)));
+            out.axis.push_back(Seg(P(a,yc),P(a+l,yc)));
+        }else{out.lines.push_back(Seg(P(a,0),P(a+l,l)));out.lines.push_back(Seg(P(a,l+w),P(a+l,l+w)));}
         out.lines.push_back(Seg(P(a+l,l-f),P(a+l,l+w+f)));
         return true;
     }
@@ -140,7 +149,9 @@ inline double area(const Tee& t,double b,double bb){
     double s=0;
     if(t.type==Tap){   // main minus opening (w + L) + two trapezoids, downstream wall, 45 deg wall
         const double L=runLength(t),w=t.w1,l=t.l;
-        s=perimeter(t.A,b)*L-(w+l)*bb+l*(2*w+l)+bb*l+bb*l*std::sqrt(2.0);}
+        if(t.round){const double r1=(t.cone>0?t.cone:w)/2,r2=w/2;   // opening on the main + cylinder / cone
+            s=perimeter(t.A,b)*L-pi()*r1*r1+pi()*(r1+r2)*std::sqrt(l*l+(r1-r2)*(r1-r2));}
+        else s=perimeter(t.A,b)*L-(w+l)*bb+l*(2*w+l)+bb*l+bb*l*std::sqrt(2.0);}
     else if(t.type==Branch){const double L=runLength(t);
         s=(perimeter(t.A,b)+perimeter(t.C,b))/2*L-t.w1*bb+arm(t.w1,t.R1,bb,t.l);}
     else{const PantsFrame p=pantsFrame(t);

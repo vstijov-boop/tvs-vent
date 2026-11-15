@@ -98,6 +98,16 @@ int main(int argc,char** argv){
             const double q=1200/3600.0,beta=0.09/0.18,vc=1.0/0.18,pvc=0.6*vc*vc;
             if(t.f[k].what.find(L"ogranak")!=std::wstring::npos)eq(t.f[k].dp,idelchikBranch(q,beta)*pvc,"Idelchik branch dp");else eq(t.f[k].dp,idelchikStraight(q)*pvc,"Idelchik main dp");}
         yes(idel==2,"two Idelchik legs");}
+    yes(junctionKey(false,TeeTap,Section(400,200,false),Section(160,0,true),true)=="SR5-12"&&junctionKey(false,TeeTap,Section(400,200,false),Section(160,0,true))=="SR5-11"&&junctionKey(true,TeeTap,Section(400,200,false),Section(160,0,true),true)=="ER5-2","round tap keys");
+    {   // supply TK0, branch lower than the run: KanCalc 0.7 / 0.6 instead of SR5-5
+        eq(idelchikDivBranch(0.3,0.2),2.9,"KanCalc 0.7");eq(idelchikDivStraight(0.5),0.1,"KanCalc 0.6");
+        std::vector<Element> n4=network();n4[3].parts[0].tee=TeePlain;n4[3].ports[2]=Section(300,200,false);n4[3].parts[0].sections[2]=n4[3].ports[2];
+        Result t=calc.run(n4,0);int idel=0;
+        for(size_t k=0;k<t.f.size();++k)if(t.f[k].key==L"Idelchik"){++idel;yes(t.f[k].note.find(L"0.7")!=std::wstring::npos,"note 0.7 / 0.6");
+            const double vc=1.0/0.18,pvc=0.6*vc*vc;
+            if(t.f[k].what.find(L"ogranak")!=std::wstring::npos)eq(t.f[k].dp,idelchikDivBranch(1.0/3,0.06/0.18)*pvc,"div branch dp");
+            else eq(t.f[k].dp,idelchikDivStraight((2400/3600.0/0.15)/vc)*pvc,"div main dp");}
+        yes(idel==2,"two KanCalc legs");}
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");

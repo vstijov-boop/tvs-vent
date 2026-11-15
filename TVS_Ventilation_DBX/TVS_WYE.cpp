@@ -1181,6 +1181,7 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 	tee = tvsTee::Tee(); tee.type = r.type; tee.l = r.l; tee.flange = tvsTeeData::flangeMm() / tvsUnits::factor(this);
 	if (r.type == tvsTee::Tap) {   // stucna SR5-3: collar = LengthPl, straight main
 		tee.A = SizeApr; tee.C = SizeApr; tee.w1 = SizeAotv; tee.l = LengthPl;
+		tee.round = ThisRoundotv; tee.cone = ThisRoundotv && r.second > 0 ? r.second : 0;   // okrugla / konusna stucna
 		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
 	}
 	else if (r.type == tvsTee::Branch) {

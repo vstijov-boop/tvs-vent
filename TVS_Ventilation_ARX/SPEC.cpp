@@ -298,7 +298,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 						if (tee.type == tvsTee::Tap) {   // stucna SR5-3: A x B / w x b (L=)
 							status = TeeTap; Extra = mm.l;
 							const bool roundBranch = pWye->ThisRoundotv;   // A x B / D: kutija D x D, prikljucak D
-							setName(roundBranch ? L"Štucna 45°, okrugli ogranak" : L"Štucna 45° SR5-3");
+							setName(roundBranch ? (tee.cone > 0 ? L"Konusna štucna SR5-12, okrugli ogranak" : L"Valjkasta štucna SR5-11, okrugli ogranak") : L"Štucna 45° SR5-3");
 							setLable(SizeA); appendLable(_T("x")); appendLable(SizeB); appendLable(_T(" / "));
 							if (roundBranch) { appendLable(d); appendLable(SizeA2); }
 							else { appendLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3); }

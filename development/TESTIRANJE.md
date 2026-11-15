@@ -6,6 +6,13 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## Okrugla štucna: valjkasta / konusna (novo, 15.11.) – testirati
+- Okrugli ogranak na pravougaonom kanalu (TVS_TK_TIP komandna linija, Račva, TVS_CONNECTW): `[Stucna/Konusna/Ravni]`. Stucna = valjkasta (ASHRAE SR5-11, L = 0,25 D, min. 75 mm), Konusna = konusna (SR5-12, L = 100 mm, baza konusa D + 2·L·tan 15° ≈ D + 54 mm). Kucano SR5-11 / SR5-12 radi isto.
+- Crtež: bez kosog ulaza od 45°; valjkasta = dva paralelna zida, konusna = zidovi od baze na kanalu do ogranka. Nema pitanja „strana kosog ulaza“.
+- Promjena prečnika ogranka (TVS_DIM_PRATI, TVS_PROTOK Primijeni, dijalog TVS_TK_TIP): konusna ostaje konusna (nova baza), valjkasta dobija novi L.
+- Specifikacija: „Valjkasta štucna SR5-11“ / „Konusna štucna SR5-12“; TVS_PAD: SR5-11 / SR5-12 (dovod), ER5-2 (odvod).
+- TVS_PAD dovod: TK0 čiji je ogranak druge visine od voda → Idelchik razdvajanje (tabela kao KanCalc 0.7 / 0.6), iste visine → SR5-5.
+
 ## TVS_PAD (novo, 14.11.) – testirati
 - Prvi put: opcija „Podaci“ (ili pitanje na početku) → izaberite `Equation.csv` u folderu `ashrae_data` instalacije DuctPressDrop. Folder se pamti (registry `Software\TVS_Vent`, `AshraeData`). ASHRAE tabele nisu u TVS_VENT-u.
 - Izbor kraja mreže kod jedinice (kao TVS_PROTOK; protoci se sabiraju, u crtež se ništa ne upisuje) → `Sistem [Dovod/Odvod/Podaci]`.

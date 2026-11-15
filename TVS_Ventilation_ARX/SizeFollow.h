@@ -457,7 +457,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
         w->assertWriteEnabled();   // before the fields change (UNDO)
         if(t.port==2){w->SizeAotv=A;w->SizeBotv=round?0:B;
-            if(typed&&r.type==tvsTee::Tap){r.l=tvsTeeCommand::tapLength(A,f);w->LengthPl=r.l;}
+            if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,A,round,tvsTeeCommand::conicalOf(r),f);w->LengthPl=r.l;}
             else if(typed&&r.type==tvsTee::Branch)w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(A),A);}
         else if(typed&&r.type==tvsTee::Branch){
             if(t.port==0){if(!(r.second>0))r.second=w->SizeApr;w->SizeApr=A;w->SizeBpr=round?0:B;}   // C keeps its width
