@@ -44,7 +44,7 @@ public:
         if(run){
             facts.Format(L"Kanala %d  ·  koljena %d  ·  T komada %d  ·  etaža %d  ·  obilazaka %d",pv.ducts,pv.elbows,pv.tees,pv.etazes,pv.bypasses);
             if(!pv.stops.empty()){facts+=L"\nGranice: ";for(size_t k=0;k<pv.stops.size();++k){if(k)facts+=L", ";facts+=pv.stops[k].c_str();}}
-            if(pv.teeDialogs){CString d;d.Format(L"\nPoslije primjene otvara se dijalog T komada (%d).",pv.teeDialogs);facts+=d;}
+            if(pv.teeDialogs){CString d;d.Format(L"\nPoslije primjene otvara se dijalog T komada (%d). Na ogranku / prolazu TK-O / TK-G mijenja se samo širina (visina: prelaz).",pv.teeDialogs);facts+=d;}   // D5a
         }else if(pv.joints==0)facts=L"Izabrani kanal ne naliježe direktno na element stare dimenzije.";
         else if(c.scope==Only)facts.Format(L"Spojeva sa elementom stare dimenzije: %d.\nOstaju bez prelaza (upozorenje u komandnoj liniji).",pv.joints);
         else facts.Format(L"Spojeva sa elementom stare dimenzije: %d.\nNa svaki se umeće prelaz nova → stara dimenzija.",pv.joints);
