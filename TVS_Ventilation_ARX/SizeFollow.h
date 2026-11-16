@@ -11,6 +11,7 @@
 // (new radius, the duct ends follow the elbow ports along their axes). It stops at an etaz,
 // obilazak, T komad, vertical or round elbow it cannot recompute, or an element of another
 // size, and says where.
+#include <rxmfcapi.h>
 #include "BuildTransaction.h"
 #include "TVSMoveCommand.h"
 #include "TransAlignCommand.h"
@@ -87,6 +88,34 @@ inline void post(){
         resbuf rb={};if(acedGetVar(L"CMDACTIVE",&rb)==RTNORM&&rb.restype==RTSHORT&&(rb.resval.rint&(4|32)))return;}
     posted()=true;postedAt()=tvsSpiro::nowMs();acDocManager->sendStringToExecute(doc,L"_TVS_DIM_PRATI\n",false,true,false);
 }
+// D6 (user decision 2026-11-16): edits from the Properties palette (no command, drawing quiescent)
+// are collected - A then B is one TVS_DIM_PRATI, one dialog. It is sent when the palette is left:
+// focus out of its pane 400 ms after the last edit, or the cursor out of it after 1,5 s; at the
+// latest after 15 s. A command started meanwhile settles them at its end (commandEnded).
+inline UINT_PTR& paletteTimer(){static UINT_PTR t=0;return t;}
+inline unsigned long long& paletteEditAt(){static unsigned long long t=0;return t;}
+inline HWND& palettePane(){static HWND h=NULL;return h;}
+inline HWND paneOf(HWND w){   // the window right under the AutoCAD frame (dock bar, MDI client, floating palette)
+    CWnd* frame=acedGetAcadFrame();const HWND main=frame?frame->GetSafeHwnd():NULL;
+    for(HWND p=w;p;){const HWND up=GetParent(p);if(!up||up==main)return p;p=up;}
+    return NULL;
+}
+inline void stopPaletteTimer(){if(paletteTimer()){KillTimer(NULL,paletteTimer());paletteTimer()=0;}}
+inline VOID CALLBACK paletteTick(HWND,UINT,UINT_PTR,DWORD){
+    AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;
+    if(!doc){stopPaletteTimer();return;}
+    if(!doc->isQuiescent())return;   // a command runs: it settles them at its end
+    const unsigned long long dt=tvsSpiro::nowMs()-paletteEditAt();const HWND pane=palettePane();
+    bool focusIn=false,cursorIn=false;
+    if(pane&&IsWindow(pane)){const HWND f=GetFocus();focusIn=f&&paneOf(f)==pane;
+        POINT c;RECT r;cursorIn=GetCursorPos(&c)&&GetWindowRect(pane,&r)&&PtInRect(&r,c);}
+    if((dt>=400&&!focusIn)||(dt>=1500&&!cursorIn)||dt>=15000){stopPaletteTimer();post();}
+}
+inline void schedule(){
+    paletteEditAt()=tvsSpiro::nowMs();const HWND f=GetFocus();palettePane()=f?paneOf(f):NULL;
+    if(!paletteTimer())paletteTimer()=SetTimer(NULL,0,200,paletteTick);
+    if(!paletteTimer())post();   // no timer: at once, as before
+}
 class DbReactor : public AcDbDatabaseReactor {
 public:
     virtual void objectOpenedForModify(const AcDbDatabase*,const AcDbObject* o){
@@ -94,7 +123,7 @@ public:
     }
     virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){
         if(!o->isUndoing()&&TVS_Entity::cast(o)){touched().insert(o->objectId());
-            if(!applying()){AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(doc&&doc->isQuiescent())post();}}
+            if(!applying()){AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(doc&&doc->isQuiescent())schedule();}}
         std::map<AcDbObjectId,Sizes>::iterator it=opened().find(o->objectId());if(it==opened().end())return;
         const Sizes was=it->second;opened().erase(it);
         if(applying()||o->isUndoing()||!userEdit())return;
@@ -104,7 +133,7 @@ public:
         pending()[o->objectId()]|=ends;
         if(plainDuct(o)&&!previous().count(o->objectId()))previous()[o->objectId()]=was;
         AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;
-        if(doc&&doc->isQuiescent())post();
+        if(doc&&doc->isQuiescent())schedule();
     }
     virtual void goodbye(const AcDbDatabase* db);
 };
@@ -136,6 +165,7 @@ inline void start(){
     delete it;
 }
 inline void stop(){
+    stopPaletteTimer();
     if(acedEditor)acedEditor->removeReactor(&edReactor());
     for(std::set<AcDbDatabase*>::iterator i=attached().begin();i!=attached().end();++i)(*i)->removeReactor(&dbReactor());
     attached().clear();
@@ -703,9 +733,19 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 banner.Format(L"Kanal  %ls  →  %ls mm",was.GetString(),now.GetString());
                 if(starts.size()>1){CString more;more.Format(L"   (+ %d)",static_cast<int>(starts.size())-1);banner+=more;}}
             if(ids().run)++dialogsShown();
-            if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=cancelScope();   // Otkaži: the edited duct alone
-                acutPrintf(L"\nDionica nije mijenjana; izabrani kanal zadržava novu dimenziju.");}
-            if(ch.scope==tvsRunDialog::Only||ch.scope==tvsRunDialog::OnlyPrelaz){
+            bool reverted=false;
+            if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=cancelScope();
+                if(cancelScope()==tvsRunDialog::Only){   // D6, user decision 2026-11-16: Otkaži undoes the edit of the duct too
+                    int back=0;
+                    for(size_t k=0;k<starts.size();++k){const AcDbObjectId id=nodes[starts[k]].id;const Sizes& o=old[id];
+                        AcDbObjectPointer<TVS_Pipe> p(id,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk)continue;
+                        if(p->ThisRound!=o.round[0])p->put_ThisRound(o.round[0]);p->put_SizeA(o.a[0]);p->put_SizeB(o.b[0]);p->recordGraphicsModified();++back;
+                        for(size_t q=0;q<queue.size();++q)if(queue[q].first==id)queue[q].second=0;}   // its prelaz ends: nothing to follow
+                    reverted=true;dirty=true;
+                    acutPrintf(L"\nOtkazano: kanal vraćen na staru dimenziju (%d).",back);
+                }else acutPrintf(L"\nDionica nije mijenjana; izabrani kanal zadržava novu dimenziju.");}
+            if(reverted){}
+            else if(ch.scope==tvsRunDialog::Only||ch.scope==tvsRunDialog::OnlyPrelaz){
                 const bool insert=ch.scope==tvsRunDialog::OnlyPrelaz;int n=0;
                 for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,insert);
                 if(insert){if(n)dirty=true;else acutPrintf(L"\nPrelaz na spoju nije umetnut (spoj sa više elemenata, T komad ili element druge dimenzije).");}
@@ -732,7 +772,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
     for(size_t q=0;q<queue.size();++q){
         if(q>=5000){acutPrintf(L"\nTVS_DIM_PRATI: prekinuto poslije 5000 elemenata; ostatak mreže nije prilagođen.");break;}
         if(!fresh())break;
-        const AcDbObjectId id=queue[q].first;const int ends=queue[q].second;const int i=index(id);if(i<0)continue;
+        const AcDbObjectId id=queue[q].first;const int ends=queue[q].second;const int i=index(id);if(i<0||!ends)continue;   // 0: edit undone (Otkaži)
         AcDbObjectPointer<AcDbEntity> e(id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)continue;
         if(TVS_Pipe::cast(e.object())){
             // duct -> transitions at its ends

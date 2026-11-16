@@ -73,4 +73,13 @@ class Review2026_11bD(unittest.TestCase):
   self.assertLess(s.index('// D7:'),s.index('// write: etazi, elbows'))
   self.assertIn('stop(L"fleksibilno crijevo")',s)                                 # D8
   self.assertEqual(s.count('{'),s.count('}'))
+class Review2026_11bD6(unittest.TestCase):
+ def test_palette_collect_and_cancel(self):
+  s=text('TVS_Ventilation_ARX/SizeFollow.h')
+  self.assertEqual(s.count('isQuiescent())schedule();'),2)                       # paleta: skupljanje, ne odmah
+  self.assertIn('paletteTimer()=SetTimer(NULL,0,200,paletteTick);',s)
+  self.assertIn('stopPaletteTimer();\n    if(acedEditor)',s)
+  self.assertIn('if(cancelScope()==tvsRunDialog::Only){',s)                      # Otkazi vraca kanal
+  self.assertIn('p->put_SizeA(o.a[0]);p->put_SizeB(o.b[0]);',s)
+  self.assertIn('if(i<0||!ends)continue;',s)
 if __name__=='__main__':unittest.main()

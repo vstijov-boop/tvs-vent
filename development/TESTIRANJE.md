@@ -186,6 +186,8 @@ Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → In
 - **Dvoklik → Svojstva → Odustani:** ništa se ne mijenja.
 - **Promjena ugla u Svojstvima** (npr. 45 → 30) i dalje radi.
 - **TVS_KOLJENA_UGAO (novo):** izbor koljena ili Enter = cijeli crtež. Koljena u osnovi sa uglom manje od 0,5° od 15 / 22,5 / 30 / 45 / 60 / 75 / 90° dobijaju tačan ugao, krajevi kanala na njima se pomjere za njima. Koljeno uz koje je prelaz / T komad / drugo koljeno se ne dira (ispis koliko). Probati na crtežu gdje je TVS_MOVE / TVS_ALIGN javljao „ose nisu tangentne“ ili je TVS_DIM_PRATI stajao na koljenu, pa ponoviti.
+- **Dionica iz Properties palete (D6):** promijeni A pa B kanala u paleti – dijalog dionice se otvara tek kad izađeš iz palete (klik / kursor u crtež), jednom za obje izmjene. **Otkaži** u dijalogu vraća kanal na staru dimenziju. Provjeriti i dvoklik / Svojstva (dijalog odmah, kao do sad).
+- **Dionica (D1, D3, D4, D5b, D7, D8):** koljeno sa kotom malo pomjerenom se prelazi; okruglo segmentno koljeno se pri promjeni oblika pretvara; ogranak štucne / TK0 preuzima novi oblik; element na zaključanom sloju → ništa se ne mijenja; fleks crijevo kao granica „fleksibilno crijevo“.
 
 ## Faza 6 pregleda (elementi) – testirati
 - **SCALE nad TVS elementima:** odbijen, poruka jednom po komandi; ostali (ne-TVS) objekti u izboru se skaliraju normalno. MOVE, ROTATE, COPY i MIRROR rade kao ranije.
