@@ -131,6 +131,20 @@
         syncTVSGlobalUnits();
         tvsDpdExport::execute();
     }
+    // TVS_OPREMA: drawn blocks (oprema) linked into the duct network in place (EquipmentLinkCommand.h).
+    static void Ventilation_ARXTVS_OPREMA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsEquipmentLinkCmd::execute();   // a cut piece takes the duct's layer (not the current one)
+    }
+    // TVS_OPREMA_ODVEZI: the link record removed from the blocks, ducts unchanged.
+    static void Ventilation_ARXTVS_OPREMA_ODVEZI(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsEquipmentLinkCmd::unlink();
+    }
     // TVS_SPOJ_TKO: inlet, prolaz and branch duct joined by a TK-O (BranchJoinCommand.h).
     static void Ventilation_ARXTVS_SPOJ_TKO(void)
     {
