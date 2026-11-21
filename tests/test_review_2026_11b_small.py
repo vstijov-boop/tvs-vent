@@ -50,4 +50,15 @@ class OffsetProofSplit(unittest.TestCase):
    v=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX%s.vcxproj'%y)
    self.assertIn("Condition=\"'$(TVSDev)'=='true'\"",v);self.assertIn('<PreprocessorDefinitions>TVS_OFFSET_INTEGRATION;%(',v)
   self.assertIn('/p:TVSDev=true',text('.github/workflows/dev-tvs-dev.yml'))
+class K4Connect(unittest.TestCase):
+ def test_connect_by_id(self):
+  c=text('TVS_Ventilation_ARX/commands/Connect.inl')
+  self.assertIn('static bool selectTwoPipes(',c);self.assertEqual(c.count('selectTwoPipes(id1, id2, pt1, pt2)'),2)
+  self.assertNotIn('ConnectWithWye(pEnt1, pEnt2, pt1, pt2);\n\t}\n\n\tstatic void Ventilation_ARXTVS_CONNECTT(void)\n\t{\n\t\tif (ActivationErrorMessage() != pError_Ok) return;\n\t\tsyncTVSGlobalUnits();\n\t\tif (!currentLayerWritable()) return;\n\t\t// Add',c)
+  self.assertEqual(c.count('{'),c.count('}'))
+  h=text('TVS_Ventilation_ARX/commands/ConnectHelpers.inl')
+  self.assertEqual(h.count('// K4 / reopen: both ducts writable before anything is drawn'),2)
+  s=text('TVS_Ventilation_ARX/commands/Specification.inl')
+  self.assertNotIn('pEnt->close();\n\t\t\t\t\t\tif ((br = AcDbBlockReference::cast(pEnt))',s)
+  self.assertEqual(s.count('pEnt->close();   // K4: after addBlock'),2)
 if __name__=='__main__':unittest.main()

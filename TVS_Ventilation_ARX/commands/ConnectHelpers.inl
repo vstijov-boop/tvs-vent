@@ -139,6 +139,11 @@
 
 		TVS_Pipe* pPipe1 = TVS_Pipe::cast(pEnt1);
 		TVS_Pipe* pPipe2 = TVS_Pipe::cast(pEnt2);
+		// K4 / reopen: both ducts writable before anything is drawn (a failed reopen half way left a T komad)
+		if (!reopen(pPipe1)) return false;
+		pPipe1->close();
+		if (!reopen(pPipe2)) return false;
+		pPipe2->close();
 		AcGePoint3d p1 = pPipe1->get_FirstPoint();
 		AcGePoint3d p2 = pPipe1->get_Lastpoint();
 		AcGePoint3d p3 = pPipe2->get_FirstPoint();
@@ -305,6 +310,11 @@
 
 		TVS_Pipe* pPipe1 = TVS_Pipe::cast(pEnt1);
 		TVS_Pipe* pPipe2 = TVS_Pipe::cast(pEnt2);
+		// K4 / reopen: both ducts writable before anything is drawn (a failed reopen half way left a T komad)
+		if (!reopen(pPipe1)) return false;
+		pPipe1->close();
+		if (!reopen(pPipe2)) return false;
+		pPipe2->close();
 		AcGePoint3d p1 = pPipe1->get_FirstPoint();
 		AcGePoint3d p2 = pPipe1->get_Lastpoint();
 		AcGePoint3d p3 = pPipe2->get_FirstPoint();

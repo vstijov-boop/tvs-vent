@@ -24,7 +24,6 @@
 					if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForRead) == eOk)
 					{
 
-						pEnt->close();
 						if ((br = AcDbBlockReference::cast(pEnt)) != NULL)
 						{
 							SPEC spec;
@@ -36,6 +35,7 @@
 								specatrlist.append(spec);
 							}
 						}
+						pEnt->close();   // K4: after addBlock (it reads the attributes)
 
 					}
 				}
@@ -103,7 +103,6 @@
 								}
 							}
 						}
-						pEnt->close();
 						if ((br = AcDbBlockReference::cast(pEnt)) != NULL)
 						{
 							SPEC spec;
@@ -114,6 +113,7 @@
 								specatrlist.append(spec);
 							}
 						}
+						pEnt->close();   // K4: after addBlock (it reads the attributes)
 
 					}
 				}
