@@ -22,9 +22,6 @@ Već nacrtani blokovi se povezuju NA MJESTU, blok se nikad ne pomjera:
 
 Kod: `geometry/EquipmentLink.h` (geometrija i odluka, test `tests/test_equipment_link.cpp`), `TVS_Ventilation_ARX/EquipmentLinkCommand.h` (komande).
 
-
-Obični AutoCAD 2D blokovi (regulator protoka, PP klapna, CAV, VAV, prigušivač buke = inline, 2 priključka; rešetka, difuzor, krovna kapa, protivkišna žaluzina = terminal, 1 priključak) postaju dio TVS kanalske mreže. Blok ostaje kakav jeste; TVS u njega upisuje zapis (geometry/Equipment.h, TVS_Ventilation_ARX/EquipmentStore.h): vrsta, oznaka, priključci (tačke na osi kanala, kota = osa kanala), dimenzija, model pada pritiska (fiksni Δp, ζ, kataloška tačka Δp pri Qn), protok terminala.
-
 ## Oprema u proračunima mreže (TVS_PROTOK, TVS_PAD, TVS_DPD_IZVOZ, TVS_DIM_PRATI, TVS_PROVJERA)
 - Čitanje: TVS_Ventilation_ARX/EquipmentNodes.h dodaje povezane blokove trenutnog prostora mreži; priključci se preračunavaju u jedinice crteža, a z priključka uzima z kraja kanala na koji naliježe u osnovi (kanali nose kotu u Elev). Pravila: geometry/EquipmentFlow.h.
 - **TVS_PROTOK**: terminal ima protok iz zapisa; bez njega protok kanala na kome stoji (ranije upisan); oba i različita → upozorenje, važi oprema. Protok terminala se upisuje u zapis opreme, ne u kanal. Inline oprema nema protok.
