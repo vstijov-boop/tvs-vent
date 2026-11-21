@@ -26,5 +26,12 @@ int main(){
     {std::vector<Item> v={duct(0,0,100,0,40,20,0),duct(100.2,0,200,0,40,20,0)};check(v,10,r);assert(count(r,Miss)==1&&std::fabs(r[0].value-2)<1e-6);}
     // stacked: three ports at one point -> no one-to-one level issue
     {std::vector<Item> v={duct(0,0,1000,0,200,200,0),duct(1000,0,2000,0,200,200,0),duct(1000,0,1000,800,200,200,3000)};check(v,1,r);assert(count(r,Level)==0);}
+    // oprema (kind 5, known = false): ports on duct ends of its size and level -> fine
+    {auto eq=[](double ax,double bx,double a,double b,double z){Item it;it.kind=5;it.x={ax,bx};it.y={0,0};Section s;s.a=a;s.b=b;s.elevation=z;s.known=false;it.s={s,s};return it;};
+     std::vector<Item> v={duct(0,0,1000,0,400,200,2850),eq(1000,1400,400,200,2850),duct(1400,0,2000,0,400,200,2850)};check(v,1,r);assert(r.empty());
+     v[1].s[1].b=250;check(v,1,r);assert(count(r,Equipment)==1&&r[0].b==2&&r[0].value==0&&r[0].a==1);          // other size
+     v[1].s[1].b=200;v[2].x[0]=1403;check(v,1,r);assert(count(r,Equipment)==1&&std::fabs(r[0].value-3)<1e-6&&count(r,Miss)==0);   // 3 mm gap
+     v[2].x[0]=1400;v[1].s[0].elevation=2700;check(v,1,r);assert(count(r,Equipment)==1&&r[0].x==1000);          // other level
+     v[1].s[0].elevation=2850;v.erase(v.begin()+2);v.erase(v.begin());v.push_back(duct(0,0,3000,0,400,200,2850));check(v,1,r);assert(count(r,Equipment)==2);}   // duct under the block
     std::puts("network check OK");return 0;
 }

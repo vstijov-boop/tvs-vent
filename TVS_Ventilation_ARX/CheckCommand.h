@@ -3,13 +3,14 @@
 // in the command line and walks through them: zoom to the joint, the elements selected (grips).
 // A selection limits the report to problems that touch it (Enter = whole drawing).
 #include "TVSMoveCommand.h"
+#include "EquipmentNodes.h"
 #include "../geometry/NetworkCheck.h"
 #include <cmath>
 #include <set>
 #include <vector>
 namespace tvsCheck {
 inline const wchar_t* kindName(const tvsMove::Node& n){
-    if(n.flex)return L"flex";switch(n.kind){case 1:return L"kanal";case 2:return L"koljeno";case 3:return L"prelaz";case 4:return L"T komad";default:return L"element";}
+    if(n.flex)return L"flex";switch(n.kind){case 1:return L"kanal";case 2:return L"koljeno";case 3:return L"prelaz";case 4:return L"T komad";case 5:return L"oprema";default:return L"element";}
 }
 inline void section(wchar_t* out,size_t len,const tvsNetworkCheck::Section& s,double f){
     if(s.round)swprintf_s(out,len,L"Ø%.0f",s.a*f);else swprintf_s(out,len,L"%.0f×%.0f",s.a*f,s.b*f);
@@ -28,6 +29,11 @@ inline void describeIssue(const tvsNetworkCheck::Issue& e,const std::vector<tvsM
     case tvsNetworkCheck::Middle:acutPrintf(L"kraj (%ls) naliježe na sredinu kanala – nema T komada / kanal nije podijeljen.",a);break;
     case tvsNetworkCheck::Angle:acutPrintf(L"koljeno %.3f° – malo odstupa od standardnog ugla (TVS_KOLJENA_UGAO).",e.value);break;
     case tvsNetworkCheck::Short:acutPrintf(L"kanal dužine %.1f mm.",e.value);break;
+    case tvsNetworkCheck::Equipment:
+        if(e.b>=0&&e.value>0)acutPrintf(L"oprema: priključak ne naliježe na kanal (najbliži kraj %.1f mm).",e.value);
+        else if(e.b>=0)acutPrintf(L"oprema: priključak ne naliježe na kanal (%ls druge dimenzije ili kote).",b);
+        else acutPrintf(L"oprema: priključak ne naliježe na kanal.");
+        break;
     }
 }
 inline void zoom(double x,double y,double height){
@@ -51,23 +57,23 @@ inline void execute(){
      const int rc=acedSSGet(NULL,NULL,NULL,NULL,ss);if(rc==RTCAN)return;
      if(rc==RTNORM){Int32 n=0;acedSSLength(ss,&n);for(Int32 i=0;i<n;++i){ads_name e;AcDbObjectId id;if(acedSSName(ss,i,e)==RTNORM&&acdbGetObjectId(id,e)==Acad::eOk)limit.insert(id);}acedSSFree(ss);}}
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
-    if(!tvsMove::snapshot(db,nodes,labels)){acutPrintf(L"\nTVS_PROVJERA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
+    if(!tvsMove::snapshot(db,nodes,labels)||!tvsEquipmentNodes::append(db,nodes,NULL,0)){acutPrintf(L"\nTVS_PROVJERA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
     std::vector<tvsNetworkCheck::Item> items(nodes.size());
     for(size_t i=0;i<nodes.size();++i){const tvsMove::Node& n=nodes[i];tvsNetworkCheck::Item& it=items[i];
         it.kind=n.kind;it.flex=n.flex;
         for(size_t p=0;p<n.ports.size();++p){it.x.push_back(n.ports[p].x);it.y.push_back(n.ports[p].y);
-            tvsNetworkCheck::Section s;if(p<n.sections.size()){s.a=n.sections[p].a;s.b=n.sections[p].b;s.round=n.sections[p].round;s.elevation=n.sections[p].elevation;s.known=!n.flex;}
+            tvsNetworkCheck::Section s;if(p<n.sections.size()){s.a=n.sections[p].a;s.b=n.sections[p].b;s.round=n.sections[p].round;s.elevation=n.sections[p].elevation;s.known=!n.flex&&!tvsEquipmentNodes::isNode(n);}
             it.s.push_back(s);}
         if(n.kind==2){AcDbObjectPointer<TVS_TAP> t(n.id,AcDb::kForRead);
             if(t.openStatus()==Acad::eOk&&t->Form==Form_Direct&&std::fabs(std::fabs(t->Normvector.z)-1)<1e-9)it.angle=t->Swectangle*180/M_PI;}
     }
     std::vector<tvsNetworkCheck::Issue> all,issues;tvsNetworkCheck::check(items,f,all);
     for(size_t k=0;k<all.size();++k)if(limit.empty()||limit.count(nodes[all[k].a].id)||(all[k].b>=0&&limit.count(nodes[all[k].b].id)))issues.push_back(all[k]);
-    int count[7]={0};for(size_t k=0;k<issues.size();++k)++count[issues[k].type];
+    int count[8]={0};for(size_t k=0;k<issues.size();++k)++count[issues[k].type];
     acutPrintf(L"\nTVS_PROVJERA: elemenata %d, problema %d.",static_cast<int>(limit.empty()?nodes.size():limit.size()),static_cast<int>(issues.size()));
     if(issues.empty())return;
-    acutPrintf(L"\n  dimenzije bez prelaza: %d, kota: %d, promašen priključak: %d, kraj usred kanala: %d, ugao koljena: %d, kratki kanali: %d",
-               count[1],count[2],count[3],count[4],count[5],count[6]);
+    acutPrintf(L"\n  dimenzije bez prelaza: %d, kota: %d, promašen priključak: %d, kraj usred kanala: %d, ugao koljena: %d, kratki kanali: %d, oprema: %d",
+               count[1],count[2],count[3],count[4],count[5],count[6],count[7]);
     for(size_t k=0;k<issues.size()&&k<200;++k)describeIssue(issues[k],nodes,items,static_cast<int>(k)+1,f);
     if(issues.size()>200)acutPrintf(L"\n... i još %d.",static_cast<int>(issues.size())-200);
     if(count[5])acutPrintf(L"\nUglove koljena popravlja TVS_KOLJENA_UGAO; kotu i prelaz na T komadu nude TVS_STRETCH / TVS_MOVE.");

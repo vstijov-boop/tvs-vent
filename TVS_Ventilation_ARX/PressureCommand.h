@@ -1,7 +1,8 @@
 ﻿#pragma once
 // TVS_PAD: pad pritiska po dionicama u Excel. The network from the end at the unit (as TVS_PROTOK;
 // flows summed from the terminals, nothing is written into the drawing), split into dionice with
-// friction and the ASHRAE fittings (geometry/PressureDrop.h), then the workbook
+// friction and the ASHRAE fittings (geometry/PressureDrop.h; linked oprema: the loss of its record,
+// terminals in "Δp kraj. elem."), then the workbook
 // (geometry/PressureSheet.h) is built in Excel (ExcelWriter.h): Dionice, Fitinzi, Sema.
 //   ASHRAE data: the user's DuctPressDrop folder ashrae_data (Constants / Equation / Output /
 //   Input.csv, tables\*.TBL), chosen once by picking its Equation.csv (registry Software\TVS_Vent,
@@ -71,6 +72,8 @@ inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
             if(t.tee==tvsPressure::TeePants){t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}
             else{t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}}
         return true;}
+    if(const AcDbBlockReference* b=AcDbBlockReference::cast(e.object())){   // oprema (EquipmentNodes.h): loss from its record
+        tvsEquipment::Record rec;if(tvsEquipmentStore::read(b,rec)){t.kind=tvsPressure::Equipment;t.equipment=rec;return true;}}
     t.kind=tvsPressure::Other;return true;
 }
 inline void execute(){
@@ -96,7 +99,8 @@ inline void execute(){
         for(size_t p=0;p<el[i].ports.size();++p){bool done=false;
             for(size_t k=0;k<el.size()&&!done;++k){if(k==i)continue;
                 for(size_t q=0;q<el[k].ports.size();++q){if(std::hypot(el[k].ports[q].x-el[i].ports[p].x,el[k].ports[q].y-el[i].ports[p].y)<=tol&&std::fabs(el[k].ports[q].z-el[i].ports[p].z)>tol){el[i].ports[p].z=el[k].ports[q].z;done=true;break;}}}}}
-    const tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
+    tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
+    tvsFlow::equipmentFlows(net,el,r,root,port,tol,L"TVS_PAD");   // oprema: terminal flows from the records
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}
     int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;
     if(missing)acutPrintf(L"\nTVS_PAD: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",missing);

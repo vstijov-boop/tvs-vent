@@ -3,7 +3,7 @@
 // BOM), imported there with Datoteka -> Uvezi sistem... (Ctrl+I) as a new system. The network is
 // read as in TVS_PAD (PressureCommand.h: the end at the unit, flows summed from the terminals,
 // dionice), then geometry/DpdExport.h writes one DuctPressDrop dionica per straight piece (Q m3/h,
-// W / H / D mm, smjer m, plan only). No fittings: DuctPressDrop derives elbows, tees and
+// W / H / D mm, smjer m, plan only; linked oprema as DuctPressDrop equipment). No other fittings: DuctPressDrop derives elbows, tees and
 // transitions from the geometry. Nothing is written into the drawing.
 //   A preselected element (one) with exactly one free end is taken as the end at the unit.
 #include "PressureCommand.h"
@@ -61,7 +61,8 @@ inline void execute(){
         for(size_t p=0;p<el[i].ports.size();++p){bool done=false;
             for(size_t k=0;k<el.size()&&!done;++k){if(k==i)continue;
                 for(size_t q=0;q<el[k].ports.size();++q){if(std::hypot(el[k].ports[q].x-el[i].ports[p].x,el[k].ports[q].y-el[i].ports[p].y)<=tol&&std::fabs(el[k].ports[q].z-el[i].ports[p].z)>tol){el[i].ports[p].z=el[k].ports[q].z;done=true;break;}}}}}
-    const tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
+    tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
+    tvsFlow::equipmentFlows(net,el,r,root,port,tol,L"TVS_DPD_IZVOZ");   // oprema: terminal flows from the records
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}
     int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;
     if(missing)acutPrintf(L"\nTVS_DPD_IZVOZ: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",missing);
@@ -102,6 +103,6 @@ inline void execute(){
     for(size_t k=0;k<warnings.size();++k)acutPrintf(L"\n  %ls",warnings[k].c_str());
     acutPrintf(L"\nTVS_DPD_IZVOZ: %ls, Q = %.0f m3/h, TVS dionica %d -> DuctPressDrop dionica %d (podijeljene na koljenima). Upisano: %ls",
         kind.c_str(),res.d.empty()?0.0:res.d[0].flow,static_cast<int>(res.d.size()),static_cast<int>(sys.segments.size()),path.c_str());
-    acutPrintf(L"\nTVS_DPD_IZVOZ: u DuctPressDrop-u Datoteka -> Uvezi sistem... (Ctrl+I). Koljena, T komadi i prelazi se tamo izvode iz geometrije; krajnji elementi (rešetke / difuzori) i kote se ne prenose.");
+    acutPrintf(L"\nTVS_DPD_IZVOZ: u DuctPressDrop-u Datoteka -> Uvezi sistem... (Ctrl+I). Koljena, T komadi i prelazi se tamo izvode iz geometrije; povezana oprema (TVS_OPREMA) ide kao oprema na dionici; kote se ne prenose.");
 }
 }
