@@ -124,6 +124,13 @@
         syncTVSGlobalUnits();
         tvsPad::execute();
     }
+    // TVS_DPD_IZVOZ: the network as a DuctPressDrop system file (JSON, DpdExportCommand.h).
+    static void Ventilation_ARXTVS_DPD_IZVOZ(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsDpdExport::execute();
+    }
     // TVS_SPOJ_TKO: inlet, prolaz and branch duct joined by a TK-O (BranchJoinCommand.h).
     static void Ventilation_ARXTVS_SPOJ_TKO(void)
     {
