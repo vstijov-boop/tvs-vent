@@ -30,17 +30,9 @@
 
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "DecimalText.h"
-static void DDX_MillimetreString(CDataExchange* dx, int id, CString& value) {
-    const double factor = tvsUnits::factor();
-    CString display = value;
-    double number = 0;
-    if (!dx->m_bSaveAndValidate && tvsDecimal::parse(value, number))
-        display.Format(L"%.15g", number * factor);
-    DDX_Text(dx, id, display);
-    if (dx->m_bSaveAndValidate) {
-        if (tvsDecimal::parse(display, number)) value.Format(L"%.15g", number / factor);   // decimal comma or point
-        else value = display;
-    }
+// Length in drawing units shown in mm; untouched it stays exactly as read (DecimalText.h, N1).
+static void DDX_MillimetreString(CDataExchange* dx, int id, CString& value, bool positive = false) {
+    tvsDecimal::DDX_Millimetres(dx, id, value, tvsUnits::factor(), positive);
 }
 
 #include "Calculate.h"
@@ -148,10 +140,10 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 
 
 
-	DDX_MillimetreString(pDX, IDC_SizeA, SizeA);
+	DDX_MillimetreString(pDX, IDC_SizeA, SizeA, true);
 	DDX_MillimetreString(pDX, IDC_SizeB, SizeB);
-		tvsDecimal::DDX_Number(pDX, IDC_Flow, Flow);
-	DDX_MillimetreString(pDX, IDC_SizeA2, SizeA2);
+	tvsDecimal::DDX_Plain(pDX, IDC_Flow, Flow);
+	DDX_MillimetreString(pDX, IDC_SizeA2, SizeA2, true);
 	DDX_MillimetreString(pDX, IDC_SizeB2, SizeB2);
 	DDX_MillimetreString(pDX, IDC_TransLength, LengthTr);
 	DDX_MillimetreString(pDX, IDC_LengthWye, LengthW);
@@ -165,8 +157,8 @@ void dgAllEdit::DoDataExchange(CDataExchange *pDX) {
 	DDX_Text(pDX, IDC_i, I);
 	DDX_Text(pDX, IDC_dP, Dp);
 
-		tvsDecimal::DDX_Number(pDX, IDC_Swectangle, Swectangle);
-		tvsDecimal::DDX_Number(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
+	tvsDecimal::DDX_Degrees(pDX, IDC_Swectangle, Swectangle);   // radians, shown in degrees
+	tvsDecimal::DDX_Plain(pDX, IDC_TapRadiusVariableParameter, TapRadiusVariableParameter);
 	DDX_MillimetreString(pDX, IDC_TapRadiusConst, TapRadiusConst);
 
 
@@ -314,14 +306,7 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 		iTypeRoundTap = _wtoi(TypeRoundTap);
 		iRadiusTypeRound = _wtoi(RadiusTypeRound);
 		iRadiusTypeRect = _wtoi(RadiusTypeRect);
-		CString var;
-		SwectangleRadians = Swectangle; SwectangleShown.Empty();
-		if ((tvsDecimal::value(Swectangle) / M_PI * 180) != 0)
-		{
-			var.Format(L"%.10g", tvsDecimal::value(Swectangle) / M_PI * 180);
-			fSwectangle.SetWindowTextW(var);
-			SwectangleShown = var;
-		}
+		// ugao: DDX_Degrees (DoDataExchange) shows degrees and keeps the radians when untouched
 
 
 		switch (iTapForm)
@@ -688,16 +673,7 @@ void dgAllEdit::OnBnClickedOk()
 		RadiusTypeRect.Format(L"%i", RadiusTypeRect_RadiusVariable);
 	}
 
-	CString var;
-	fSwectangle.GetWindowTextW(var);
-
-	if (!SwectangleShown.IsEmpty() && tvsDecimal::normalized(var) == tvsDecimal::normalized(SwectangleShown))
-		fSwectangle.SetWindowTextW(SwectangleRadians);   // ugao nije diran: ostaje tačno kakav je bio
-	else if ((M_PI*tvsDecimal::value(var) / 180) != 0)
-	{
-		var.Format(L"%.15g", M_PI*tvsDecimal::value(var) / 180);
-		fSwectangle.SetWindowTextW(var);
-	}
+	// ugao: degrees -> radians in DDX_Degrees (OnOK -> UpdateData); untouched it stays as it was
 
 
 

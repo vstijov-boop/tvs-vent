@@ -7,6 +7,7 @@
 // the command picks the other kind.
 #include "SectionCommand.h"
 #include "../geometry/SectionSketch.h"
+#include "../geometry/NumericField.h"
 #include "SketchRender.h"
 #include "adui.h"
 #include <cmath>
@@ -34,11 +35,9 @@ public:
     Dialog(const Setup& setup,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),s(setup),valid(false),loading(false){}
 
     static bool number(CWnd* w,double& v,bool allowZero){
-        if(!w)return false;CString t;w->GetWindowText(t);t.Trim();t.Replace(L',',L'.');if(t.IsEmpty())return false;
-        wchar_t* end=NULL;v=wcstod(t,&end);return end&&!*end&&(allowZero?v>=0:v>0)&&v<1e6;}
+        if(!w)return false;CString t;w->GetWindowText(t);return tvsNumeric::parse(t.GetString(),v)&&(allowZero?v>=0:v>0)&&v<1e6;}
     static bool level(CWnd* w,double& v){
-        if(!w)return false;CString t;w->GetWindowText(t);t.Trim();t.Replace(L',',L'.');if(t.IsEmpty())return false;
-        wchar_t* end=NULL;v=wcstod(t,&end);return end&&!*end&&std::fabs(v)<1e5;}
+        if(!w)return false;CString t;w->GetWindowText(t);return tvsNumeric::parse(t.GetString(),v)&&std::fabs(v)<1e5;}
     void setValue(int id,double v,int dec){if(CWnd* w=GetDlgItem(id))if(::GetFocus()==w->m_hWnd)return;
         CString t;t.Format(dec==0?L"%.0f":dec==1?L"%.1f":L"%.2f",v);SetDlgItemText(id,t);}
     void enable(int id,bool on){if(CWnd* w=GetDlgItem(id))w->EnableWindow(on?TRUE:FALSE);}

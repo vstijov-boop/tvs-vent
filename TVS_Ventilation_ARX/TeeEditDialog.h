@@ -8,6 +8,7 @@
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "dgAllEdit.h"
 #include "TeeNeighbours.h"
+#include "../geometry/NumericField.h"
 #include <map>
 #include <cwchar>
 namespace tvsTeeEdit {
@@ -25,7 +26,7 @@ struct Gather {
     }
     int commonType()const{return any&&!mixedType?type:0;}
     // Drawing units; dgAllEdit converts to mm for display.
-    CString text()const{CString s;if(commonType()&&!mixedSecond)s.Format(L"%.15g",second);return s;}
+    CString text()const{CString s;if(commonType()&&!mixedSecond)s=tvsNumeric::exact(second).c_str();return s;}
 };
 inline void prepare(dgAllEdit& dg,const Gather& g){dg.TeeType=g.commonType();dg.TeeSecond=g.text();}
 // Called with the element open for write, after the generic fields were applied.
@@ -33,11 +34,9 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
     if(!g.commonType())return;
     tvsTeeData::Record r;if(!tvsTeeData::read(w,r))return;
     bool changed=false;
-    if(dg.TeeSecond!=g.text()){
-        wchar_t* end=NULL;const double v=wcstod(dg.TeeSecond,&end);
-        if(end!=(LPCTSTR)dg.TeeSecond&&end&&*end==0&&v>0){
-            r.second=v;if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);changed=true;}
-    }
+    double v=0;   // by number, not by text (N1): untouched / same number -> no change
+    if(tvsNumeric::differs(g.text().GetString(),dg.TeeSecond.GetString(),v)&&v>0){
+        r.second=v;if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);changed=true;}
     // TK-G: both branch widths set L (axes on one line); TK-O: the branch width.
     const bool branchWidth=r.type!=tvsTee::Pants?widthA2Changed:(widthAChanged||changed);
     if(changed){w->assertWriteEnabled();if(tvsTeeData::write(w,r)!=Acad::eOk)return;}

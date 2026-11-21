@@ -2490,22 +2490,7 @@ void func::strfil(double &myvar,
 {
 	if (variableconst == true)
 		stringconst = CString(L"Razli\u010Dito");
-	else
-	{
-		double pnum = myvar;
-		CString stringvar;
-		getdouble(stringvar, pnum);
-		int y = (int)pnum;
-		if ((pnum - y) == 0)
-		{
-			getint(stringconst, myvar);
-			double g = 1;
-
-		}
-		else stringconst.Format(L"%.15g", myvar);   // full precision: "%.2f\n" changed angles / m sizes on a plain OK
-	}
-
-	double g = 1;
+	else stringconst = tvsDecimal::exact(myvar);   // exact text (geometry/NumericField.h); the dialog shows mm / degrees
 }
 
 void func::strfil(int &myvar,
@@ -2530,24 +2515,18 @@ void func::strfil(bool &myvar,
 
 }
 
-// Svar1: value shown in the dialog, Svar2: value after it. Numbers are compared as numbers (a
-// text that only looks different, "1.5" / "1,50", is no change); equ = true: nothing to write.
+// Svar1: value passed to the dialog, Svar2: value after it. Compared as NUMBERS within a tolerance
+// (tvsNumeric::differs), never as texts; text (Različito, empty) is no change. equ = true: nothing
+// to write, var keeps the exact value read from the element.
 void func::sequal(double &var,
 	CString &Svar1,//начальный
 	CString &Svar2,//конечный
 	bool &equ
 )
 {
-	double before = 0, after = 0;
-	const bool numberBefore = tvsDecimal::parse(Svar1, before), numberAfter = tvsDecimal::parse(Svar2, after);
-	if (Svar1 == Svar2 || (numberBefore && numberAfter && std::fabs(before - after) <= 1e-9 * (std::fabs(before) > 1 ? std::fabs(before) : 1)))
-	{
-		equ = true;
-		return;
-	}
-	if (!numberAfter) { equ = true; return; }   // text (Različito, empty): no change
-	var = after;
-	equ = false;
+	double after = 0;
+	equ = !tvsDecimal::differs(Svar1, Svar2, after);
+	if (!equ) var = after;
 }
 
 void func::sequal(int &var,
@@ -2556,36 +2535,9 @@ void func::sequal(int &var,
 	bool &equ
 )
 {
-
-	CString s;
-	const wchar_t *wch;
-	char *ch;
-	int z;
-	size_t sizeb,
-		cnv;
-	wch = Svar2.GetBuffer();
-	sizeb = (Svar2.GetLength() + 1) * 2;
-	ch = new char[sizeb];
-	wcstombs_s(&cnv, ch, sizeb, wch, sizeb);
-	int dbl = atoi(ch);
-
-
-	delete[] ch;
-
-
-	if (Svar1 == Svar2)
-	{
-		equ = true;
-
-	}
-
-	else
-	{
-		var = dbl;
-		equ = false;
-	}
-
-
+	double after = 0;   // by number, as the double overload ("2" / "2,0" is no change)
+	equ = !tvsDecimal::differs(Svar1, Svar2, after);
+	if (!equ) var = (int)(after < 0 ? after - 0.5 : after + 0.5);
 }
 
 void func::sequal(bool &var,

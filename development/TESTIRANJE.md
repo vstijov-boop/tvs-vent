@@ -186,6 +186,14 @@ Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → In
 - **SCALE** nad TVS elementima: i dalje odbijen.
 - **TK-O / TK-G** poslije kopiranja mm → cm: oblik i priključci isti (kragna, druga širina, radijus).
 
+## Numerička polja dijaloga, jedan sloj (prijedlog 4, 21.11.) – testirati
+- **Svojstva, OK bez izmjene** (koljeno 45° / 90°, kanal Ø315 u crtežu u m, kota 2,755 m, TK-O / TK-G sa drugim ogrankom, prelaz): ništa se ne mijenja – Properties pokazuje iste brojeve, oznake se ne osvježavaju zbog „izmjene“.
+- **Prikaz kao do sad:** dimenzije u mm, ugao u stepenima (npr. 89,95437384 kod starog zaokruženog koljena), protok i k radijusa bez promjene broja decimala; „Različito“ kod različitih vrijednosti.
+- **Unos sa zarezom:** ugao „44,5“, dimenzija „315,5“, protok „1,5“, kota „2,75“ – upisuje se tačno ta vrijednost. Ukucati isti broj drugačije („45,0“ umjesto „45“) – nije izmjena.
+- **Novo – provjera opsega (S-2):** ukucati ugao 0, 180, 200 ili -10 → poruka „Ugao koljena mora biti veći od 0° i manji od 180°.“, dijalog ostaje otvoren; dimenzija A (ili A2) 0 → „Dimenzija mora biti veća od 0.“. Odustani i dalje ne mijenja ništa.
+- **Više izabranih elemenata:** polje „Različito“ prepisati brojem → svi dobiju taj broj; ostaviti „Različito“ → ništa.
+- **Vrh / Centar / Dno** u Svojstvima i TVS_SETTINGS preračunava kotu kao do sad; TVS_PRESJEK (kote, razmjera) i dijalog promjene kote (TVS_OFFSET / opcija Z pri crtanju) primaju zarez i tačku kao do sad.
+
 ## Ponovni pregled N1 – Svojstva ne mijenjaju ništa na „OK“ – testirati
 - **Koljeno 45° / 90°** → Svojstva → OK bez izmjene → Properties: ugao ostaje tačno 45 / 90 (ranije 45,26 / 89,954).
 - **Crtež u metrima:** kanal Ø315 → Svojstva → OK → ostaje Ø315 (ranije Ø320). Isto kote i dužine prelaza.

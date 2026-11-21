@@ -15,7 +15,8 @@ class Decimal(unittest.TestCase):
   p=text('TVS_Ventilation_ARX/dgPipeSize.cpp')
   self.assertNotRegex(p,r'(?m)^\s*DDX_Text\(pDX, IDC_(Flow|Speed|i|TapRadiusVariableParameter|SpiroC),')
   a=text('TVS_Ventilation_ARX/dgAllEdit.cpp')
-  for x in ('Flow','Swectangle','TapRadiusVariableParameter'):self.assertIn('tvsDecimal::DDX_Number(pDX, IDC_%s, %s);'%(x,x),a)
+  for x in ('Flow','TapRadiusVariableParameter'):self.assertIn('tvsDecimal::DDX_Plain(pDX, IDC_%s, %s);'%(x,x),a)
+  self.assertIn('tvsDecimal::DDX_Degrees(pDX, IDC_Swectangle, Swectangle);',a)
  def test_svojstva(self):
   f=text('TVS_Ventilation_ARX/Func.cpp')
   self.assertIn('if (dg.DoModal() != IDOK) return;   // Odustani',f)
@@ -23,12 +24,12 @@ class Decimal(unittest.TestCase):
  def test_no_rounding_on_ok(self):
   f=text('TVS_Ventilation_ARX/Func.cpp')
   self.assertNotIn('Format(L"%.2f\\n"',f)                                            # zaokruzivanje na 2 decimale + \n
-  self.assertIn('stringconst.Format(L"%.15g", myvar);',f)
-  self.assertIn('std::fabs(before - after) <= 1e-9',f)                     # poredjenje brojeva, ne teksta
+  self.assertIn('else stringconst = tvsDecimal::exact(myvar);',f)
+  self.assertEqual(f.count('equ = !tvsDecimal::differs(Svar1, Svar2, after);'),2)   # poredjenje brojeva, ne teksta (NumericField.h)
   self.assertNotIn('"Разные"',f)                            # ruski tekst u dijalogu
   self.assertEqual(f.count('if (dg.DoModal() != IDOK) return;'),2)         # i dvoklik postuje Odustani
   a=text('TVS_Ventilation_ARX/dgAllEdit.cpp')
-  self.assertIn('fSwectangle.SetWindowTextW(SwectangleRadians);',a)        # nediran ugao ostaje tacno isti
+  self.assertIn('tvsDecimal::DDX_Degrees(pDX, IDC_Swectangle, Swectangle);',a)   # nediran ugao ostaje tacno isti (DDX_Scaled)
  def test_elbow_angle_command(self):
   c=text('TVS_Ventilation_ARX/ElbowAngleCommand.h')
   self.assertIn('{15,22.5,30,45,60,75,90}',c);self.assertIn('standard(before,0.5)',c)
