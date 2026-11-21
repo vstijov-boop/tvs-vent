@@ -13,6 +13,18 @@
 - Obilazak pri promjeni dimenzije: zaključati sloj jednog člana obilaska → poruka „element sklopa se ne može mijenjati“, obilazak ostaje cio.
 - Tip T komada (TVS_CONNECTW, Račva, TVS_TK_TIP): klik na opciju i kucanje TK-O / TK-G / SR5-3 rade.
 
+## TVS_DPD_IZVOZ – izvoz mreže u DuctPressDrop (novo, 21.11.) – testirati
+Format i pravila: [DPD_IZVOZ.md](DPD_IZVOZ.md).
+- Mreža sa jedinicom, koljenima, TK0 / TK-O / TK-G, prelazom i fleksom; protoci upisani (TVS_PROTOK).
+- `TVS_DPD_IZVOZ` → klik blizu slobodnog kraja kod jedinice (ili prije komande izabrati jedan kanal sa jednim slobodnim krajem) → `Sistem [Dovod/Odvod]` → dijalog za snimanje, predloženo `<crtež>_Dovod.json`.
+- Poruka: broj TVS dionica → DuctPressDrop dionica (više, jer se dijele na koljenima), Q kod jedinice, putanja. U crtežu se ništa ne mijenja.
+- DuctPressDrop: Datoteka → Uvezi sistem… (Ctrl+I) → novi sistem „Dovod <crtež>“. Provjeriti: Q, dimenzije i dužine dionica kao u crtežu (L = osa između čvorova, sa fitinzima), šema (osnova) izgleda kao crtež, koljena / račve / prelazi su se sami pojavili (šuplji simboli), nema upozorenja o zatvaranju geometrije.
+- Odvod: isto, sistem „Odvod …“, dionice O-01…, smjer toka ka jedinici.
+- Crtež u cm / m: dužine i smjer u DuctPressDrop-u ipak u metrima, dimenzije u mm.
+- Ne prenosi se: kote (sve u jednoj ravni), rešetke / difuzori (dodati u DuctPressDrop-u), temperatura.
+- Krajnji element bez protoka → poruka, dionica sa Q = 0.
+- Meni / ribbon „Crtanje kanala“: dugme „Izvoz u DuctPressDrop“ (ikona kao TVS_PAD).
+
 ## Sitne ispravke iz pregleda (15.11.) – testirati
 - TVS_SPEC / TVS_EXCELSPEC: blok sa atributima na zaključanom sloju je u specifikaciji (ranije tiho izostavljen).
 - Fleks koljeno: dužina u specifikaciji = luk ose (npr. Ø200, 90°, k = 0,5 → ≈ 0,31 m, ranije 0,08 m).

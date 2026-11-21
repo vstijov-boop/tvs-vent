@@ -1,0 +1,95 @@
+// geometry/DpdExport.h: the TVS_PAD network as a DuctPressDrop system file.
+//   test_dpd_export [supply.json exhaust.json]: also writes the sample files (test_dpd_export.py
+//   loads them with DuctPressDrop's own importer when it is available).
+#include "../geometry/DpdExport.h"
+#include <clocale>
+#include <cstdio>
+#include <fstream>
+using namespace tvsPressure;
+static int fails=0;
+static void eq(double a,double b,const char* w,double tol=1e-9){if(!(std::fabs(a-b)<=tol)){std::printf("FAIL %s: %.9g vs %.9g\n",w,a,b);++fails;}}
+static void yes(bool c,const char* w){if(!c){std::printf("FAIL %s\n",w);++fails;}}
+static void same(const std::string& a,const std::string& b,const char* w){if(a!=b){std::printf("FAIL %s: [%s] vs [%s]\n",w,a.c_str(),b.c_str());++fails;}}
+static double dpdLen(XY p,XY q){return std::hypot(q.x-p.x,q.y-p.y);}
+static Part duct(double a,double b,bool round,XY p,XY q,bool flex=false){Part t;t.kind=Duct;t.flex=flex;t.length=dpdLen(p,q);t.sections.assign(2,Section(a,b,round));t.line.push_back(p);t.line.push_back(q);return t;}
+static Element one(const Part& t,double flow,int parent,int entry,int via,std::vector<XY> at){Element e;e.parts.push_back(t);e.ports=t.sections;e.at=at;e.flow=flow;e.parent=parent;e.entry=entry;e.via=via;return e;}
+// the network of test_pressure_drop.cpp, with the T komad drawn as TVS_PAD does (line through its
+// base point): unit -> duct 600x300 -> elbow 90 -> duct -> TK-O (prolaz 500x300, ogranak 300x300)
+//   prolaz: duct -> prelaz 500x300 -> 400x300 -> duct (terminal); ogranak: duct 300x300 -> flex
+static std::vector<Element> network(){
+    std::vector<Element> e;
+    e.push_back(one(duct(600,300,false,XY(0,0),XY(5000,0)),3600,-1,0,-1,{XY(0,0),XY(5000,0)}));
+    Part el;el.kind=Elbow;el.angle=90;el.radius=600;el.sections.assign(2,Section(600,300,false));el.line={XY(5000,0),XY(5600,0),XY(5600,600)};
+    e.push_back(one(el,3600,0,0,1,{XY(5000,0),XY(5600,600)}));
+    e.push_back(one(duct(600,300,false,XY(5600,600),XY(5600,4600)),3600,1,0,1,{XY(5600,600),XY(5600,4600)}));
+    Part t;t.kind=Tee;t.tee=TeeBranch;t.sections={Section(600,300,false),Section(500,300,false),Section(300,300,false)};
+    t.line={XY(5600,4600),XY(5600,5000),XY(5600,5400),XY(5600,5000),XY(5900,5000)};
+    e.push_back(one(t,3600,2,0,1,{XY(5600,4600),XY(5600,5400),XY(5900,5000)}));
+    e.push_back(one(duct(500,300,false,XY(5600,5400),XY(5600,8400)),2400,3,0,1,{XY(5600,5400),XY(5600,8400)}));
+    Part tr;tr.kind=Transition;tr.length=300;tr.sections={Section(500,300,false),Section(400,300,false)};tr.line={XY(5600,8400),XY(5600,8700)};
+    e.push_back(one(tr,2400,4,0,1,{XY(5600,8400),XY(5600,8700)}));
+    e.push_back(one(duct(400,300,false,XY(5600,8700),XY(5600,10700)),2400,5,0,1,{XY(5600,8700),XY(5600,10700)}));
+    e.push_back(one(duct(300,300,false,XY(5900,5000),XY(8400,5000)),1200,3,0,2,{XY(5900,5000),XY(8400,5000)}));
+    e.push_back(one(duct(250,0,true,XY(8400,5000),XY(9900,5000),true),1200,7,0,1,{XY(8400,5000),XY(9900,5000)}));
+    return e;
+}
+static bool has(const std::string& s,const std::string& w){return s.find(w)!=std::string::npos;}
+static void write(const char* file,const std::string& text){std::ofstream f(file,std::ios::binary);f<<text;}
+int main(int argc,char** argv){
+    // numbers: '.', trailing zeros, -0, not finite, also under a decimal-comma locale
+    same(tvsDpd::number(1.5,1),"1.5","1.5");same(tvsDpd::number(3600,1),"3600","3600");same(tvsDpd::number(-0.00001,4),"0","-0");
+    same(tvsDpd::number(2.80004,4),"2.8","2.8");same(tvsDpd::number(-5.6,4),"-5.6","-5.6");same(tvsDpd::number(std::nan(""),2),"0","nan");
+    if(std::setlocale(LC_NUMERIC,"de_DE.UTF-8")||std::setlocale(LC_NUMERIC,"de_DE")){same(tvsDpd::number(1.25,2),"1.25","comma locale");std::setlocale(LC_NUMERIC,"C");}
+    // strings
+    same(tvsDpd::escape("a\"b\\c\nd\x01"),"a\\\"b\\\\c\\nd\\u0001","escape");
+    same(tvsDpd::utf8(L"žica č"),"\xc5\xbe" "ica \xc4\x8d","utf8 2 bytes");same(tvsDpd::utf8(L"–"),"\xe2\x80\x93","utf8 3 bytes");
+    {std::wstring w;w+=static_cast<wchar_t>(0xD83D);w+=static_cast<wchar_t>(0xDE00);same(tvsDpd::utf8(w),"\xf0\x9f\x98\x80","utf8 surrogate pair");}
+    // the network
+    const std::vector<Element> net=network();
+    Options o;Calculator calc(nullptr,o);const Result r=calc.run(net,0);
+    yes(r.d.size()==5,"5 TVS dionice");
+    std::vector<std::wstring> warn;
+    const std::vector<tvsDpd::Segment> s=tvsDpd::segments(net,r,false,&warn);
+    yes(warn.empty(),"no warnings");
+    yes(s.size()==6,"6 pieces (the first dionica split at the elbow)");
+    if(s.size()==6){
+        same(s[0].id,"D-01","id");same(s[0].from,"J","J");same(s[0].to,"KO1","corner node");same(s[1].from,"KO1","corner");same(s[1].to,"T1","T1");
+        eq(s[0].dx,5.6,"J-KO1 dx");eq(s[0].dy,0,"J-KO1 dy");eq(s[1].dx,0,"KO1-T1 dx");eq(s[1].dy,5.0,"KO1-T1 dy: T node on the run axis");
+        same(s[0].opis,"TVS dionica 1 (1/2)","opis split");same(s[2].opis,"TVS dionica 2","opis");
+        same(s[2].from,"T1","prolaz from T1");same(s[2].to,"P1","prolaz to P1");eq(s[2].dy,3.7,"prolaz up to the end of the prelaz");eq(s[2].q,2400,"Q prolaz");
+        same(s[3].from,"T1","ogranak from T1");eq(s[3].dx,2.8,"ogranak from the run axis");eq(s[3].dy,0,"ogranak perpendicular");eq(s[3].q,1200,"Q ogranak");
+        eq(s[3].w,300,"W");eq(s[3].h,300,"H");yes(!s[3].round&&!s[3].flex,"rigid rect");
+        same(s[4].from,"P1","after prelaz");same(s[4].to,"K1","terminal");eq(s[4].w,400,"W after prelaz");eq(s[4].dy,2.0,"terminal length");
+        yes(s[5].round&&s[5].flex,"flex round");eq(s[5].d,250,"D");eq(s[5].length(),1.5,"flex length");eq(s[0].q,3600,"Q at the unit");
+        for(size_t k=0;k<s.size();++k)eq(s[k].dz,0,"plan only");}
+    tvsDpd::System sys;sys.name="Dovod \xc5\xbe";sys.project="crte\xc5\xbe.dwg";sys.source="TVS_VENT TVS_DPD_IZVOZ";sys.segments=s;
+    const std::string j=tvsDpd::json(sys);
+    yes(has(j,"\"naziv\": \"Dovod \xc5\xbe\""),"naziv");yes(has(j,"\"sistem\": \"supply\""),"supply");yes(has(j,"\"fitinzi\": []"),"no fittings");
+    yes(has(j,"\"smjer\": [5.6, 0, 0]"),"smjer");yes(has(j,"\"Q\": 3600, \"W\": 600, \"H\": 300, \"D\": 0, \"L\": 5.6"),"segment fields");
+    yes(has(j,"\"tip\": \"K\"")&&has(j,"\"D\": 250"),"round");yes(has(j,"Pocinkovani \\u010deli\\u010dni lim")&&has(j,"Fleksibilni izolovani"),"materials");
+    yes(!has(j,",\n  ]")&&!has(j,"},]"),"no trailing comma");
+    // exhaust: same orientation (from the unit), other ids and kind
+    tvsDpd::System ex=sys;ex.exhaust=true;ex.name="Odvod";ex.segments=tvsDpd::segments(net,r,true);
+    const std::string k=tvsDpd::json(ex);yes(has(k,"\"id\": \"O-01\"")&&has(k,"\"sistem\": \"extract\"")&&!has(k,"supply"),"exhaust");
+    // empty system is still valid JSON
+    yes(has(tvsDpd::json(tvsDpd::System()),"\"dionice\": []"),"empty");
+    // a dionica without length (flex of 0 mm between two ducts): dropped, its end node joined to its start
+    {std::vector<Element> z;
+     z.push_back(one(duct(300,200,false,XY(0,0),XY(1000,0)),500,-1,0,-1,{XY(0,0),XY(1000,0)}));
+     z.push_back(one(duct(300,200,false,XY(1000,0),XY(1000,0),true),500,0,0,1,{XY(1000,0),XY(1000,0)}));
+     z.push_back(one(duct(300,200,false,XY(1000,0),XY(3000,0)),500,1,0,1,{XY(1000,0),XY(3000,0)}));
+     const Result rz=calc.run(z,0);std::vector<std::wstring> w;const std::vector<tvsDpd::Segment> sz=tvsDpd::segments(z,rz,false,&w);
+     yes(rz.d.size()==3,"3 dionice (rigid / flex / rigid)");yes(sz.size()==2&&w.size()==1,"zero length dropped with a warning");
+     if(sz.size()==2){same(sz[1].from,sz[0].to,"joined node");eq(sz[1].dx,2.0,"last piece");}}
+    // a bend below 1 degree is straight on; a 45 degree elbow is a vertex
+    {std::vector<Element> b;
+     b.push_back(one(duct(300,200,false,XY(0,0),XY(1000,0)),500,-1,0,-1,{XY(0,0),XY(1000,0)}));
+     Part el;el.kind=Elbow;el.angle=45;el.sections.assign(2,Section(300,200,false));el.line={XY(1000,0),XY(1200,0),XY(1341.42,141.42)};
+     b.push_back(one(el,500,0,0,1,{XY(1000,0),XY(1341.42,141.42)}));
+     b.push_back(one(duct(300,200,false,XY(1341.42,141.42),XY(2048.53,848.53)),500,1,0,1,{XY(1341.42,141.42),XY(2048.53,848.53)}));
+     const Result rb=calc.run(b,0);const std::vector<tvsDpd::Segment> sb=tvsDpd::segments(b,rb,false);
+     yes(sb.size()==2,"45 deg: two pieces");if(sb.size()==2){eq(sb[0].dx,1.2,"to the vertex");eq(sb[1].dx,0.84853,"45 deg dx",1e-6);eq(sb[1].dy,0.84853,"45 deg dy",1e-6);}}
+    if(argc>=3){write(argv[1],j);write(argv[2],k);}
+    if(fails){std::printf("%d FAIL\n",fails);return 1;}
+    std::printf("OK\n");return 0;
+}

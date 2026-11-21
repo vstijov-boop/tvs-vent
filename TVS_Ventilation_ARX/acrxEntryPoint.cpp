@@ -80,6 +80,7 @@
 #include "BranchJoinCommand.h"
 #include "LabelCommand.h"
 #include "PressureCommand.h"
+#include "DpdExportCommand.h"
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 
@@ -400,6 +401,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SPOJ_TK
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SPOJ_TKO, TVS_SPOJ_TKO, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OZNAKE, TVS_OZNAKE, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PAD, TVS_PAD, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_DPD_IZVOZ, TVS_DPD_IZVOZ, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_MODAL, NULL)

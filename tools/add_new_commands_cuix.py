@@ -30,6 +30,7 @@ CMDS = [
  ('SPOJ_TKG', 'Spoj gaćastim T komadom', 'Spaja ulazni kanal i dva suprotna ogranka TK-G T komadom: jedan ogranak se pomjera u osu drugog, ulaz se skraćuje; prikaz prije potvrde.', 'Crtanje kanala', 'Crtanje kanala', 'TG'),
  ('SPOJ_TKO', 'Spoj T komadom sa ogrankom', 'Spaja ulazni, prolazni kanal i ogranak TK-O T komadom: prolaz u osi ulaza ili poravnat uz ivicu ulaza; prikaz prije potvrde.', 'Crtanje kanala', 'Crtanje kanala', 'TO'),
  ('PAD', 'Pad pritiska', 'Pad pritiska po dionicama u Excel (izbor kraja mreže kod jedinice; Dovod / Odvod): trenje, ASHRAE fitinzi, kritična grana, šema; Δp krajnjih elemenata se unosi u Excelu.', 'Crtanje kanala', 'Crtanje kanala', 'PP'),
+ ('DPD_IZVOZ', 'Izvoz u DuctPressDrop', 'Mreža dovoda / odvoda kao sistem za DuctPressDrop (JSON; izbor kraja mreže kod jedinice): dionice s protokom, dimenzijama i geometrijom; fitinge DuctPressDrop izvodi sam.', 'Crtanje kanala', 'Crtanje kanala', 'DP'),
  ('OZNAKE', 'Oznake kanala', 'Oznake dimenzija/protok na pravim kanalima (sloj AT-DIM_KANAL, štampaju se, prate izmjene): uključi / isključi, položaj, razmjera, pojedinačni natpisi.', 'Crtanje kanala', 'Crtanje kanala', 'OZ'),
 ]
 def clone(e, cmd, label, key):
