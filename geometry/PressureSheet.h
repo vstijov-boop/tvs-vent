@@ -9,6 +9,10 @@
 //   "Fitinzi": zeta on the pd of the dionica (editable; Dionice sums it), ASHRAE key and C.
 //   "Sema": single-line plan of the network (flex dashed), dionica numbers, nodes; the critical
 //   branch red as exported (terminal Dp = 0).
+//   Oprema: Fitinzi rows with Izvor "Oprema" (kind name, tag); inline: zeta on the pd of the
+//   dionica as every row; terminal: no zeta, its dp in H (value), "Dp kraj. elem." of the dionica
+//   = that cell and its tag is the end label in Sema. "Za ventilator": the reserve is not applied
+//   to "Dp kraj. elem." (max over the rows of (cum - kraj) * (1 + rez) + kraj).
 #include "PressureDrop.h"
 #include <string>
 #include <vector>
@@ -68,11 +72,17 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
     const wchar_t* head[]={L"Dionica",L"Od",L"Do",L"Q\nm\u00B3/h",L"Dimenzija\nmm",L"a\nmm",L"b\nmm",L"Dh\nmm",L"L\nm",L"k\nmm",L"v\nm/s",L"pd\nPa",L"Re",L"\u03BB",L"R\nPa/m",L"R\u00B7L\nPa",L"\u03A3\u03B6",L"Z\nPa",L"\u0394p kraj.\nelem. Pa",L"\u0394p\ndionice Pa",L"\u0394p od\njedinice Pa",L"max\nispod",L"Vi\u0161ak\nPa",L"Kriti\u010Dna"};
     for(int c=cNo;c<=cLast;++c)s.put(h,c,text(head[c-1]));
     {Format f;f.range=cell(cNo,h)+L":"+cell(cLast,h);f.bold=true;f.font=rgb(255,255,255);f.fill=navy;f.align=1;f.wrap=true;f.border=true;f.size=10;s.format(f);}
-    // the critical branch as exported (terminal dp = 0): cumulative per dionica
+    // Fitinzi rows: by dionica number (stable); terminal oprema -> its row (Dp kraj. elem.)
+    std::vector<size_t> order;for(size_t k=0;k<r.f.size();++k)order.push_back(k);
+    for(size_t a=1;a<order.size();++a){const size_t x=order[a];size_t j=a;while(j>0&&r.d[r.f[order[j-1]].dionica].number>r.d[r.f[x].dionica].number){order[j]=order[j-1];--j;}order[j]=x;}
+    std::vector<int> termRow(r.d.size(),0);std::vector<double> termDp(r.d.size(),0);
+    for(size_t k=0;k<order.size();++k){const tvsPressure::Fitting& x=r.f[order[k]];
+        if(x.equipment&&x.terminal&&x.ok&&x.dionica>=0&&x.dionica<static_cast<int>(r.d.size())){termRow[x.dionica]=2+static_cast<int>(k);termDp[x.dionica]=x.dp;}}
+    // the critical branch as exported (terminal dp = 0, oprema: its dp): cumulative per dionica
     std::vector<double> cum(r.d.size(),0);
     for(size_t i=0;i<r.d.size();++i){const tvsPressure::Dionica& d=r.d[i];double z=0;
         for(size_t k=0;k<r.f.size();++k)if(r.f[k].dionica==static_cast<int>(i))z+=r.f[k].zeta;
-        cum[i]=d.r*d.length+z*d.pd+(d.parent>=0?cum[d.parent]:0);}
+        cum[i]=d.r*d.length+z*d.pd+termDp[i]+(d.parent>=0?cum[d.parent]:0);}
     const std::wstring dpNet=L"$D$"+std::to_wstring(last+3);
     for(size_t i=0;i<r.d.size();++i){const tvsPressure::Dionica& d=r.d[i];const int row=first+static_cast<int>(i);const std::wstring R=std::to_wstring(row);
         s.put(row,cNo,num(d.number,0));s.put(row,cFrom,text(d.from));s.put(row,cTo,text(d.to));s.put(row,cQ,num(d.flow,0));
@@ -87,7 +97,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         s.put(row,cRL,L"="+cell(cR,row)+L"*"+cell(cL,row));
         s.put(row,cZeta,L"=SUMIF(Fitinzi!$A:$A,"+cell(cNo,row)+L",Fitinzi!$E:$E)");
         s.put(row,cZ,L"="+cell(cZeta,row)+L"*"+cell(cPd,row));
-        if(d.terminal)s.put(row,cTerm,L"0");
+        if(d.terminal)s.put(row,cTerm,termRow[i]?L"=Fitinzi!$H$"+std::to_wstring(termRow[i]):std::wstring(L"0"));
         s.put(row,cDp,L"="+cell(cRL,row)+L"+"+cell(cZ,row)+L"+"+cell(cTerm,row));
         s.put(row,cCum,d.parent<0?L"="+cell(cDp,row):L"="+cell(cDp,row)+L"+"+cell(cCum,first+d.parent));
         std::wstring mx=L"=MAX("+cell(cCum,row);for(size_t k=0;k<d.children.size();++k)mx+=L","+cell(cMax,first+d.children[k]);s.put(row,cMax,mx+L")");
@@ -101,14 +111,16 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         for(size_t k=0;k<sizeof(nf)/sizeof(nf[0]);++k){Format f;f.range=cell(nf[k].c,first)+L":"+cell(nf[k].c,last);f.number=nf[k].f;f.align=2;s.format(f);}
         const int centred[]={cNo,cFrom,cTo,cDim,cCrit};
         for(int k=0;k<5;++k){Format f;f.range=cell(centred[k],first)+L":"+cell(centred[k],last);f.align=1;s.format(f);}
-        for(size_t i=0;i<r.d.size();++i)if(r.d[i].terminal){Format f;f.range=cell(cTerm,first+static_cast<int>(i));f.fill=yellow;s.format(f);}
+        for(size_t i=0;i<r.d.size();++i)if(r.d[i].terminal&&!termRow[i]){Format f;f.range=cell(cTerm,first+static_cast<int>(i));f.fill=yellow;s.format(f);}
         Condition c;c.range=cell(cNo,first)+L":"+cell(cLast,last);c.formula=L"=$"+col(cCrit)+std::to_wstring(first)+L"=\"\u2713\"";c.fill=pink;s.conditions.push_back(c);
         // summary
         const int b=last+2;
         s.put(b,1,text(L"Kriti\u010Dna grana"));{Format f;f.range=cell(1,b);f.bold=true;f.size=11;f.font=navy;s.format(f);}
         s.put(b+1,1,text(L"\u0394p mre\u017Ee, Pa"));s.put(b+1,4,L"=MAX("+cell(cCum,first)+L":"+cell(cCum,last)+L")");
         s.put(b+2,1,text(L"Rezerva, %"));s.put(b+2,4,L"10");
-        s.put(b+3,1,text(L"Za ventilator, Pa"));s.put(b+3,4,L"="+cell(4,b+1)+L"*(1+"+cell(4,b+2)+L"/100)");
+        // no reserve on the terminal elements (as DuctPressDrop): max over the rows of (cum - kraj) * (1 + rez) + kraj
+        const std::wstring U=cell(cCum,first)+L":"+cell(cCum,last),S=cell(cTerm,first)+L":"+cell(cTerm,last);
+        s.put(b+3,1,text(L"Za ventilator, Pa"));s.put(b+3,4,L"=SUMPRODUCT(MAX(("+U+L"-"+S+L")*(1+"+cell(4,b+2)+L"/100)+"+S+L"))");
         {Format f;f.range=cell(1,b+1)+L":"+cell(1,b+3);f.bold=true;f.size=10;f.font=blue;s.format(f);}
         {Format f;f.range=cell(4,b+1)+L":"+cell(4,b+3);f.number=L"0.0";f.bold=true;f.size=10;f.align=2;s.format(f);}
         {Format f;f.range=cell(4,b+2);f.number=L"0";f.fill=yellow;s.format(f);}
@@ -118,7 +130,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         std::wstring p=L"J";for(size_t k=0;k<path.size();++k)p+=L" \u2192 "+r.d[path[k]].to;
         p+=L" (dionice ";for(size_t k=0;k<path.size();++k)p+=(k?L", ":L"")+std::to_wstring(r.d[path[k]].number);p+=L"; pri izvozu, \u0394p kraj. elemenata = 0)";
         s.put(b+4,1,text(L"Put"));s.put(b+4,4,text(p));{Format f;f.range=cell(1,b+4);f.bold=true;f.size=10;f.font=blue;s.format(f);}
-        s.put(b+5,1,text(L"Upi\u0161ite \u0394p krajnjih elemenata (\u017Eute \u0107elije) i rezervu; kriti\u010Dna grana i vi\u0161ak za prigu\u0161ivanje se prera\u010Dunavaju."));
+        s.put(b+5,1,text(L"Upi\u0161ite \u0394p krajnjih elemenata (\u017Eute \u0107elije) i rezervu; kriti\u010Dna grana i vi\u0161ak za prigu\u0161ivanje se prera\u010Dunavaju. Rezerva se ne primjenjuje na \u0394p krajnjih elemenata."));
         {Format f;f.range=cell(1,b+5);f.italic=true;f.size=9;f.font=grey;s.format(f);}
         int w=b+7;
         if(!r.warnings.empty()){s.put(w++,1,text(L"Upozorenja"));for(size_t k=0;k<r.warnings.size();++k)s.put(w++,1,text(L"\u2022 "+r.warnings[k]));}
@@ -130,12 +142,14 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
     const wchar_t* fh[]={L"Dionica",L"Element",L"Opis",L"Dimenzija",L"\u03B6 (pd dionice)",L"Izvor",L"C (izvor)",L"\u0394p, Pa",L"Napomena"};
     for(int c=1;c<=9;++c)f.put(1,c,text(fh[c-1]));
     {Format x;x.range=L"A1:I1";x.bold=true;x.font=rgb(255,255,255);x.fill=navy;x.align=1;x.border=true;x.size=10;x.wrap=true;f.format(x);}
-    std::vector<size_t> order;for(size_t k=0;k<r.f.size();++k)order.push_back(k);
-    for(size_t a=1;a<order.size();++a){const size_t x=order[a];size_t j=a;while(j>0&&r.d[r.f[order[j-1]].dionica].number>r.d[r.f[x].dionica].number){order[j]=order[j-1];--j;}order[j]=x;}
     for(size_t k=0;k<order.size();++k){const tvsPressure::Fitting& x=r.f[order[k]];const int row=2+static_cast<int>(k);
         f.put(row,1,num(r.d[x.dionica].number,0));f.put(row,2,text(x.what));f.put(row,3,text(x.note.empty()?std::wstring():x.note));f.put(row,4,text(x.dim));
-        f.put(row,5,num(x.zeta,4));f.put(row,6,text(x.key.empty()?std::wstring(L"\u2013"):(x.key==L"Idelchik"?x.key:L"ASHRAE "+x.key)));
-        if(x.ok)f.put(row,7,num(x.c,4));
+        if(x.equipment){f.put(row,6,text(L"Oprema"));if(x.ok&&x.c>0)f.put(row,7,num(x.c,4));}
+        else{f.put(row,6,text(x.key.empty()?std::wstring(L"\u2013"):(x.key==L"Idelchik"?x.key:L"ASHRAE "+x.key)));if(x.ok)f.put(row,7,num(x.c,4));}
+        if(x.equipment&&x.terminal){   // terminal oprema: dp itself (Dionice takes it as "Dp kraj. elem."), no zeta
+            if(x.ok)f.put(row,8,num(x.dp,1));else{Format y;y.range=L"H"+std::to_wstring(row);y.fill=yellow;f.format(y);}
+            continue;}
+        f.put(row,5,num(x.zeta,4));
         f.put(row,8,L"=E"+std::to_wstring(row)+L"*INDEX(Dionice!$"+col(cPd)+L":$"+col(cPd)+L",MATCH(A"+std::to_wstring(row)+L",Dionice!$A:$A,0))");
         if(!x.ok){Format y;y.range=L"E"+std::to_wstring(row);y.fill=yellow;f.format(y);}}
     const int fl=1+static_cast<int>(order.size());
@@ -171,7 +185,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         for(size_t i=0;i<r.d.size();++i){const tvsPressure::Dionica& d=r.d[i];
             const std::wstring names[2]={d.from,d.to};const tvsPressure::XY at[2]={d.fromAt,d.toAt};
             for(int k=0;k<2;++k){bool dup=false;for(size_t j=0;j<seen.size();++j)if(seen[j]==names[k])dup=true;if(dup)continue;seen.push_back(names[k]);
-                Label t;t.x=X(at[k].x)+4;t.y=Y(at[k].y)-13;t.text=names[k];t.size=8;t.color=grey;t.bold=false;g.labels.push_back(t);}}
+                Label t;t.x=X(at[k].x)+4;t.y=Y(at[k].y)-13;t.text=k==1&&!d.tag.empty()?d.tag:names[k];t.size=8;t.color=grey;t.bold=false;g.labels.push_back(t);}}
     }
     return wb;
 }

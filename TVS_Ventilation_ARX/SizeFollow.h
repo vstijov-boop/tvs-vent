@@ -10,11 +10,12 @@
 // to the whole run of the old size up to the next prelaz / free end: ducts and plan elbows
 // (new radius, the duct ends follow the elbow ports along their axes). It stops at an etaz,
 // obilazak, T komad, vertical or round elbow it cannot recompute, or an element of another
-// size, and says where.
+// size, and says where. A linked oprema block (EquipmentNodes.h) is a boundary "oprema".
 #include <rxmfcapi.h>
 #include "BuildTransaction.h"
 #include "ActionTransaction.h"
 #include "TVSMoveCommand.h"
+#include "EquipmentNodes.h"
 #include "TransAlignCommand.h"
 #include "TeeCommand.h"
 #include "MleaderController.h"
@@ -223,6 +224,7 @@ struct NoEtaz {};typedef std::vector<NoEtaz> Etazes;
 #endif
 inline CString boundary(const AcDbObject* o){
     if(TVS_WYE::cast(o))return L"T komad";
+    if(AcDbBlockReference::cast(o)&&tvsEquipmentStore::linked(o))return L"oprema";   // not resized through it
 #ifdef TVS_OFFSET_INTEGRATION
     if(tvsBypassData::marked(o))return L"obilazak";
     if(tvsOffsetData::marked(o))return L"etaž";
@@ -686,9 +688,9 @@ inline void run(UINT runDialog=0,UINT teeDialog=0){
 inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
     const double f=tvsUnits::factor(db),tol=1.0/f;
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
-    if(!tvsMove::snapshot(db,nodes,labels)){acutPrintf(L"\nTVS_DIM_PRATI: mreža se ne može pročitati (objekat otvoren u drugoj komandi?); dimenzije na spojevima nisu prilagođene.");return;}
+    if(!tvsMove::snapshot(db,nodes,labels)||!tvsEquipmentNodes::append(db,nodes,NULL,0)){acutPrintf(L"\nTVS_DIM_PRATI: mreža se ne može pročitati (objekat otvoren u drugoj komandi?); dimenzije na spojevima nisu prilagođene.");return;}
     bool dirty=false;   // geometry changed since the snapshot: read again before the next step
-    auto fresh=[&](){if(!dirty)return true;dirty=false;nodes.clear();labels.setLogicalLength(0);return tvsMove::snapshot(db,nodes,labels);};
+    auto fresh=[&](){if(!dirty)return true;dirty=false;nodes.clear();labels.setLogicalLength(0);return tvsMove::snapshot(db,nodes,labels)&&tvsEquipmentNodes::append(db,nodes,NULL,0);};
     auto index=[&](const AcDbObjectId& id){for(size_t i=0;i<nodes.size();++i)if(nodes[i].id==id)return static_cast<int>(i);return -1;};
         const bool wasApplying=applying();applying()=true;   // also when nested: TVS_TK_TIP opened from a run
     int ducts=0,transitions=0;

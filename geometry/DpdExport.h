@@ -13,6 +13,12 @@
 //   for exhaust; DuctPressDrop reverses the air flow of "extract" itself). L = |smjer| (the axis
 //   between the nodes, fittings included): DuctPressDrop always sets L from smjer.
 //   Numbers with '.', whatever the C locale; strings are UTF-8 and escaped for JSON.
+//   Oprema (linked blocks, geometry/Equipment.h): a fitting of the DuctPressDrop piece it lies on,
+//   with Fiting.oprema = {tip (oprema.py palette key), pos 0..1 from cvor_od, oznaka = tag} and an
+//   explicit "terminal"; terminal at the free end (pos 1, OD -> DO points away from the unit), inline
+//   at its centre. FixedDp -> fn dp_fix (dp), Zeta -> konst / manual (zeta), Nominal -> dp_fix
+//   computed at the exported Q (DuctPressDrop keeps it fixed: warning), no model -> dp_fix 0.
+//   Names are DuctPressDrop hvac_data FITING_META keys (JSON escapes keep this header ASCII).
 #include "PressureDrop.h"
 #include <cmath>
 #include <cstdio>
@@ -20,11 +26,17 @@
 #include <string>
 #include <vector>
 namespace tvsDpd {
+struct Equip {
+    std::string naziv,fn,tip,oznaka;   // naziv: JSON string body (escaped); oznaka UTF-8
+    double value,pos;bool terminal;    // dp_fix: Pa, konst / manual: zeta
+    Equip():value(0),pos(0.5),terminal(false){}
+};
 struct Segment {
     std::string id,opis,from,to;
     bool round,flex;
     double w,h,d,q;        // mm, m3/h
     double dx,dy,dz;       // m, from -> to
+    std::vector<Equip> equipment;
     Segment():round(false),flex(false),w(0),h(0),d(0),q(0),dx(0),dy(0),dz(0){}
     double length()const{return std::sqrt(dx*dx+dy*dy+dz*dz);}
 };
@@ -69,6 +81,46 @@ inline std::string utf8(const std::wstring& w){
 // material names of DuctPressDrop MATERIAL_PRESETS (JSON escapes keep this header ASCII)
 inline const char* sheetMaterial(){return "Pocinkovani \\u010deli\\u010dni lim";}
 inline const char* flexMaterial(){return "Fleksibilni izolovani";}
+// ---- oprema -> DuctPressDrop fitting (FITING_META name, fn, oprema.py palette key) ----
+inline const char* equipmentTip(int kind){
+    switch(kind){
+    case tvsEquipment::FlowDamper:return "zaluzina";case tvsEquipment::FireDamper:return "pp_klapna";
+    case tvsEquipment::Cav:case tvsEquipment::Vav:return "vav";case tvsEquipment::Silencer:return "prigusivac";
+    case tvsEquipment::Grille:return "resetka";case tvsEquipment::Diffuser:return "difuzor";
+    case tvsEquipment::Hood:return "kapa";case tvsEquipment::Louvre:return "usisna_zaluzina";
+    default:return "oprema";}   // not a palette type: no symbol in DuctPressDrop, the loss counts
+}
+// fixed dp (fn dp_fix)
+inline const char* equipmentDpName(int kind,bool exhaust){
+    switch(kind){
+    case tvsEquipment::FireDamper:return "Po\\u017earna klapna (otvorena)";
+    case tvsEquipment::Silencer:return "Prigu\\u0161iva\\u010d buke (fiksni \\u0394P)";
+    case tvsEquipment::Cav:case tvsEquipment::Vav:return "VAV kutija (terminal)";
+    case tvsEquipment::Grille:return exhaust?"Re\\u0161etka \\u2013 povrat (fiksni \\u0394P)":"Re\\u0161etka \\u2013 dovod (fiksni \\u0394P)";
+    case tvsEquipment::Diffuser:return "Difuzor kvadratni (fiksni \\u0394P)";
+    case tvsEquipment::Louvre:return exhaust?"\\u017daluzina \\u2013 odvod (fiksni \\u0394P)":"\\u017daluzina \\u2013 dovod (fiksni \\u0394P)";
+    default:return "Ru\\u010dni unos \\u0394P [Pa]";}
+}
+// zeta: terminals with a catalogue entry (fn konst, param = zeta), else manual zeta
+inline const char* equipmentZetaName(int kind,bool exhaust,const char*& fn){
+    fn="konst";
+    switch(kind){
+    case tvsEquipment::Grille:return exhaust?"Re\\u0161etka \\u2013 povrat (tipi\\u010dna)":"Re\\u0161etka \\u2013 dovod (tipi\\u010dna)";
+    case tvsEquipment::Diffuser:return "Difuzor kvadratni (tipi\\u010dan)";
+    case tvsEquipment::Louvre:return exhaust?"\\u017daluzina \\u2013 odvod (tipi\\u010dna)":"\\u017daluzina \\u2013 dovod (tipi\\u010dna)";
+    default:fn="manual";return "Ru\\u010dni unos \\u03b6";}
+}
+// q: the flow through it (m3/h). warning: set for Nominal / no model (UTF-16 text)
+inline Equip equipment(const tvsEquipment::Record& r,double q,bool exhaust,const std::string& oznaka,std::wstring* warning=nullptr){
+    Equip x;x.tip=equipmentTip(r.kind);x.oznaka=oznaka;x.terminal=r.terminal();
+    if(r.model==tvsEquipment::Zeta){const char* fn=nullptr;x.naziv=equipmentZetaName(r.kind,exhaust,fn);x.fn=fn;x.value=r.zeta>0?r.zeta:0;return x;}
+    x.naziv=equipmentDpName(r.kind,exhaust);x.fn="dp_fix";x.value=tvsEquipment::loss(r,q,0);
+    if(warning){wchar_t t[200];t[0]=0;
+        if(r.model==tvsEquipment::Nominal)std::swprintf(t,200,L": \u0394p %.1f Pa izra\u010dunat pri Q = %.0f m\u00b3/h (katalo\u0161ka ta\u010dka %.1f Pa / %.0f m\u00b3/h) \u2013 u DuctPressDrop-u fiksan",x.value,q,r.dpNominal,r.qNominal);
+        else if(r.model!=tvsEquipment::FixedDp)std::swprintf(t,200,L": bez modela gubitka \u2013 izvezeno \u0394p = 0");
+        if(t[0])*warning=t;}
+    return x;
+}
 inline std::string json(const System& s){
     std::string o="{\n";
     o+="  \"naziv\": "+quoted(s.name)+",\n";
@@ -85,13 +137,23 @@ inline std::string json(const System& s){
         o+="\"tip\": \""+std::string(x.round?"K":"P")+"\", \"sistem\": \""+kind+"\", ";
         o+="\"Q\": "+number(x.q,1)+", \"W\": "+number(x.round?0:x.w,1)+", \"H\": "+number(x.round?0:x.h,1)+", \"D\": "+number(x.round?x.d:0,1)+", ";
         o+="\"L\": "+number(x.length(),4)+", \"smjer\": ["+number(x.dx,4)+", "+number(x.dy,4)+", "+number(x.dz,4)+"], ";
-        o+="\"materijal\": \""+std::string(x.flex?flexMaterial():sheetMaterial())+"\", \"fitinzi\": []}";}
+        o+="\"materijal\": \""+std::string(x.flex?flexMaterial():sheetMaterial())+"\", \"fitinzi\": [";
+        for(size_t k=0;k<x.equipment.size();++k){const Equip& q=x.equipment[k];
+            o+=k?", {":"{";
+            o+="\"naziv\": \""+q.naziv+"\", \"fn\": \""+q.fn+"\", \"kolicina\": 1, \"param_vals\": ["+number(q.value,3)+"], ";
+            o+="\"terminal\": "+std::string(q.terminal?"true":"false")+", \"oprema\": {\"tip\": \""+q.tip+"\", \"pos\": "+number(q.pos,4)+", \"oznaka\": "+quoted(q.oznaka)+"}}";}
+        o+="]}";}
     o+=s.segments.empty()?"]\n}\n":"\n  ]\n}\n";
     return o;
 }
 // ---- geometry: tvsPressure dionice -> straight DuctPressDrop pieces ---------------------------
 typedef tvsPressure::XY XY;
 inline double dist(const XY& a,const XY& b){return std::hypot(a.x-b.x,a.y-b.y);}
+// parameter (0..1) of the point c projected on a -> b, and its distance from the segment
+inline double along(const XY& a,const XY& b,const XY& c,double& off){
+    const double ux=b.x-a.x,uy=b.y-a.y,l2=ux*ux+uy*uy;double t=l2>0?((c.x-a.x)*ux+(c.y-a.y)*uy)/l2:0;
+    if(t<0)t=0;if(t>1)t=1;off=dist(XY(a.x+ux*t,a.y+uy*t),c);return t;
+}
 inline bool isTee(const tvsPressure::Element& x){return x.parts.size()==1&&x.parts[0].kind==tvsPressure::Tee&&x.at.size()==3;}
 // T komad node: the branch port (2) projected onto the run axis (ports 0 - 1)
 inline XY teeCentre(const tvsPressure::Element& x){
@@ -151,7 +213,9 @@ inline std::string idOf(bool exhaust,int n){char b[24];std::snprintf(b,sizeof(b)
 inline std::vector<Segment> segments(const std::vector<tvsPressure::Element>& e,const tvsPressure::Result& r,bool exhaust,
                                      std::vector<std::wstring>* warnings=nullptr,const Options& o=Options()){
     std::vector<Segment> out;const std::vector<XY> end=ends(e,r);
-    std::map<std::string,std::string> alias;int corner=0,zero=0;
+    std::map<std::string,std::string> alias;int corner=0,zero=0;std::map<std::wstring,int> tags;
+    auto tagOf=[&](const tvsEquipment::Record& r){   // the tag, or prefix-nn for an untagged one
+        if(!r.tag.empty())return utf8(r.tag);const std::wstring p=tvsEquipment::tagPrefix(r.kind);char b[16];std::snprintf(b,sizeof(b),"-%02d",++tags[p]);return utf8(p)+b;};
     auto node=[&](const std::string& n){std::map<std::string,std::string>::const_iterator i=alias.find(n);return i==alias.end()?n:i->second;};
     for(size_t q=0;q<r.d.size();++q){const tvsPressure::Dionica& d=r.d[q];
         const std::string from=node(utf8(d.from)),to=utf8(d.to);
@@ -159,6 +223,8 @@ inline std::vector<Segment> segments(const std::vector<tvsPressure::Element>& e,
         double total=0;for(size_t k=1;k<p.size();++k)total+=dist(p[k-1],p[k]);
         if(p.size()<2||total<o.minLength){alias[to]=from;
             if(warnings)warnings->push_back(L"dionica "+std::to_wstring(d.number)+L" ("+d.from+L" \u2013 "+d.to+L") nema du\u017Einu: \u010Dvor "+d.to+L" spojen sa prethodnim");
+            for(size_t k=0;k<d.elements.size();++k){const tvsPressure::Element& x=e[d.elements[k]];
+                if(warnings&&x.parts.size()==1&&x.parts[0].kind==tvsPressure::Equipment)warnings->push_back(L"oprema "+x.parts[0].equipment.tag+L" nije izvezena (dionica bez du\u017Eine)");}
             continue;}
         if(!(d.flow>0))++zero;
         const size_t pieces=p.size()-1;std::string at=from;
@@ -171,6 +237,14 @@ inline std::vector<Segment> segments(const std::vector<tvsPressure::Element>& e,
             if(s.round)s.d=d.s.a;else{s.w=d.s.a;s.h=d.s.b;}
             s.dx=(p[k].x-p[k-1].x)/1000.0;s.dy=(p[k].y-p[k-1].y)/1000.0;s.dz=0;
             out.push_back(s);}
+        // oprema of the dionica: on the piece nearest to its centre; a terminal at the free end
+        for(size_t k=0;k<d.elements.size();++k){const tvsPressure::Element& x=e[d.elements[k]];
+            if(x.parts.size()!=1||x.parts[0].kind!=tvsPressure::Equipment||x.at.empty())continue;const tvsEquipment::Record& rec=x.parts[0].equipment;
+            XY c;for(size_t j=0;j<x.at.size();++j){c.x+=x.at[j].x/x.at.size();c.y+=x.at[j].y/x.at.size();}
+            size_t best=out.size()-1;double pos=1,off=-1;
+            if(!rec.terminal())for(size_t j=1;j<p.size();++j){double dj=0;const double t=along(p[j-1],p[j],c,dj);if(off<0||dj<off){off=dj;best=out.size()-pieces+j-1;pos=t;}}
+            std::wstring w;Equip q=equipment(rec,x.flow,exhaust,tagOf(rec),warnings?&w:nullptr);q.pos=pos;out[best].equipment.push_back(q);
+            if(warnings&&!w.empty())warnings->push_back(L"oprema "+(rec.tag.empty()?std::wstring(tvsEquipment::kindName(rec.kind)):rec.tag)+w);}
     }
     if(zero&&warnings)warnings->push_back(L"dionica bez protoka (Q = 0): "+std::to_wstring(zero));
     return out;

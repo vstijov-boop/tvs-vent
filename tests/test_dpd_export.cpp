@@ -89,7 +89,40 @@ int main(int argc,char** argv){
      b.push_back(one(duct(300,200,false,XY(1341.42,141.42),XY(2048.53,848.53)),500,1,0,1,{XY(1341.42,141.42),XY(2048.53,848.53)}));
      const Result rb=calc.run(b,0);const std::vector<tvsDpd::Segment> sb=tvsDpd::segments(b,rb,false);
      yes(sb.size()==2,"45 deg: two pieces");if(sb.size()==2){eq(sb[0].dx,1.2,"to the vertex");eq(sb[1].dx,0.84853,"45 deg dx",1e-6);eq(sb[1].dy,0.84853,"45 deg dy",1e-6);}}
+    // oprema: unit duct 400x200 -> damper RP-01 (Nominal 30 Pa at 1800) -> duct -> elbow 90 -> duct ->
+    // silencer PB-01 (FixedDp 25) -> duct -> diffuser D-01 (Zeta 2.5, terminal, qTerminal 900)
+    std::string jo;
+    {auto equip=[](int kind,int ports,int model,double v1,double v2,const wchar_t* tag,std::vector<XY> at){Part t;t.kind=Equipment;
+         t.equipment.kind=kind;t.equipment.ports=ports;t.equipment.model=model;t.equipment.tag=tag;t.equipment.a=400;t.equipment.b=200;
+         if(model==tvsEquipment::Nominal){t.equipment.dpNominal=v1;t.equipment.qNominal=v2;}else if(model==tvsEquipment::FixedDp)t.equipment.dp=v1;else t.equipment.zeta=v1;
+         t.sections.assign(ports,Section(400,200,false));t.line=at;return t;};
+     std::vector<Element> q;
+     q.push_back(one(duct(400,200,false,XY(0,0),XY(1000,0)),900,-1,0,-1,{XY(0,0),XY(1000,0)}));
+     q.push_back(one(equip(tvsEquipment::FlowDamper,2,tvsEquipment::Nominal,30,1800,L"RP-01",{XY(1000,0),XY(1400,0)}),900,0,0,1,{XY(1000,0),XY(1400,0)}));
+     q.push_back(one(duct(400,200,false,XY(1400,0),XY(4000,0)),900,1,0,1,{XY(1400,0),XY(4000,0)}));
+     Part el;el.kind=Elbow;el.angle=90;el.radius=400;el.sections.assign(2,Section(400,200,false));el.line={XY(4000,0),XY(4400,0),XY(4400,400)};
+     q.push_back(one(el,900,2,0,1,{XY(4000,0),XY(4400,400)}));
+     q.push_back(one(duct(400,200,false,XY(4400,400),XY(4400,2000)),900,3,0,1,{XY(4400,400),XY(4400,2000)}));
+     q.push_back(one(equip(tvsEquipment::Silencer,2,tvsEquipment::FixedDp,25,0,L"PB-01",{XY(4400,2000),XY(4400,3000)}),900,4,0,1,{XY(4400,2000),XY(4400,3000)}));
+     q.push_back(one(duct(400,200,false,XY(4400,3000),XY(4400,4400)),900,5,0,1,{XY(4400,3000),XY(4400,4400)}));
+     Part df=equip(tvsEquipment::Diffuser,1,tvsEquipment::Zeta,2.5,0,L"D-01",{XY(4400,4400)});df.equipment.qTerminal=900;
+     q.push_back(one(df,900,6,0,1,{XY(4400,4400)}));
+     const Result rq=calc.run(q,0);std::vector<std::wstring> w;const std::vector<tvsDpd::Segment> sq=tvsDpd::segments(q,rq,false,&w);
+     yes(rq.d.size()==1,"oprema: one TVS dionica");yes(sq.size()==2,"two pieces (elbow)");
+     yes(w.size()==1&&w[0].find(L"RP-01")!=std::wstring::npos,"Nominal: warning (fixed in DuctPressDrop)");
+     if(sq.size()==2){
+        yes(sq[0].equipment.size()==1&&sq[1].equipment.size()==2,"oprema on its pieces");
+        if(sq[0].equipment.size()==1){const tvsDpd::Equip& x=sq[0].equipment[0];same(x.tip,"zaluzina","damper tip");same(x.fn,"dp_fix","dp_fix");eq(x.value,7.5,"Nominal at Q");eq(x.pos,1200.0/4400,"damper pos",1e-12);yes(!x.terminal,"inline");same(x.oznaka,"RP-01","tag");}
+        if(sq[1].equipment.size()==2){const tvsDpd::Equip& x=sq[1].equipment[0];const tvsDpd::Equip& y=sq[1].equipment[1];
+            same(x.tip,"prigusivac","silencer");eq(x.value,25,"FixedDp");eq(x.pos,2500.0/4400,"silencer pos",1e-12);
+            same(y.tip,"difuzor","diffuser");same(y.fn,"konst","zeta: catalogue entry");eq(y.value,2.5,"zeta");eq(y.pos,1,"terminal at the free end");yes(y.terminal,"terminal");}}
+     tvsDpd::System so;so.name="Oprema";so.segments=sq;jo=tvsDpd::json(so);
+     yes(has(jo,"\"fitinzi\": [{\"naziv\": \"Ru\\u010dni unos \\u0394P [Pa]\", \"fn\": \"dp_fix\", \"kolicina\": 1, \"param_vals\": [7.5], \"terminal\": false, \"oprema\": {\"tip\": \"zaluzina\", \"pos\": 0.2727, \"oznaka\": \"RP-01\"}}]"),"fitting JSON");
+     // untagged: prefix-nn
+     q[1].parts[0].equipment.tag.clear();const std::vector<tvsDpd::Segment> su=tvsDpd::segments(q,rq,false);
+     if(su.size()==2&&su[0].equipment.size()==1)same(su[0].equipment[0].oznaka,"RP-01","generated tag");}
     if(argc>=3){write(argv[1],j);write(argv[2],k);}
+    if(argc>=4)write(argv[3],jo);
     if(fails){std::printf("%d FAIL\n",fails);return 1;}
     std::printf("OK\n");return 0;
 }

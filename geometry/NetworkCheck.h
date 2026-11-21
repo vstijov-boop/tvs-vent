@@ -8,15 +8,18 @@
 //   Middle    duct end on the middle of another duct (branch without T komad / split)
 //   Angle     plan elbow a little off 15 / 22,5 / 30 / 45 / 60 / 75 / 90 deg (TVS_KOLJENA_UGAO)
 //   Short     duct shorter than 10 mm
+//   Equipment linked oprema (kind 5): a port not on an end of another element of its size and
+//             level (1 mm); value = distance to the nearest end within 5 mm (0: there, other size /
+//             level), b = that element or -1. Its ports are not compared by Size / Level / Miss.
 #include <cmath>
 #include <map>
 #include <utility>
 #include <vector>
 namespace tvsNetworkCheck {
-enum Type {Size=1,Level=2,Miss=3,Middle=4,Angle=5,Short=6};
+enum Type {Size=1,Level=2,Miss=3,Middle=4,Angle=5,Short=6,Equipment=7};
 struct Section {double a,b,elevation;bool round,known;Section():a(0),b(0),elevation(0),round(false),known(false){}};
 struct Item {
-    int kind;                    // 1 duct, 2 elbow, 3 prelaz, 4 T komad, 0 other (flex ...)
+    int kind;                    // 1 duct, 2 elbow, 3 prelaz, 4 T komad, 5 oprema (s: known = false), 0 other (flex ...)
     bool flex;
     std::vector<double> x,y;     // ports in plan
     std::vector<Section> s;      // section at each port (known = false: not compared)
@@ -50,7 +53,7 @@ inline void check(const std::vector<Item>& items,double f,std::vector<Issue>& ou
         for(size_t n=0;n<at.size();++n){const int j=at[n].first,q=at[n].second;if(j<static_cast<int>(i))continue;   // each pair once
             const Section& a=items[i].s.size()>p?items[i].s[p]:Section();const Section& b=items[j].s.size()>static_cast<size_t>(q)?items[j].s[q]:Section();
             Issue e;e.a=static_cast<int>(i);e.b=j;e.x=x;e.y=y;
-            if(dist[n]>join){if(close==0){e.type=Miss;e.value=dist[n]*f;out.push_back(e);}continue;}
+            if(dist[n]>join){if(close==0&&items[i].kind!=5&&items[j].kind!=5){e.type=Miss;e.value=dist[n]*f;out.push_back(e);}continue;}
             if(!a.known||!b.known||close>1)continue;   // one-to-one joints only
             const bool same=a.round==b.round&&std::fabs(a.a-b.a)<=join&&(a.round||std::fabs(a.b-b.b)<=join);
             if(!same){e.type=Size;e.value=0;out.push_back(e);}
@@ -66,6 +69,19 @@ inline void check(const std::vector<Item>& items,double f,std::vector<Issue>& ou
                 const double d=std::hypot(ax+(bx-ax)*t-x,ay+(by-ay)*t-y);
                 const double half=items[j].s.empty()?0:items[j].s[0].a/2;
                 if(d<=half+join){Issue e;e.type=Middle;e.a=static_cast<int>(i);e.b=static_cast<int>(j);e.x=x;e.y=y;e.value=0;out.push_back(e);break;}}}}
+    // oprema: every port on an end of its size and level
+    const double sizeTol=1.0/f;
+    for(size_t i=0;i<items.size();++i){if(items[i].kind!=5)continue;
+        for(size_t p=0;p<items[i].x.size()&&p<items[i].s.size();++p){const Section& a=items[i].s[p];
+            bool ok=false;int closest=-1;double best=0;
+            for(size_t j=0;j<items.size()&&!ok;++j){if(j==i)continue;
+                for(size_t q=0;q<items[j].x.size();++q){const double d=std::hypot(items[j].x[q]-items[i].x[p],items[j].y[q]-items[i].y[p]);
+                    if(d<=miss&&(closest<0||d<best)){closest=static_cast<int>(j);best=d;}
+                    if(d>join)continue;
+                    const Section& b=items[j].s.size()>q?items[j].s[q]:Section();
+                    if(!b.known&&items[j].kind!=5){ok=true;break;}   // flex: size not known, the joint is enough
+                    if(a.round==b.round&&std::fabs(a.a-b.a)<=sizeTol&&(a.round||std::fabs(a.b-b.b)<=sizeTol)&&std::fabs(a.elevation-b.elevation)<=sizeTol){ok=true;break;}}}
+            if(!ok){Issue e;e.type=Equipment;e.a=static_cast<int>(i);e.b=closest;e.x=items[i].x[p];e.y=items[i].y[p];e.value=closest>=0&&best>join?best*f:0;out.push_back(e);}}}
     for(size_t i=0;i<items.size();++i){const Item& it=items[i];
         if(it.kind==2&&it.angle>0){const double s=standardAngle(it.angle,0.5);
             if(s>0&&std::fabs(s-it.angle)>1e-6){Issue e;e.type=Angle;e.a=static_cast<int>(i);e.b=-1;e.x=it.x.empty()?0:it.x[0];e.y=it.y.empty()?0:it.y[0];e.value=it.angle;out.push_back(e);}}

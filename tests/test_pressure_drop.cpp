@@ -120,6 +120,40 @@ int main(int argc,char** argv){
         for(size_t k=0;k<t.f.size();++k)if(t.f[k].key==L"SR5-15"){++legs;yes(t.f[k].ok&&t.f[k].note.find(L"bullhead")!=std::wstring::npos,"bullhead computed");
             if(t.f[k].note.find(L"krak 1")!=std::wstring::npos)eq(t.f[k].dp,(0.3+1000.0/3000)*10,"krak 1 Qb1");else eq(t.f[k].dp,0.7*500/600*20,"krak 2 Wb2");}
         yes(legs==2,"two bullhead legs");}
+    {   // oprema: damper (Nominal) and silencer (FixedDp) inline, diffuser (Zeta, qTerminal) at the end of a flex
+        auto equip=[](int kind,int ports,int model,double v1,double v2,const wchar_t* tag,std::vector<XY> at){Part t;t.kind=Equipment;
+            t.equipment.kind=kind;t.equipment.ports=ports;t.equipment.model=model;t.equipment.tag=tag;t.equipment.a=400;t.equipment.b=200;
+            if(model==tvsEquipment::Nominal){t.equipment.dpNominal=v1;t.equipment.qNominal=v2;}else if(model==tvsEquipment::FixedDp)t.equipment.dp=v1;else t.equipment.zeta=v1;
+            t.sections.assign(ports,Section(400,200,false));t.line=at;return t;};
+        std::vector<Element> n6;
+        n6.push_back(one(duct(400,200,false,3000,XY(0,0),XY(3000,0)),900,-1,0,-1,{XY(0,0),XY(3000,0)}));
+        n6.push_back(one(equip(tvsEquipment::FlowDamper,2,tvsEquipment::Nominal,30,1800,L"RP-01",{XY(3000,0),XY(3400,0)}),900,0,0,1,{XY(3000,0),XY(3400,0)}));
+        n6.push_back(one(duct(400,200,false,2600,XY(3400,0),XY(6000,0)),900,1,0,1,{XY(3400,0),XY(6000,0)}));
+        n6.push_back(one(equip(tvsEquipment::Silencer,2,tvsEquipment::FixedDp,25,0,L"PB-01",{XY(6000,0),XY(7000,0)}),900,2,0,1,{XY(6000,0),XY(7000,0)}));
+        n6.push_back(one(duct(400,200,false,2000,XY(7000,0),XY(9000,0)),900,3,0,1,{XY(7000,0),XY(9000,0)}));
+        n6.push_back(one(duct(400,200,false,1000,XY(9000,0),XY(10000,0),true),900,4,0,1,{XY(9000,0),XY(10000,0)}));
+        Part df=equip(tvsEquipment::Diffuser,1,tvsEquipment::Zeta,2.0,0,L"D-01",{XY(10000,0)});df.equipment.qTerminal=900;
+        n6.push_back(one(df,900,5,0,1,{XY(10000,0)}));
+        Result t=calc.run(n6,0);
+        yes(t.d.size()==2,"oprema: inline is no node, flex is, the terminal stays with the flex");
+        if(t.d.size()==2){eq(t.d[0].length,7.6,"oprema has no length");yes(t.d[1].flex&&t.d[1].terminal&&t.d[1].to==L"K1"&&t.d[1].tag==L"D-01","terminal tag");
+            yes(std::fabs(t.d[1].toAt.x-10000)<1e-9,"terminal end at its port");}
+        yes(t.f.size()==3,"three oprema rows");const double pd=0.6*std::pow(900/3600.0/0.08,2);
+        for(size_t k=0;k<t.f.size();++k){const Fitting& f=t.f[k];yes(f.equipment&&f.ok,"oprema computed");
+            if(f.tag==L"RP-01"){eq(f.dp,7.5,"Nominal: 30 Pa * (900/1800)^2");eq(f.zeta,7.5/pd,"zeta on pd");yes(f.dionica==0&&!f.terminal&&f.what==L"Regulator protoka","damper");}
+            if(f.tag==L"PB-01"){eq(f.dp,25,"FixedDp");yes(f.dionica==0,"silencer on 1");}
+            if(f.tag==L"D-01"){eq(f.dp,2.0*pd,"Zeta on the pd of the flex at the port");yes(f.terminal&&f.zeta==0&&f.dionica==1&&f.c==2.0,"terminal: dp only");}}
+        tvsSheet::Info in6;tvsSheet::Workbook w6=tvsSheet::build(t,in6,o);const tvsSheet::Sheet& d6=w6.sheets[0];const tvsSheet::Sheet& f6=w6.sheets[1];
+        yes(f6.at(2,6)==L"'Oprema"&&f6.at(4,6)==L"'Oprema"&&f6.at(2,2)==L"'Regulator protoka","Izvor Oprema, kind name");
+        yes(f6.at(2,3).find(L"RP-01")!=std::wstring::npos&&f6.at(2,5)==tvsSheet::num(7.5/pd,4)&&f6.at(2,8).find(L"=E2*INDEX(")==0,"inline row: zeta and H formula");
+        yes(f6.at(4,5).empty()&&f6.at(4,8)==tvsSheet::num(2.0*pd,1),"terminal row: dp value, no zeta");
+        yes(d6.at(13,tvsSheet::cTerm)==L"=Fitinzi!$H$4"&&d6.at(12,tvsSheet::cTerm).empty(),"Dp kraj. elem. = the terminal row");
+        yes(d6.at(18,4)==L"=SUMPRODUCT(MAX((U12:U13-S12:S13)*(1+D17/100)+S12:S13))","no reserve on terminals");
+        bool label=false;for(size_t k=0;k<w6.sheets[2].labels.size();++k)label|=w6.sheets[2].labels[k].text==L"D-01";yes(label,"Sema: the tag of the terminal");
+        // no loss model: listed, typed by the user (yellow Dp kraj. elem.)
+        n6[6].parts[0].equipment.model=tvsEquipment::NoLoss;Result u=calc.run(n6,0);tvsSheet::Workbook w7=tvsSheet::build(u,in6,o);
+        yes(u.f.size()==3&&!u.f[2].ok&&w7.sheets[0].at(13,tvsSheet::cTerm)==L"0","no model: typed");
+    }
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");

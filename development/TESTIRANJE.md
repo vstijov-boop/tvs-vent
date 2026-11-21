@@ -1,5 +1,14 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## Oprema na mreži u proračunima (TVS_PAD, TVS_PROTOK, TVS_DPD_IZVOZ, TVS_DIM_PRATI, TVS_PROVJERA) – testirati
+Opis: [OPREMA.md](OPREMA.md). Priprema: mreža (dovod) sa povezanim blokovima (TVS_OPREMA): regulator protoka (model „katalog“ Δp 30 Pa pri 1800 m³/h), prigušivač buke (fiksni Δp 25 Pa), na kraju kanala / fleksa difuzor (ζ 2,5), još jedna grana sa rešetkom bez protoka.
+- **TVS_PROTOK**: protok difuzora iz opreme; rešetka bez protoka → zoom, „Rešetka – protok [m³/h]“ → upisuje se u blok (svojstva opreme), ne u kanal. Kanali iza regulatora / prigušivača dobijaju zbir kao do sada; inline oprema nema svoj protok. Kanal na kome je terminal ranije imao protok, a oprema nema → protok kanala prelazi u opremu. Oba upisana i različita → poruka „protok u opremi … na kanalu … uzet protok opreme“.
+- **TVS_PAD**: regulator i prigušivač su u istoj dionici sa kanalima (ne prave novu dionicu, dužina bez njih). Fitinzi: redovi sa Izvor „Oprema“, naziv vrste, oznaka (RP-01 …) i model u opisu; ζ = Δp / pd dionice. Difuzor: red bez ζ, Δp u koloni Δp; u Dionice „Δp kraj. elem.“ te dionice = ta ćelija (nije žuta) – promjena Δp u Fitinzi mijenja Dionice. Šema: kraj dionice sa difuzorom nosi njegovu oznaku (D-01). „Za ventilator“: rezerva se ne računa na Δp krajnjih elemenata (provjera: rezerva 10 %, Δp kraj. elem. 20 Pa → za 20 Pa manje uvećanje nego ranije). Oprema bez modela gubitka: red žut, kraj. elem. žut kao ranije.
+- **TVS_DPD_IZVOZ**: u DuctPressDrop-u (Uvezi sistem) oprema je na svojoj dionici kao oprema iz palete (simbol, oznaka RP-01 / PB-01 / D-01): regulator i prigušivač na svom mjestu duž dionice, difuzor na slobodnom kraju; ΔP: fiksni = isti, ζ = isti, „katalog“ = Δp pri izvezenom Q (poruka: u DuctPressDrop-u fiksan).
+- **TVS_DIM_PRATI**: promijeniti dimenziju kanala ispred regulatora → dionica staje na regulatoru, oznaka „oprema“ u pregledu; kanal iza regulatora se ne mijenja.
+- **TVS_PROVJERA**: pomjeriti kanal 3 mm od regulatora / promijeniti mu dimenziju / kotu / provući kanal ispod bloka → „oprema: priključak ne naliježe na kanal“ (sa rastojanjem ili „druge dimenzije ili kote“), zoom na priključak.
+- Crtež u cm / m i blok kopiran iz crteža u mm: priključci se preračunavaju (mmPerUnit zapisa).
+
 ## Jedna radnja = jedan UNDO korak, sve ili ništa (prijedlog 3, 21.11.) – testirati
 - Svojstva (TVS_CHANGE) na kanalu u dionici, dijalog dionice → Primijeni: **jedan U** vraća i izmjenu kanala i dionicu (ranije dva U: TVS_DIM_PRATI je bila posebna komanda). Poslije toga Enter / razmak ponavlja TVS_CHANGE, ne TVS_DIM_PRATI. Isto za TVS_CHANGE na jednom T komadu (dijalog TVS_TK_TIP, pa dionica iza kanala nove dimenzije).
 - Dvoklik na kanal i Properties paleta: kao i do sada (dva koraka – izmjenu bilježi AutoCAD van TVS komande). Javiti ako to smeta.

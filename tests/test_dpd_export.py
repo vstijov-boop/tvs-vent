@@ -14,13 +14,15 @@ CHECK=textwrap.dedent('''
  import json,sys,math
  from services.system_import import parse_system_file
  from hvac_geometrija import izracunaj_geometriju
+ from hvac_data import FITING_META
  out={}
  for name in sys.argv[1:]:
   s=parse_system_file(name)
   assert len(s)==1,len(s)
   s=s[0];g=izracunaj_geometriju(s.dionice)
   r={'naziv':s.naziv,'dionice':[[d.id,d.cvor_od,d.cvor_do,d.tip,d.sistem,d.Q,d.W,d.H,d.D,d.L,list(d.smjer),d.materijal] for d in s.dionice],
-     'greske':g.greske,'potpuna':g.potpuna,'koordinate':{k:list(v) for k,v in g.koordinate.items()}}
+     'greske':g.greske,'potpuna':g.potpuna,'koordinate':{k:list(v) for k,v in g.koordinate.items()},
+     'oprema':[[d.id,f.oprema['oznaka'],f.oprema['tip'],f.fn,f.naziv in FITING_META,round(f.dP(d.Pd),4),round(d.Pd,4),f.je_terminal,f.oprema['pos']] for d in s.dionice for f in d.fitinzi if f.oprema]}
   try:
    import os;os.environ.setdefault('QT_QPA_PLATFORM','offscreen')
    from services.project import ProjectService
@@ -32,6 +34,8 @@ CHECK=textwrap.dedent('''
    r['service']='ok'
    r['izvedeni']=sorted([d.id,f.veza['cvor'],vrsta_fitinga(f)] for d in ps.active_system.dionice for f in d.fitinzi if f.veza)
    r['dp']=[d.dP_ukupno for d in ps.active_system.dionice]
+   r['oprema_servis']=[[d.id,f.oprema['oznaka'],round(f.dP_s_re(d.Pd,d.Re,q_m3h=d.Q),4)] for d in ps.active_system.dionice for f in d.fitinzi if f.oprema]
+   r['dp_oprema']=[round(d.dP_oprema,4) for d in ps.active_system.dionice]
   out[name]=r
  print(json.dumps(out))
 ''')
@@ -39,20 +43,26 @@ class DpdExport(unittest.TestCase):
  def test_ascii(self):(ROOT/'geometry/DpdExport.h').read_bytes().decode('ascii')
  def test_cpp_and_round_trip(self):
   with tempfile.TemporaryDirectory() as d:
-   d=pathlib.Path(d);exe=d/'t';su=d/'dovod.json';ex=d/'odvod.json'
+   d=pathlib.Path(d);exe=d/'t';su=d/'dovod.json';ex=d/'odvod.json';op=d/'oprema.json'
    subprocess.run(FLAGS+[str(ROOT/'tests/test_dpd_export.cpp'),'-o',str(exe)],check=True)
-   self.assertIn('OK',subprocess.run([str(exe),str(su),str(ex)],check=True,capture_output=True,text=True).stdout)
-   for p in (su,ex):
+   self.assertIn('OK',subprocess.run([str(exe),str(su),str(ex),str(op)],check=True,capture_output=True,text=True).stdout)
+   for p in (su,ex,op):
     raw=p.read_bytes();self.assertFalse(raw.startswith(b'\xef\xbb\xbf'));json.loads(raw.decode('utf-8'))   # UTF-8 without BOM, valid JSON
    app=dpd_app()
    if app is None:
     print('test_dpd_export: DuctPressDrop (hvac_app) nije dostupan - round trip preskocen (TVS_DPD_APP=...)');return
    env=dict(os.environ,PYTHONPATH=str(app),QT_QPA_PLATFORM='offscreen')
    (d/'check.py').write_text(CHECK,encoding='utf-8')
-   r=subprocess.run([sys.executable,str(d/'check.py'),str(su),str(ex)],cwd=str(d),env=env,capture_output=True,text=True)
+   r=subprocess.run([sys.executable,str(d/'check.py'),str(su),str(ex),str(op)],cwd=str(d),env=env,capture_output=True,text=True)
    self.assertEqual(r.returncode,0,r.stderr[-3000:])
    out=json.loads(r.stdout.strip().splitlines()[-1])
-   s=out[str(su)];x=out[str(ex)]
+   s=out[str(su)];x=out[str(ex)];o=out[str(op)]
+   # oprema: read back as DuctPressDrop equipment (Fiting.oprema) with the right dp and tag
+   self.assertEqual(s['oprema'],[]);self.assertEqual(o['greske'],[])
+   pd=0.6*(900/3600/0.08)**2;self.assertAlmostEqual(o['oprema'][0][6],pd,3)
+   self.assertEqual([y[:5] for y in o['oprema']],[['D-01','RP-01','zaluzina','dp_fix',True],['D-02','PB-01','prigusivac','dp_fix',True],['D-02','D-01','difuzor','konst',True]])
+   self.assertEqual([y[5] for y in o['oprema']],[7.5,25.0,round(2.5*pd,4)])            # Nominal at Q, FixedDp, zeta * pd
+   self.assertEqual([y[7] for y in o['oprema']],[False,False,True]);self.assertEqual(o['oprema'][2][8],1.0)   # terminal at the free end
    self.assertEqual(s['naziv'],'Dovod ž')
    self.assertEqual(s['dionice'][0],['D-01','J','KO1','P','supply',3600,600,300,0,5.6,[5.6,0,0],'Pocinkovani čelični lim'])
    self.assertEqual(s['dionice'][3][:10],['D-04','T1','P2','P','supply',1200,300,300,0,2.8])
@@ -66,6 +76,8 @@ class DpdExport(unittest.TestCase):
    self.assertEqual(s['izvedeni'],[['D-02','KO1','koljeno'],['D-03','P1','tranzicija'],['D-03','T1','spoj'],['D-04','P2','tranzicija'],['D-04','T1','spoj']])
    self.assertIn(['O-01','KO1','koljeno'],x['izvedeni']);self.assertIn(['O-04','T1','spoj'],x['izvedeni'])
    self.assertTrue(all(v>0 for v in s['dp']+x['dp']))
+   self.assertEqual(o['oprema_servis'],[['D-01','RP-01',7.5],['D-02','PB-01',25.0],['D-02','D-01',round(2.5*pd,4)]])   # kept by ProjectService
+   self.assertEqual(o['dp_oprema'],[7.5,round(25+2.5*pd,4)])
  def test_command(self):
   c=(ROOT/'TVS_Ventilation_ARX/DpdExportCommand.h').read_bytes();self.assertTrue(c.startswith(b'\xef\xbb\xbf'))
   c=text('TVS_Ventilation_ARX/DpdExportCommand.h')

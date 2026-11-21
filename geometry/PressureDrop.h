@@ -20,7 +20,12 @@
 //   exhaust ER5-1 (TK-O), TK0 and stucna outside Ab/Ac 0.4..0.6 Idelchik (sharp T), stucna ER5-3, round branch ER5-2, TK-G ER5-4, round main ED5-3. The branch loss goes to the
 //   dionica of the branch, the straight (main) loss to the dionica of the prolaz. Every loss is
 //   given as zeta on the pd of its dionica (zeta = dp / pd), so Z = sum(zeta) * pd in the sheet.
+//   Oprema (linked block, geometry/Equipment.h): inline (2 ports) is a local loss inside the dionica
+//   like an elbow (no new dionica, no length), tvsEquipment::loss at the flow of the dionica and the
+//   pd of the duct at its inlet port; terminal (1 port) ends the dionica, its loss is the "dp kraj.
+//   elem." of that dionica (no zeta, no reserve) and its tag labels the end in the schematic.
 #include "AshraeEngine.h"
+#include "Equipment.h"
 #include <cmath>
 #include <cwchar>
 #include <map>
@@ -29,7 +34,7 @@
 namespace tvsPressure {
 struct Section {double a,b;bool round;Section():a(0),b(0),round(false){}Section(double x,double y,bool r):a(x),b(y),round(r){}};
 struct XY {double x,y;XY():x(0),y(0){}XY(double a,double b):x(a),y(b){}};
-enum PartKind {Other=0,Duct=1,Elbow=2,Transition=3,Tee=4};
+enum PartKind {Other=0,Duct=1,Elbow=2,Transition=3,Tee=4,Equipment=5};
 enum TeeType {TeePlain=0,TeeBranch=1,TeePants=2,TeeTap=3};   // TK0, TK-O, TK-G, stucna (TeeData.h)
 struct Part {
     int kind;bool flex;
@@ -39,6 +44,7 @@ struct Part {
     bool cone;            // stucna with a round conical branch (SR5-12)
     std::vector<Section> sections;   // per port (a single part: the element's ports)
     std::vector<XY> line;            // plan polyline for the schematic, mm
+    tvsEquipment::Record equipment;  // kind Equipment: the record of the linked block
     Part():kind(Other),flex(false),length(0),angle(0),radius(0),tee(TeePlain),cone(false){}
 };
 struct Element {
@@ -54,11 +60,13 @@ struct Fitting {
     std::wstring what,note,dim,key;   // Element, opis / napomena, dimenzija, ASHRAE key ("" none)
     double c,dp,zeta;                 // ASHRAE C (its own reference), dp Pa, zeta on the dionica pd
     bool ok;                          // computed (else the user types zeta)
-    Fitting():dionica(-1),element(-1),c(0),dp(0),zeta(0),ok(false){}
+    bool equipment,terminal;          // oprema; terminal: dp goes to "dp kraj. elem." (zeta 0)
+    std::wstring tag;                 // oprema: its tag
+    Fitting():dionica(-1),element(-1),c(0),dp(0),zeta(0),ok(false),equipment(false),terminal(false){}
 };
 struct Dionica {
     int number,parent;std::vector<int> children,elements;
-    std::wstring from,to;XY fromAt,toAt;
+    std::wstring from,to,tag;XY fromAt,toAt;   // tag: the terminal oprema at the end (schematic label)
     double flow;Section s;bool flex,terminal;
     double length,rough,dh,v,pd,re,lambda,r;   // length m, rough mm, dh mm, r Pa/m
     Dionica():number(0),parent(-1),flow(0),flex(false),terminal(false),length(0),rough(0),dh(0),v(0),pd(0),re(0),lambda(0),r(0){}
@@ -225,10 +233,16 @@ private:
     static bool flexOf(const Element& x){return !x.parts.empty()&&x.parts[0].flex;}
     static bool isTransition(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Transition;}
     static bool isTee(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Tee;}
+    static bool isEquipment(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Equipment;}
     static const Section& port(const Element& x,int p){static const Section none;return p>=0&&p<static_cast<int>(x.ports.size())?x.ports[p]:none;}
     static bool startsNew(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,int p,int c){
-        if(kids[p].size()>1||isTee(e[p])||isTransition(e[p])||flexOf(e[p])!=flexOf(e[c]))return true;   // a T komad is always a node, also with one free port (cep)
-        const Section& a=port(e[p],e[c].via);const Section& b=port(e[c],e[c].entry);
+        if(kids[p].size()>1||isTee(e[p])||isTransition(e[p]))return true;   // a T komad is always a node, also with one free port (cep)
+        if(isEquipment(e[c]))return false;   // oprema: a local loss inside the dionica (like an elbow)
+        // after oprema: compare with the element before it (flex / section of the duct it sits in)
+        int up=p,via=e[c].via;const int n=static_cast<int>(e.size());
+        for(int guard=0;guard<n&&isEquipment(e[up])&&e[up].parent>=0&&e[up].parent<n;++guard){via=e[up].via;up=e[up].parent;}
+        if(flexOf(e[up])!=flexOf(e[c]))return true;
+        const Section& a=port(e[up],via);const Section& b=port(e[c],e[c].entry);
         return a.a>0&&b.a>0&&!same(a,b);
     }
     void describe(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,Dionica& d)const{
@@ -244,7 +258,9 @@ private:
     void nodes(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,Result& r)const{
         int t=0,p=0,k=0;
         for(size_t q=0;q<r.d.size();++q){Dionica& d=r.d[q];const int last=d.elements.back();const Element& x=e[last];wchar_t name[16];
-            if(d.children.empty()&&!isTee(x)){swprintf(name,16,L"K%d",++k);for(size_t j=0;j<x.at.size();++j)if(static_cast<int>(j)!=x.entry){d.toAt=x.at[j];break;}}
+            if(d.children.empty()&&!isTee(x)){swprintf(name,16,L"K%d",++k);for(size_t j=0;j<x.at.size();++j)if(static_cast<int>(j)!=x.entry){d.toAt=x.at[j];break;}
+                if(x.at.size()==1)d.toAt=x.at[0];   // terminal oprema: its one port
+                if(isEquipment(x))d.tag=x.parts[0].equipment.tag;}
             else if(kids[last].size()>1||isTee(x)){swprintf(name,16,L"T%d",++t);XY c;for(size_t j=0;j<x.at.size();++j){c.x+=x.at[j].x/x.at.size();c.y+=x.at[j].y/x.at.size();}d.toAt=c;}
             else{swprintf(name,16,L"P%d",++p);const Element& y=e[kids[last][0]];if(y.entry>=0&&y.entry<static_cast<int>(y.at.size()))d.toAt=y.at[y.entry];}
             d.to=name;}
@@ -291,7 +307,39 @@ private:
                     if(eng_&&eng_->has(key))in=seed(eng_->params(key),a2,&b2,x.flow/3.6,t.length);
                     add(r,q,i,L"Prelaz",dimText(a)+L" \u2192 "+dimText(b),a,key,in,false,0);}
                 else if(t.kind==Tee&&x.parts.size()==1)junction(e,kids,of,r,i);
+                else if(t.kind==Equipment&&x.parts.size()==1)equipment(e,r,q,i);
                 else if(t.kind==Other)r.warnings.push_back(L"element bez prora\u010Duna (dionica "+std::to_wstring(d.number)+L")");}}
+    }
+    // Oprema: tvsEquipment::loss at the flow of the element and the pd of the duct at its inlet (the
+    // parent's port; else the record section). Inline: zeta = dp / pd of the dionica; terminal: dp
+    // only (the sheet puts it in "dp kraj. elem."). No loss model: listed, the user types it.
+    void equipment(const std::vector<Element>& e,Result& r,int q,int i){
+        const Element& x=e[i];const tvsEquipment::Record& rec=x.parts[0].equipment;
+        Section s=port(x,x.entry);
+        if(x.parent>=0&&x.parent<static_cast<int>(e.size())){const Section& up=port(e[x.parent],x.via);if(up.a>0)s=up;}
+        if(!(s.a>0)&&rec.a>0)s=Section(rec.a,rec.round?0:rec.b,rec.round);
+        const double ar=area(s),v=ar>0?std::fabs(x.flow)/3600.0/ar:0,pv=o_.rho*v*v/2;
+        Fitting f;f.dionica=q;f.element=i;f.equipment=true;f.terminal=rec.terminal();f.tag=rec.tag;
+        f.what=tvsEquipment::kindName(rec.kind);f.dim=dimText(s);f.note=rec.tag;
+        auto more=[&](const std::wstring& t){if(!f.note.empty())f.note+=L", ";f.note+=t;};
+        if(!rec.note.empty())more(rec.note);
+        wchar_t t[160];
+        switch(rec.model){
+        case tvsEquipment::FixedDp:swprintf(t,160,L"\u0394p = %.1f Pa (zadato)",rec.dp);break;
+        case tvsEquipment::Zeta:swprintf(t,160,L"\u03B6 = %.2f na pd priklju\u010Dka (%.1f Pa)",rec.zeta,pv);break;
+        case tvsEquipment::Nominal:swprintf(t,160,L"\u0394p = %.1f Pa pri %.0f m\u00B3/h \u00B7 (Q/Qn)\u00B2",rec.dpNominal,rec.qNominal);break;
+        default:t[0]=0;break;}
+        for(wchar_t* c=t;*c;++c)if(*c==L'.')*c=L',';
+        if(t[0])more(t);else more(f.terminal?L"model gubitka nije zadat \u2013 unesite \u0394p kraj. elem.":L"model gubitka nije zadat \u2013 unesite \u03B6");
+        if(rec.model==tvsEquipment::Zeta)f.c=rec.zeta;
+        f.dp=tvsEquipment::loss(rec,x.flow,pv);
+        const double pd=r.d[q].pd;
+        if(rec.model<tvsEquipment::FixedDp||rec.model>tvsEquipment::Nominal)f.ok=false;
+        else if(f.terminal)f.ok=true;
+        else if(pd>0){f.ok=true;f.zeta=f.dp/pd;}
+        else more(L"Q = 0 \u2013 unesite \u03B6");
+        if(f.terminal&&f.ok)more(L"u \u0394p kraj. elem. (bez rezerve)");
+        r.f.push_back(f);
     }
     // Bullhead (ASHRAE SR5-15 / ER5-5 rectangular, SD5-19 / ED5-4 round): the common duct on the
     // T komad's ogranak, the two run ends are branches b1 (port 0) and b2 (port 1); C on each Vb.
