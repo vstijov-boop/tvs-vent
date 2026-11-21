@@ -25,6 +25,20 @@ Format i pravila: [DPD_IZVOZ.md](DPD_IZVOZ.md).
 - Krajnji element bez protoka → poruka, dionica sa Q = 0.
 - Meni / ribbon „Crtanje kanala“: dugme „Izvoz u DuctPressDrop“ (ikona kao TVS_PAD).
 
+## TVS_OPREMA – povezivanje nacrtanih blokova opreme u mrežu (novo, 21.11.) – testirati
+Opis: [OPREMA.md](OPREMA.md). Blok se nikad ne pomjera; mijenjaju se samo krajevi kanala.
+- **Slučaj 1:** kanal – blok regulatora (npr. 500 mm) – kanal, krajevi kanala tačno na licima bloka → `TVS_OPREMA`, izaberi blok → „povezano 1 (u liniji 1…)“, kanali nepromijenjeni.
+- **Slučaj 2:** isto, ali jedan kanal 50–100 mm prije bloka, drugi ulazi 100 mm pod blok → oba kraja dođu tačno na lica bloka („krajeva kanala skraćeno / produženo 2“). Razmak veći od 150 mm → odbijeno „razmak između bloka i kanala je veći od dozvoljenog (… mm)“; opcija **Tolerancija** mijenja 150 mm.
+- **Slučaj 3:** jedan neprekinut kanal ispod bloka → kanal se presiječe za dužinu bloka; novi komad ima ista svojstva (dimenzija, kota, protok, sloj, boja, TVS svojstva) kao poslije TVS_CUT. Komad kraći od 50 mm → odbijeno.
+- **Zarotiran blok** (npr. 30°, kanal pod 30°) i kanal crtan s desna na lijevo / odozgo na dolje: isto kao gore. Dužina bloka = granice definicije bloka (bez atributa) duž ose kanala.
+- **Terminal:** rešetka / difuzor na slobodnom kraju kanala ili flex crijeva (dodiruje, razmak ili kraj pod blokom) → 1 priključak, kraj kanala na licu bloka. Kraj spojen sa koljenom / T komadom → „kraj kanala je spojen sa drugim elementom“.
+- **Odbijanja (ništa se ne mijenja, blok ostaje izabran, ispis sa handle-om):** osa kanala 100 mm od sredine bloka, kanali različitih dimenzija / kota sa dvije strane, dva kanala ukrštena ispod bloka, kanal cio ispod bloka, flex ispod regulatora, kanal na zaključanom sloju, kanal iz etaža / obilaska, blok zarotiran u 3D.
+- **Podrazumijevano po nazivu bloka** (TVS_OPREMA_TIPOVI, upisuje dijalog opreme): vrsta rešetka → blok preko kontinualnog kanala odbijen („bočna ugradnja – kasnije“); vrsta regulator → blok sa kanalom samo s jedne strane odbijen; zadata dužina → kanal se reže / skraćuje na tu dužinu (centrirano na blok). Bez zapisa: terminal = Rešetka, u liniji = Ostala oprema.
+- **Sve:** `TVS_OPREMA` → `Sve` → svi blokovi trenutnog prostora koji leže na kanalu; ostali se samo prebroje („blokova van kanala“). Xref blokovi se preskaču.
+- **Ponovo:** već povezan blok → pitanje „Povezati ih ponovo [Da/Ne] <Ne>“; Da → isti blok se ponovo poveže (vrsta / oznaka / model gubitka ostaju).
+- **Jedan U** vraća sve što je TVS_OPREMA uradila (sve blokove, kanale i nove komade). Crtež u cm / m: tolerancije u mm rade isto.
+- **TVS_OPREMA_ODVEZI:** izaberi povezane blokove → zapis obrisan, kanali i blok ostaju kakvi jesu.
+
 ## Sitne ispravke iz pregleda (15.11.) – testirati
 - TVS_SPEC / TVS_EXCELSPEC: blok sa atributima na zaključanom sloju je u specifikaciji (ranije tiho izostavljen).
 - Fleks koljeno: dužina u specifikaciji = luk ose (npr. Ø200, 90°, k = 0,5 → ≈ 0,31 m, ranije 0,08 m).
