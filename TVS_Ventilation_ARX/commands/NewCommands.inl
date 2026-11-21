@@ -124,6 +124,13 @@
         syncTVSGlobalUnits();
         tvsPad::execute();
     }
+    // TVS_OPREMA_SVOJSTVA: vrsta, oznaka, opis, model pada pritiska i protok povezanih blokova opreme (EquipmentDialog.h).
+    static void Ventilation_ARXTVS_OPREMA_SVOJSTVA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsEquipmentDialog::run(IDD_EQUIPMENT);
+    }
     // TVS_DPD_IZVOZ: the network as a DuctPressDrop system file (JSON, DpdExportCommand.h).
     static void Ventilation_ARXTVS_DPD_IZVOZ(void)
     {

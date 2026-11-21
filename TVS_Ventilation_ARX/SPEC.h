@@ -111,6 +111,7 @@ ACHAR sCommit[512];
 AcDbEntity* sEnt;
 AcArray <AcDbEntity*> entityList;
 bool addBlock(AcDbEntity * pEnt);
+bool addEquipment(AcDbEntity * pEnt);   // block linked by TVS_OPREMA (EquipmentStore.h); false = not linked
 bool setAtribToEnt(AcDbEntity* pEnt, ACHAR* tag, ACHAR *pVal);
 bool setAtribListToEnt();
 static bool getBlockName(AcDbEntity* pEnt , ACHAR *pName);

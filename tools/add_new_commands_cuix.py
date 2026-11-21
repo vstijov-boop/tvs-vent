@@ -1,4 +1,4 @@
-"""Add the new TVS_VENT commands (presjek, kote, match, prelaz, offset, bypass, T komad, flex)
+"""Add the new TVS_VENT commands (presjek, kote, match, prelaz, offset, bypass, T komad, flex, oprema)
 to TVS_VENT.cuix with their icons, and refresh the MOVE/STRETCH icons. Idempotent."""
 import copy, io, pathlib, zipfile
 from lxml import etree as E
@@ -32,6 +32,9 @@ CMDS = [
  ('PAD', 'Pad pritiska', 'Pad pritiska po dionicama u Excel (izbor kraja mreže kod jedinice; Dovod / Odvod): trenje, ASHRAE fitinzi, kritična grana, šema; Δp krajnjih elemenata se unosi u Excelu.', 'Crtanje kanala', 'Crtanje kanala', 'PP'),
  ('DPD_IZVOZ', 'Izvoz u DuctPressDrop', 'Mreža dovoda / odvoda kao sistem za DuctPressDrop (JSON; izbor kraja mreže kod jedinice): dionice s protokom, dimenzijama i geometrijom; fitinge DuctPressDrop izvodi sam.', 'Crtanje kanala', 'Crtanje kanala', 'DP'),
  ('OZNAKE', 'Oznake kanala', 'Oznake dimenzija/protok na pravim kanalima (sloj AT-DIM_KANAL, štampaju se, prate izmjene): uključi / isključi, položaj, razmjera, pojedinačni natpisi.', 'Crtanje kanala', 'Crtanje kanala', 'OZ'),
+ ('OPREMA', 'Oprema na mreži', 'Povezuje nacrtane blokove opreme (regulator protoka, PP klapna, CAV/VAV, prigušivač, rešetka, difuzor, kapa, žaluzina) u mrežu kanala: kanali se skraćuju / sijeku do čela bloka.', 'Crtanje kanala', 'Crtanje kanala', 'OP'),
+ ('OPREMA_ODVEZI', 'Odveži opremu', 'Uklanja vezu bloka opreme sa mrežom kanala; blok i kanali ostaju u crtežu.', 'Crtanje kanala', 'Crtanje kanala', 'OO'),
+ ('OPREMA_SVOJSTVA', 'Svojstva opreme', 'Vrsta, oznaka, opis / tip, model pada pritiska (Δp / ζ / Δp_n pri Q_n) i protok povezanih blokova opreme; primjena na sve blokove istog naziva.', 'Crtanje kanala', 'Crtanje kanala', 'OS'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)
@@ -62,7 +65,7 @@ for cmd, label, helptext, pop, panel, key in CMDS:
     t = trees['PopMenuRoot.cui']
     if not t.xpath(ref):
         target = t.xpath('.//PopMenu[Name="'+pop+'"]')[0]
-        if cmd not in seps and cmd in ('OFFSET', 'MATCH', 'PRESJEK'):
+        if cmd not in seps and cmd in ('OFFSET', 'MATCH', 'PRESJEK', 'OPREMA'):
             s = E.SubElement(target, 'PopMenuItem', IsSeparator='true', hasDiesel='false', UID='POPMENUITEM_SEP_TVS_'+cmd)
             E.SubElement(s, 'ModifiedRev', MajorVersion='20', MinorVersion='1', UserVersion='1')
             seps.add(cmd)

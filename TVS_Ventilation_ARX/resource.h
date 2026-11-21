@@ -39,6 +39,7 @@
 #define IDD_SECTION                     119
 #define IDD_RUN                         120
 #define IDD_SIZING                      121
+#define IDD_EQUIPMENT                   122
 #define IDC_ZOldTop                     1210
 #define IDC_ZOldBottom                  1211
 #define IDC_ZRefTop                     1212

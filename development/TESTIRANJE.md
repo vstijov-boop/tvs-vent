@@ -1,5 +1,17 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## Oprema na mreži: TVS_OPREMA_SVOJSTVA, specifikacija, meni (novo, 21.11.) – testirati
+Opis: [OPREMA.md](OPREMA.md). Blokovi se prvo povežu sa TVS_OPREMA.
+- `TVS_OPREMA_SVOJSTVA` → izabrati jedan povezan blok (ili ga izabrati prije komande) → dijalog „Svojstva opreme“: vrsta, oznaka, opis / tip, model pada pritiska, protok (samo krajnji element sa 1 priključkom), dolje priključci / dimenzija / dužina (samo za čitanje).
+- Nepovezan blok → poruka „Blok nije povezan u mrežu (TVS_OPREMA).“; mješovit izbor → povezani se uređuju, za ostale poruka „preskočeno n“.
+- „Nova“: sljedeća oznaka za izabranu vrstu u crtežu (PPK-01, PPK-02 postoje → PPK-03; RP, CAV, VAV, PB, R, D, KK, PZ, OP). Promijeniti vrstu pa „Nova“ → novi prefiks.
+- Model: Bez / Fiksni Δp / ζ / Δp_n pri Q_n – aktivna su samo polja izabranog modela. Decimalni zarez i tačka (0,8 = 0.8). Negativno Δp ili ζ → poruka, dijalog ostaje otvoren; Δp_n pri Q_n sa Q_n = 0 → poruka. Slovo u polju broja → „Unesite broj“.
+- Više blokova: polja koja se razlikuju pokazuju „Različito“ (vrsta: stavka „Različito“, model: nijedno dugme) i ostaju kakva jesu u svakom bloku dok ih ne promijenite; promijenjeno polje ide u sve izabrane.
+- „Primijeni na sve blokove ovog naziva“: svi povezani blokovi tog naziva u crtežu dobijaju vrstu, opis, model i vrijednosti (oznaka i protok ostaju svoji); novi blok tog naziva povezan sa TVS_OPREMA treba da dobije ista svojstva. Nepovezani blokovi tog naziva se ne mijenjaju.
+- Zaključan sloj jednog bloka → poruka, ništa se ne mijenja. Jedan U vraća sve izmjene blokova.
+- TVS_SPEC / TVS_EXCELSPEC: povezan blok je u tabeli blokova kao oprema – Pozicija = oznaka, Naziv = opis / tip (ili vrsta kad opisa nema), Tip i dimenzije = 400x250 ili Ø250, kom; isti naziv + dimenzija + oznaka se sabiraju. Šifra / proizvođač / masa / napomena iz atributa bloka ako ih ima. Nepovezani blokovi sa atributima – kao do sada. TVS_BLCKMNGR: bez promjene (atributi).
+- Meni i ribbon „Crtanje kanala“: dugmad „Oprema na mreži“, „Odveži opremu“, „Svojstva opreme“ (nove ikone) – pokreću TVS_OPREMA, TVS_OPREMA_ODVEZI, TVS_OPREMA_SVOJSTVA.
+
 ## Jedna radnja = jedan UNDO korak, sve ili ništa (prijedlog 3, 21.11.) – testirati
 - Svojstva (TVS_CHANGE) na kanalu u dionici, dijalog dionice → Primijeni: **jedan U** vraća i izmjenu kanala i dionicu (ranije dva U: TVS_DIM_PRATI je bila posebna komanda). Poslije toga Enter / razmak ponavlja TVS_CHANGE, ne TVS_DIM_PRATI. Isto za TVS_CHANGE na jednom T komadu (dijalog TVS_TK_TIP, pa dionica iza kanala nove dimenzije).
 - Dvoklik na kanal i Properties paleta: kao i do sada (dva koraka – izmjenu bilježi AutoCAD van TVS komande). Javiti ako to smeta.

@@ -3,6 +3,8 @@
 #ifdef TVS_OFFSET_INTEGRATION
 #include <limits>
 #endif
+#include "EquipmentStore.h"   // oprema na mrezi: povezani blok u specifikaciji (addEquipment)
+#include "../geometry/EquipmentEdit.h"
 #include "SPEC.h"
 #include "TablePresentation.h"
 #include "../TVS_Ventilation_DBX/SheetMetal.h"
@@ -628,6 +630,36 @@ bool SPEC::addBlock(AcDbEntity * pEnt)
 	else return false;
 }
 
+
+// Oprema na mreži: a block linked by TVS_OPREMA (record TVS_OPREMA_V1) is listed as equipment -
+// name = opis / tip (note) or the kind, size a x b / diameter a mm, tag in the position column,
+// unit kom; šifra / proizvođač / masa / napomena still from its attributes when it has them.
+// Unlinked blocks are not touched here (addBlock, attributes, as before).
+bool SPEC::addEquipment(AcDbEntity * pEnt)
+{
+	tvsEquipment::Record rec;
+	if (!pEnt || !AcDbBlockReference::cast(pEnt) || !tvsEquipmentStore::read(pEnt, rec)) return false;
+	wcsncpy_s(sPos, rec.tag.c_str(), _TRUNCATE);
+	wcsncpy_s(sName, tvsEquipmentEdit::specName(rec).c_str(), _TRUNCATE);
+	wcscpy_s(sType, _T(""));
+	wcsncpy_s(sSize, tvsEquipmentEdit::sizeText(rec, d).c_str(), _TRUNCATE);
+	wcsncpy_s(sTypeSize, sSize, _TRUNCATE);
+	wcscpy_s(sArticle, _T(""));
+	wcscpy_s(sManufacture, _T(""));
+	wcscpy_s(sUnit, _T("kom"));
+	wcscpy_s(sValue, _T(""));
+	wcscpy_s(sMass, _T(""));
+	wcscpy_s(sCommit, _T(""));
+	GetAtt(pEnt, TagManufacture, sManufacture);
+	GetAtt(pEnt, TagMass, sMass);
+	GetAtt(pEnt, TagArticle, sArticle);
+	GetAtt(pEnt, TagCommit, sCommit);
+	setParam1(1, TypeInt);
+	setParam2(0, TypeInt);
+	sEnt = pEnt;
+	entityList.append(sEnt);
+	return true;
+}
 
 bool SPEC::setAtribToEnt(AcDbEntity* pEnt, ACHAR* tag, ACHAR  *pVal)
 {
