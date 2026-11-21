@@ -12,6 +12,7 @@
 // round the elbow); Gore / Dolje needs a free port. U redu = one command, one UNDO step.
 // Also opened by Svojstva (TVS_CHANGE / double click) on one T komad.
 #include "TeePort.h"
+#include "ActionTransaction.h"
 #include "TeeCommand.h"
 #include "../TVS_Ventilation_DBX/SpiroCatalog.h"
 #include "../TVS_Ventilation_DBX/TVS_TAP.h"
@@ -522,8 +523,25 @@ inline void apply(const Dialog& d){
     {const int inletPort=d.choice==Pants?2:0;tvsTeePort::ensure(s.id,inletPort);}
     acutPrintf(L"\nT komad: %ls.",d.choice==Branch?L"TK-O sa ogrankom":d.choice==Pants?L"TK-G sa dva ogranka":d.choice==Tap?L"štucna":L"TK0");
 }
+// Prijedlog 3 (pregled 2026-11b): apply() writes the T komad and the elements on its ports one
+// by one (open / close) and skipped one it could not open - the T komad changed, the duct on its
+// port not. Before the dialog: the T komad, the duct or prelaz on each port and the duct behind
+// such a prelaz must be writable (unlocked layer), else nothing is changed.
+inline bool writable(const Source& s){
+    std::vector<AcDbObjectId> ids;ids.push_back(s.id);
+    {AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)return false;
+     const double tol=2.0/s.f;
+     for(int k=0;k<3;++k){const tvsTeePort::Neighbour n=tvsTeePort::at(w.object(),s.port[k],tol);
+        if(n.kind!=1&&n.kind!=2)continue;ids.push_back(n.id);
+        if(n.kind==2){tvsMove::Node tn;AcGePoint3d beyond;bool ok=false;
+            {AcDbObjectPointer<TVS_TRANS> t(n.id,AcDb::kForRead);if(t.openStatus()==Acad::eOk&&tvsMove::describe(t.object(),tn)&&tn.ports.size()==2){beyond=tvsMove::acad(tn.ports[1-n.end]);ok=true;}}
+            if(!ok)continue;const tvsTeePort::Neighbour q=tvsTeePort::at(w.object(),beyond,tol);if(q.kind==1)ids.push_back(q.id);}}}
+    if(tvsAction::writable(ids))return true;
+    acutPrintf(L"\nT komad nije mijenjan: on ili element na njegovom priključku je na zaključanom sloju (ili nije dostupan).");return false;
+}
 inline bool open(const AcDbObjectId& id,UINT idd){
     Source s;if(!readSource(id,s)){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
+    if(!writable(s))return true;
     Dialog dg(s,idd);
     {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return true;}
     apply(dg);return true;
@@ -536,6 +554,7 @@ inline bool open(const AcDbObjectId& id,UINT idd){
 inline bool openArriving(const AcDbObjectId& id,UINT idd,int k,const Section& in){
     Source s;if(!idd||!readSource(id,s))return false;
     const int choice=choiceOf(s.type);if(choice!=Branch&&choice!=Pants)return false;
+    if(!writable(s))return false;
     const bool inlet=choice==Pants?k==2:k==0;int tab=0;
     if(inlet){
         if((choice==Pants?s.roundOtv:s.roundPr)!=in.round){acutPrintf(L"\nT komad: ulaz je drugog oblika od kanala; T komad nije mijenjan (prelaz na priključku).");return false;}

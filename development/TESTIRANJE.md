@@ -1,5 +1,12 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## Jedna radnja = jedan UNDO korak, sve ili ništa (prijedlog 3, 21.11.) – testirati
+- Svojstva (TVS_CHANGE) na kanalu u dionici, dijalog dionice → Primijeni: **jedan U** vraća i izmjenu kanala i dionicu (ranije dva U: TVS_DIM_PRATI je bila posebna komanda). Poslije toga Enter / razmak ponavlja TVS_CHANGE, ne TVS_DIM_PRATI. Isto za TVS_CHANGE na jednom T komadu (dijalog TVS_TK_TIP, pa dionica iza kanala nove dimenzije).
+- Dvoklik na kanal i Properties paleta: kao i do sada (dva koraka – izmjenu bilježi AutoCAD van TVS komande). Javiti ako to smeta.
+- TVS_TK_TIP: zaključati sloj kanala (ili prelaza, ili kanala iza prelaza) na jednom priključku T komada → odmah poruka „T komad nije mijenjan: on ili element na njegovom priključku je na zaključanom sloju“, dijalog se ne otvara, ništa se ne mijenja (ranije: T komad promijenjen, kanal na priključku ne). Isto kad dijalog T komada otvori dionica (ostaje prelaz na priključku). Napomena: provjeravaju se sva tri priključka, i onaj koji se ne mijenja.
+- TVS_RAZBIJ / TVS_ERASE: svaki element se razbija u jednoj transakciji – ako se neki dio ne može dodati u prostor, element ostaje cio (ranije obrisan bez tog dijela). Provjeriti: razbijanje u Model, Layout i u bloku (BEDIT / REFEDIT), zaključan sloj (preskočeno, poruka kao ranije), jedan U vraća sve razbijene elemente, oznake (TVS_OZNAKE) i dalje postaju TEXT.
+- Dionica sa zaključanim elementom: poruka „Dionica nije promijenjena …“ kao i do sada (ista provjera, sada zajednička).
+
 ## Izdanje i sklopovi (12.11.) – testirati
 - TVS_BYPASS_PREVIEW, TVS_OFFSET_STATUS, TVS_OFFSET_POLICY više ne postoje u izdanju (Unknown command). TVS_OFFSET i opcija Z ne ispisuju „DEV“ linije.
 - TVS_RAZBIJ / TVS_ERASE: izbor koji obuhvata etaž ili obilazak – članovi sklopa se preskaču uz poruku; ostali TVS elementi se razbiju kao ranije.

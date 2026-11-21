@@ -316,10 +316,14 @@
 		if (acedSSGet(_T(""), NULL, NULL, NULL, sset) != RTNORM)
 			return;
 		// one T komad: the TVS_TK_TIP dialog (TeeTypeDialog.h) instead of the general Svojstva dialog
-		if (tvsTeeDialog::forSelection(sset, IDD_TEETYPE)) { acedSSFree(sset); return; }
+		// prijedlog 3 (pregled 2026-11b): the dionica / joints that follow the edit are settled here,
+		// in this command - one UNDO step with the edit (before: TVS_DIM_PRATI was posted after it as
+		// its own command, a second UNDO step). Nothing waits afterwards, so nothing is posted.
+		if (tvsTeeDialog::forSelection(sset, IDD_TEETYPE)) { acedSSFree(sset); tvsSizeFollow::run(IDD_RUN, IDD_TEETYPE); return; }
 
 		Change(sset);
 		acedSSFree(sset);
+		tvsSizeFollow::run(IDD_RUN, IDD_TEETYPE);
 
 
 
@@ -334,26 +338,28 @@
 
 
 
-	// Parts of an exploded element into the space that owned it (model, paper or block).
-	static Acad::ErrorStatus postToDatabase(const AcDbVoidPtrArray& eSet, const AcDbObjectId& owner)
+	// Parts of an exploded element into the space that owned it (model, paper or block), in the
+	// element's transaction (prijedlog 3): a part that cannot be added fails the whole element,
+	// the transaction then takes back the parts already added (before: the element was erased
+	// without that part).
+	static Acad::ErrorStatus postToDatabase(tvsAction::Transaction& tx, const AcDbVoidPtrArray& eSet, const AcDbObjectId& owner)
 	{
-		AcDbBlockTableRecord* space = NULL;
-		Acad::ErrorStatus es = acdbOpenObject(space, owner, AcDb::kForWrite);
-		if (es != Acad::eOk)
+		AcDbBlockTableRecord* space = AcDbBlockTableRecord::cast(tx.open(owner, AcDb::kForWrite));
+		if (!space)
 		{
 			acutPrintf(L"\nNije moguće otvoriti prostor crteža; dijelovi nisu dodati.");
 			for (int i = 0; i < eSet.length(); i++) delete static_cast<AcRxObject*>(eSet[i]);
-			return es;
+			return tx.status == Acad::eOk ? Acad::eNotApplicable : tx.status;
 		}
+		Acad::ErrorStatus es = Acad::eOk;
 		for (int i = 0; i < eSet.length(); i++)
 		{
-			AcDbEntity* part = AcDbEntity::cast(static_cast<AcRxObject*>(eSet[i]));
-			if (!part) { delete static_cast<AcRxObject*>(eSet[i]); continue; }
+			AcDbEntity* part = es == Acad::eOk ? AcDbEntity::cast(static_cast<AcRxObject*>(eSet[i])) : NULL;
+			if (!part) { delete static_cast<AcRxObject*>(eSet[i]); continue; }   // after a failure: only freed
 			AcDbObjectId partId;
-			if (space->appendAcDbEntity(partId, part) == Acad::eOk) part->close();
-			else { delete part; acutPrintf(L"\nNije moguće dodati dio elementa."); }
+			if (!tx.append(space, part, partId)) { es = tx.status; acutPrintf(L"\nNije moguće dodati dio elementa; element ostaje."); }
 		}
-		return space->close();
+		return es;
 	}
 
 	// - Ventilation_ARX.TVS_ERASE command (do not rename)
@@ -397,9 +403,13 @@
 			if (acdbGetObjectId(id, eName) != eOk || id.isNull()) continue;
 			// etaž / obilazak: a member alone would leave the assembly record orphaned (V7)
 			if (tvsAlignCmd::inAssembly(id)) { ++assembly; continue; }
-			AcDbEntity* pEnt = NULL;
-			if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) != eOk) { ++locked; continue; }
-			if (!TVS_Pipe::cast(pEnt) && !TVS_TAP::cast(pEnt) && !TVS_WYE::cast(pEnt) && !TVS_TRANS::cast(pEnt)) { pEnt->close(); continue; }
+			// prijedlog 3: per element one transaction - its parts in and the element out, or
+			// (any step failing) none of it; never close() what the transaction returns
+			tvsAction::Transaction tx;
+			if (!tx.good()) { ++failed; continue; }
+			AcDbEntity* pEnt = AcDbEntity::cast(tx.open(id, AcDb::kForWrite));
+			if (!pEnt) { ++locked; continue; }
+			if (!TVS_Pipe::cast(pEnt) && !TVS_TAP::cast(pEnt) && !TVS_WYE::cast(pEnt) && !TVS_TRANS::cast(pEnt)) continue;
 			AcDbVoidPtrArray eSet;
 			const AcDbObjectId owner = pEnt->ownerId();
 			Acad::ErrorStatus es = pEnt->explode(eSet);
@@ -407,14 +417,13 @@
 			// space that cannot take the parts keeps the element)
 			if (es != Acad::eOk || eSet.length() == 0)
 			{
-				pEnt->close();
 				for (int k = 0; k < eSet.length(); k++) delete static_cast<AcRxObject*>(eSet[k]);
 				++failed; continue;
 			}
-			es = postToDatabase(eSet, owner);
+			es = postToDatabase(tx, eSet, owner);
 			if (es == Acad::eOk) es = pEnt->erase();
-			pEnt->close();
-			if (es != Acad::eOk) { ++failed; continue; }
+			if (es == Acad::eOk && !tx.commit()) es = tx.status;
+			if (es != Acad::eOk) { ++failed; continue; }   // tx aborts: element and space as before
 			++done;
 		}
 		if (assembly) acutPrintf(_T("\nČlanovi etaža / obilaska se ne razbijaju pojedinačno (preskočeno: %d). Za crtež bez TVS elemenata: TVS_IZVOZ."), assembly);

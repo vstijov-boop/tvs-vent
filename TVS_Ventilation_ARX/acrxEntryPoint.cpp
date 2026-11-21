@@ -31,6 +31,7 @@
 #include "TVSMoveCommand.h"
 #include "AlignCommand.h"
 #include "BuildTransaction.h"   // production helpers (pt, modelId, BuildTransaction)
+#include "ActionTransaction.h"   // prijedlog 3: transakcija + provjera upisivosti po radnji
 #if defined(TVS_OFFSET_PROOF)&&defined(TVS_DEV)
 #include "TVSTestOffset.h"
 #endif
