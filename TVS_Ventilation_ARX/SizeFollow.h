@@ -13,6 +13,7 @@
 // size, and says where.
 #include <rxmfcapi.h>
 #include "BuildTransaction.h"
+#include "ActionTransaction.h"
 #include "TVSMoveCommand.h"
 #include "TransAlignCommand.h"
 #include "TeeCommand.h"
@@ -501,10 +502,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
 #ifdef TVS_OFFSET_INTEGRATION
      for(size_t k=0;k<run.etazes.size();++k){const tvsOffsetRefit::Assembly& s=etazes[run.etazes[k].index];w.push_back(s.a);w.push_back(s.b);w.push_back(s.p);}
 #endif
-     for(size_t k=0;k<w.size();++k){if(w[k].isNull())continue;bool ok=false;
-        {AcDbObjectPointer<AcDbEntity> o(w[k],AcDb::kForRead);
-         if(o.openStatus()==Acad::eOk){AcDbObjectPointer<AcDbLayerTableRecord> layer(o->layerId(),AcDb::kForRead);ok=layer.openStatus()==Acad::eOk&&!layer->isLocked();}}
-        if(!ok){acutPrintf(L"\nDionica nije promijenjena: element dionice je na zaključanom sloju ili nije dostupan.");return false;}}}
+     if(!tvsAction::writable(w)){acutPrintf(L"\nDionica nije promijenjena: element dionice je na zaključanom sloju ili nije dostupan.");return false;}}   // prijedlog 3: shared preflight (ActionTransaction.h)
     // write: etazi, elbows, T komadi, ducts
 #ifdef TVS_OFFSET_INTEGRATION
     for(size_t k=0;k<run.etazes.size();++k)if(!etazResize(etazes[run.etazes[k].index],A,B,f)){acutPrintf(L"\nEtaž nije preračunat; dionica je promijenjena samo do njega.");return false;}

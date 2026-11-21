@@ -41,7 +41,7 @@ class Release(unittest.TestCase):
   self.assertNotIn('pipi->LastPoint = ',d+e)                         # kraj kanala samo kroz put_Lastpoint
   self.assertIn('const double stub = 100.0 / tvsUnits::factor();',d)
   self.assertIn('const double minLength = 50.0 / tvsUnits::factor();',e)   # TVS_CUT u mm
-  self.assertIn('es = postToDatabase(eSet, owner);\n\t\t\tif (es == Acad::eOk) es = pEnt->erase();',e)   # TVS_ERASE: original ide tek kad su dijelovi u crtezu
+  self.assertIn('es = postToDatabase(tx, eSet, owner);\n\t\t\tif (es == Acad::eOk) es = pEnt->erase();',e)   # TVS_ERASE: original ide tek kad su dijelovi u crtezu (prijedlog 3: u istoj transakciji)
   self.assertIn('if (tvsAlignCmd::inAssembly(id)) { ++assembly; continue; }',e)   # V7: clan etaza / obilaska se ne razbija sam
   self.assertIn('TVS_RAZBIJ, TVS_RAZBIJ',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
  def test_release_defines_and_units(self):
