@@ -162,8 +162,7 @@ public:
 	CString RadiusTypeRect;
 	CString TapRadiusVariableParameter;
 	CString TapRadiusConst;
-	CString Swectangle;
-	CString SwectangleRadians, SwectangleShown;   // as read and as shown in degrees: unchanged -> written back as it was
+	CString Swectangle;   // radians (shown in degrees, DecimalText.h DDX_Degrees)
 
 	BOOL Wipe;
 	BOOL Grani;

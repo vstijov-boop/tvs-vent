@@ -26,6 +26,7 @@
 #include "resource.h"
 #include "dgChangeZ.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
+#include "../geometry/NumericField.h"
 
 #include <cmath>
 #include <vector>
@@ -84,10 +85,9 @@ int dgChangeZ::reference() const {
 
 // New axis level (drawing units) and angle from the fields; false = not a number.
 bool dgChangeZ::read(double& axis, double& angle) const {
-	CString t; GetDlgItemText(IDC_NextZ, t); t.Replace(L',', L'.');
-	wchar_t* end = NULL; const double v = wcstod(t, &end); if (t.IsEmpty() || !end || *end) return false;
-	CString a; GetDlgItemText(IDC_Axis, a); a.Replace(L',', L'.');
-	const double g = wcstod(a, &end); if (a.IsEmpty() || !end || *end) return false;
+	double v = 0, g = 0;   // decimal comma or point (geometry/NumericField.h)
+	CString t; GetDlgItemText(IDC_NextZ, t); if (!tvsNumeric::parse(t.GetString(), v)) return false;
+	CString a; GetDlgItemText(IDC_Axis, a); if (!tvsNumeric::parse(a.GetString(), g)) return false;
 	const int ref = reference(); const double h = height / 2;
 	axis = v / tvsUnits::factor() - (ref == 1 ? h : ref == 2 ? -h : 0); angle = g;
 	return true;
