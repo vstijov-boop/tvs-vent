@@ -108,7 +108,7 @@
 							SPEC spec;
 							wcscpy_s(spec.grad, grad);
 							wcscpy_s(spec.d, d);
-							if (spec.addBlock(pEnt) == true)
+							if (spec.addEquipment(pEnt) || spec.addBlock(pEnt))   // oprema na mreži: povezani blok kao oprema
 							{
 								specatrlist.append(spec);
 							}
