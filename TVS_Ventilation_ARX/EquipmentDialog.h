@@ -202,8 +202,9 @@ inline void run(UINT idd,const std::vector<AcDbObjectId>& ids){
     allTags(db,dg.tags);
     if(items.size()==1)dg.banner.Format(L"Blok „%ls“",items[0].block.c_str());
     else dg.banner.Format(L"Izabrano blokova: %d  ·  naziva: %d",static_cast<int>(items.size()),static_cast<int>(names.size()));
-    if(names.size()==1)dg.allText.Format(L"Primijeni na sve blokove ovog naziva (%ls)",names.begin()->c_str());
-    else dg.allText=L"Primijeni na sve blokove ovog naziva";
+    // user 2026-11-23: the label says what is carried over - tag and flow stay per block
+    if(names.size()==1)dg.allText.Format(L"Primijeni vrstu, opis i Δp na sve blokove „%ls“ (oznaka i protok ostaju)",names.begin()->c_str());
+    else dg.allText=L"Primijeni vrstu, opis i Δp na sve blokove istog naziva (oznaka i protok ostaju)";
     INT_PTR rc;
     {CAcModuleResourceOverride resources;rc=dg.DoModal();}
     if(rc!=IDOK||dg.records.size()!=items.size())return;

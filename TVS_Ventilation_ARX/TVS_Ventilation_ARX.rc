@@ -438,7 +438,7 @@ BEGIN
     LTEXT           "Protok [m³/h]",1722,10,175,90,8
     EDITTEXT        1714,10,184,80,14,ES_AUTOHSCROLL
     LTEXT           "",1715,100,175,210,26
-    CONTROL         "Primijeni na sve blokove ovog naziva",1716,"Button",BS_AUTOCHECKBOX | WS_GROUP | WS_TABSTOP,10,208,300,10
+    CONTROL         "Primijeni vrstu, opis i Δp na sve blokove istog naziva (oznaka i protok ostaju)",1716,"Button",BS_AUTOCHECKBOX | BS_MULTILINE | WS_GROUP | WS_TABSTOP,10,206,300,20
     LTEXT           "",1717,10,236,196,10
     PUSHBUTTON      "Otkaži",IDCANCEL,212,232,44,16
     PUSHBUTTON      "Primijeni",IDOK,260,232,50,16,BS_OWNERDRAW
