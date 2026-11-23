@@ -51,7 +51,6 @@ src = menu.xpath('.//MenuMacro[@UID="MMU_TVS_MOVE"]')[0]
 trees = {n: load(n) for n in ('ToolbarRoot.cui', 'PopMenuRoot.cui', 'RibbonRoot.cui')}
 tb_tpl = trees['ToolbarRoot.cui'].xpath('.//ToolbarButton[.//MacroRef/@MenuMacroID="MMU_TVS_MOVE"]')[0]
 pm_tpl = trees['PopMenuRoot.cui'].xpath('.//PopMenuItem[.//MacroRef/@MenuMacroID="MMU_TVS_MOVE"]')[0]
-rb_tpl = trees['RibbonRoot.cui'].xpath('.//RibbonCommandButton[@MenuMacroID="MMU_TVS_MOVE"]')[0]
 seps = set()
 for cmd, label, helptext, pop, panel, key in CMDS:
     if not menu.xpath('.//MenuMacro[@UID="MMU_TVS_'+cmd+'"]'):
@@ -71,10 +70,7 @@ for cmd, label, helptext, pop, panel, key in CMDS:
             E.SubElement(s, 'ModifiedRev', MajorVersion='20', MinorVersion='1', UserVersion='1')
             seps.add(cmd)
         target.append(clone(pm_tpl, cmd, label, key))
-    t = trees['RibbonRoot.cui']
-    if not t.xpath(ref):
-        src_panel = t.xpath('.//RibbonPanelSource[@Text="'+panel+'"]')[0]
-        src_panel.find('RibbonRow').append(clone(rb_tpl, cmd, label, key))
+    # ribbon: the panels are built by tools/ribbon_layout.py (LAYOUT) - add new commands there
     for size in (16, 32):
         n = f'TVS_{cmd}_{size}.png'
         arch[n] = (arch[n][0] if n in arch else zipfile.ZipInfo(n, (1980, 1, 1, 0, 0, 0)), (icons/n).read_bytes())
@@ -87,6 +83,9 @@ buf = io.BytesIO()
 with zipfile.ZipFile(buf, 'w') as z:
     for info, data in arch.values(): z.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED)
 cuix.write_bytes(buf.getvalue())
+import importlib.util, sys
+spec = importlib.util.spec_from_file_location('ribbon_layout', root/'tools'/'ribbon_layout.py')
+rl = importlib.util.module_from_spec(spec); spec.loader.exec_module(rl); rl.main()
 with zipfile.ZipFile(cuix) as z:
     assert z.testzip() is None
     for n in z.namelist():

@@ -352,3 +352,4 @@ Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → In
 
 - **TVS_NATPIS + oprema:** uključi TVS_NATPIS – povezani blokovi: zeleni „+ DAS-1 / 550 m3/h / 30 Pa“, nepovezani blok poznatog naziva: crveni „- Dif_1“; ne štampa se (PLOT preview); EXPLODE bloka ne pravi tekst. TVS_PROTOK / TVS_OPREMA_SVOJSTVA osvježe natpis.
 - **Primijeni na sve blokove ovog naziva:** komandna linija kaže koliko je ostalih blokova tog naziva i koliko je povezano; povezani dobiju vrstu / opis / model Δp.
+- **Ribbon po panelima (23.11.):** kartica TVS_Vent: paneli Crtanje, Izmjena mreže, Flex, Oprema, Proračun, Oznake, Specifikacija, Svojstva i podešavanja; glavna komanda velika, ostale male ikone (naziv i opis u tooltipu). Provjeriti da svako dugme pokreće svoju komandu, izgled na užem ekranu (paneli se skupljaju), toolbar TVS_VENT i padajući meni nepromijenjeni. Poslije nove instalacije možda treba CUILOAD / ponovno učitavanje TVS_VENT.cuix.
