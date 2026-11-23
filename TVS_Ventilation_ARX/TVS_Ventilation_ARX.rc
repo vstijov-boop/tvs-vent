@@ -450,9 +450,10 @@ CAPTION "TVS_VENT"
 FONT 9, "Segoe UI", 400, 0, 0x1
 BEGIN
     LTEXT           "",1801,16,31,290,9
-    CONTROL         "Lijevo",1802,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,18,61,80,10
-    CONTROL         "Desno",1803,"Button",BS_AUTORADIOBUTTON,104,61,80,10
-    CONTROL         "Dno (rešetka u dnu kanala)",1804,"Button",BS_AUTORADIOBUTTON,190,61,114,10
+    CONTROL         "Lijevo",1802,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,18,61,56,10
+    CONTROL         "Desno",1803,"Button",BS_AUTORADIOBUTTON,78,61,56,10
+    CONTROL         "Dno kanala",1804,"Button",BS_AUTORADIOBUTTON,138,61,74,10
+    CONTROL         "Kraj kanala",1820,"Button",BS_AUTORADIOBUTTON,216,61,88,10
     CONTROL         "Ravni T komad (TK0)",1805,"Button",BS_AUTORADIOBUTTON | WS_GROUP | WS_TABSTOP,18,95,110,10
     CONTROL         "Štucna",1806,"Button",BS_AUTORADIOBUTTON,154,95,100,10
     CONTROL         "Konusna štucna (okrugli ogranak)",1807,"Button",BS_AUTORADIOBUTTON,18,108,130,10

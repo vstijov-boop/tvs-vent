@@ -347,3 +347,5 @@ Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → In
 - Koljeno direktno na priključku grane T komada.
 - Detalji koljena u presjeku (kao TVS koljena gore/dolje).
 - Finese nastavka crtanja poslije umetanja T komada.
+
+- **TVS_RESETKA – Kraj kanala:** rešetka iza prelaza na kratkom kanalu: dijalog sam bira „Kraj kanala“; upiši 100 (ili 50) – kanal se skrati na tu dužinu, rešetka dođe na kraj okrenuta prema van; U vraća sve. TVS_PROTOK / TVS_PAD vide rešetku na kraju.

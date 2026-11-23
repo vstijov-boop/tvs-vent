@@ -28,7 +28,10 @@ inline double dot(const V& p,const V& q){return p.x*q.x+p.y*q.y;}
 inline double cross(const V& p,const V& q){return p.x*q.y-p.y*q.x;}
 inline double length(const V& p){return std::sqrt(dot(p,p));}
 
-enum Side {Left=0,Right=1,Bottom=2};
+// End (user 2026-11-23): grille on a FREE end of the duct (after a transition, a short duct of
+// 50 / 100 mm - the grille's damper - is enough): no T komad; the duct end may be set to a given
+// length from its other end, the block goes on the end facing outward.
+enum Side {Left=0,Right=1,Bottom=2,End=3};
 enum Method {Tee=0,Tap=1,Cone=2,Direct=3};   // ravni T komad TK0, stucna, konusna stucna, direktno na stranicu
 
 struct Duct {
@@ -65,7 +68,8 @@ struct Choice {
     int side,method;
     double stub;      // straight part of the branch (Lijevo / Desno)
     double a,b;bool round;   // branch / neck size; round: a = D
-    Choice():side(Left),method(Tee),stub(0),a(0),b(0),round(false){}
+    int end;          // End: 0 = FirstPoint, 1 = LastPoint; stub = duct length to the grille (0 = keep)
+    Choice():side(Left),method(Tee),stub(0),a(0),b(0),round(false),end(-1){}
 };
 struct Options {
     double collar;    // TK0: TVS_WYE LengthPl (TVS_SETTINGS T komad length)
@@ -124,7 +128,21 @@ inline Layout layout(const Duct& d,const Place& p,const Choice& c,const Options&
     r.fit=!shortStart&&!shortEnd?Split:shortEnd&&!shortStart&&d.freeEnd[1]?AtLast:shortStart&&!shortEnd&&d.freeEnd[0]?AtFirst:Refused;
     return r;
 }
-enum Error {Ok=0,NoDuct,BadSize,NoStub,MethodSide,RoundMain,ConeRect,TooTall,TooWide,Outside,NearEnd,errorCount};
+// The free end nearest to `at` within reach (drawing units); -1 none.
+inline int nearFreeEnd(const Duct& d,const V& at,double reach){
+    int best=-1;double bd=reach;
+    for(int e=0;e<2;++e){if(!d.freeEnd[e])continue;const double x=length(sub(at,e==0?d.p0:d.p1));if(x<=bd){bd=x;best=e;}}
+    return best;
+}
+struct EndLayout {bool ok;V at,outward;double rotation;EndLayout():ok(false),rotation(0){}};
+// End: the new end point (length > 0: measured from the other end along the axis) and the outward direction.
+inline EndLayout endLayout(const Duct& d,int end,double length){
+    EndLayout r;const double l=d.len();if(!(l>0)||end<0||end>1)return r;
+    const V u=mul(sub(d.p1,d.p0),1.0/l);r.outward=end==1?u:mul(u,-1);
+    const V other=end==1?d.p0:d.p1;r.at=length>0?add(other,mul(r.outward,length)):(end==1?d.p1:d.p0);
+    r.rotation=blockRotation(r.outward);r.ok=true;return r;
+}
+enum Error {Ok=0,NoDuct,BadSize,NoStub,MethodSide,RoundMain,ConeRect,TooTall,TooWide,Outside,NearEnd,NotFreeEnd,errorCount};
 // detail (drawing units): TooTall = duct side height, TooWide = duct width, NearEnd = length needed
 // on the short side, Outside = how far beyond the duct end.
 struct Check {int error;double detail;Check():error(Ok),detail(0){}};
@@ -133,6 +151,11 @@ inline Check validate(const Duct& d,const Place& p,const Choice& c,const Options
     Check k;const double l=d.len();
     if(!p.ok||!(l>0)||!(d.a>0)){k.error=NoDuct;return k;}
     if(!(c.a>0)||(!c.round&&!(c.b>0))){k.error=BadSize;return k;}
+    if(c.side==End){
+        if(c.end<0||c.end>1||!d.freeEnd[c.end]){k.error=NotFreeEnd;return k;}
+        if(c.stub<0){k.error=NoStub;return k;}
+        return k;
+    }
     const bool bottom=c.side==Bottom;
     if(bottom!=(c.method==Direct)){k.error=MethodSide;return k;}
     if(!bottom&&(c.method==Tap||c.method==Cone)&&(d.round||!(d.b>0))){k.error=RoundMain;return k;}
@@ -170,6 +193,7 @@ inline const wchar_t* errorText(int e){
     case TooWide:return L"priklju\u010dak re\u0161etke je \u0161iri od dna kanala";
     case Outside:return L"blok nije naspram kanala (projekcija je van kanala)";
     case NearEnd:return L"mjesto priklju\u010denja je preblizu kraju kanala (kraj nije slobodan ili je kanal prekratak)";
+    case NotFreeEnd:return L"re\u0161etka nije kod slobodnog kraja kanala (na kraju je drugi element)";
     default:return L"";
     }
 }

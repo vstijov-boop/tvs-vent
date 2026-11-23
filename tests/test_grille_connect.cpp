@@ -120,6 +120,16 @@ int main(){
      const Layout y=layout(d,p,choice(Left,Tee,100,300,200),o);
      assert(at(y.outward,-1,0)&&at(y.branchPort,-250,1000)&&at(y.stubEnd,-350,1000)&&eq(y.rotation,-PI/2));}
     for(int e=1;e<errorCount;++e)assert(errorText(e)[0]!=0);
+    // Kraj kanala (user 2026-11-23): transition 450x150 -> duct 248 mm -> grille at its free end
+    {Duct d=duct(1000,0,1248,0,450,150);d.freeEnd[1]=true;
+     assert(nearFreeEnd(d,V(1248,0),600)==1&&nearFreeEnd(d,V(1240,30),600)==1&&nearFreeEnd(d,V(1000,0),100)==-1);
+     Choice c;c.side=End;c.method=Direct;c.end=1;c.stub=100;c.a=450;c.b=150;
+     assert(validate(d,place(d,V(1248,0)),c,Options()).error==Ok);   // 100 mm is enough (no 225 mm minimum)
+     c.stub=50;assert(validate(d,place(d,V(1248,0)),c,Options()).error==Ok);
+     const EndLayout e=endLayout(d,1,100);assert(e.ok&&std::fabs(e.at.x-1100)<1e-9&&std::fabs(e.at.y)<1e-9&&e.outward.x==1);
+     const EndLayout k=endLayout(d,1,0);assert(k.ok&&std::fabs(k.at.x-1248)<1e-9);   // 0: keep the drawn end
+     const EndLayout f0=endLayout(d,0,0);assert(f0.ok&&f0.outward.x==-1);
+     d.freeEnd[1]=false;assert(validate(d,place(d,V(1248,0)),c,Options()).error==NotFreeEnd);}
     std::puts("grille connect OK");
     return 0;
 }

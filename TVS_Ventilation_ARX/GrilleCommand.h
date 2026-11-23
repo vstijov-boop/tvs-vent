@@ -55,33 +55,43 @@ class Dialog : public CAdUiBaseDialog {
 public:
     enum {IdInfo=1801,IdLeft=1802,IdRight=1803,IdBottom=1804,IdTee=1805,IdTap=1806,IdCone=1807,IdDirect=1808,
           IdNote=1809,IdLengthLabel=1810,IdLength=1811,IdALabel=1812,IdA=1813,IdX=1814,IdBLabel=1815,IdB=1816,
-          IdRound=1817,IdFacts=1818,IdStatus=1819};
+          IdRound=1817,IdFacts=1818,IdStatus=1819,IdEnd=1820};
     // in / out
     int side,method;double lengthMm,aMm,bMm;bool round;
+    int end;double stubMm,endLengthMm;int shownSide;   // End: which free end; stored stub / current end duct length (mm)
     // context of the check (drawing units)
     gc::Duct duct;gc::Place atInsert,atCentre;gc::Options options;double f;bool mainRound;
     CString banner,facts;bool loading;CFont bold,title;CBrush back,band,white;
     explicit Dialog(UINT idd):CAdUiBaseDialog(idd,NULL,NULL),side(gc::Left),method(gc::Tee),lengthMm(100),aMm(0),bMm(0),round(false),
-        f(1),mainRound(false),loading(false){}
+        end(-1),stubMm(100),endLengthMm(0),shownSide(-1),f(1),mainRound(false),loading(false){}
     void enable(int id,bool on){if(CWnd* w=GetDlgItem(id))w->EnableWindow(on?TRUE:FALSE);}
-    int sideSel(){for(int k=gc::Left;k<=gc::Bottom;++k)if(IsDlgButtonChecked(IdLeft+k)==BST_CHECKED)return k;return gc::Left;}
+    static int sideId(int k){return k==gc::End?IdEnd:IdLeft+k;}
+    int sideSel(){for(int k=gc::Left;k<=gc::End;++k)if(IsDlgButtonChecked(sideId(k))==BST_CHECKED)return k;return gc::Left;}
+    void checkSide(int s){for(int k=gc::Left;k<=gc::End;++k)CheckDlgButton(sideId(k),k==s?BST_CHECKED:BST_UNCHECKED);}
     int methodSel(){for(int k=gc::Tee;k<=gc::Direct;++k)if(IsDlgButtonChecked(IdTee+k)==BST_CHECKED)return k;return gc::Tee;}
     bool roundSel(){return IsDlgButtonChecked(IdRound)==BST_CHECKED;}
     // Methods that fit the side and the shapes; the chosen one moves to a valid one.
     void refresh(){
-        const int s=sideSel();const bool bottom=s==gc::Bottom,r=roundSel();
-        enable(IdTee,!bottom);enable(IdTap,!bottom&&!mainRound);enable(IdCone,!bottom&&!mainRound&&r);enable(IdDirect,bottom);
+        const int s=sideSel();const bool bottom=s==gc::Bottom,atEnd=s==gc::End,r=roundSel();
+        enable(IdEnd,end>=0);
+        // the one length field: stub (Lijevo / Desno) or the end duct length (Kraj)
+        if(s!=shownSide){
+            if(shownSide>=0&&!loading){CString t;GetDlgItemText(IdLength,t);double v=0;if(tvsNumeric::parse(std::wstring(t.GetString()),v)){if(shownSide==gc::End)endLengthMm=v;else stubMm=v;}}
+            CString t;t.Format(L"%.0f",atEnd?endLengthMm:stubMm);SetDlgItemText(IdLength,t);shownSide=s;}
+        SetDlgItemText(IdLengthLabel,atEnd?L"Dužina kanala do rešetke [mm]":L"Dužina ravnog dijela ogranka [mm]");
+        enable(IdTee,!bottom&&!atEnd);enable(IdTap,!bottom&&!atEnd&&!mainRound);enable(IdCone,!bottom&&!atEnd&&!mainRound&&r);enable(IdDirect,bottom||atEnd);
         int m=methodSel();
-        if(bottom)m=gc::Direct;
+        if(bottom||atEnd)m=gc::Direct;
         else{if(m==gc::Direct)m=gc::Tee;if(m==gc::Cone&&!r)m=gc::Tap;if((m==gc::Tap||m==gc::Cone)&&mainRound)m=gc::Tee;}
         CheckRadioButton(IdTee,IdDirect,IdTee+m);
         enable(IdLength,!bottom);enable(IdLengthLabel,!bottom);
         enable(IdB,!r);enable(IdBLabel,!r);enable(IdX,!r);
         SetDlgItemText(IdALabel,r?L"D [mm]":L"A [mm]");
-        SetDlgItemText(IdNote,bottom?L"Dno: ogranak naniže (T komad / štucna na dnu kanala) za sada nije podržan – mreža je horizontalna. Rešetka se povezuje direktno na stranicu kanala, ništa se ne crta."
+        SetDlgItemText(IdNote,atEnd?L"Kraj kanala: rešetka na slobodnom kraju, bez T komada. Kanal do rešetke se postavlja na zadatu dužinu od drugog kraja (npr. 100 mm regulator rešetke, 50 mm bez regulatora); blok se postavlja na kraj, okrenut prema van."
+                           :bottom?L"Dno: ogranak naniže (T komad / štucna na dnu kanala) za sada nije podržan – mreža je horizontalna. Rešetka se povezuje direktno na stranicu kanala, ništa se ne crta."
                            :mainRound?L"Okrugli kanal: samo ravni T komad (štucna je za pravougaoni kanal)."
                            :L"Štucna: L = 0,25 × širina ogranka (najmanje 75 mm), kosi ulaz uzvodno (u smjeru crtanja kanala). Konusna: L = 100 mm, samo okrugli ogranak.");
-        SetDlgItemText(IdStatus,bottom?L"Upisuje se u blok (rešetka na dnu kanala), jedan UNDO korak"
+        SetDlgItemText(IdStatus,atEnd?L"Kanal do rešetke + blok na kraju, jedan UNDO korak":bottom?L"Upisuje se u blok (rešetka na dnu kanala), jedan UNDO korak"
                                       :L"T komad + ogranak + blok na kraju ogranka, jedan UNDO korak");
     }
     virtual void DoDataExchange(CDataExchange* dx){
@@ -95,16 +105,16 @@ public:
         back.CreateSolidBrush(RGB(244,245,247));band.CreateSolidBrush(RGB(231,236,242));white.CreateSolidBrush(RGB(255,255,255));
         SetWindowText(L"TVS_VENT – priključenje rešetke");
         loading=true;
-        CheckRadioButton(IdLeft,IdBottom,IdLeft+side);CheckRadioButton(IdTee,IdDirect,IdTee+method);
+        checkSide(side);CheckRadioButton(IdTee,IdDirect,IdTee+method);
         CheckDlgButton(IdRound,round?BST_CHECKED:BST_UNCHECKED);
         SetDlgItemText(IdInfo,banner);SetDlgItemText(IdFacts,facts);
         loading=false;refresh();
-        GetDlgItem(IdLeft+side)->SetFocus();return FALSE;
+        GetDlgItem(sideId(side))->SetFocus();return FALSE;
     }
     virtual void OnOK(){
         if(!UpdateData(TRUE))return;
         gc::Choice c;c.side=sideSel();c.method=methodSel();c.round=roundSel();
-        c.stub=lengthMm/f;c.a=aMm/f;c.b=c.round?0:bMm/f;
+        c.stub=lengthMm/f;c.a=aMm/f;c.b=c.round?0:bMm/f;c.end=end;
         const gc::Check k=gc::validate(duct,c.side==gc::Bottom?atCentre:atInsert,c,options);
         if(k.error!=gc::Ok){
             CString m;m.Format(L"Priključenje nije moguće: %ls",gc::errorText(k.error));
@@ -122,7 +132,7 @@ public:
     }
     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
         const int id=LOWORD(wp),code=HIWORD(wp);
-        if(!loading&&code==BN_CLICKED&&((id>=IdLeft&&id<=IdDirect)||id==IdRound)){refresh();}
+        if(!loading&&code==BN_CLICKED&&((id>=IdLeft&&id<=IdDirect)||id==IdRound||id==IdEnd)){refresh();}
         return CAdUiBaseDialog::OnCommand(wp,lp);
     }
     CRect du(int x,int y,int w,int h){CRect r(x,y,x+w,y+h);MapDialogRect(&r);return r;}
@@ -256,8 +266,10 @@ inline void execute(UINT idd,double collar){
     o.margin=tvsTee::tapMarginMm()/f;o.minPiece=50/f;
     // ---- dialog ----
     Dialog dg(idd);
-    dg.side=pc.side==gc::Bottom||pi.side==gc::Bottom?gc::Bottom:pi.side;
-    dg.method=dg.side==gc::Bottom?gc::Direct:gc::Tee;dg.lengthMm=storedStubMm();
+    dg.end=gc::nearFreeEnd(duct,v2(ins),A+150/f);   // grille by a free end: Kraj kanala (user 2026-11-23)
+    dg.side=dg.end>=0?gc::End:pc.side==gc::Bottom||pi.side==gc::Bottom?gc::Bottom:pi.side;
+    dg.method=dg.side==gc::Bottom||dg.side==gc::End?gc::Direct:gc::Tee;dg.stubMm=storedStubMm();dg.endLengthMm=roundMm(duct.len()*f);
+    dg.lengthMm=dg.side==gc::End?dg.endLengthMm:dg.stubMm;
     // size: neck of the record, else the default of the block name, else the block footprint
     const double footW=std::hypot(foot[1].x-foot[0].x,foot[1].y-foot[0].y)*f,footD=std::hypot(foot[3].x-foot[0].x,foot[3].y-foot[0].y)*f;
     if(wasLinked&&old.neckA>0){dg.aMm=old.neckA;dg.bMm=old.neckB;dg.round=old.neckRound;}
@@ -273,9 +285,9 @@ inline void execute(UINT idd,double collar){
     INT_PTR rc;
     {CAcModuleResourceOverride resources;rc=dg.DoModal();}
     if(rc!=IDOK)return;
-    const bool bottom=dg.side==gc::Bottom;
-    if(!bottom)storeStubMm(dg.lengthMm);
-    gc::Choice c;c.side=dg.side;c.method=dg.method;c.round=dg.round;c.stub=dg.lengthMm/f;c.a=dg.aMm/f;c.b=dg.round?0:dg.bMm/f;
+    const bool bottom=dg.side==gc::Bottom,atEnd=dg.side==gc::End;
+    if(!bottom&&!atEnd)storeStubMm(dg.lengthMm);
+    gc::Choice c;c.side=dg.side;c.method=dg.method;c.round=dg.round;c.stub=dg.lengthMm/f;c.a=dg.aMm/f;c.b=dg.round?0:dg.bMm/f;c.end=dg.end;
     const gc::Place& p=bottom?pc:pi;
     const gc::Check k=gc::validate(duct,p,c,o);
     if(k.error!=gc::Ok){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",gc::errorText(k.error));return;}
@@ -293,6 +305,30 @@ inline void execute(UINT idd,double collar){
         CString neck;if(dg.round)neck.Format(L"Ø%.0f",dg.aMm);else neck.Format(L"%.0f×%.0f",dg.aMm,dg.bMm);
         acutPrintf(L"\nTVS_RESETKA: rešetka „%ls“ povezana na dnu kanala %ls (priključak %ls mm, %.0f mm od početka kanala); ništa nije nacrtano.",
             name.c_str(),size.GetString(),neck.GetString(),p.t*f);
+        return;
+    }
+    if(atEnd){   // ---- Kraj kanala: end duct to the given length, block on the end facing outward ----
+        const double want=c.stub>0&&std::fabs(c.stub-duct.len())>0.5/f?c.stub:0;
+        const gc::EndLayout e=gc::endLayout(duct,c.end,want);
+        if(!e.ok){acutPrintf(L"\nTVS_RESETKA: kraj kanala se ne može izračunati. Ništa nije promijenjeno.");return;}
+        rec.mount=tvsEquipment::AtEnd;rec.round=roundDuct;rec.a=A*f;rec.b=roundDuct?0:B*f;rec.neckA=rec.neckB=0;rec.neckRound=false;
+        {tvsEquipment::Port& q=rec.port[0];q.x=e.at.x;q.y=e.at.y;q.z=elev;q.dx=-e.outward.x;q.dy=-e.outward.y;}
+        tvsAction::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_RESETKA: transakcija nije pokrenuta. Ništa nije promijenjeno.");return;}
+        const wchar_t* failed=NULL;
+        do{
+            TVS_Pipe* d=TVS_Pipe::cast(tx.open(ductId,AcDb::kForWrite));if(!d){failed=L"kanal se ne može mijenjati";break;}
+            if(want>0){Acad::ErrorStatus es=c.end==1?d->put_Lastpoint(AcGePoint3d(e.at.x,e.at.y,d->LastPoint.z)):d->put_FirstPoint(AcGePoint3d(e.at.x,e.at.y,d->FirstPoint.z));
+                if(es!=Acad::eOk){failed=L"kanal se ne može skratiti / produžiti";break;}d->recordGraphicsModified();}
+            AcDbBlockReference* ref=AcDbBlockReference::cast(tx.open(blockId,AcDb::kForWrite));if(!ref){failed=L"blok se ne može mijenjati";break;}
+            const AcGePoint3d pos=ref->position();const AcGePoint3d target(e.at.x,e.at.y,pos.z);
+            const double turn=gc::turnAngle(gc::V(localDown.x,localDown.y),e.outward);
+            const AcGeMatrix3d m=AcGeMatrix3d::translation(target-pos)*AcGeMatrix3d::rotation(turn,AcGeVector3d::kZAxis,pos);
+            if(ref->transformBy(m)!=Acad::eOk){failed=L"blok se ne može pomjeriti";break;}
+            if(tvsEquipmentStore::write(ref,rec)!=Acad::eOk){failed=L"zapis opreme nije upisan";break;}
+        }while(false);
+        if(failed||!tx.commit()){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",failed?failed:L"transakcija nije završena");return;}
+        acutPrintf(L"\nTVS_RESETKA: rešetka „%ls“ priključena na kraj kanala %ls (U vraća sve).",name.c_str(),size.GetString());
+        if(want>0)acutPrintf(L"\n  Kanal do rešetke: %.0f mm.",c.stub*f);
         return;
     }
     const gc::Layout y=gc::layout(duct,p,c,o);

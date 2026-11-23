@@ -80,3 +80,5 @@ Crta priključak rešetke koji se do sada crtao ručno (primjeri korisnika: reš
 
 Kod: `geometry/GrilleConnect.h` (tačka priključenja, strana, raspored T komada / ogranka / bloka, provjera; test `tests/test_grille_connect.cpp` sa geometrijom primjera), `TVS_Ventilation_ARX/GrilleCommand.h` (komanda i dijalog), meni / ribbon „Priključenje rešetke“ (`tools/add_new_commands_cuix.py`, ikone `TVS_RESETKA_16/32.png`).
 Ne radi (još): ogranak naniže (T komad na dnu), ogranak drugačije kote, linijski difuzori sa dva priključka.
+
+- **Kraj kanala (23.11., korisnik):** TVS_RESETKA – četvrta strana „Kraj kanala“ (predizabrana kad je tačka umetanja bloka kod slobodnog kraja kanala): bez T komada; kanal do rešetke se postavlja na zadatu dužinu od drugog kraja (polje „Dužina kanala do rešetke“, početno nacrtana dužina; 100 mm sa regulatorom, 50 mm bez), blok ide na kraj okrenut prema van, zapis AtEnd. Nema minimuma od 225 mm.
