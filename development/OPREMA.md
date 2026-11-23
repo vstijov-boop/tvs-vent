@@ -85,3 +85,5 @@ Ne radi (još): ogranak naniže (T komad na dnu), ogranak drugačije kote, linij
 
 - **Natpis opreme (23.11., korisnik):** uz TVS_NATPIS svaki blok opreme dobija natpis iznad sebe (samo na ekranu, ne štampa se): „+ OZNAKA / Q m3/h / Δp Pa“ za povezan blok, „- naziv“ za blok čiji je naziv podešen kao oprema, a nije povezan. Crta ga overrule na AcDbBlockReference (EquipmentCaption.h); u crtežu se ništa ne upisuje.
 - **Primijeni na sve blokove ovog naziva:** mijenja povezane blokove tog naziva i pamti svojstva za naziv; nepovezani ih dobijaju kad ih poveže TVS_OPREMA. Komanda sada ispiše koliko je ostalih blokova tog naziva i koliko ih je povezano.
+
+- **Model „Kriva Q–Δp“ (23.11., korisnik – VAV, CAV, difuzori):** u TVS_OPREMA_SVOJSTVA do 20 kataloških tačaka „Q Δp“ (jedna po redu ili odvojene sa ;, decimalni zarez ili tačka; može se zalijepiti iz Excela ili iz alata za digitalizaciju dijagrama). Između tačaka interpolacija linearno po Q² (Δp ∝ Q²), van opsega produženje po (Q/Q_kraj)² uz napomenu u Excelu. TVS_PAD, natpis i izvoz u DuctPressDrop (Δp pri izvezenom Q, fiksan) koriste istu vrijednost; „Primijeni na sve blokove…“ prenosi i krivu.

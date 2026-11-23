@@ -24,22 +24,24 @@ class Dialog : public CAdUiBaseDialog {
 public:
     enum {IdInfo=1701,IdKind=1702,IdTag=1703,IdNewTag=1704,IdNote=1705,IdNone=1706,IdFixed=1707,IdZeta=1708,IdNominal=1709,
           IdDp=1710,IdZetaValue=1711,IdDpn=1712,IdQn=1713,IdFlow=1714,IdFacts=1715,IdAll=1716,IdStatus=1717,
-          IdDpLabel=1718,IdZetaLabel=1719,IdDpnLabel=1720,IdQnLabel=1721,IdFlowLabel=1722};
+          IdDpLabel=1718,IdZetaLabel=1719,IdDpnLabel=1720,IdQnLabel=1721,IdFlowLabel=1722,IdCurve=1723,IdCurveText=1724,IdCurveLabel=1725};
+    static int modelId(int m){return m==tvsEquipment::Curve?IdCurve:IdNone+m;}
     std::vector<tvsEquipment::Record> records;   // in: as read; after OK: as edited
     std::vector<char> changed;                   // after OK: record k changed
     std::vector<std::wstring> tags;              // every tag in the drawing (Nova)
     tvsEquipmentEdit::Values shown;              // what the dialog showed
     CString dp,zeta,dpn,qn,q;                    // numeric fields (exact numbers / Različito), DecimalText.h
+    CString curve;                               // model Kriva Q–Δp: "Q Δp; Q Δp" (EquipmentEdit.h parseCurve)
     CString banner,allText;bool applyAll;bool loading;CFont bold,title;CBrush back,band,white;
     Dialog(const std::vector<tvsEquipment::Record>& rs,UINT idd):CAdUiBaseDialog(idd,NULL,NULL),records(rs),applyAll(false),loading(false){
         shown=tvsEquipmentEdit::merge(records);
-        dp=shown.dp.c_str();zeta=shown.zeta.c_str();dpn=shown.dpn.c_str();qn=shown.qn.c_str();q=shown.q.c_str();
+        dp=shown.dp.c_str();zeta=shown.zeta.c_str();dpn=shown.dpn.c_str();qn=shown.qn.c_str();q=shown.q.c_str();curve=shown.curve.c_str();
     }
     void enable(int id,bool on){if(CWnd* w=GetDlgItem(id))w->EnableWindow(on?TRUE:FALSE);}
     int kindSel(){CComboBox* b=static_cast<CComboBox*>(GetDlgItem(IdKind));const int k=b?b->GetCurSel():-1;
         return k>=0&&k<tvsEquipment::kindCount()?k:-1;}
     int modelSel(){
-        for(int m=tvsEquipment::NoLoss;m<=tvsEquipment::Nominal;++m)if(IsDlgButtonChecked(IdNone+m)==BST_CHECKED)return m;
+        for(int m=tvsEquipment::NoLoss;m<=tvsEquipment::Curve;++m)if(IsDlgButtonChecked(modelId(m))==BST_CHECKED)return m;
         return -1;   // different models, none chosen
     }
     void refresh(){
@@ -47,6 +49,7 @@ public:
         const bool fixed=any||m==tvsEquipment::FixedDp,zt=any||m==tvsEquipment::Zeta,nom=any||m==tvsEquipment::Nominal;
         enable(IdDp,fixed);enable(IdDpLabel,fixed);enable(IdZetaValue,zt);enable(IdZetaLabel,zt);
         enable(IdDpn,nom);enable(IdDpnLabel,nom);enable(IdQn,nom);enable(IdQnLabel,nom);
+        const bool cv=any||m==tvsEquipment::Curve;enable(IdCurveText,cv);enable(IdCurveLabel,cv);
         enable(IdNewTag,kindSel()>=0);
     }
     // A numeric field through the shared layer: a typed text that is not a number stops the OK.
@@ -63,6 +66,7 @@ public:
         CAdUiBaseDialog::DoDataExchange(dx);
         number(dx,IdDp,dp);number(dx,IdZetaValue,zeta);number(dx,IdDpn,dpn);number(dx,IdQn,qn);
         if(shown.terminals())number(dx,IdFlow,q);
+        DDX_Text(dx,IdCurveText,curve);
     }
     virtual BOOL OnInitDialog(){
         CAdUiBaseDialog::OnInitDialog();
@@ -76,7 +80,7 @@ public:
             if(shown.kind<0)b->AddString(tvsEquipmentEdit::differentText());
             b->SetCurSel(shown.kind<0?tvsEquipment::kindCount():shown.kind);}
         SetDlgItemText(IdTag,shown.tag.c_str());SetDlgItemText(IdNote,shown.note.c_str());
-        if(shown.model>=0)CheckRadioButton(IdNone,IdNominal,IdNone+shown.model);
+        if(shown.model>=0)for(int m=tvsEquipment::NoLoss;m<=tvsEquipment::Curve;++m)CheckDlgButton(modelId(m),m==shown.model?BST_CHECKED:BST_UNCHECKED);
         enable(IdFlow,shown.terminals());enable(IdFlowLabel,shown.terminals());
         if(!shown.terminals())SetDlgItemText(IdFlow,L"");
         CString facts;
@@ -99,6 +103,10 @@ public:
         a.model=modelSel();
         a.dp=dp.GetString();a.zeta=zeta.GetString();a.dpn=dpn.GetString();a.qn=qn.GetString();
         if(shown.terminals())a.q=q.GetString();
+        a.curve=curve.GetString();
+        {const std::wstring t=tvsEquipmentEdit::trim(a.curve);std::vector<std::pair<double,double> > c;
+         if(t!=tvsEquipmentEdit::differentText()&&t!=tvsEquipmentEdit::trim(shown.curve)){const std::wstring e=tvsEquipmentEdit::parseCurve(t,c);
+             if(!e.empty()){AfxMessageBox(e.c_str(),MB_ICONEXCLAMATION);GetDlgItem(IdCurveText)->SetFocus();return;}}}
         std::vector<tvsEquipment::Record> out=records;std::vector<char> flags(out.size(),0);
         for(size_t k=0;k<out.size();++k){
             flags[k]=tvsEquipmentEdit::apply(shown,a,out[k])?1:0;
@@ -110,7 +118,7 @@ public:
     }
     virtual BOOL OnCommand(WPARAM wp,LPARAM lp){
         const int id=LOWORD(wp),code=HIWORD(wp);
-        if(!loading&&id>=IdNone&&id<=IdNominal&&code==BN_CLICKED){refresh();}
+        if(!loading&&((id>=IdNone&&id<=IdNominal)||id==IdCurve)&&code==BN_CLICKED){refresh();}
         if(!loading&&id==IdKind&&code==CBN_SELCHANGE){refresh();return TRUE;}
         if(id==IdNewTag&&code==BN_CLICKED){const int k=kindSel();
             if(k>=0)SetDlgItemText(IdTag,tvsEquipmentEdit::nextTag(tvsEquipment::tagPrefix(k),tags).c_str());
@@ -121,14 +129,14 @@ public:
     void frame(CDC* dc,const CRect& r,COLORREF col){CPen p(PS_SOLID,1,col);CPen* op=dc->SelectObject(&p);CBrush* ob=static_cast<CBrush*>(dc->SelectStockObject(NULL_BRUSH));dc->Rectangle(r);dc->SelectObject(op);dc->SelectObject(ob);}
     void paintBack(CDC* dc){
         CRect all;GetClientRect(&all);dc->FillSolidRect(all,RGB(244,245,247));
-        const CRect head=du(0,0,320,22),foot=du(0,226,320,30);
+        const CRect head=du(0,0,320,22),foot=du(0,264,320,30);
         dc->FillSolidRect(CRect(all.left,all.top,all.right,head.bottom),RGB(231,236,242));dc->FillSolidRect(all.left,head.bottom,all.Width(),1,RGB(173,186,203));
         dc->FillSolidRect(CRect(all.left,foot.top,all.right,all.bottom),RGB(231,236,242));dc->FillSolidRect(all.left,foot.top,all.Width(),1,RGB(173,186,203));
         dc->SetBkMode(TRANSPARENT);
         {CFont* of=dc->SelectObject(&title);dc->SetTextColor(RGB(0,26,45));CRect t=du(10,0,160,22);dc->DrawText(L"Svojstva opreme",t,DT_LEFT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
         {CFont* of=dc->SelectObject(GetFont());dc->SetTextColor(RGB(7,53,90));CRect t=du(170,0,140,22);dc->DrawText(L"Oprema na mreži  ·  TVS_OPREMA_SVOJSTVA",t,DT_RIGHT|DT_VCENTER|DT_SINGLELINE);dc->SelectObject(of);}
         {CRect r=du(10,28,300,15);dc->FillSolidRect(r,RGB(255,255,255));dc->FillSolidRect(r.left,r.top,3,r.Height(),RGB(38,117,174));}   // banner
-        {CRect r=du(10,106,300,58);frame(dc,r,RGB(213,223,236));CFont* of=dc->SelectObject(&bold);const wchar_t* t=L"Model pada pritiska";CSize sz=dc->GetTextExtent(t);
+        {CRect r=du(10,106,300,96);frame(dc,r,RGB(213,223,236));CFont* of=dc->SelectObject(&bold);const wchar_t* t=L"Model pada pritiska";CSize sz=dc->GetTextExtent(t);
          dc->FillSolidRect(CRect(r.left+8,r.top-sz.cy/2,r.left+14+sz.cx,r.top+sz.cy/2+1),RGB(244,245,247));dc->SetTextColor(RGB(0,52,89));dc->TextOut(r.left+11,r.top-sz.cy/2,t);dc->SelectObject(of);}
     }
     void drawButton(LPDRAWITEMSTRUCT it){

@@ -30,6 +30,11 @@ inline std::wstring linkedText(const tvsEquipment::Record& r){
         if(r.terminal()&&r.qTerminal>0&&r.qNominal>0){swprintf_s(b,L" / %.0f Pa",tvsEquipment::loss(r,r.qTerminal,0));s+=b;}
         else{swprintf_s(b,L" / %.0f Pa pri %.0f m3/h",r.dpNominal,r.qNominal);s+=b;}
         break;
+    case tvsEquipment::Curve:
+        if(r.curve.empty())s+=L" / kriva ?";
+        else if(r.terminal()&&r.qTerminal>0){swprintf_s(b,L" / %.0f Pa (kriva)",tvsEquipment::loss(r,r.qTerminal,0));s+=b;}
+        else{swprintf_s(b,L" / kriva %d tac.",static_cast<int>(r.curve.size()));s+=b;}
+        break;
     default:s+=L" / dp ?";
     }
     return s;

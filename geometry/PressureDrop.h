@@ -348,13 +348,18 @@ private:
         case tvsEquipment::FixedDp:swprintf(t,160,L"\u0394p = %.1f Pa (zadato)",rec.dp);break;
         case tvsEquipment::Zeta:swprintf(t,160,L"\u03B6 = %.2f na pd priklju\u010Dka (%.1f Pa)",rec.zeta,pv);break;
         case tvsEquipment::Nominal:swprintf(t,160,L"\u0394p = %.1f Pa pri %.0f m\u00B3/h \u00B7 (Q/Qn)\u00B2",rec.dpNominal,rec.qNominal);break;
+        case tvsEquipment::Curve:
+            if(rec.curve.empty())t[0]=0;
+            else swprintf(t,160,tvsEquipment::curveOutside(rec,std::fabs(x.flow))?L"kriva Q\u2013\u0394p (%d ta\u010D.), Q van opsega %.0f\u2013%.0f m\u00B3/h \u2013 produ\u017Eeno po Q\u00B2":L"kriva Q\u2013\u0394p (%d ta\u010D., %.0f\u2013%.0f m\u00B3/h)",
+                     static_cast<int>(rec.curve.size()),rec.curve.front().first,rec.curve.back().first);
+            break;
         default:t[0]=0;break;}
         for(wchar_t* c=t;*c;++c)if(*c==L'.')*c=L',';
         if(t[0])more(t);else more(f.terminal?L"model gubitka nije zadat \u2013 unesite \u0394p kraj. elem.":L"model gubitka nije zadat \u2013 unesite \u03B6");
         if(rec.model==tvsEquipment::Zeta)f.c=rec.zeta;
         f.dp=tvsEquipment::loss(rec,x.flow,pv);
         const double pd=r.d[q].pd;
-        if(rec.model<tvsEquipment::FixedDp||rec.model>tvsEquipment::Nominal)f.ok=false;
+        if(rec.model<tvsEquipment::FixedDp||rec.model>tvsEquipment::Curve||(rec.model==tvsEquipment::Curve&&rec.curve.empty()))f.ok=false;
         else if(f.terminal)f.ok=true;
         else if(pd>0){f.ok=true;f.zeta=f.dp/pd;}
         else more(L"Q = 0 \u2013 unesite \u03B6");

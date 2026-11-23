@@ -121,7 +121,8 @@ inline Equip equipment(const tvsEquipment::Record& r,double q,bool exhaust,const
     if(r.model==tvsEquipment::Zeta){const char* fn=nullptr;x.naziv=equipmentZetaName(r.kind,exhaust,fn);x.fn=fn;x.value=r.zeta>0?r.zeta:0;return x;}
     x.naziv=equipmentDpName(r.kind,exhaust);x.fn="dp_fix";x.value=tvsEquipment::loss(r,q,0);
     if(warning){wchar_t t[200];t[0]=0;
-        if(r.model==tvsEquipment::Nominal)std::swprintf(t,200,L": \u0394p %.1f Pa izra\u010dunat pri Q = %.0f m\u00b3/h (katalo\u0161ka ta\u010dka %.1f Pa / %.0f m\u00b3/h) \u2013 u DuctPressDrop-u fiksan",x.value,q,r.dpNominal,r.qNominal);
+        if(r.model==tvsEquipment::Curve)std::swprintf(t,200,L": \u0394p %.1f Pa iz krive Q\u2013\u0394p pri Q = %.0f m\u00b3/h \u2013 u DuctPressDrop-u fiksan",x.value,q);
+        else if(r.model==tvsEquipment::Nominal)std::swprintf(t,200,L": \u0394p %.1f Pa izra\u010dunat pri Q = %.0f m\u00b3/h (katalo\u0161ka ta\u010dka %.1f Pa / %.0f m\u00b3/h) \u2013 u DuctPressDrop-u fiksan",x.value,q,r.dpNominal,r.qNominal);
         else if(r.model!=tvsEquipment::FixedDp)std::swprintf(t,200,L": bez modela gubitka \u2013 izvezeno \u0394p = 0");
         if(t[0])*warning=t;}
     return x;

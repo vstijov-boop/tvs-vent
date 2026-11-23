@@ -27,6 +27,14 @@ int main(){
     Record g;g.kind=Grille;g.ports=1;g.mount=Bottom;g.neckA=425;g.neckB=125;g.a=400;g.b=250;
     Record h;assert(parse(format(g),h));assert(h.mount==Bottom&&h.neckA==425&&h.neckB==125&&!h.neckRound);
     Record e;assert(parse(format(t),e)&&e.mount==AtEnd&&e.neckA==0);   // old records: at the end
+    // curve (Q^2 interpolation, extrapolation by Q^2)
+    {Record c;c.model=Curve;c.curve.push_back(std::make_pair(500.0,20.0));c.curve.push_back(std::make_pair(1000.0,80.0));c.curve.push_back(std::make_pair(1500.0,200.0));
+     assert(std::fabs(loss(c,500,0)-20)<1e-9&&std::fabs(loss(c,1000,0)-80)<1e-9&&std::fabs(loss(c,1500,0)-200)<1e-9);
+     assert(std::fabs(loss(c,750,0)-(20+60*(750.0*750-250000)/(1000000-250000)))<1e-9);
+     assert(std::fabs(loss(c,250,0)-5)<1e-9&&std::fabs(loss(c,3000,0)-800)<1e-9);
+     assert(curveOutside(c,250)&&curveOutside(c,3000)&&!curveOutside(c,500)&&!curveOutside(c,1200));
+     Record d;assert(parse(format(c),d)&&d.model==Curve&&d.curve.size()==3&&d.curve[2].first==1500&&d.curve[2].second==200);
+     Record one;one.model=Curve;one.curve.push_back(std::make_pair(750.0,50.0));assert(std::fabs(loss(one,1500,0)-200)<1e-9);}
     std::puts("equipment OK");
     return 0;
 }

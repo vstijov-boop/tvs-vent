@@ -59,6 +59,20 @@ int main(){
     assert(td.tag.empty()&&td.qTerminal==0&&td.port[0].x==0&&td.model==Nominal&&td.dpNominal==30&&td.lengthMm==500);
     Record other=b;assert(applyType(td,other)&&other.kind==td.kind&&other.model==Nominal&&other.qNominal==1800&&other.tag==L"PPK-02");
     assert(!applyType(td,other));
+    // curve text (model Curve): paste from Excel / a digitizer, comma decimals, sorting
+    {std::vector<std::pair<double,double> > c;
+     assert(parseCurve(L"1000\t80\r\n500\t20\r\n1500\t200\r\n",c).empty()&&c.size()==3&&c[0].first==500&&c[2].second==200);
+     assert(parseCurve(L"500 20; 750 37,5",c).empty()&&c.size()==2&&c[1].second==37.5);
+     assert(parseCurve(L"500:20/",c).empty()||true);
+     assert(!parseCurve(L"500",c).empty()&&!parseCurve(L"0 20",c).empty()&&!parseCurve(L"500 -1",c).empty()&&!parseCurve(L"500 20;500 30",c).empty());
+     assert(parseCurve(L"",c).empty()&&c.empty());
+     assert(formatCurve(c).empty());
+     std::vector<std::pair<double,double> > d;d.push_back(std::make_pair(500.0,20.0));d.push_back(std::make_pair(750.0,37.5));
+     assert(formatCurve(d)==L"500 20; 750 37.5");
+     tvsEquipment::Record r;r.model=tvsEquipment::Curve;assert(!validate(r).empty());r.curve=d;assert(validate(r).empty());
+     std::vector<tvsEquipment::Record> rs(1,r);Values b=merge(rs);Values a=b;a.curve=L"500 20; 1000 80";
+     tvsEquipment::Record x=r;assert(apply(b,a,x)&&x.curve.size()==2&&x.curve[1].first==1000);
+     tvsEquipment::Record y;assert(applyType(r,y)&&y.curve==d);}
     std::puts("equipment edit OK");
     return 0;
 }

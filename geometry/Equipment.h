@@ -18,11 +18,15 @@
 #include <cstdio>
 #include <cwchar>
 #include <string>
+#include <utility>
 #include <vector>
 namespace tvsEquipment {
 
 enum Kind {Other=0,FlowDamper=1,FireDamper=2,Cav=3,Vav=4,Silencer=5,Grille=6,Diffuser=7,Hood=8,Louvre=9};
-enum Model {NoLoss=0,FixedDp=1,Zeta=2,Nominal=3};
+enum Model {NoLoss=0,FixedDp=1,Zeta=2,Nominal=3,Curve=4};
+// Curve (user 2026-11-23, VAV / CAV / diffusers): catalogue points (Q m3/h, dp Pa); between two
+// points dp is interpolated linearly in Q^2 (dp ~ Q^2 inside a regulator / terminal), outside the
+// range it is scaled with (Q / Q_end)^2 from the nearest end point (curveOutside() tells).
 // How a terminal (1 port) sits on the network:
 //  AtEnd  - port on a free end (duct, flex, stub of a tee branch, vertical outlet of an elbow);
 //  Bottom - grille in the bottom face of a duct, drawn over the duct: NO duct end, port[0] is the
@@ -78,6 +82,7 @@ struct Record {
     double dpNominal;     // Pa at qNominal (Nominal)
     double qNominal;      // m3/h (Nominal)
     double qTerminal;     // m3/h, terminals: design flow (0 = not set, TVS_PROTOK)
+    std::vector<std::pair<double,double> > curve;   // Curve: (q m3/h, dp Pa), q ascending
     int mount;            // Mount (terminals)
     double neckA,neckB;   // mm, grille connection (Bottom); 0 = take the duct size
     bool neckRound;
@@ -86,11 +91,25 @@ struct Record {
     bool terminal()const{return ports==1;}
 };
 
+inline double curveLoss(const std::vector<std::pair<double,double> >& c,double q){
+    if(c.empty())return 0;
+    const double q2=q*q;
+    if(c.size()==1||q<=c.front().first){const double a=c.front().first;return a>0?c.front().second*q2/(a*a):c.front().second;}
+    if(q>=c.back().first){const double a=c.back().first;return a>0?c.back().second*q2/(a*a):c.back().second;}
+    for(size_t i=0;i+1<c.size();++i){const double a=c[i].first,b=c[i+1].first;
+        if(q<=b){const double d=b*b-a*a;return d>0?c[i].second+(c[i+1].second-c[i].second)*(q2-a*a)/d:c[i].second;}}
+    return c.back().second;
+}
+// True when q is outside the catalogue range of a Curve record (extrapolated).
+inline bool curveOutside(const Record& r,double q){
+    return r.model==Curve&&!r.curve.empty()&&(q<r.curve.front().first*(1-1e-9)||q>r.curve.back().first*(1+1e-9));
+}
 // Pressure loss [Pa] at flow q [m3/h]; pv = velocity pressure [Pa] of the duct at the port
 // (only the Zeta model needs it). Never negative.
 inline double loss(const Record& r,double q,double pv){
     double v=0;
     switch(r.model){
+    case Curve:v=curveLoss(r.curve,q);break;
     case FixedDp:v=r.dp;break;
     case Zeta:v=r.zeta*pv;break;
     case Nominal:v=r.qNominal>0?r.dpNominal*(q/r.qNominal)*(q/r.qNominal):r.dpNominal;break;
@@ -120,6 +139,7 @@ inline std::wstring format(const Record& r){
     put(L"dpn",num(r.dpNominal));put(L"qn",num(r.qNominal));put(L"q",num(r.qTerminal));
     if(r.mount!=AtEnd)put(L"mount",num(r.mount));
     if(r.neckA>0){put(L"na",num(r.neckA));put(L"nb",num(r.neckB));put(L"nr",num(r.neckRound?1:0));}
+    if(!r.curve.empty()){std::wstring c;for(size_t i=0;i<r.curve.size();++i){if(i)c+=L",";c+=num(r.curve[i].first)+L":"+num(r.curve[i].second);}put(L"curve",c);}
     for(int k=0;k<2&&k<r.ports;++k){const wchar_t* p=k==0?L"p0":L"p1";const Port& t=r.port[k];
         put(p,num(t.x)+L","+num(t.y)+L","+num(t.z)+L","+num(t.dx)+L","+num(t.dy));}
     return s;
@@ -160,6 +180,14 @@ inline bool parse(const std::wstring& s,Record& r){
         else if(key==L"na"&&n)r.neckA=v;
         else if(key==L"nb"&&n)r.neckB=v;
         else if(key==L"nr"&&n)r.neckRound=v!=0;
+        else if(key==L"curve"){
+            std::wstring part;
+            for(size_t j=0;j<=val.size();++j){
+                if(j==val.size()||val[j]==L','){const size_t c=part.find(L':');double x=0,y=0;
+                    if(c!=std::wstring::npos&&number(part.substr(0,c),x)&&number(part.substr(c+1),y))r.curve.push_back(std::make_pair(x,y));
+                    part.clear();}
+                else part+=val[j];}
+        }
         else if(key==L"p0"||key==L"p1"){
             double c[5]={0,0,0,1,0};int k=0;std::wstring part;
             for(size_t j=0;j<=val.size()&&k<5;++j){if(j==val.size()||val[j]==L','){double x=0;if(number(part,x))c[k]=x;++k;part.clear();}else part+=val[j];}
@@ -167,7 +195,7 @@ inline bool parse(const std::wstring& s,Record& r){
         }
     }
     if(r.kind<0||r.kind>=kindCount())r.kind=Other;
-    if(r.model<NoLoss||r.model>Nominal)r.model=NoLoss;
+    if(r.model<NoLoss||r.model>Curve)r.model=NoLoss;
     return any&&r.version==1;
 }
 }
