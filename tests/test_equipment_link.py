@@ -29,6 +29,32 @@ class EquipmentLink(unittest.TestCase):
   self.assertIn('p->put_FirstPoint(to):p->put_Lastpoint(to)',c);self.assertIn('tx.append(space,n,pieceId)',c)
   self.assertNotIn('TVS_Pipe::add_new',c)                       # add_new posts with open/close (no rollback)
   self.assertIn('acedInitGet(0,L"Izaberi Sve Tolerancija")',c);self.assertIn('acedInitGet(0,L"Da Ne")',c)
+ def test_terminal_rules(self):
+  c=text('TVS_Ventilation_ARX/EquipmentLinkCommand.h')
+  # base point rule: insertion point + free elbow outlets go to the 5-argument link
+  self.assertIn('at=lk::Pt(ref->position().x,ref->position().y);',c)
+  self.assertIn('lk::Result r=lk::link(block,at,ducts,outlets,o);',c);self.assertNotIn('lk::link(block,ducts,o)',c)
+  self.assertIn('base.bottom=true;',c)
+  # elbow Gore / Dolje outlet: form, 90 deg, level Elev -/+ rc, RoundElbow.h for round elbows
+  self.assertIn('#include "../geometry/RoundElbow.h"',c)
+  self.assertIn('form!=Form_Up&&form!=Form_Down',c);self.assertIn('tap->get_radius()+(round?tap->SizeA:tap->SizeB)/2',c)
+  self.assertIn('tap->Elev+(form==Form_Up?1:-1)*rc*(1-std::cos(tap->Swectangle))',c);self.assertIn('tvsRoundElbow::ports(',c)
+  # bottom grille: Dno / Linija once per block name, remembered as the default; neck from the default or the footprint
+  self.assertIn('acedInitGet(0,L"Dno Linija")',c);self.assertIn('[Dno/Linija] <Linija>',c)
+  self.assertIn('tvsEquipmentStore::writeDefault(db,name.c_str(),d)',c)
+  self.assertIn('rec.mount=r.ports==1?r.mount:tvsEquipment::AtEnd;',c);self.assertIn('lk::footprintMm(block,f,w,h);',c)
+  self.assertIn('TVS_OPREMA_SVOJSTVA',c)
+  # kinds not set: hint + the properties dialog for those blocks
+  self.assertIn('Podesiti vrstu sada? [Da/Ne] <Da>',c);self.assertIn('tvsEquipmentDialog::run(IDD_EQUIPMENT,t.unset);',c)
+  self.assertIn('#include "EquipmentDialog.h"',c)
+  d=text('TVS_Ventilation_ARX/EquipmentDialog.h')
+  self.assertIn('inline void run(UINT idd,const std::vector<AcDbObjectId>& ids){',d)
+  self.assertRegex(d,r'inline void run\(UINT idd\)\{\n    std::vector<AcDbObjectId> ids;if\(!pick\(ids\)\)return;\n    run\(idd,ids\);\n\}')
+  for f in (c,d):
+   code=re.sub(r'//.*','',f)
+   for w in ('near','far','small','min','max'):self.assertNotRegex(code,r'\b%s\b'%w)
+  # acedInitGet keywords plain ASCII
+  for k in re.findall(r'acedInitGet\(0,L"([^"]*)"\)',c):k.encode('ascii')
  def test_registered(self):
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
   self.assertIn('#include "EquipmentLinkCommand.h"',e)

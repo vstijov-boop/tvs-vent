@@ -9,16 +9,26 @@
 // Jedan blok = jedna transakcija (tvsAction::Transaction) uz provjeru prije upisa (zaključan sloj,
 // etaž / obilazak): odbijen blok ne mijenja ništa.
 // TVS_OPREMA_ODVEZI: zapis se briše, kanali ostaju kakvi jesu.
+// Terminal po baznoj tački (crteži korisnika 23.11.): bazna tačka bloka na slobodnom kraju kanala / flexa /
+// kratkog nastavka ili na slobodnom vertikalnom izlazu koljena gore / dolje = priključak, bez skraćivanja
+// i bez gabarita bloka. Rešetka (vrsta terminal) preko kontinualnog kanala = rešetka na dnu kanala (mount
+// Bottom, kanal se ne siječe); blok bez podrazumijevanog zapisa preko kanala: pitanje Dno / Linija jednom po
+// nazivu bloka (pamti se kao podrazumijevana vrsta). Na kraju: blokovi bez podešene vrste -> TVS_OPREMA_SVOJSTVA.
 #include "TVSMoveCommand.h"
 #include "CheckCommand.h"
 #include "ActionTransaction.h"
 #include "BuildTransaction.h"
 #include "EquipmentStore.h"
+#include "EquipmentDialog.h"
+#include "resource.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../geometry/EquipmentLink.h"
+#include "../geometry/RoundElbow.h"
 #include <dbdynblk.h>
 #include <dbents.h>
 #include <cmath>
+#include <map>
+#include <set>
 #include <string>
 #include <vector>
 namespace tvsEquipmentLinkCmd {
@@ -122,10 +132,47 @@ inline void ductsNear(const Scene& s,const AcDbObjectId& self,const std::vector<
             if(s.equipment[q].id!=self&&lk::length(lk::sub(p,s.equipment[q].at))<=tol)++out[k].others[e];
     }
 }
+// Free vertical outlets of elbows Gore / Dolje (TVS_TAP Form_Up / Form_Down, 90 deg) within `reach` of
+// the base point: outlet centre in plan as OffsetService::describe / RoundElbow.h compute it (rectangular:
+// MiddlePoint; round constant / variable radius: tvsRoundElbow::ports; other round elbows: the drawn MC),
+// level Elev -/+ rc (rc = R + B/2, round R + A/2). Free: no other element port, no other linked block there.
+inline void elbowOutlets(const Scene& s,const AcDbObjectId& self,const lk::Pt& base,double reach,double tol,double f,
+                         std::vector<lk::Outlet>& out){
+    out.clear();const double halfPi=1.57079632679489661923;
+    for(size_t i=0;i<s.nodes.size();++i){const tvsMove::Node& n=s.nodes[i];
+        if(n.id.objectClass()!=TVS_TAP::desc())continue;
+        lk::Outlet w;
+        {AcDbObjectPointer<TVS_TAP> tap(n.id,AcDb::kForRead);if(tap.openStatus()!=Acad::eOk)continue;
+         const int form=tap->get_Form();
+         if((form!=Form_Up&&form!=Form_Down)||tap->DuctType!=DuctTypeStill)continue;
+         if(std::fabs(tap->Swectangle-halfPi)>0.02||(tap->Normvector-AcGeVector3d(0,0,1)).length()>1e-6)continue;
+         const bool round=tap->ThisRound;
+         const double rc=tap->get_radius()+(round?tap->SizeA:tap->SizeB)/2;
+         if(!(rc>0))continue;
+         AcGePoint3d mc=tap->MiddlePoint;
+         if(round){
+             if(tap->RadiusTypeRound==RadiusTypeRound_RadiusConstant||tap->RadiusTypeRound==RadiusTypeRound_RadiusVariable){
+                 const AcGeVector3d st=tap->Startvector;tvsRoundElbow::P ma,m;
+                 tvsRoundElbow::ports(tvsRoundElbow::P(tap->MiddlePoint.x,tap->MiddlePoint.y),st.x,st.y,tap->Swectangle,rc,ma,m);
+                 mc.x=m.x;mc.y=m.y;}
+             else mc=tap->MC;}
+         w.at=lk::Pt(mc.x,mc.y);w.level=tap->Elev+(form==Form_Up?1:-1)*rc*(1-std::cos(tap->Swectangle));
+         w.a=tap->SizeA*f;w.b=round?0:tap->SizeB*f;w.round=round;}
+        if(lk::length(lk::sub(w.at,base))>reach)continue;
+        bool taken=false;
+        for(size_t j=0;j<s.nodes.size()&&!taken;++j){if(j==i)continue;
+            for(size_t q=0;q<s.nodes[j].ports.size();++q)
+                if(lk::length(lk::sub(w.at,lk::Pt(s.nodes[j].ports[q].x,s.nodes[j].ports[q].y)))<=tol){taken=true;break;}}
+        for(size_t q=0;q<s.equipment.size()&&!taken;++q)
+            if(s.equipment[q].id!=self&&lk::length(lk::sub(w.at,s.equipment[q].at))<=tol)taken=true;
+        if(!taken)out.push_back(w);
+    }
+}
 struct Totals {
-    int inl,term,ends,cuts;int count[reasonCount];int skippedLinked,offDuct,xref;
+    int inl,term,ends,cuts;int count[reasonCount];int skippedLinked,offDuct,xref;int bottom;
     std::vector<AcDbObjectId> refused;
-    Totals():inl(0),term(0),ends(0),cuts(0),skippedLinked(0),offDuct(0),xref(0){for(int k=0;k<reasonCount;++k)count[k]=0;}
+    std::vector<AcDbObjectId> unset;std::set<std::wstring> unsetNames;   // linked, block name without a default
+    Totals():inl(0),term(0),ends(0),cuts(0),skippedLinked(0),offDuct(0),xref(0),bottom(0){for(int k=0;k<reasonCount;++k)count[k]=0;}
 };
 inline void refuse(Totals& t,const AcDbObjectId& id,const std::wstring& name,int reason,double detailMm,bool quiet){
     if(quiet&&reason==lk::NoDuct){++t.offDuct;return;}
@@ -232,10 +279,12 @@ inline void execute(){
         relink=rc==RTNORM&&_wcsicmp(kw,L"Da")==0;
     }
     Totals t;
-    lk::Options base;base.tol=tolMm/f;base.axisTol=axisTolMm/f;base.gap=gapMm()/f;base.minPiece=minPieceMm/f;
-    for(size_t k=0;k<blocks.size();++k){
+    lk::Options base;base.tol=tolMm/f;base.axisTol=axisTolMm/f;base.gap=gapMm()/f;base.minPiece=minPieceMm/f;base.bottom=true;
+    std::map<std::wstring,int> answered;   // Dno / Linija per block name (when writeDefault did not keep it)
+    bool stop=false;
+    for(size_t k=0;k<blocks.size()&&!stop;++k){
         const AcDbObjectId id=blocks[k];
-        std::vector<lk::Pt> block;std::wstring name;tvsEquipment::Record old;bool wasLinked=false;int reason=lk::Ok;
+        std::vector<lk::Pt> block;lk::Pt at;std::wstring name;tvsEquipment::Record old;bool wasLinked=false;int reason=lk::Ok;
         {AcDbObjectPointer<AcDbBlockReference> ref(id,AcDb::kForRead);if(ref.openStatus()!=Acad::eOk)continue;
          if(ref->ownerId()!=db->currentSpaceId())continue;
          {AcDbBlockTableRecordPointer btr(ref->blockTableRecord(),AcDb::kForRead);
@@ -244,20 +293,41 @@ inline void execute(){
          name=blockName(id,ref->blockTableRecord());
          wasLinked=tvsEquipmentStore::read(ref.object(),old);
          if(wasLinked&&!relink){++t.skippedLinked;continue;}
+         at=lk::Pt(ref->position().x,ref->position().y);   // insertion point (WCS)
          if(std::fabs(std::fabs(ref->normal().z)-1)>1e-6)reason=NotPlan;
          else if(!footprint(ref.object(),block))reason=NoGeometry;}
         if(reason!=lk::Ok){refuse(t,id,name,reason,0,false);continue;}
         // the record: kept from an earlier link, else the default for the block name, else new
-        tvsEquipment::Record def;const bool hasDefault=tvsEquipmentStore::readDefault(db,name.c_str(),def);
+        tvsEquipment::Record def;bool hasDefault=tvsEquipmentStore::readDefault(db,name.c_str(),def);
+        if(!hasDefault){std::map<std::wstring,int>::const_iterator a=answered.find(name);
+            if(a!=answered.end()){def=tvsEquipment::Record();def.kind=a->second;def.ports=a->second==tvsEquipment::Grille?1:2;hasDefault=true;}}
+        bool userKind=wasLinked||hasDefault;   // kind not only guessed by this command
         tvsEquipment::Record rec=wasLinked?old:hasDefault?def:tvsEquipment::Record();
-        const bool known=wasLinked||hasDefault;
+        bool known=wasLinked||hasDefault;
         lk::Options o=base;
         if(known)o.expect=tvsEquipment::terminalKind(rec.kind)?lk::Terminal:rec.kind!=tvsEquipment::Other?lk::Inline:lk::Any;
         if(hasDefault&&def.lengthMm>0&&o.expect!=lk::Terminal)o.fixedLength=def.lengthMm/f;
         if(wasLinked)forget(scene,id);
         std::vector<lk::Duct> ducts;std::vector<int> index;
         ductsNear(scene,id,block,4*o.gap+o.tol+(o.fixedLength>0?o.fixedLength:0),o.tol,f,ducts,index);
-        const lk::Result r=lk::link(block,ducts,o);
+        std::vector<lk::Outlet> outlets;elbowOutlets(scene,id,at,10*o.tol,o.tol,f,outlets);
+        lk::Result r=lk::link(block,at,ducts,outlets,o);
+        if(!known&&r.error==lk::Ok&&r.linkCase==lk::Cut){
+            // a block of a name without a default over a continuous duct: grille in the bottom face or inline
+            wchar_t prompt[300];swprintf_s(prompt,L"\nBlok %ls preko kanala: [Dno/Linija] <Linija>: ",name.c_str());
+            acedInitGet(0,L"Dno Linija");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw,16);
+            if(rc!=RTNORM&&rc!=RTNONE){stop=true;
+                if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
+                break;}
+            const bool dno=rc==RTNORM&&_wcsicmp(kw,L"Dno")==0;
+            tvsEquipment::Record d;d.kind=dno?tvsEquipment::Grille:tvsEquipment::Other;d.ports=dno?1:2;
+            if(dno)d.mount=tvsEquipment::Bottom;
+            answered[name]=d.kind;
+            if(tvsEquipmentStore::writeDefault(db,name.c_str(),d)!=Acad::eOk)
+                acutPrintf(L"\n  podrazumijevana vrsta bloka %ls nije sačuvana (važi do kraja komande).",name.c_str());
+            def=d;hasDefault=true;known=true;userKind=true;rec=d;
+            if(dno){o.expect=lk::Terminal;r=lk::link(block,at,ducts,outlets,o);}
+        }
         if(r.error!=lk::Ok){
             refuse(t,id,name,r.error,r.detail*f,all);
             if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
@@ -275,6 +345,12 @@ inline void execute(){
         rec.version=1;rec.ports=r.ports;rec.mmPerUnit=f;rec.round=r.round;rec.a=r.a;rec.b=r.round?0:r.b;
         rec.lengthMm=r.ports==2?r.length*f:0;
         for(int p=0;p<2;++p)rec.port[p]=p<r.ports?r.port[p]:tvsEquipment::Port();
+        rec.mount=r.ports==1?r.mount:tvsEquipment::AtEnd;
+        bool neckGuessed=false;
+        if(rec.mount==tvsEquipment::Bottom){   // neck: default of the name, else kept from an earlier link, else the footprint
+            if(hasDefault&&def.neckA>0){rec.neckA=def.neckA;rec.neckB=def.neckB;rec.neckRound=def.neckRound;}
+            else if(!(wasLinked&&old.neckA>0)){double w=0,h=0;lk::footprintMm(block,f,w,h);rec.neckA=w;rec.neckB=h;rec.neckRound=false;neckGuessed=w>0;}
+        }
         AcDbObjectId piece;
         if(!apply(id,r,index,scene,rec,piece)){
             refuse(t,id,name,WriteFailed,0,false);
@@ -282,9 +358,14 @@ inline void execute(){
             continue;}
         if(r.ports==2)++t.inl;else ++t.term;
         t.ends+=static_cast<int>(r.edits.size());if(r.linkCase==lk::Cut)++t.cuts;
+        if(rec.mount==tvsEquipment::Bottom&&r.ports==1)++t.bottom;
+        if(neckGuessed)acutPrintf(L"\n  blok %ls [%ls]: rešetka na dnu kanala, priključak %.0f×%.0f mm uzet iz gabarita bloka – provjeriti u TVS_OPREMA_SVOJSTVA.",
+            name.c_str(),handleText(id).c_str(),rec.neckA,rec.neckB);
+        if(!userKind){t.unset.push_back(id);t.unsetNames.insert(name);}
     }
     acutPrintf(L"\nTVS_OPREMA: povezano %d (u liniji %d, terminala %d); krajeva kanala skraćeno / produženo %d, presječeno kanala %d.",
         t.inl+t.term,t.inl,t.term,t.ends,t.cuts);
+    if(t.bottom)acutPrintf(L"\n  rešetki na dnu kanala (kanal nije presječen): %d.",t.bottom);
     if(t.skippedLinked)acutPrintf(L"\n  već povezanih (preskočeno): %d.",t.skippedLinked);
     if(t.offDuct)acutPrintf(L"\n  blokova van kanala (preskočeno): %d.",t.offDuct);
     if(t.xref)acutPrintf(L"\n  xref / layout blokova (preskočeno): %d.",t.xref);
@@ -292,6 +373,17 @@ inline void execute(){
         acutPrintf(L"\n  odbijeno %d:",static_cast<int>(t.refused.size()));
         for(int k=1;k<reasonCount;++k)if(t.count[k])acutPrintf(L"\n    %d × %ls",t.count[k],reasonText(k));
         tvsCheck::select(t.refused);   // odbijeni blokovi ostaju izabrani
+    }
+    if(stop)acutPrintf(L"\n  prekinuto: ostali blokovi nisu obrađeni.");
+    // blocks whose name has no default: the kind is only guessed (Rešetka / Ostala oprema)
+    if(!t.unset.empty()&&!stop){
+        std::wstring names;for(std::set<std::wstring>::const_iterator n=t.unsetNames.begin();n!=t.unsetNames.end();++n){if(!names.empty())names+=L", ";names+=*n;}
+        acutPrintf(L"\n  vrsta nije podešena za %d blokova (naziv bez podrazumijevanih svojstava: %ls) – pretpostavljeno Rešetka (terminal) / Ostala oprema (u liniji).",
+            static_cast<int>(t.unset.size()),names.c_str());
+        acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";
+        const int rc=acedGetKword(L"\nPodesiti vrstu sada? [Da/Ne] <Da>: ",kw,8);
+        if(rc==RTNONE||(rc==RTNORM&&_wcsicmp(kw,L"Da")==0))tvsEquipmentDialog::run(IDD_EQUIPMENT,t.unset);
+        else if(rc==RTNORM)acutPrintf(L"\n  vrsta se može podesiti kasnije: TVS_OPREMA_SVOJSTVA („Primijeni na sve blokove ovog naziva“).");
     }
 }
 // TVS_OPREMA_ODVEZI: the record goes, the block and the ducts stay as they are.
