@@ -23,6 +23,14 @@ namespace tvsEquipment {
 
 enum Kind {Other=0,FlowDamper=1,FireDamper=2,Cav=3,Vav=4,Silencer=5,Grille=6,Diffuser=7,Hood=8,Louvre=9};
 enum Model {NoLoss=0,FixedDp=1,Zeta=2,Nominal=3};
+// How a terminal (1 port) sits on the network:
+//  AtEnd  - port on a free end (duct, flex, stub of a tee branch, vertical outlet of an elbow);
+//  Bottom - grille in the bottom face of a duct, drawn over the duct: NO duct end, port[0] is the
+//           tap point on the duct axis (z = axis level); the duct is not cut. The network treats it
+//           as a zero-length branch with the neck size (na x nb / round) - tee loss by the KanCalc /
+//           Idelchik tables (branch = neck, straight = duct) plus the grille's own loss
+//           (user decision 2026-11-23).
+enum Mount {AtEnd=0,Bottom=1};
 
 inline int kindCount(){return 10;}
 // Names shown in the dialogs / specification (BCS, \u escapes keep this file ASCII).
@@ -70,8 +78,11 @@ struct Record {
     double dpNominal;     // Pa at qNominal (Nominal)
     double qNominal;      // m3/h (Nominal)
     double qTerminal;     // m3/h, terminals: design flow (0 = not set, TVS_PROTOK)
+    int mount;            // Mount (terminals)
+    double neckA,neckB;   // mm, grille connection (Bottom); 0 = take the duct size
+    bool neckRound;
     Record():version(1),kind(Other),ports(2),mmPerUnit(1),round(false),a(0),b(0),lengthMm(0),
-             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0){}
+             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false){}
     bool terminal()const{return ports==1;}
 };
 
@@ -107,6 +118,8 @@ inline std::wstring format(const Record& r){
     put(L"a",num(r.a));put(L"b",num(r.b));put(L"len",num(r.lengthMm));
     put(L"model",num(r.model));put(L"dp",num(r.dp));put(L"zeta",num(r.zeta));
     put(L"dpn",num(r.dpNominal));put(L"qn",num(r.qNominal));put(L"q",num(r.qTerminal));
+    if(r.mount!=AtEnd)put(L"mount",num(r.mount));
+    if(r.neckA>0){put(L"na",num(r.neckA));put(L"nb",num(r.neckB));put(L"nr",num(r.neckRound?1:0));}
     for(int k=0;k<2&&k<r.ports;++k){const wchar_t* p=k==0?L"p0":L"p1";const Port& t=r.port[k];
         put(p,num(t.x)+L","+num(t.y)+L","+num(t.z)+L","+num(t.dx)+L","+num(t.dy));}
     return s;
@@ -143,6 +156,10 @@ inline bool parse(const std::wstring& s,Record& r){
         else if(key==L"dpn"&&n)r.dpNominal=v;
         else if(key==L"qn"&&n)r.qNominal=v;
         else if(key==L"q"&&n)r.qTerminal=v;
+        else if(key==L"mount"&&n)r.mount=v==Bottom?Bottom:AtEnd;
+        else if(key==L"na"&&n)r.neckA=v;
+        else if(key==L"nb"&&n)r.neckB=v;
+        else if(key==L"nr"&&n)r.neckRound=v!=0;
         else if(key==L"p0"||key==L"p1"){
             double c[5]={0,0,0,1,0};int k=0;std::wstring part;
             for(size_t j=0;j<=val.size()&&k<5;++j){if(j==val.size()||val[j]==L','){double x=0;if(number(part,x))c[k]=x;++k;part.clear();}else part+=val[j];}

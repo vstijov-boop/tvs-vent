@@ -23,6 +23,10 @@ int main(){
     assert(terminalKind(Grille)&&!terminalKind(Vav));
     // not a record / unknown version / bad kind
     Record w;assert(!parse(L"",w));assert(!parse(L"v=2;",w));assert(parse(L"v=1;kind=99;model=7;",w)&&w.kind==Other&&w.model==NoLoss);
+    // bottom grille (mount, neck)
+    Record g;g.kind=Grille;g.ports=1;g.mount=Bottom;g.neckA=425;g.neckB=125;g.a=400;g.b=250;
+    Record h;assert(parse(format(g),h));assert(h.mount==Bottom&&h.neckA==425&&h.neckB==125&&!h.neckRound);
+    Record e;assert(parse(format(t),e)&&e.mount==AtEnd&&e.neckA==0);   // old records: at the end
     std::puts("equipment OK");
     return 0;
 }
