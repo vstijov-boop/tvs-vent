@@ -1,5 +1,14 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## TVS_RESETKA – priključenje rešetke (novo, 23.11.) – testirati
+Opis: [OPREMA.md](OPREMA.md). Priprema: pravi kanal 250×200 nacrtan s lijeva na desno, blok rešetke (npr. Res_2) ispod kanala, blok Res_1 preko kanala.
+- `TVS_RESETKA` → blok Res_2 ispod kanala → Enter (najbliži kanal je istaknut) → dijalog: predizbor **Desno**, Ravni T komad, dužina 100, dimenzija = širina bloka × 200 → Priključi: T komad TK0 na kanalu u projekciji tačke umetanja, kanal podijeljen (dva komada sa istim svojstvima), ogranak 100 mm, blok pomjeren na kraj ogranka i okrenut napolje (kao u primjeru: rotacija 0 za ogranak prema dolje). Jedan U vraća sve.
+- Isto sa blokom iznad kanala → predizbor **Lijevo**, blok okrenut za 180°. Kanal nacrtan s desna na lijevo: lijevo / desno se zamijene (strana se gleda u smjeru crtanja).
+- **Štucna:** pravougaoni ogranak → SR5-3 (L = 0,25 × širina, min. 75 mm), kosi ulaz uzvodno; „Okrugli ogranak (D)“ → štucna SR5-11, uključuje se i „Konusna štucna“ (SR5-12, L = 100 mm). Okrugli glavni kanal: štucna isključena, samo ravni T komad. Svojstva / TVS_TK_TIP na novom T komadu prikazuju isti tip.
+- **Dno:** blok Res_1 preko kanala → predizbor **Dno**, aktivno samo „Direktno na stranicu“, napomena da T komad / štucna naniže još nisu podržani; dimenzija = 490 × 190 (otisak bloka) → Priključi: ništa se ne crta, blok povezan (TVS_OPREMA_SVOJSTVA ga prikazuje kao povezan; TVS_PAD / TVS_PROTOK ga vide kao rešetku na dnu).
+- Provjere u dijalogu (poruka, dijalog ostaje otvoren): ogranak viši od kanala (npr. B 250 na kanalu 200), dno: priključak širi od kanala, blok preblizu kraja kanala (T komad + 50 mm ne staje), blok naspram mjesta iza kraja kanala, dužina 0.
+- Dužina ogranka se pamti (zatvoriti i ponovo pokrenuti AutoCAD → ista vrijednost). Zaključan sloj kanala ili bloka → poruka, ništa nije promijenjeno. Crtež u cm / m: dužine u mm rade isto. Već povezan blok → zapis se zamjenjuje (oznaka, protok, model ostaju).
+- Meni / ribbon „Crtanje kanala“: dugme „Priključenje rešetke“ (nova ikona) pokreće TVS_RESETKA.
 ## Oprema na mreži u proračunima (TVS_PAD, TVS_PROTOK, TVS_DPD_IZVOZ, TVS_DIM_PRATI, TVS_PROVJERA) – testirati
 Opis: [OPREMA.md](OPREMA.md). Priprema: mreža (dovod) sa povezanim blokovima (TVS_OPREMA): regulator protoka (model „katalog“ Δp 30 Pa pri 1800 m³/h), prigušivač buke (fiksni Δp 25 Pa), na kraju kanala / fleksa difuzor (ζ 2,5), još jedna grana sa rešetkom bez protoka.
 - **TVS_PROTOK**: protok difuzora iz opreme; rešetka bez protoka → zoom, „Rešetka – protok [m³/h]“ → upisuje se u blok (svojstva opreme), ne u kanal. Kanali iza regulatora / prigušivača dobijaju zbir kao do sada; inline oprema nema svoj protok. Kanal na kome je terminal ranije imao protok, a oprema nema → protok kanala prelazi u opremu. Oba upisana i različita → poruka „protok u opremi … na kanalu … uzet protok opreme“.

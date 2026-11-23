@@ -131,6 +131,13 @@
         syncTVSGlobalUnits();
         tvsEquipmentDialog::run(IDD_EQUIPMENT);
     }
+    // TVS_RESETKA: blok rešetke priključen na kanal – T komad / štucna + ogranak (blok na kraju ogranka) ili dno kanala (GrilleCommand.h).
+    static void Ventilation_ARXTVS_RESETKA(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsGrilleCmd::execute(IDD_GRILLE, globalLengthW);   // TK0: dužina kao TVS_CONNECTW (TVS_SETTINGS, jedinice crteža)
+    }
     // TVS_DPD_IZVOZ: the network as a DuctPressDrop system file (JSON, DpdExportCommand.h).
     static void Ventilation_ARXTVS_DPD_IZVOZ(void)
     {
