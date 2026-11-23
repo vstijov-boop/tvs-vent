@@ -85,6 +85,7 @@
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 #include "EquipmentDialog.h"   // TVS_OPREMA_SVOJSTVA: svojstva povezanih blokova opreme
+#include "EquipmentCaption.h"  // TVS_NATPIS: natpis opreme (+ povezan / - nije povezan)
 #include "GrilleCommand.h"   // TVS_RESETKA: priključenje rešetke (T komad + ogranak ili dno kanala)
 
 #include "TVSLeadCommand.h"
@@ -141,6 +142,7 @@ public:
 		// You *must* call On_kInitAppMsg here
 		AcRx::AppRetCode retCode = AcRxArxApp::On_kInitAppMsg(pkt);
 		tvsLevelTooltip::start();
+		tvsEquipmentCaption::start();   // TVS_NATPIS: natpis blokova opreme (overrule)
 		tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
 		tvsJointFix::install();   // TVS_STRETCH / TVS_MOVE: ponuda popravke spoja
 		tvsScaleWindow::start();  // jedinice crteža pri kopiranju / umetanju (ScaleWindow.h)
@@ -181,6 +183,7 @@ public:
 #endif
         PropertyAdmin::uninitialize();
         tvsLevelTooltip::stop();
+        tvsEquipmentCaption::stop();
         tvsSizeFollow::stop();
         tvsScaleWindow::stop();
 #ifdef TVS_OFFSET_INTEGRATION

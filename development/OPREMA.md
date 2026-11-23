@@ -82,3 +82,6 @@ Kod: `geometry/GrilleConnect.h` (tačka priključenja, strana, raspored T komada
 Ne radi (još): ogranak naniže (T komad na dnu), ogranak drugačije kote, linijski difuzori sa dva priključka.
 
 - **Kraj kanala (23.11., korisnik):** TVS_RESETKA – četvrta strana „Kraj kanala“ (predizabrana kad je tačka umetanja bloka kod slobodnog kraja kanala): bez T komada; kanal do rešetke se postavlja na zadatu dužinu od drugog kraja (polje „Dužina kanala do rešetke“, početno nacrtana dužina; 100 mm sa regulatorom, 50 mm bez), blok ide na kraj okrenut prema van, zapis AtEnd. Nema minimuma od 225 mm.
+
+- **Natpis opreme (23.11., korisnik):** uz TVS_NATPIS svaki blok opreme dobija natpis iznad sebe (samo na ekranu, ne štampa se): „+ OZNAKA / Q m3/h / Δp Pa“ za povezan blok, „- naziv“ za blok čiji je naziv podešen kao oprema, a nije povezan. Crta ga overrule na AcDbBlockReference (EquipmentCaption.h); u crtežu se ništa ne upisuje.
+- **Primijeni na sve blokove ovog naziva:** mijenja povezane blokove tog naziva i pamti svojstva za naziv; nepovezani ih dobijaju kad ih poveže TVS_OPREMA. Komanda sada ispiše koliko je ostalih blokova tog naziva i koliko ih je povezano.

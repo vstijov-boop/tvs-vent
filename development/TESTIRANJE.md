@@ -349,3 +349,6 @@ Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → In
 - Finese nastavka crtanja poslije umetanja T komada.
 
 - **TVS_RESETKA – Kraj kanala:** rešetka iza prelaza na kratkom kanalu: dijalog sam bira „Kraj kanala“; upiši 100 (ili 50) – kanal se skrati na tu dužinu, rešetka dođe na kraj okrenuta prema van; U vraća sve. TVS_PROTOK / TVS_PAD vide rešetku na kraju.
+
+- **TVS_NATPIS + oprema:** uključi TVS_NATPIS – povezani blokovi: zeleni „+ DAS-1 / 550 m3/h / 30 Pa“, nepovezani blok poznatog naziva: crveni „- Dif_1“; ne štampa se (PLOT preview); EXPLODE bloka ne pravi tekst. TVS_PROTOK / TVS_OPREMA_SVOJSTVA osvježe natpis.
+- **Primijeni na sve blokove ovog naziva:** komandna linija kaže koliko je ostalih blokova tog naziva i koliko je povezano; povezani dobiju vrstu / opis / model Δp.

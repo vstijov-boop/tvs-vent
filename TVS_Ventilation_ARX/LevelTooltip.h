@@ -90,7 +90,7 @@ inline void toggleCaptions(){
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc||!doc->database())return;
     const bool on=!tvsDuctCaption::enabled(doc->database());
     if(!tvsDuctCaption::set(doc->database(),on)){acutPrintf(L"\nTVS_NATPIS: prikaz nije promijenjen.");return;}
-    acutPrintf(on?L"\nTVS_NATPIS: natpisi kanala ukljuceni (dimenzija / protok m3/h / brzina m/s, ne stampaju se).":L"\nTVS_NATPIS: natpisi kanala iskljuceni.");
+    acutPrintf(on?L"\nTVS_NATPIS: natpisi kanala ukljuceni (dimenzija / protok m3/h / brzina m/s; oprema: + povezana / - nije povezana; ne stampaju se).":L"\nTVS_NATPIS: natpisi kanala iskljuceni.");
     acDocManager->sendStringToExecute(doc,L"_.REGENALL\n",false,true,false);
 }
 // TVS_KOTE: labels on screen in the current drawing, on/off.

@@ -209,6 +209,7 @@ inline void run(UINT idd,const std::vector<AcDbObjectId>& ids){
     if(rc!=IDOK||dg.records.size()!=items.size())return;
     // what is written: the edited blocks, and with "sve blokove ovog naziva" every linked block of the names
     std::map<AcDbObjectId,tvsEquipment::Record> writes;std::map<std::wstring,tvsEquipment::Record> defaults;
+    int sameName=0,sameNameUnlinked=0;   // other blocks of the names (report)
     for(size_t k=0;k<items.size();++k)if(k<dg.changed.size()&&dg.changed[k])writes[items[k].id]=dg.records[k];
     if(dg.applyAll){
         for(size_t k=0;k<items.size();++k)if(!items[k].block.empty()&&!defaults.count(items[k].block))
@@ -222,14 +223,21 @@ inline void run(UINT idd,const std::vector<AcDbObjectId>& ids){
             AcDbObjectId btrId;if(table->getAt(d->first.c_str(),btrId)!=Acad::eOk)continue;
             AcDbObjectPointer<AcDbBlockTableRecord> btr(btrId,AcDb::kForRead);if(btr.openStatus()!=Acad::eOk)continue;
             AcDbObjectIdArray refs;if(btr->getBlockReferenceIds(refs)!=Acad::eOk)continue;
-            for(int i=0;i<refs.length();++i){if(writes.count(refs[i]))continue;
+            for(int i=0;i<refs.length();++i){
                 bool selected=false;for(size_t k=0;k<items.size()&&!selected;++k)selected=items[k].id==refs[i];
                 if(selected)continue;
-                tvsEquipment::Record r;if(!tvsEquipmentStore::read(refs[i],r))continue;   // not linked: stays as it is
+                {AcDbObjectPointer<AcDbBlockReference> o(refs[i],AcDb::kForRead);if(o.openStatus()!=Acad::eOk||o->isErased())continue;}
+                ++sameName;
+                tvsEquipment::Record r;
+                if(!tvsEquipmentStore::read(refs[i],r)){++sameNameUnlinked;continue;}   // not linked: gets the default when TVS_OPREMA links it
+                if(writes.count(refs[i]))r=writes[refs[i]];
                 if(tvsEquipmentEdit::applyType(d->second,r))writes[refs[i]]=r;}
         }
     }
     if(writes.empty()&&defaults.empty()){acutPrintf(L"\nNišta nije promijenjeno.");return;}
+    if(dg.applyAll){
+        acutPrintf(L"\nOstalih blokova istog naziva: %d (povezanih %d).",sameName,sameName-sameNameUnlinked);
+        if(sameNameUnlinked)acutPrintf(L"\n  %d nije povezano u mrežu – svojstva dobijaju kad ih poveže TVS_OPREMA (TVS_OPREMA, opcija Sve).",sameNameUnlinked);}
     std::vector<AcDbObjectId> targets;
     for(std::map<AcDbObjectId,tvsEquipment::Record>::const_iterator w=writes.begin();w!=writes.end();++w)targets.push_back(w->first);
     if(!tvsAction::writable(targets)){acutPrintf(L"\nBlok opreme je na zaključanom sloju ili nije dostupan. Ništa nije promijenjeno.");return;}
