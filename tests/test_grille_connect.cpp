@@ -42,6 +42,35 @@ int main(){
      // the user's drawing has the duct ending at the T komad: the tap is beyond the duct
      const Duct real=duct(14733.47,4881.18,17602.82,4881.18,250,200);
      assert(validate(real,place(real,ins),c,o).error==Outside);
+     assert(y.fit==Split);
+     // ... and with that end FREE it is the typical case (coordinator 2026-11-23): T komad at the end,
+     // branch axis on the projection, duct trimmed to the inlet (here exactly its end), no new piece,
+     // the straight outlet beyond the old duct end stays free (cap)
+     {Duct freeD=real;freeD.freeEnd[1]=true;const Place q=place(freeD,ins);
+      assert(eq(q.t,ins.x-14733.47)&&q.t>freeD.len());
+      const Layout e=layout(freeD,q,c,o);
+      assert(e.ok&&e.fit==AtLast&&validate(freeD,q,c,o).error==Ok);
+      assert(at(e.tap,ins.x,4881.18)&&at(e.runStart,17602.81908863922,4881.18)&&eq(e.runStart.x,17602.82,0.01));   // = the duct end of 694
+      assert(at(e.runEnd,18152.81908863922,4881.18)&&at(e.branchPort,ins.x,4706.18)&&at(e.stubEnd,ins.x,ins.y));
+      // free start instead: nothing to do there (the short side is the last end)
+      Duct startFree=real;startFree.freeEnd[0]=true;assert(validate(startFree,place(startFree,ins),c,o).error==Outside);
+      // grille a bit before the free end: inlet inside the duct (duct trimmed), still AtLast
+      const Place q2=place(freeD,V(17500,4643.33));const Layout e2=layout(freeD,q2,c,o);
+      assert(e2.fit==AtLast&&eq(e2.runStart.x,17225)&&validate(freeD,q2,c,o).error==Ok);
+      // the duct too short for the inlet piece: refused even with a free end
+      Duct tiny=duct(17580,4881.18,17602.82,4881.18,250,200);tiny.freeEnd[0]=tiny.freeEnd[1]=true;
+      assert(validate(tiny,place(tiny,ins),c,o).error==Outside||validate(tiny,place(tiny,ins),c,o).error==NearEnd);
+      assert(layout(tiny,place(tiny,ins),c,o).fit==Refused);}
+     // the same at the START of a duct drawn the other way (free p0): FirstPoint goes to runEnd
+     {Duct rev=duct(17602.82,4881.18,14733.47,4881.18,250,200);rev.freeEnd[0]=true;
+      const Place q=place(rev,ins);assert(q.side==Left&&q.t<0);
+      const Choice cl=choice(Left,Tee,4706.18-ins.y,450,200);
+      const Layout e=layout(rev,q,cl,o);
+      assert(e.fit==AtFirst&&validate(rev,q,cl,o).error==Ok&&eq(e.runEnd.x,17602.82,0.01)&&at(e.stubEnd,ins.x,ins.y,1e-6));
+      rev.freeEnd[0]=false;assert(validate(rev,q,cl,o).error==Outside);}
+     // stucna near a free end: run 25 + L + w/2 upstream
+     {Duct freeD=real;freeD.freeEnd[1]=true;const Layout e=layout(freeD,place(freeD,ins),choice(Right,Tap,60,400,200),o);
+      assert(e.fit==AtLast&&eq(e.before,25+100+200)&&eq(e.runStart.x,ins.x-325));}
      // branch higher than the side face
      assert(validate(d,p,choice(Right,Tee,60,450,250),o).error==TooTall&&eq(validate(d,p,choice(Right,Tee,60,450,250),o).detail,200));
      assert(validate(d,p,choice(Right,Tee,0,450,200),o).error==NoStub);

@@ -35,7 +35,8 @@ struct Duct {
     V p0,p1;          // axis in plan: FirstPoint, LastPoint
     double a,b;       // width, height; round: a = D, b = 0
     bool round;
-    Duct():a(0),b(0),round(false){}
+    bool freeEnd[2];  // nothing else on p0 / p1: the T komad may sit at that end (outlet left free = cap)
+    Duct():a(0),b(0),round(false){freeEnd[0]=freeEnd[1]=false;}
     double len()const{return length(sub(p1,p0));}
     double height()const{return round?a:b;}   // the side face the branch enters
     double width()const{return a;}            // the bottom face (plan width)
@@ -46,7 +47,7 @@ struct Place {
     V u,left;          // axis direction p0 -> p1, its left normal
     double t;          // projection along the axis from p0
     double offset;     // signed distance from the axis (+ = left)
-    V tap;             // projection on the axis (t clamped to the duct)
+    V tap;             // projection on the axis (also beyond the duct ends)
     int side;          // suggested Side: Bottom over the duct, else Left / Right of the axis
     Place():ok(false),t(0),offset(0),side(Left){}
 };
@@ -54,7 +55,7 @@ inline Place place(const Duct& d,const V& at){
     Place p;const double l=d.len();if(!(l>0))return p;
     p.u=mul(sub(d.p1,d.p0),1.0/l);p.left=V(-p.u.y,p.u.x);
     const V r=sub(at,d.p0);p.t=dot(r,p.u);p.offset=dot(r,p.left);
-    double tc=p.t;if(tc<0)tc=0;if(tc>l)tc=l;p.tap=add(d.p0,mul(p.u,tc));
+    p.tap=add(d.p0,mul(p.u,p.t));
     const bool over=p.t>=0&&p.t<=l&&std::fabs(p.offset)<d.a/2;
     p.side=over?Bottom:p.offset>=0?Left:Right;p.ok=true;
     return p;
@@ -74,6 +75,14 @@ struct Options {
     double minPiece;  // shortest duct piece left on each side of the T komad
     Options():collar(50),tapMinimum(75),coneLength(100),margin(25),minPiece(50){}
 };
+// Split: the duct is cut at the T komad (original up to runStart, new piece from runEnd).
+// AtLast / AtFirst (user 2026-11-23, the typical case of p.dxf): the projection is closer than
+// half the run + minPiece to a FREE end of the duct -> the T komad sits at that end, its branch
+// axis on the projection; the duct is trimmed (or extended) to the T komad inlet, no new piece,
+// the straight outlet of the T komad stays free (the network treats a free tee port as a cap). The
+// run may reach beyond the original duct end (p.dxf: duct end 17603, T komad 17603-18153, branch
+// axis 17878). Refused: the short end is not free, or both ends are short.
+enum Fit {Refused=-1,Split=0,AtLast=1,AtFirst=2};
 // The T komad, stub and block of Lijevo / Desno.
 struct Layout {
     bool ok;
@@ -87,7 +96,8 @@ struct Layout {
     double cone;      // konusna: cone base diameter (TVS_TEE_V1 second), else 0
     int teeType;      // tvsTee::Straight / tvsTee::Tap
     double rotation;  // block rotation for an unmirrored block (radians)
-    Layout():ok(false),lengthPl(0),before(0),after(0),cone(0),teeType(tvsTee::Straight),rotation(0){}
+    int fit;          // Fit: how the duct meets the T komad
+    Layout():ok(false),lengthPl(0),before(0),after(0),cone(0),teeType(tvsTee::Straight),rotation(0),fit(Refused){}
 };
 // Rotation of an unmirrored block so that its local -y points along o (outward).
 inline double blockRotation(const V& o){return std::atan2(o.x,-o.y);}
@@ -109,6 +119,9 @@ inline Layout layout(const Duct& d,const Place& p,const Choice& c,const Options&
     r.branchPort=add(p.tap,mul(r.outward,d.a/2+r.lengthPl));
     r.stubEnd=add(r.branchPort,mul(r.outward,c.stub));
     r.rotation=blockRotation(r.outward);r.ok=true;
+    const double l=d.len();
+    const bool shortStart=p.t<r.before+o.minPiece-1e-9,shortEnd=l-p.t<r.after+o.minPiece-1e-9;
+    r.fit=!shortStart&&!shortEnd?Split:shortEnd&&!shortStart&&d.freeEnd[1]?AtLast:shortStart&&!shortEnd&&d.freeEnd[0]?AtFirst:Refused;
     return r;
 }
 enum Error {Ok=0,NoDuct,BadSize,NoStub,MethodSide,RoundMain,ConeRect,TooTall,TooWide,Outside,NearEnd,errorCount};
@@ -124,7 +137,7 @@ inline Check validate(const Duct& d,const Place& p,const Choice& c,const Options
     if(bottom!=(c.method==Direct)){k.error=MethodSide;return k;}
     if(!bottom&&(c.method==Tap||c.method==Cone)&&(d.round||!(d.b>0))){k.error=RoundMain;return k;}
     if(c.method==Cone&&!c.round){k.error=ConeRect;return k;}
-    if(p.t<0||p.t>l){k.error=Outside;k.detail=p.t<0?-p.t:p.t-l;return k;}
+    if(bottom&&(p.t<0||p.t>l)){k.error=Outside;k.detail=p.t<0?-p.t:p.t-l;return k;}
     if(bottom){
         // neck in the bottom face: the smaller side across the duct, the larger along it
         const double across=c.round?c.a:(c.a<c.b?c.a:c.b),along=c.round?c.a:(c.a<c.b?c.b:c.a);
@@ -138,9 +151,10 @@ inline Check validate(const Duct& d,const Place& p,const Choice& c,const Options
     if(h>d.height()+1e-9){k.error=TooTall;k.detail=d.height();return k;}
     const Layout y=layout(d,p,c,o);
     if(!y.ok){k.error=NoDuct;return k;}
+    if(y.fit!=Refused)return k;
+    if(p.t<0||p.t>l){k.error=Outside;k.detail=p.t<0?-p.t:p.t-l;return k;}   // beyond an end that is not free
     const double needBefore=y.before+o.minPiece,needAfter=y.after+o.minPiece;
-    if(p.t+1e-9<needBefore){k.error=NearEnd;k.detail=needBefore;return k;}
-    if(l-p.t+1e-9<needAfter){k.error=NearEnd;k.detail=needAfter;return k;}
+    k.error=NearEnd;k.detail=p.t+1e-9<needBefore?needBefore:needAfter;
     return k;
 }
 // Messages (BCS, \u escapes keep this file ASCII); the command adds the numbers in mm.
@@ -155,7 +169,7 @@ inline const wchar_t* errorText(int e){
     case TooTall:return L"ogranak je vi\u0161i od bo\u010dne stranice kanala";
     case TooWide:return L"priklju\u010dak re\u0161etke je \u0161iri od dna kanala";
     case Outside:return L"blok nije naspram kanala (projekcija je van kanala)";
-    case NearEnd:return L"mjesto priklju\u010denja je preblizu kraju kanala";
+    case NearEnd:return L"mjesto priklju\u010denja je preblizu kraju kanala (kraj nije slobodan ili je kanal prekratak)";
     default:return L"";
     }
 }

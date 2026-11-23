@@ -31,7 +31,9 @@ class GrilleConnect(unittest.TestCase):
   # one transaction, preflight before it, nothing through add_new (open / close, no rollback)
   self.assertIn('tvsAction::Transaction tx;',h);self.assertIn('tvsAction::writable(touched)',h);self.assertIn('tx.commit()',h)
   self.assertNotIn('::add_new',re.sub(r'//.*','',h));self.assertIn('tx.append(space,w,teeId)',h);self.assertIn('tx.append(space,s,stubId)',h);self.assertIn('tx.append(space,rest,restId)',h)
-  self.assertIn('tvsEquipmentLinkCmd::newPiece(d,runEnd)',h);self.assertIn('d->put_Lastpoint(runStart)',h)
+  self.assertIn('tvsEquipmentLinkCmd::newPiece(d,runEnd)',h);self.assertIn('if(y.fit==gc::Split){',h);self.assertIn('else if(y.fit==gc::AtFirst){if(d->put_FirstPoint(',h)
+  self.assertIn('duct.freeEnd[e]=!taken;',h)   # T komad at a free end: no new piece, outlet = cap
+  self.assertIn('d->put_Lastpoint(runStart)',h)
   # stucna as the drawing commands make it: record type Tap, L, cone base, margin 25 mm (radius2)
   self.assertIn('r.type=tvsTee::Tap;r.l=y.lengthPl;r.second=y.cone;r.radius2=o.margin;',h)
   self.assertIn('o.tapMinimum=tvsTeeData::tapMinimumMm()/f',h);self.assertIn('o.margin=tvsTee::tapMarginMm()/f',h)

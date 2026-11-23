@@ -240,6 +240,15 @@ inline void execute(UINT idd,double collar){
      first=d->FirstPoint;last=d->LastPoint;A=d->SizeA;B=d->SizeB;elev=d->Elev;roundDuct=d->ThisRound||d->SizeB<=0;}
     if(tvsEquipmentLinkCmd::inAssembly(ductId)){acutPrintf(L"\nTVS_RESETKA: kanal je dio etaža / obilaska.");return;}
     gc::Duct duct;duct.p0=v2(first);duct.p1=v2(last);duct.a=A;duct.b=roundDuct?0:B;duct.round=roundDuct;
+    {   // free ends: no other element (TVS port, linked block port other than this block) on them
+        const double tolEnd=1.0/f;const gc::V ends[2]={duct.p0,duct.p1};
+        for(int e=0;e<2;++e){bool taken=false;
+            for(size_t k=0;k<scene.nodes.size()&&!taken;++k){const tvsMove::Node& n=scene.nodes[k];if(n.id==ductId)continue;
+                for(size_t q=0;q<n.ports.size();++q)if(std::hypot(n.ports[q].x-ends[e].x,n.ports[q].y-ends[e].y)<=tolEnd){taken=true;break;}}
+            for(size_t q=0;q<scene.equipment.size()&&!taken;++q)
+                if(scene.equipment[q].id!=blockId&&std::hypot(scene.equipment[q].at.x-ends[e].x,scene.equipment[q].at.y-ends[e].y)<=tolEnd)taken=true;
+            duct.freeEnd[e]=!taken;}
+    }
     if(!(duct.len()>0)){acutPrintf(L"\nTVS_RESETKA: kanal nema dužinu u osnovi.");return;}
     gc::V centre;for(size_t k=0;k<foot.size();++k)centre=gc::add(centre,gc::V(foot[k].x,foot[k].y));centre=gc::mul(centre,1.0/foot.size());
     const gc::Place pi=gc::place(duct,v2(ins)),pc=gc::place(duct,centre);
@@ -299,12 +308,18 @@ inline void execute(UINT idd,double collar){
         const double z=d->LastPoint.z;
         const AcGePoint3d runStart(y.runStart.x,y.runStart.y,d->FirstPoint.z),runEnd(y.runEnd.x,y.runEnd.y,z),
                           branchPort(y.branchPort.x,y.branchPort.y,z),stubEnd(y.stubEnd.x,y.stubEnd.y,z);
-        // the duct after the T komad: a new piece with all properties of the duct (as TVS_OPREMA cuts)
-        TVS_Pipe* rest=tvsEquipmentLinkCmd::newPiece(d,runEnd);AcDbObjectId restId;
-        if(!tx.append(space,rest,restId)){failed=L"kanal iza T komada nije napravljen";break;}
-        if(resbuf* x=d->xData(NULL)){const Acad::ErrorStatus es=rest->setXData(x);acutRelRb(x);if(es!=Acad::eOk){failed=L"svojstva kanala nisu prenesena";break;}}
-        rest->recordGraphicsModified();
-        if(d->put_Lastpoint(runStart)!=Acad::eOk){failed=L"kanal se ne može skratiti";break;}
+        if(y.fit==gc::Split){
+            // the duct after the T komad: a new piece with all properties of the duct (as TVS_OPREMA cuts)
+            TVS_Pipe* rest=tvsEquipmentLinkCmd::newPiece(d,runEnd);AcDbObjectId restId;
+            if(!tx.append(space,rest,restId)){failed=L"kanal iza T komada nije napravljen";break;}
+            if(resbuf* x=d->xData(NULL)){const Acad::ErrorStatus es=rest->setXData(x);acutRelRb(x);if(es!=Acad::eOk){failed=L"svojstva kanala nisu prenesena";break;}}
+            rest->recordGraphicsModified();
+            if(d->put_Lastpoint(runStart)!=Acad::eOk){failed=L"kanal se ne može skratiti";break;}
+        }
+        // T komad at a free end: the duct ends at the T komad inlet, no new piece, the outlet stays free (čep)
+        else if(y.fit==gc::AtLast){if(d->put_Lastpoint(runStart)!=Acad::eOk){failed=L"kanal se ne može skratiti / produžiti";break;}}
+        else if(y.fit==gc::AtFirst){if(d->put_FirstPoint(AcGePoint3d(y.runEnd.x,y.runEnd.y,d->FirstPoint.z))!=Acad::eOk){failed=L"kanal se ne može skratiti / produžiti";break;}}
+        else{failed=L"mjesto priključenja je preblizu kraju kanala";break;}
         d->recordGraphicsModified();
         // the T komad (TVS_WYE as TVS_WYE::add_new fills it, in the duct's space and transaction)
         TVS_WYE* w=new TVS_WYE();tvsOffsetProof::initialize(w);
@@ -320,7 +335,8 @@ inline void execute(UINT idd,double collar){
             if(tvsTeeData::write(w,r)!=Acad::eOk){failed=L"tip štucne nije upisan";break;}}
         w->recordGraphicsModified();
         if(y.teeType==tvsTee::Straight){const tvsTeeFit::Ports q=tvsTeeFit::ports(w);   // TK0: the TVS ports must be where the ducts go (stucna: tapRun, GrilleConnect.h)
-         if(!q.ok||tvsTeeFit::planDistance(q.p[0],runStart)>tol||tvsTeeFit::planDistance(q.p[1],runEnd)>tol||tvsTeeFit::planDistance(q.p[2],branchPort)>tol){
+         const AcGePoint3d inlet(y.runStart.x,y.runStart.y,z),outlet(y.runEnd.x,y.runEnd.y,z);
+         if(!q.ok||tvsTeeFit::planDistance(q.p[0],inlet)>tol||tvsTeeFit::planDistance(q.p[1],outlet)>tol||tvsTeeFit::planDistance(q.p[2],branchPort)>tol){
             failed=L"priključci T komada ne odgovaraju kanalu";break;}}
         // the stub: straight duct of the branch size, same level as the duct
         TVS_Pipe* s=tvsEquipmentLinkCmd::newPiece(d,branchPort);
@@ -340,5 +356,6 @@ inline void execute(UINT idd,double collar){
     const wchar_t* how=c.method==gc::Tee?L"ravni T komad (TK0)":c.method==gc::Cone?L"konusna štucna SR5-12":dg.round?L"štucna SR5-11":L"štucna SR5-3";
     acutPrintf(L"\nTVS_RESETKA: rešetka „%ls“ priključena %ls na kanal %ls – %ls, ogranak %ls mm dužine %.0f mm; blok na kraju ogranka (U vraća sve).",
         name.c_str(),c.side==gc::Left?L"lijevo":L"desno",size.GetString(),how,branch.GetString(),dg.lengthMm);
+    if(y.fit!=gc::Split)acutPrintf(L"\n  T komad je na slobodnom kraju kanala: kanal završava na ulazu T komada, prolazni izlaz ostaje slobodan (čep).");
 }
 }
