@@ -13,6 +13,8 @@
 //   dionica as every row; terminal: no zeta, its dp in H (value), "Dp kraj. elem." of the dionica
 //   = that cell and its tag is the end label in Sema. "Za ventilator": the reserve is not applied
 //   to "Dp kraj. elem." (max over the rows of (cum - kraj) * (1 + rez) + kraj).
+//   Resetka na dnu: its tap junction rows (branch / prolaz) have Izvor "Idelchik" like the other
+//   Idelchik T rows, the grille row "Oprema"; in Sema the branch is a short stub with the tag.
 #include "PressureDrop.h"
 #include <string>
 #include <vector>

@@ -154,6 +154,47 @@ int main(int argc,char** argv){
         n6[6].parts[0].equipment.model=tvsEquipment::NoLoss;Result u=calc.run(n6,0);tvsSheet::Workbook w7=tvsSheet::build(u,in6,o);
         yes(u.f.size()==3&&!u.f[2].ok&&w7.sheets[0].at(13,tvsSheet::cTerm)==L"0","no model: typed");
     }
+    {   // resetka na dnu (Bottom): duct 400x200 -> tap junction 80 mm before the closed end -> grille R-01
+        //  (neck 300x100, FixedDp 15 Pa, 400 m3/h) as FlowCommand.h splitBottom builds it; the closed end left (dropDeadEnds)
+        auto bottomNet=[](bool goesOn){std::vector<Element> n;
+            n.push_back(one(duct(400,200,false,2919.8,XY(0,0),XY(2919.8,0)),goesOn?700:400,-1,0,-1,{XY(0,0),XY(2919.8,0)}));
+            Part tp;tp.kind=BottomTap;tp.sections={Section(400,200,false),Section(400,200,false),Section(300,100,false)};
+            n.push_back(one(tp,goesOn?700:400,0,0,1,{XY(2919.8,0),XY(2920.2,0),XY(2920,0)}));
+            Part g;g.kind=Equipment;g.equipment.kind=tvsEquipment::Grille;g.equipment.ports=1;g.equipment.mount=tvsEquipment::Bottom;g.equipment.model=tvsEquipment::FixedDp;
+            g.equipment.dp=15;g.equipment.tag=L"R-01";g.equipment.a=400;g.equipment.b=200;g.equipment.neckA=300;g.equipment.neckB=100;g.sections.assign(1,Section(300,100,false));g.line={XY(2920,0)};
+            n.push_back(one(g,400,1,0,2,{XY(2920,0)}));
+            if(goesOn){n.push_back(one(duct(400,200,false,2079.8,XY(2920.2,0),XY(5000,0)),300,1,0,1,{XY(2920.2,0),XY(5000,0)}));
+                Part h=g;h.equipment.mount=tvsEquipment::AtEnd;h.equipment.tag=L"R-02";h.equipment.dp=10;h.sections.assign(1,Section(400,200,false));h.line={XY(5000,0)};
+                n.push_back(one(h,300,3,0,1,{XY(5000,0)}));}
+            return n;};
+        for(int ex=0;ex<2;++ex){Options ob;ob.exhaust=ex==1;Calculator cb(&e,ob);const std::vector<Element> n=bottomNet(false);Result t=cb.run(n,0);
+            yes(t.d.size()==2,"bottom: duct + zero-length branch");
+            if(t.d.size()!=2)continue;
+            yes(t.d[0].to==L"T1"&&!t.d[0].terminal&&t.d[1].from==L"T1"&&t.d[1].to==L"K1"&&t.d[1].terminal&&t.d[1].tag==L"R-01","bottom: tap is a T node, grille the end");
+            eq(t.d[1].length,0,"bottom: branch without length");yes(t.d[1].s.a==300&&t.d[1].s.b==100,"bottom: branch = neck");eq(t.d[1].flow,400,"bottom: grille flow");
+            int idel=0,grille=0;
+            for(size_t k=0;k<t.f.size();++k){const Fitting& f=t.f[k];
+                if(f.key==L"Idelchik"){++idel;yes(f.dionica==1&&f.what.find(L"ogranak")!=std::wstring::npos&&f.ok,"bottom: branch loss on the grille dionica");
+                    yes(f.note.find(L"\u010Dep")!=std::wstring::npos&&f.note.find(ex?L"1.7":L"0.7")!=std::wstring::npos&&f.note.find(L"R-01")!=std::wstring::npos,"bottom: note (cep, table, tag)");
+                    const double vc=400/3600.0/0.08,pvc=0.6*vc*vc,beta=0.03/0.08;
+                    eq(f.dp,(ex?idelchikBranch(1.0,beta):idelchikDivBranch(1.0,beta))*pvc,"bottom: Idelchik branch on Vc");
+                    eq(f.zeta,f.dp/t.d[1].pd,"bottom: zeta on the neck pd");}
+                if(f.equipment){++grille;yes(f.terminal&&f.tag==L"R-01"&&f.dionica==1&&f.dp==15,"bottom: grille own loss, terminal");}}
+            yes(idel==1&&grille==1&&t.f.size()==2,"bottom: closed end has no row");
+            bool stub=false;for(size_t k=0;k<t.lines.size();++k)if(t.lines[k].dionica==1&&std::fabs(std::hypot(t.lines[k].b.x-t.lines[k].a.x,t.lines[k].b.y-t.lines[k].a.y)-300)<1e-6)stub=true;
+            yes(stub,"bottom: schematic stub");
+            tvsSheet::Info ib;tvsSheet::Workbook wbb=tvsSheet::build(t,ib,ob);const tvsSheet::Sheet& fb=wbb.sheets[1];
+            yes(fb.at(2,6)==L"'Idelchik"&&fb.at(3,6)==L"'Oprema"&&fb.at(3,2)==L"'Re\u0161etka","bottom: Fitinzi Izvor Idelchik / Oprema");
+            yes(wbb.sheets[0].at(13,tvsSheet::cTerm)==L"=Fitinzi!$H$3","bottom: dp kraj. elem. = the grille row");
+            bool label=false;for(size_t k=0;k<wbb.sheets[2].labels.size();++k)label|=wbb.sheets[2].labels[k].text==L"R-01";yes(label,"bottom: Sema tag");}
+        {   // the duct goes on to a grille at its end: straight loss on the dionica behind the tap
+            const std::vector<Element> n=bottomNet(true);Result t=calc.run(n,0);
+            yes(t.d.size()==3&&t.d[1].flow==400&&t.d[1].tag==L"R-01"&&t.d[2].flow==300&&t.d[2].tag==L"R-02","bottom on: dionice (larger flow first)");
+            int legs=0;for(size_t k=0;k<t.f.size();++k)if(t.f[k].key==L"Idelchik"){++legs;const double vc=700/3600.0/0.08,pvc=0.6*vc*vc;
+                if(t.f[k].what.find(L"prolaz")!=std::wstring::npos){std::printf("dio %d %ls\n",t.f[k].dionica,t.f[k].note.c_str());yes(t.f[k].dionica==2&&t.f[k].note.find(L"\u010Dep")==std::wstring::npos,"bottom on: straight on the duct on");eq(t.f[k].dp,idelchikDivStraight(3.0/7)*pvc,"bottom on: 0.6 on Vs/Vc");}
+                else{yes(t.f[k].dionica==1,"bottom on: branch");eq(t.f[k].dp,idelchikDivBranch(4.0/7,0.375)*pvc,"bottom on: 0.7 on Qb/Qc");}}
+            yes(legs==2,"bottom on: two legs");}
+    }
     // exhaust: transition keys turn
     yes(transitionKey(true,Section(400,300,false),Section(500,300,false))=="ER4-1","exhaust ER4-1");
     yes(transitionKey(false,Section(250,0,true),Section(400,300,false))=="SR4-3"&&transitionKey(false,Section(400,300,false),Section(250,0,true))=="SD4-2","shape change keys");

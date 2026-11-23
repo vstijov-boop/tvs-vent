@@ -80,4 +80,22 @@ inline Result solve(const std::vector<Element>& e,int root,int rootPort,double t
     for(size_t k=0;k<order.size();++k)r.entry[order[k]]=entry[order[k]];
     return r;
 }
+// Pieces of a duct split at a resetka na dnu (TVS_Ventilation_ARX/FlowCommand.h splitBottom) carry
+// no flow of their own: a reached piece with nothing further on (not the root) is the closed end
+// beyond the grille - it leaves the network (like the capped leg of a T komad: no flow, no terminal,
+// its parent's port is not "open"). piece[i] != 0 marks the pieces.
+inline void dropDeadEnds(Result& r,const std::vector<char>& piece,int root){
+    if(r.error!=Ok)return;
+    const size_t n=r.reached.size();
+    std::vector<int> kids(n,0);for(size_t i=0;i<n;++i)if(r.reached[i]&&r.parent[i]>=0)++kids[r.parent[i]];
+    std::vector<char> drop(n,0);bool any=false;
+    for(size_t i=0;i<n&&i<piece.size();++i)if(piece[i]&&r.reached[i]&&static_cast<int>(i)!=root&&kids[i]==0){drop[i]=1;any=true;}
+    if(!any)return;
+    for(size_t i=0;i<n;++i)if(drop[i]){r.reached[i]=0;r.parent[i]=-1;r.entry[i]=-1;r.via[i]=-1;}
+    std::vector<int> order,terminals;std::vector<std::pair<int,int> > open;
+    for(size_t k=0;k<r.order.size();++k)if(!drop[r.order[k]])order.push_back(r.order[k]);
+    for(size_t k=0;k<r.terminals.size();++k)if(!drop[r.terminals[k]])terminals.push_back(r.terminals[k]);
+    for(size_t k=0;k<r.open.size();++k)if(!drop[r.open[k].first])open.push_back(r.open[k]);
+    r.order.swap(order);r.terminals.swap(terminals);r.open.swap(open);
+}
 }

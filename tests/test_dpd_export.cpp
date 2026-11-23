@@ -121,8 +121,34 @@ int main(int argc,char** argv){
      // untagged: prefix-nn
      q[1].parts[0].equipment.tag.clear();const std::vector<tvsDpd::Segment> su=tvsDpd::segments(q,rq,false);
      if(su.size()==2&&su[0].equipment.size()==1)same(su[0].equipment[0].oznaka,"RP-01","generated tag");}
+    // resetka na dnu: duct 400x200 -> tap junction (FlowCommand.h splitBottom) -> grille R-01 (neck 300x100,
+    // FixedDp 15 Pa, 400 m3/h) as a short vertical branch; closed end beyond it (b) / the duct goes on to R-02 (c)
+    std::string jb,jc;
+    for(int on=0;on<2;++on){std::vector<Element> n;
+        n.push_back(one(duct(400,200,false,XY(0,0),XY(2919.8,0)),on?700:400,-1,0,-1,{XY(0,0),XY(2919.8,0)}));
+        Part tp;tp.kind=BottomTap;tp.sections={Section(400,200,false),Section(400,200,false),Section(300,100,false)};if(!on)tp.length=80;   // closed end 80 mm (DpdExportCommand.h)
+        n.push_back(one(tp,on?700:400,0,0,1,{XY(2919.8,0),XY(2920.2,0),XY(2920,0)}));
+        Part g;g.kind=Equipment;g.equipment.kind=tvsEquipment::Grille;g.equipment.ports=1;g.equipment.mount=tvsEquipment::Bottom;g.equipment.model=tvsEquipment::FixedDp;
+        g.equipment.dp=15;g.equipment.tag=L"R-01";g.equipment.a=400;g.equipment.b=200;g.equipment.neckA=300;g.equipment.neckB=100;g.sections.assign(1,Section(300,100,false));
+        n.push_back(one(g,400,1,0,2,{XY(2920,0)}));
+        if(on){n.push_back(one(duct(400,200,false,XY(2920.2,0),XY(5000,0)),300,1,0,1,{XY(2920.2,0),XY(5000,0)}));
+            Part h=g;h.equipment.mount=tvsEquipment::AtEnd;h.equipment.tag=L"R-02";h.equipment.dp=10;h.sections.assign(1,Section(400,200,false));
+            n.push_back(one(h,300,3,0,1,{XY(5000,0)}));}
+        const Result rn=calc.run(n,0);std::vector<std::wstring> w;const std::vector<tvsDpd::Segment> sn=tvsDpd::segments(n,rn,false,&w);
+        yes(w.size()==(on?0u:1u),"bottom: warning for the closed end only");yes(sn.size()==3,"bottom: pieces");
+        if(sn.size()<3)continue;
+        same(sn[0].to,"T1","bottom: node on the duct");eq(sn[0].dx,2.92,"bottom: node at the tap point",1e-9);eq(sn[0].q,on?700:400,"bottom: Q before");
+        const tvsDpd::Segment& b=sn[on?1:2];
+        same(b.from,"T1","bottom: branch from the node");eq(b.dx,0,"branch dx");eq(b.dy,0,"branch dy");eq(b.dz,-0.1,"branch down 0.10 m");
+        eq(b.w,300,"branch W = neck");eq(b.h,100,"branch H = neck");eq(b.q,400,"branch Q = grille");
+        yes(b.equipment.size()==1&&b.equipment[0].terminal&&b.equipment[0].pos==1&&b.equipment[0].oznaka=="R-01"&&b.equipment[0].tip=="resetka"&&b.equipment[0].value==15,"bottom: grille at the free end");
+        if(on){eq(sn[2].dx,2.08,"bottom on: the duct on",1e-9);same(sn[2].from,"T1","bottom on: from the node");eq(sn[2].q,300,"bottom on: Q");}
+        else{const tvsDpd::Segment& c=sn[1];same(c.from,"T1","closed end from the node");same(c.to,"Z1","closed end node");eq(c.dx,0.08,"closed end as drawn",1e-12);eq(c.q,0,"closed end Q = 0");yes(c.equipment.empty()&&c.w==400&&c.h==200,"closed end: the duct");}
+        tvsDpd::System sb;sb.name=on?"Resetka na dnu - nastavak":"Resetka na dnu";sb.segments=sn;(on?jc:jb)=tvsDpd::json(sb);}
+    yes(has(jb,"\"smjer\": [0, 0, -0.1]"),"bottom: smjer JSON");
     if(argc>=3){write(argv[1],j);write(argv[2],k);}
     if(argc>=4)write(argv[3],jo);
+    if(argc>=6){write(argv[4],jb);write(argv[5],jc);}
     if(fails){std::printf("%d FAIL\n",fails);return 1;}
     std::printf("OK\n");return 0;
 }

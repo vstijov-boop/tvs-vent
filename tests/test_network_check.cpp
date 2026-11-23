@@ -33,5 +33,16 @@ int main(){
      v[1].s[1].b=200;v[2].x[0]=1403;check(v,1,r);assert(count(r,Equipment)==1&&std::fabs(r[0].value-3)<1e-6&&count(r,Miss)==0);   // 3 mm gap
      v[2].x[0]=1400;v[1].s[0].elevation=2700;check(v,1,r);assert(count(r,Equipment)==1&&r[0].x==1000);          // other level
      v[1].s[0].elevation=2850;v.erase(v.begin()+2);v.erase(v.begin());v.push_back(duct(0,0,3000,0,400,200,2850));check(v,1,r);assert(count(r,Equipment)==2);}   // duct under the block
+    // terminal at the vertical outlet of a koljeno gore / dolje: compared with the outlet's level
+    {Item el;el.kind=0;el.x={1000,1300};el.y={0,0};Section s;s.a=400;s.b=200;s.elevation=2850;s.known=true;el.s={s,s};
+     Item t;t.kind=5;t.x={1300};t.y={0};Section q=s;q.known=false;q.elevation=2550;t.s={q};
+     std::vector<Item> v={duct(0,0,1000,0,400,200,2850),el,t};check(v,1,r);assert(count(r,Equipment)==1&&!r[0].bottom);   // the axis level: not there
+     v[1].s[1].vertical=true;v[1].s[1].outlet=2550;check(v,1,r);assert(r.empty());}
+    // resetka na dnu: port on the duct axis, inside the duct (80 mm before the closed end): fine
+    {Item g;g.kind=5;g.bottom=true;g.x={2920};g.y={0.4};Section s;s.a=400;s.b=200;s.elevation=2850;g.s={s};
+     std::vector<Item> v={duct(0,0,3000,0,400,200,2850),g};check(v,1,r);assert(r.empty());
+     v[1].y[0]=3;check(v,1,r);assert(count(r,Equipment)==1&&r[0].bottom&&r[0].b==0&&std::fabs(r[0].value-3)<1e-9);   // 3 mm off the axis
+     v[1].y[0]=0;v[1].x[0]=3000;check(v,1,r);assert(count(r,Equipment)==1&&r[0].bottom);                              // at the end: not a bottom grille
+     v[1].x[0]=1500;v[1].y[0]=400;check(v,1,r);assert(count(r,Equipment)==1&&r[0].b==-1&&r[0].value==0);}            // far from any duct
     std::puts("network check OK");return 0;
 }

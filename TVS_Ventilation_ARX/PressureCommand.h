@@ -2,7 +2,7 @@
 // TVS_PAD: pad pritiska po dionicama u Excel. The network from the end at the unit (as TVS_PROTOK;
 // flows summed from the terminals, nothing is written into the drawing), split into dionice with
 // friction and the ASHRAE fittings (geometry/PressureDrop.h; linked oprema: the loss of its record,
-// terminals in "Δp kraj. elem."), then the workbook
+// terminals in "Δp kraj. elem."; rešetka na dnu: a zero-length branch with the Idelchik T), then the workbook
 // (geometry/PressureSheet.h) is built in Excel (ExcelWriter.h): Dionice, Fitinzi, Sema.
 //   ASHRAE data: the user's DuctPressDrop folder ashrae_data (Constants / Equation / Output /
 //   Input.csv, tables\*.TBL), chosen once by picking its Equation.csv (registry Software\TVS_Vent,
@@ -47,6 +47,9 @@ inline tvsPressure::Section section(const tvsMoveNetwork::Section& s,double f){r
 inline tvsPressure::XY xy(const tvsMoveGeometry::Point& p,double f){return tvsPressure::XY(p.x*f,p.y*f);}
 // one drawing element as a part (sizes in mm)
 inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
+    if(n.kind==tvsEquipmentFlow::tapKind()){   // rešetka na dnu: the tap junction (FlowCommand.h splitBottom), not in the drawing
+        for(size_t k=0;k<n.sections.size();++k)t.sections.push_back(section(n.sections[k],f));
+        t.kind=tvsPressure::BottomTap;return true;}
     AcDbObjectPointer<AcDbEntity> e(n.id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)return false;
     for(size_t k=0;k<n.sections.size();++k)t.sections.push_back(section(n.sections[k],f));
     for(size_t k=0;k<n.ports.size();++k)t.line.push_back(xy(n.ports[k],f));
@@ -84,21 +87,11 @@ inline void execute(){
     AcDbObjectId pickedId;if(acdbGetObjectId(pickedId,picked)!=Acad::eOk)return;
     tvsFlow::Net net;
     if(!tvsFlow::read(db,tol,net)){acutPrintf(L"\nTVS_PAD: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
-    int root=-1;for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==pickedId)root=net.owner[i];
-    if(root<0||net.bodies[root].ports.empty()){acutPrintf(L"\nTVS_PAD: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
     ads_point w;if(tvsCoordinates::transformPoint(at,1,0,w)!=RTNORM)return;
-    int port=-1;double nearest=0;
-    for(size_t p=0;p<net.bodies[root].ports.size();++p){const double d=std::hypot(net.bodies[root].ports[p].x-w[0],net.bodies[root].ports[p].y-w[1]);if(port<0||d<nearest){port=static_cast<int>(p);nearest=d;}}
+    int root=-1,port=-1;   // a split duct (rešetka na dnu): the piece with the nearest end
+    if(!tvsFlow::rootOf(net,pickedId,w[0],w[1],root,port)){acutPrintf(L"\nTVS_PAD: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
     std::vector<tvsFlowNetwork::Element> el;tvsFlow::elements(net,el);
-    // koljeno gore / dolje: its ports carry the elevation in z, the duct ends often do not; joined
-    // when they meet in plan (only these elbows, only for this calculation)
-    for(size_t i=0;i<net.bodies.size()&&i<el.size();++i){
-        int only=-1,count=0;for(size_t j=0;j<net.nodes.size();++j)if(net.owner[j]==static_cast<int>(i)){only=static_cast<int>(j);++count;}
-        if(count!=1)continue;
-        {AcDbObjectPointer<TVS_TAP> t(net.nodes[only].id,AcDb::kForRead);if(t.openStatus()!=Acad::eOk||t->get_Form()==Form_Direct)continue;}
-        for(size_t p=0;p<el[i].ports.size();++p){bool done=false;
-            for(size_t k=0;k<el.size()&&!done;++k){if(k==i)continue;
-                for(size_t q=0;q<el[k].ports.size();++q){if(std::hypot(el[k].ports[q].x-el[i].ports[p].x,el[k].ports[q].y-el[i].ports[p].y)<=tol&&std::fabs(el[k].ports[q].z-el[i].ports[p].z)>tol){el[i].ports[p].z=el[k].ports[q].z;done=true;break;}}}}}
+    tvsFlow::verticalJoints(net,el,tol);   // koljeno gore / dolje: joined with the duct in plan (its ports carry the elevation in z)
     tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
     tvsFlow::equipmentFlows(net,el,r,root,port,tol,L"TVS_PAD");   // oprema: terminal flows from the records
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}

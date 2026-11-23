@@ -24,6 +24,13 @@
 //   like an elbow (no new dionica, no length), tvsEquipment::loss at the flow of the dionica and the
 //   pd of the duct at its inlet port; terminal (1 port) ends the dionica, its loss is the "dp kraj.
 //   elem." of that dionica (no zeta, no reserve) and its tag labels the end in the schematic.
+//   Resetka na dnu (tvsEquipment::Bottom): the readers split the duct at the tap point; the tap
+//   junction (part BottomTap, ports 0 / 1 the duct run, 2 the neck) is a node like a T komad, the
+//   grille is a zero-length branch dionica (section = neck). Loss as the KanCalc / Idelchik sharp T:
+//   supply diverging 0.7 / 0.6, exhaust converging 1.7 / 1.6 (branch = neck, Qb = the grille's flow,
+//   straight = the duct on), C on Vc; the closed end beyond the last grille is the capped prolaz
+//   (cep, no row). The grille's own loss is its terminal "dp kraj. elem."; in the schematic the
+//   branch is a short stub across the duct (tapStub) with the grille's tag.
 #include "AshraeEngine.h"
 #include "Equipment.h"
 #include <cmath>
@@ -34,11 +41,11 @@
 namespace tvsPressure {
 struct Section {double a,b;bool round;Section():a(0),b(0),round(false){}Section(double x,double y,bool r):a(x),b(y),round(r){}};
 struct XY {double x,y;XY():x(0),y(0){}XY(double a,double b):x(a),y(b){}};
-enum PartKind {Other=0,Duct=1,Elbow=2,Transition=3,Tee=4,Equipment=5};
+enum PartKind {Other=0,Duct=1,Elbow=2,Transition=3,Tee=4,Equipment=5,BottomTap=6};   // BottomTap: resetka na dnu (see above)
 enum TeeType {TeePlain=0,TeeBranch=1,TeePants=2,TeeTap=3};   // TK0, TK-O, TK-G, stucna (TeeData.h)
 struct Part {
     int kind;bool flex;
-    double length;        // mm: duct, prelaz; elbow: the axis arc (computed when 0)
+    double length;        // mm: duct, prelaz; elbow: the axis arc (computed when 0); BottomTap: the closed duct end beyond it (DPD export, 0 none)
     double angle,radius;  // elbow: deflection (deg), axis radius (mm)
     int tee;              // TeeType
     bool cone;            // stucna with a round conical branch (SR5-12)
@@ -226,17 +233,25 @@ public:
         for(size_t q=0;q<r.d.size();++q)fittings(e,kids,of,r,static_cast<int>(q));
         for(int i=0;i<n;++i){if(of[i]<0)continue;for(size_t p=0;p<e[i].parts.size();++p){const Part& t=e[i].parts[p];
             for(size_t k=1;k<t.line.size();++k){Line l;l.a=t.line[k-1];l.b=t.line[k];l.dionica=of[i];l.flex=t.flex;r.lines.push_back(l);}}}
+        for(size_t q=0;q<r.d.size();++q)if(bottomBranch(e,r.d[q])){Line l;l.a=r.d[q].fromAt;l.b=r.d[q].toAt;l.dionica=static_cast<int>(q);l.flex=false;r.lines.push_back(l);}
         return r;
     }
+    static double tapStub(){return 300;}   // mm: schematic stub of a resetka na dnu (plan, across the duct)
 private:
     tvsAshrae::Engine* eng_;Options o_;
     static bool flexOf(const Element& x){return !x.parts.empty()&&x.parts[0].flex;}
     static bool isTransition(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Transition;}
     static bool isTee(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Tee;}
     static bool isEquipment(const Element& x){return x.parts.size()==1&&x.parts[0].kind==Equipment;}
+    static bool isTap(const Element& x){return x.parts.size()==1&&x.parts[0].kind==BottomTap&&x.ports.size()==3&&x.at.size()==3;}
+    // the branch dionica of a resetka na dnu: the grille alone, right behind its tap junction
+    static bool bottomBranch(const std::vector<Element>& e,const Dionica& d){
+        if(d.elements.size()!=1)return false;const Element& x=e[d.elements[0]];
+        return isEquipment(x)&&x.parent>=0&&x.parent<static_cast<int>(e.size())&&isTap(e[x.parent])&&x.via==2;
+    }
     static const Section& port(const Element& x,int p){static const Section none;return p>=0&&p<static_cast<int>(x.ports.size())?x.ports[p]:none;}
     static bool startsNew(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,int p,int c){
-        if(kids[p].size()>1||isTee(e[p])||isTransition(e[p]))return true;   // a T komad is always a node, also with one free port (cep)
+        if(kids[p].size()>1||isTee(e[p])||isTap(e[p])||isTransition(e[p]))return true;   // a T komad is always a node, also with one free port (cep); so is a resetka na dnu
         if(isEquipment(e[c]))return false;   // oprema: a local loss inside the dionica (like an elbow)
         // after oprema: compare with the element before it (flex / section of the duct it sits in)
         int up=p,via=e[c].via;const int n=static_cast<int>(e.size());
@@ -258,10 +273,14 @@ private:
     void nodes(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,Result& r)const{
         int t=0,p=0,k=0;
         for(size_t q=0;q<r.d.size();++q){Dionica& d=r.d[q];const int last=d.elements.back();const Element& x=e[last];wchar_t name[16];
-            if(d.children.empty()&&!isTee(x)){swprintf(name,16,L"K%d",++k);for(size_t j=0;j<x.at.size();++j)if(static_cast<int>(j)!=x.entry){d.toAt=x.at[j];break;}
+            if(d.children.empty()&&!isTee(x)&&!isTap(x)){swprintf(name,16,L"K%d",++k);for(size_t j=0;j<x.at.size();++j)if(static_cast<int>(j)!=x.entry){d.toAt=x.at[j];break;}
                 if(x.at.size()==1)d.toAt=x.at[0];   // terminal oprema: its one port
-                if(isEquipment(x))d.tag=x.parts[0].equipment.tag;}
-            else if(kids[last].size()>1||isTee(x)){swprintf(name,16,L"T%d",++t);XY c;for(size_t j=0;j<x.at.size();++j){c.x+=x.at[j].x/x.at.size();c.y+=x.at[j].y/x.at.size();}d.toAt=c;}
+                if(isEquipment(x))d.tag=x.parts[0].equipment.tag;
+                if(bottomBranch(e,d)){const Element& t=e[x.parent];   // stub across the duct from the tap point
+                    double ux=t.at[1].x-t.at[0].x,uy=t.at[1].y-t.at[0].y;const double l=std::hypot(ux,uy);if(l>0){ux/=l;uy/=l;}else{ux=1;uy=0;}
+                    XY c;for(size_t j=0;j<t.at.size();++j){c.x+=t.at[j].x/t.at.size();c.y+=t.at[j].y/t.at.size();}
+                    d.toAt=XY(c.x+uy*tapStub(),c.y-ux*tapStub());}}
+            else if(kids[last].size()>1||isTee(x)||isTap(x)){swprintf(name,16,L"T%d",++t);XY c;for(size_t j=0;j<x.at.size();++j){c.x+=x.at[j].x/x.at.size();c.y+=x.at[j].y/x.at.size();}d.toAt=c;}
             else{swprintf(name,16,L"P%d",++p);const Element& y=e[kids[last][0]];if(y.entry>=0&&y.entry<static_cast<int>(y.at.size()))d.toAt=y.at[y.entry];}
             d.to=name;}
         for(size_t q=0;q<r.d.size();++q){Dionica& d=r.d[q];
@@ -308,6 +327,7 @@ private:
                     add(r,q,i,L"Prelaz",dimText(a)+L" \u2192 "+dimText(b),a,key,in,false,0);}
                 else if(t.kind==Tee&&x.parts.size()==1)junction(e,kids,of,r,i);
                 else if(t.kind==Equipment&&x.parts.size()==1)equipment(e,r,q,i);
+                else if(t.kind==BottomTap&&isTap(x))bottomTap(e,kids,of,r,i);
                 else if(t.kind==Other)r.warnings.push_back(L"element bez prora\u010Duna (dionica "+std::to_wstring(d.number)+L")");}}
     }
     // Oprema: tvsEquipment::loss at the flow of the element and the pd of the duct at its inlet (the
@@ -340,6 +360,40 @@ private:
         else more(L"Q = 0 \u2013 unesite \u03B6");
         if(f.terminal&&f.ok)more(L"u \u0394p kraj. elem. (bez rezerve)");
         r.f.push_back(f);
+    }
+    // Resetka na dnu: the tap junction (ports 0 / 1 the duct, 2 the neck); common = the run port
+    // towards the unit. KanCalc / Idelchik sharp T on Vc of the common duct: supply diverging
+    // (0.7 branch on Qb/Qc and Ab/Ac, 0.6 straight on Vs/Vc), exhaust converging (1.7 / 1.6). The
+    // branch loss goes to the grille's dionica, the straight loss to the dionica of the duct on; no
+    // duct on (closed end) = capped prolaz, no row.
+    void bottomTap(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,const std::vector<int>& of,Result& r,int i){
+        const Element& x=e[i];
+        double q[3]={0,0,0};int child[3]={-1,-1,-1};
+        for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];if(e[c].via>=0&&e[c].via<3){q[e[c].via]=e[c].flow;child[e[c].via]=c;}}
+        if(x.entry!=0&&x.entry!=1){   // the unit behind the grille
+            for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];
+                add(r,of[c],i,L"Re\u0161etka na dnu",L"ulaz kroz re\u0161etku \u2013 nestandardno",port(x,e[c].via),std::string(),std::map<std::string,double>(),false,0);}
+            return;}
+        const int straight=1-x.entry,branch=2;
+        const Section& common=port(x,x.entry);const Section& br=port(x,branch);
+        const double ac=area(common),beta=ac>0?area(br)/ac:0;
+        const double vc=ac>0?x.flow/3600.0/ac:0,pvc=o_.rho*vc*vc/2,q2=x.flow>0?q[branch]/x.flow:0;
+        const double as=area(port(x,straight)),vs=as>0?q[straight]/3600.0/as:0,vsvc=vc>0?vs/vc:0;
+        const std::wstring capped=child[straight]<0?L", kraj kanala zatvoren (\u010Dep)":L"";
+        std::wstring tag;if(child[branch]>=0&&isEquipment(e[child[branch]]))tag=e[child[branch]].parts[0].equipment.tag;
+        const int legs[2]={branch,straight};
+        for(int k=0;k<2;++k){const int leg=legs[k],c=child[leg];if(c<0)continue;const bool main=leg==straight;
+            const double cc=o_.exhaust?(main?idelchikStraight(q2):idelchikBranch(q2,beta)):(main?idelchikDivStraight(vsvc):idelchikDivBranch(q2,beta));
+            Fitting f;f.dionica=of[c];f.element=i;f.what=main?L"Re\u0161etka na dnu \u2013 prolaz":L"Re\u0161etka na dnu \u2013 ogranak";f.dim=dimText(port(x,leg));
+            f.key=L"Idelchik";f.c=cc;f.dp=cc*pvc;f.ok=std::isfinite(f.dp);const double pd=r.d[f.dionica].pd;f.zeta=pd>0&&f.ok?f.dp/pd:0;
+            wchar_t t2[96];swprintf(t2,96,L", Ab/Ac = %.2f, Qb/Qc = %.2f",beta,q2);for(wchar_t* z=t2;*z;++z)if(*z==L'.')*z=L',';
+            f.note=(tag.empty()?std::wstring():tag+L", ")+L"odvajanje u dnu kanala, "+(main?L"prolaz":L"ogranak = priklju\u010Dak re\u0161etke")+capped+t2
+                +(o_.exhaust?L"; Idelchik o\u0161tar T, sabiranje (tabela kao KanCalc 1.7 / 1.6), C na Vc":L"; Idelchik o\u0161tar T, razdvajanje (tabela kao KanCalc 0.7 / 0.6), C na Vc");
+            const double top=o_.exhaust?1.0:0.8;
+            if(beta<0.1||beta>top)f.note+=o_.exhaust?L"; Ab/Ac van tabele 0,1\u20131,0 \u2013 uzeta granica":L"; Ab/Ac van tabele 0,1\u20130,8 \u2013 uzeta granica";
+            if(!o_.exhaust&&!main&&(q2<0.1||q2>0.9))f.note+=L"; Qb/Qc van tabele 0,1\u20130,9 \u2013 uzeta granica";
+            if(main&&ac>0&&std::fabs(as/ac-1)>0.05)f.note+=L"; As \u2260 Ac \u2013 izvan formule, ra\u010Dunato kao As = Ac";
+            r.f.push_back(f);}
     }
     // Bullhead (ASHRAE SR5-15 / ER5-5 rectangular, SD5-19 / ED5-4 round): the common duct on the
     // T komad's ogranak, the two run ends are branches b1 (port 0) and b2 (port 1); C on each Vb.
