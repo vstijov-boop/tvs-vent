@@ -1,5 +1,16 @@
 ﻿# TVS_VENT – period testiranja (objedinjeno na master)
 
+## TVS_OPREMA – terminali po baznoj tački, koljeno dolje, rešetka na dnu kanala (novo, 23.11.) – testirati
+Opis: [OPREMA.md](OPREMA.md) (Pravila za terminale). Crtež sa primjerima korisnika (rešetka na kraju, bočna, na dnu kanala, difuzor na flexu, ventil ispod koljena dolje).
+- Kanal 250 → prelaz 250→450 → kanal 60 mm → blok rešetke (rot 90) sa baznom tačkom na kraju nastavka → `TVS_OPREMA` → povezan terminal, nastavak NIJE skraćen, priključak na kraju nastavka (Svojstva: 1 priključak, 450×…). Ranije: „kanal je cijeli ispod bloka“.
+- Bočna rešetka: T komad sa granom na stranu → nastavak ~63 mm → rešetka (bazna tačka na kraju) → isto kao gore.
+- Difuzor sa plenumom na kraju flexa → radi kao ranije (bez promjene).
+- Kanal → koljeno DOLJE na kraju → blok ventila (LVS-100) sa baznom tačkom u tački vertikalnog izlaza → povezan; kota priključka = kota izlaza (ispod ose kanala, TVS_PROVJERA / TVS_PAD da se vidi da je na mreži). Bazna tačka pomjerena 5 mm → odbijeno kao ranije.
+- Rešetka (blok bez zapisa) preko kanala, centrirana na osi → pitanje „Blok … preko kanala: [Dno/Linija] <Linija>“: Dno → kanal NIJE presječen, ispis „rešetki na dnu kanala: 1“ i poruka o priključku iz gabarita (npr. 489×190 mm); drugi blok istog naziva → bez pitanja. Linija → kanal presječen (kao ranije), sljedeći blok tog naziva bez pitanja. ESC na pitanju → prekid, ništa za taj blok.
+- Rešetka vrste „Rešetka“ (Primijeni na sve blokove ovog naziva) preko kanala → odmah na dno, priključak iz podrazumijevanog zapisa ako ga ima.
+- Blokovi bez podešene vrste → na kraju ispis naziva i „Podesiti vrstu sada? [Da/Ne] <Da>“ → Enter otvara Svojstva opreme za te blokove; Ne → poruka o TVS_OPREMA_SVOJSTVA.
+- Ponovno povezivanje (Da) rešetke na dnu → ostaje na dnu, priključak koji je imala ostaje.
+
 ## Oprema na mreži u proračunima (TVS_PAD, TVS_PROTOK, TVS_DPD_IZVOZ, TVS_DIM_PRATI, TVS_PROVJERA) – testirati
 Opis: [OPREMA.md](OPREMA.md). Priprema: mreža (dovod) sa povezanim blokovima (TVS_OPREMA): regulator protoka (model „katalog“ Δp 30 Pa pri 1800 m³/h), prigušivač buke (fiksni Δp 25 Pa), na kraju kanala / fleksa difuzor (ζ 2,5), još jedna grana sa rešetkom bez protoka.
 - **TVS_PROTOK**: protok difuzora iz opreme; rešetka bez protoka → zoom, „Rešetka – protok [m³/h]“ → upisuje se u blok (svojstva opreme), ne u kanal. Kanali iza regulatora / prigušivača dobijaju zbir kao do sada; inline oprema nema svoj protok. Kanal na kome je terminal ranije imao protok, a oprema nema → protok kanala prelazi u opremu. Oba upisana i različita → poruka „protok u opremi … na kanalu … uzet protok opreme“.

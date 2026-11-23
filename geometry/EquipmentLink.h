@@ -14,6 +14,13 @@
 //    the block (towards the duct), the block length along the axis (block extents projected on the
 //    axis, or fixedLength per block name centred on them);
 //  - or a refusal with a reason (reasonText). The block itself never moves.
+// Terminals by the base point (the 5-argument link, user's drawings 2026-11-23): a block that is
+// (or may be) a terminal whose INSERTION point lies on a free end - of a duct, flex hose, short stub
+// after a transition / tee branch, or the free vertical outlet of an elbow Gore / Dolje (Outlet) -
+// has its port there: nothing is trimmed, extended or cut and the block extents are not used
+// (a grille drawn over the last 60 mm of its stub, a diffuser drawn from the flex end on).
+// Grille in the bottom face (Options::bottom, kind terminal): block over a continuous duct, centre
+// on the axis -> mount Bottom: no cut, port[0] = the block centre projected on the axis, dir (0,0).
 // Units: points, levels and lengths in drawing units; duct sizes a / b in mm. Horizontal only.
 #include "Equipment.h"
 #include <cmath>
@@ -37,6 +44,9 @@ struct Duct {
     int partner[2];    // input index of a duct touching end 0 / 1 (-1: none)
     Duct():a(0),b(0),round(false),flex(false),level(0){others[0]=others[1]=0;partner[0]=partner[1]=-1;}
 };
+// Free vertical outlet of an elbow Gore / Dolje (TVS_TAP Form_Up / Form_Down) that nothing else
+// touches (the command checks that): centre in plan, outlet level, size of the elbow.
+struct Outlet {Pt at;double level;double a,b;bool round;Outlet():level(0),a(0),b(0),round(false){}};
 enum Expect {Any=0,Terminal=1,Inline=2};
 struct Options {
     double tol;         // duct end on a block face / same level (drawing units)
@@ -46,10 +56,11 @@ struct Options {
     double fixedLength; // > 0: block length along the axis (stored per block name)
     double sizeTolMm;   // same duct size on both sides
     int expect;         // Expect: from the kind stored for the block name (Any when none)
-    Options():tol(1),axisTol(25),gap(150),minPiece(50),fixedLength(0),sizeTolMm(1),expect(Any){}
+    bool bottom;        // a terminal over a continuous duct is a grille in its bottom face (else SideMounted)
+    Options():tol(1),axisTol(25),gap(150),minPiece(50),fixedLength(0),sizeTolMm(1),expect(Any),bottom(false){}
 };
 enum Error {Ok=0,BadBlock,NoDuct,OffAxis,Ambiguous,DifferentSize,DifferentLevel,GapTooLarge,TooShort,
-            DuctInside,NotFreeEnd,SideMounted,MissingSide,FlexCut,errorCount};
+            DuctInside,NotFreeEnd,SideMounted,MissingSide,FlexCut,FlexBottom,errorCount};
 enum Case {Touching=1,Adjust=2,Cut=3};
 const int NewPiece=-2;   // Result::duct of the port on the piece made by a cut
 struct EndEdit {int duct;int end;Pt to;double change;EndEdit():duct(-1),end(0),change(0){}};   // change > 0 extended, < 0 trimmed
@@ -67,8 +78,10 @@ struct Result {
     double offset;        // block centre from the axis
     int detailDuct;       // the duct a refusal is about (-1)
     double detail;        // the number behind a refusal (gap / piece length / offset)
+    int mount;            // tvsEquipment::AtEnd / Bottom (terminals)
+    int outlet;           // input index of the elbow outlet at the port (-1: a duct end / none)
     Result():error(Ok),ports(0),linkCase(0),ux(1),uy(0),length(0),cutDuct(-1),a(0),b(0),round(false),level(0),
-             offset(0),detailDuct(-1),detail(0){duct[0]=duct[1]=-1;}
+             offset(0),detailDuct(-1),detail(0),mount(tvsEquipment::AtEnd),outlet(-1){duct[0]=duct[1]=-1;}
 };
 
 inline const wchar_t* reasonText(int e){
@@ -86,6 +99,7 @@ inline const wchar_t* reasonText(int e){
     case SideMounted:return L"terminal nije na slobodnom kraju kanala (bo\u010dna ugradnja - kasnije)";
     case MissingSide:return L"oprema u liniji nema kanal sa druge strane";
     case FlexCut:return L"flex crijevo se ne sije\u010de";
+    case FlexBottom:return L"re\u0161etka na dnu flex crijeva nije podr\u017eana";
     default:return L"";
     }
 }
@@ -172,7 +186,16 @@ inline Result link(const std::vector<Pt>& block,const std::vector<Duct>& ducts,c
         for(size_t k=0;k<lefts.size();++k)if(lefts[k].hi>F0+o.tol){r.error=Ambiguous;r.detailDuct=lefts[k].i;return r;}
         for(size_t k=0;k<rights.size();++k)if(rights[k].lo<F1-o.tol){r.error=Ambiguous;r.detailDuct=rights[k].i;return r;}
         const Piece& p=spans[0];const Duct& d=ducts[p.i];
-        if(o.expect==Terminal){r.error=SideMounted;r.detailDuct=p.i;return r;}
+        if(o.expect==Terminal&&!o.bottom){r.error=SideMounted;r.detailDuct=p.i;return r;}
+        if(o.expect==Terminal){   // grille in the bottom face: tap under the block centre, no cut
+            if(d.flex){r.error=FlexBottom;r.detailDuct=p.i;return r;}
+            Pt c;for(size_t k=0;k<block.size();++k)c=add(c,block[k]);c=mul(c,1.0/block.size());
+            const Pt q=detail::onLine(d,c);
+            r.linkCase=Touching;r.mount=tvsEquipment::Bottom;r.ports=1;r.duct[0]=p.i;r.duct[1]=-1;
+            r.port[0].x=q.x;r.port[0].y=q.y;r.port[0].z=d.level;r.port[0].dx=0;r.port[0].dy=0;
+            r.a=d.a;r.b=d.round?0:d.b;r.round=d.round;r.level=d.level;
+            return r;
+        }
         if(d.flex){r.error=FlexCut;r.detailDuct=p.i;return r;}
         const double outL=F0-p.lo,outR=p.hi-F1;
         if(outL<o.minPiece||outR<o.minPiece){r.error=TooShort;r.detailDuct=p.i;r.detail=outL<outR?outL:outR;return r;}
@@ -232,5 +255,44 @@ inline Result link(const std::vector<Pt>& block,const std::vector<Duct>& ducts,c
     r.linkCase=r.edits.empty()?Touching:Adjust;
     if(sides==1){r.duct[1]=-1;}
     return r;
+}
+// Size of the footprint (side 0-1 x side 0-3: the block-local x / y extents in the drawing, scale
+// included) in mm, rounded to 1 mm - the neck of a bottom grille when nothing else gives it.
+inline void footprintMm(const std::vector<Pt>& block,double mmPerUnit,double& width,double& depth){
+    width=depth=0;if(block.size()<4)return;
+    width=std::floor(length(sub(block[1],block[0]))*mmPerUnit+0.5);depth=std::floor(length(sub(block[3],block[0]))*mmPerUnit+0.5);
+}
+// The base point rule first (see the top): `base` = the block's insertion point in plan, `outlets` =
+// free vertical elbow outlets. Not for Inline; for Any the extents decide when they find ducts on
+// both sides (an inline block whose base point happens to be on a duct end stays inline).
+// Otherwise (base point not on a free end) the extents logic above.
+inline Result link(const std::vector<Pt>& block,const Pt& base,const std::vector<Duct>& ducts,
+                   const std::vector<Outlet>& outlets,const Options& o){
+    if(o.expect!=Inline){
+        Result t;int found=0;
+        for(size_t i=0;i<ducts.size();++i)for(int e=0;e<2;++e){
+            const Duct& d=ducts[i];if(d.others[e]!=0)continue;
+            const Pt at=e==0?d.p0:d.p1;if(length(sub(at,base))>o.tol)continue;
+            const Pt v=e==0?sub(d.p0,d.p1):sub(d.p1,d.p0);const double l=length(v);if(l<=o.tol)continue;
+            ++found;t.detailDuct=static_cast<int>(i);
+            t.port[0].x=at.x;t.port[0].y=at.y;t.port[0].z=d.level;t.port[0].dx=-v.x/l;t.port[0].dy=-v.y/l;   // out of the block
+            t.ux=v.x/l;t.uy=v.y/l;t.duct[0]=static_cast<int>(i);t.outlet=-1;
+            t.a=d.a;t.b=d.round?0:d.b;t.round=d.round;t.level=d.level;
+        }
+        for(size_t k=0;k<outlets.size();++k){
+            const Outlet& w=outlets[k];if(length(sub(w.at,base))>o.tol)continue;
+            ++found;
+            t.port[0].x=w.at.x;t.port[0].y=w.at.y;t.port[0].z=w.level;t.port[0].dx=0;t.port[0].dy=0;   // vertical
+            t.ux=1;t.uy=0;t.duct[0]=-1;t.outlet=static_cast<int>(k);
+            t.a=w.a;t.b=w.round?0:w.b;t.round=w.round;t.level=w.level;
+        }
+        if(found>1){Result r;r.error=Ambiguous;r.detailDuct=t.detailDuct;return r;}
+        if(found==1){
+            if(o.expect==Any){const Result x=link(block,ducts,o);if(x.error==Ok&&x.ports==2)return x;}
+            t.error=Ok;t.ports=1;t.linkCase=Touching;t.mount=tvsEquipment::AtEnd;t.length=0;t.duct[1]=-1;t.detailDuct=-1;
+            return t;
+        }
+    }
+    return link(block,ducts,o);
 }
 }

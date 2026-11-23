@@ -20,6 +20,15 @@ Već nacrtani blokovi se povezuju NA MJESTU, blok se nikad ne pomjera:
 - `Sve` = svi blokovi trenutnog prostora koji leže na kanalu; xref blokovi se preskaču. Već povezani se preskaču, osim ako se odgovori `Da` na pitanje o ponovnom povezivanju.
 - `TVS_OPREMA_ODVEZI`: briše zapis iz izabranih blokova; kanali ostaju kakvi jesu.
 
+### Pravila za terminale (crteži korisnika, 23.11.)
+- **Bazna tačka na slobodnom kraju** (blok koji jeste ili može biti terminal – vrsta terminal ili bez zapisa): prvo se gleda TAČKA UMETANJA bloka. Ako u osnovi (1 mm) leži na slobodnom kraju kanala / flex crijeva / kratkog nastavka (npr. 60 mm iza prelaza 250→450 ili iza grane T komada), taj kraj je priključak: bez skraćivanja / produženja / sječenja, gabarit bloka se ne koristi (rešetka čiji okvir prekriva nastavak više nije „kanal je cijeli ispod bloka“). Kota = kota tog kanala. Bez zapisa: ako gabarit nađe kanale sa obje strane, blok ostaje u liniji.
+- **Vertikalni izlaz koljena gore / dolje** (TVS_TAP Form_Up / Form_Down, 90°) koji ništa drugo ne dodiruje je takođe slobodan kraj: priključak u tački izlaza u osnovi, kota = kota izlaza (Elev ∓ (R + B/2), okruglo R + A/2), smjer priključka (0, 0), dimenzija koljena. Primjer: ventil / difuzor LVS-100 ispod koljena dolje na kraju kanala.
+- Bazna tačka nije na slobodnom kraju → kao ranije (gabarit bloka: razmak / preklop / sječenje).
+- **Rešetka na dnu kanala** (mount Bottom): blok vrste terminal preko kontinualnog kanala, sredina na osi (25 mm) → kanal se NE siječe; priključak = projekcija sredine bloka na osu kanala (kota ose), smjer (0, 0), dimenzija = dimenzija kanala; priključak rešetke (na × nb) iz podrazumijevanog zapisa naziva ako ga ima, inače iz gabarita bloka (širina × dubina, mm) uz poruku da se provjeri u TVS_OPREMA_SVOJSTVA. Na flex crijevu odbijeno. Vrste u liniji i dalje sijeku kanal.
+- Blok naziva BEZ podrazumijevanog zapisa preko kontinualnog kanala: pitanje jednom po nazivu bloka „Blok <naziv> preko kanala: [Dno/Linija] <Linija>“; odgovor se pamti kao podrazumijevana vrsta naziva (Dno = Rešetka na dnu, Linija = Ostala oprema u liniji, `TVS_OPREMA_TIPOVI`).
+- Na kraju: ako su povezani blokovi čiji naziv nema podrazumijevani zapis (vrsta samo pretpostavljena), ispis naziva i pitanje „Podesiti vrstu sada? [Da/Ne] <Da>“ → Da otvara TVS_OPREMA_SVOJSTVA za te blokove.
+- Kod: `tvsEquipmentLink::link(block, base, ducts, outlets, o)` i `Options::bottom` (geometry/EquipmentLink.h), `elbowOutlets` (EquipmentLinkCommand.h), `tvsEquipmentDialog::run(idd, ids)`; test `tests/test_equipment_link.cpp` sa tačnim koordinatama iz korisnikovog crteža (nalazi 1–5).
+
 Kod: `geometry/EquipmentLink.h` (geometrija i odluka, test `tests/test_equipment_link.cpp`), `TVS_Ventilation_ARX/EquipmentLinkCommand.h` (komande).
 
 ## Oprema u proračunima mreže (TVS_PROTOK, TVS_PAD, TVS_DPD_IZVOZ, TVS_DIM_PRATI, TVS_PROVJERA)

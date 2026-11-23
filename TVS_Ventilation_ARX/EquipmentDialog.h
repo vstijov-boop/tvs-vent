@@ -184,9 +184,9 @@ inline bool pick(std::vector<AcDbObjectId>& ids){
     for(Adesk::Int32 i=0;i<n;++i){ads_name e;AcDbObjectId id;if(acedSSName(ss,i,e)==RTNORM&&acdbGetObjectId(id,e)==Acad::eOk)ids.push_back(id);}
     acedSSFree(ss);return !ids.empty();
 }
-inline void run(UINT idd){
-    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
-    std::vector<AcDbObjectId> ids;if(!pick(ids))return;
+// The given blocks (TVS_OPREMA: linked blocks whose name has no default kind yet).
+inline void run(UINT idd,const std::vector<AcDbObjectId>& ids){
+    AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db||ids.empty())return;
     std::vector<Item> items;int unlinked=0;
     for(size_t k=0;k<ids.size();++k){
         AcDbObjectPointer<AcDbBlockReference> ref(ids[k],AcDb::kForRead);if(ref.openStatus()!=Acad::eOk)continue;
@@ -252,5 +252,9 @@ inline void run(UINT idd){
     }
     acutPrintf(L"\nPromijenjeno blokova opreme: %d.",static_cast<int>(writes.size()));
     if(saved)acutPrintf(L"\nSvojstva sačuvana po nazivu bloka: %d (novi blokovi tog naziva ih dobijaju pri povezivanju).",saved);
+}
+inline void run(UINT idd){
+    std::vector<AcDbObjectId> ids;if(!pick(ids))return;
+    run(idd,ids);
 }
 }

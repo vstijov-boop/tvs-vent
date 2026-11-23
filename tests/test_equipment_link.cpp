@@ -131,6 +131,92 @@ int main(){
     {std::vector<Duct> d;d.push_back(duct(0,0,1000,0));d.push_back(duct(1500,0,3000,0));
      d[0].others[1]=1;d[0].partner[1]=-1;   // the face end is joined to a third element
      assert(link(box(1250,0,500,450,0),d,o).error==NotFreeEnd);}
+    // ---- user's drawing p.dxf (mm, 2026-11-23): exact coordinates (proxy graphics / block extents) ----
+    std::vector<Outlet> none;
+    {   // 1: duct 250 -> TVS_TRANS 250->450 -> stub 60 mm, 450 wide -> Res_2 (rot 90) based on the stub's free end,
+        //    extents (local y -10..60) cover the whole stub
+        std::vector<Duct> d;d.push_back(duct(14733.47155,3466.599385,17602.81909,3466.599385,250,200));d[0].others[1]=1;
+        d.push_back(duct(17902.81909,3466.599385,17962.81909,3466.599385,450,200));d[1].others[0]=1;
+        std::vector<Pt> b;b.push_back(Pt(17972.81909,3229.099385));b.push_back(Pt(17972.81909,3704.099385));
+        b.push_back(Pt(17902.81909,3704.099385));b.push_back(Pt(17902.81909,3229.099385));
+        const Pt base(17962.81909,3466.599385);
+        assert(link(b,d,o).error==DuctInside);   // extents only (before): refused
+        for(int x=Any;x<=Terminal;++x){Options t=o;t.expect=x;t.bottom=true;
+            Result r=link(b,base,d,none,t);
+            assert(r.error==Ok&&r.ports==1&&r.linkCase==Touching&&r.edits.empty()&&r.cutDuct==-1&&r.mount==tvsEquipment::AtEnd);
+            assert(at(r.port[0],17962.81909,3466.599385)&&eq(r.port[0].dx,-1)&&eq(r.port[0].dy,0)&&r.port[0].z==2700);
+            assert(r.duct[0]==1&&r.duct[1]==-1&&r.outlet==-1&&r.a==450&&r.b==200&&eq(r.ux,1));}
+        Options t=o;t.expect=Inline;assert(link(b,base,d,none,t).error==DuctInside);   // inline: extents as before
+    }
+    {   // 2: duct -> TVS_WYE, branch to -y 450 wide -> stub 63 mm -> Res_2 (rot 0) based on the stub's free end
+        std::vector<Duct> d;d.push_back(duct(14733.47155,4881.183363,17602.81909,4881.183363,250,200));d[0].others[1]=1;
+        d.push_back(duct(17877.81909,4706.183363,17877.81909,4643.334832,450,200));d[1].others[0]=1;
+        std::vector<Pt> b;b.push_back(Pt(17640.31909,4633.334832));b.push_back(Pt(18115.31909,4633.334832));
+        b.push_back(Pt(18115.31909,4703.334832));b.push_back(Pt(17640.31909,4703.334832));
+        const Pt base(17877.81909,4643.334832);
+        assert(link(b,d,o).error!=Ok);
+        Result r=link(b,base,d,none,o);
+        assert(r.error==Ok&&r.ports==1&&r.edits.empty()&&at(r.port[0],17877.81909,4643.334832)&&eq(r.port[0].dx,0)&&eq(r.port[0].dy,1));
+        assert(r.duct[0]==1&&eq(r.uy,-1)&&r.level==2700);
+        // the stub end joined to something else: not free -> the extents decide (refused here)
+        d[1].others[1]=1;assert(link(b,base,d,none,o).error!=Ok);
+    }
+    {   // 3: flex end -> Dif_1 based on the flex end (extents start at the base point): same as before
+        std::vector<Duct> d;d.push_back(duct(6368.006598,5237.543708,6368.006598,5857.852233,220,0));d[0].round=true;d[0].flex=true;d[0].others[0]=1;
+        std::vector<Pt> b;b.push_back(Pt(6068.006598,5857.852233));b.push_back(Pt(6668.006598,5857.852233));
+        b.push_back(Pt(6668.006598,6537.852233));b.push_back(Pt(6068.006598,6537.852233));
+        Result x=link(b,d,o),r=link(b,Pt(6368.006598,5857.852233),d,none,o);
+        assert(x.error==Ok&&r.error==Ok&&x.ports==1&&r.ports==1&&r.round&&r.b==0);
+        assert(at(r.port[0],x.port[0].x,x.port[0].y)&&eq(r.port[0].dx,x.port[0].dx)&&eq(r.port[0].dy,x.port[0].dy)&&eq(r.port[0].dy,-1));
+    }
+    {   // 4: duct -> TVS_TAP elbow Dolje at the duct end -> LVS-100-RETURN (circle D307) based on the vertical outlet
+        std::vector<Duct> d;d.push_back(duct(11123.55944,5137.346914,11123.55944,6412.968924,125,0));d[0].round=true;
+        d[0].others[0]=1;d[0].others[1]=1;   // tee / elbow
+        std::vector<Pt> b;b.push_back(Pt(11276.97952,6384.549521));b.push_back(Pt(10970.13922,6384.549521));
+        b.push_back(Pt(10970.13922,6691.389824));b.push_back(Pt(11276.97952,6691.389824));
+        std::vector<Outlet> w(1);w[0].at=Pt(11123.559435060974,6537.968923746606);w[0].level=2700-125;w[0].a=125;w[0].round=true;
+        const Pt base(11123.55943506097,6537.968923746607);
+        assert(link(b,d,o).error==NotFreeEnd);   // before: the duct end under the block is joined to the elbow
+        Result r=link(b,base,d,w,o);
+        assert(r.error==Ok&&r.ports==1&&r.linkCase==Touching&&r.edits.empty()&&r.outlet==0&&r.duct[0]==-1);
+        assert(at(r.port[0],11123.559435060974,6537.968923746606)&&r.port[0].z==2575&&r.port[0].dx==0&&r.port[0].dy==0);
+        assert(r.a==125&&r.b==0&&r.round&&r.level==2575);
+        // the second one: elbow Gore below the other duct (31B / 72D)
+        std::vector<Duct> e;e.push_back(duct(11123.55944,4912.346914,11123.55944,3639.610502,125,0));e[0].round=true;e[0].others[0]=1;e[0].others[1]=1;
+        std::vector<Pt> c;c.push_back(Pt(11276.97952,3361.191099));c.push_back(Pt(10970.13922,3361.191099));
+        c.push_back(Pt(10970.13922,3668.031402));c.push_back(Pt(11276.97952,3668.031402));
+        std::vector<Outlet> v(1);v[0].at=Pt(11123.559435060974,3514.6105015774497);v[0].level=2700+125;v[0].a=125;v[0].round=true;
+        r=link(c,Pt(11123.55943506097,3514.61050157745),e,v,o);
+        assert(r.error==Ok&&r.outlet==0&&r.port[0].z==2825);
+        // base point beside the outlet (> tol): not on a free end -> extents -> refused
+        assert(link(b,Pt(base.x+5,base.y),d,w,o).error==NotFreeEnd);
+    }
+    {   // 5: Res_1 (490 x 190 frame) over a duct 250 wide, centred on the axis, 80 mm before the closed end
+        std::vector<Duct> d;d.push_back(duct(14733.47155,6245.650885,18245.04994,6245.650885,250,200));
+        std::vector<Pt> b;b.push_back(Pt(17675.67907,6150.546218));b.push_back(Pt(18165.17166,6150.546218));
+        b.push_back(Pt(18165.17166,6340.755552));b.push_back(Pt(17675.67907,6340.755552));
+        const Pt base(17920.42537,6245.650885);
+        Options t=o;t.bottom=true;t.expect=Terminal;
+        Result r=link(b,base,d,none,t);
+        assert(r.error==Ok&&r.ports==1&&r.mount==tvsEquipment::Bottom&&r.linkCase==Touching&&r.edits.empty()&&r.cutDuct==-1);
+        assert(at(r.port[0],(17675.67907+18165.17166)/2,6245.650885,1e-6)&&r.port[0].dx==0&&r.port[0].dy==0&&r.port[0].z==2700);
+        assert(r.duct[0]==0&&r.duct[1]==-1&&r.a==250&&r.b==200);
+        t.bottom=false;assert(link(b,base,d,none,t).error==SideMounted);   // as before without the bottom option
+        t.bottom=true;t.expect=Any;r=link(b,base,d,none,t);            // no kind: the duct is cut (the command asks Dno / Linija)
+        assert(r.error==Ok&&r.linkCase==Cut&&r.ports==2&&eq(r.cutNew.x,18165.17166,1e-6));
+        t.expect=Inline;assert(link(b,base,d,none,t).linkCase==Cut);
+        d[0].flex=true;t.expect=Terminal;assert(link(b,base,d,none,t).error==FlexBottom);
+        double w=0,h=0;footprintMm(b,1,w,h);assert(w==489&&h==190);
+        footprintMm(b,10,w,h);assert(w==4895&&h==1902);
+    }
+    // base point on a duct end but ducts on both sides (no kind): the extents keep it inline
+    {std::vector<Duct> d;d.push_back(duct(0,0,1000,0));d.push_back(duct(1500,0,3000,0));
+     Result r=link(box(1250,0,500,450,0),Pt(1000,0),d,none,o);assert(r.error==Ok&&r.ports==2&&r.linkCase==Touching);
+     Options t=o;t.expect=Terminal;r=link(box(1250,0,500,450,0),Pt(1000,0),d,none,t);
+     assert(r.error==Ok&&r.ports==1&&at(r.port[0],1000,0)&&r.port[0].dx==-1);}
+    // two free ends at the base point: ambiguous
+    {std::vector<Duct> d;d.push_back(duct(0,0,1000,0));d.push_back(duct(1000,0,1000,-800));
+     assert(link(box(1100,0,200,600,0),Pt(1000,0),d,none,o).error==Ambiguous);}
     for(int e=1;e<errorCount;++e)assert(reasonText(e)[0]!=0);
     std::puts("equipment link OK");
     return 0;
