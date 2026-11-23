@@ -5,7 +5,10 @@ Installer/TVS_VENT/TVS_VENT.cuix from LAYOUT; commands, macros, icons, toolbar a
 touched. Idempotent. New commands: add them to LAYOUT (tools/add_new_commands_cuix.py calls this).
 """
 import io, pathlib, zipfile
-from lxml import etree as E
+try:
+    from lxml import etree as E
+except ImportError:   # tests read LAYOUT without lxml (CI)
+    E = None
 
 root = pathlib.Path(__file__).resolve().parents[1]
 cuix = root/'Installer'/'TVS_VENT'/'TVS_VENT.cuix'
