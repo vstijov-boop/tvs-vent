@@ -19,6 +19,11 @@
 //   at its centre. FixedDp -> fn dp_fix (dp), Zeta -> konst / manual (zeta), Nominal -> dp_fix
 //   computed at the exported Q (DuctPressDrop keeps it fixed: warning), no model -> dp_fix 0.
 //   Names are DuctPressDrop hvac_data FITING_META keys (JSON escapes keep this header ASCII).
+//   Resetka na dnu (tvsEquipment::Bottom): its tap junction is a node like a T komad (on the duct
+//   axis); the grille is a short vertical branch piece from it: D or W x H = the neck, smjer
+//   (0, 0, -tapDrop) m (DuctPressDrop takes dz), the terminal at its free end. The closed duct end
+//   beyond the last grille is exported as it is drawn (Part::length of the tap, along the duct, Q = 0,
+//   node Z1, Z2 ...), so DuctPressDrop derives a T komad there (closed leg) and not an elbow.
 #include "PressureDrop.h"
 #include <cmath>
 #include <cstdio>
@@ -154,7 +159,13 @@ inline double along(const XY& a,const XY& b,const XY& c,double& off){
     const double ux=b.x-a.x,uy=b.y-a.y,l2=ux*ux+uy*uy;double t=l2>0?((c.x-a.x)*ux+(c.y-a.y)*uy)/l2:0;
     if(t<0)t=0;if(t>1)t=1;off=dist(XY(a.x+ux*t,a.y+uy*t),c);return t;
 }
-inline bool isTee(const tvsPressure::Element& x){return x.parts.size()==1&&x.parts[0].kind==tvsPressure::Tee&&x.at.size()==3;}
+inline bool isTee(const tvsPressure::Element& x){return x.parts.size()==1&&(x.parts[0].kind==tvsPressure::Tee||x.parts[0].kind==tvsPressure::BottomTap)&&x.at.size()==3;}
+// the branch dionica of a resetka na dnu: the grille alone behind its tap junction (port 2)
+inline bool bottomBranch(const std::vector<tvsPressure::Element>& e,const tvsPressure::Dionica& d){
+    if(d.elements.size()!=1)return false;const tvsPressure::Element& x=e[d.elements[0]];
+    return x.parts.size()==1&&x.parts[0].kind==tvsPressure::Equipment&&x.via==2&&x.parent>=0&&x.parent<static_cast<int>(e.size())
+        &&e[x.parent].parts.size()==1&&e[x.parent].parts[0].kind==tvsPressure::BottomTap;
+}
 // T komad node: the branch port (2) projected onto the run axis (ports 0 - 1)
 inline XY teeCentre(const tvsPressure::Element& x){
     const XY& a=x.at[0];const XY& b=x.at[1];const XY& c=x.at[2];
@@ -174,7 +185,8 @@ inline double turn(const XY& a,const XY& b,const XY& c){
 struct Options {
     double minLength;   // mm: a shorter piece is dropped and its end node joined to its start
     double minTurn;     // deg: a smaller bend is not a vertex (straight on)
-    Options():minLength(1.0),minTurn(1.0){}
+    double tapDrop;     // m: length of the vertical branch piece of a resetka na dnu
+    Options():minLength(1.0),minTurn(1.0),tapDrop(0.10){}
 };
 // plan polyline of dionica q in mm: its start node, the plan elbow vertices, its end node
 inline std::vector<XY> path(const std::vector<tvsPressure::Element>& e,const tvsPressure::Result& r,int q,const std::vector<XY>& ends,const Options& o){
@@ -213,12 +225,21 @@ inline std::string idOf(bool exhaust,int n){char b[24];std::snprintf(b,sizeof(b)
 inline std::vector<Segment> segments(const std::vector<tvsPressure::Element>& e,const tvsPressure::Result& r,bool exhaust,
                                      std::vector<std::wstring>* warnings=nullptr,const Options& o=Options()){
     std::vector<Segment> out;const std::vector<XY> end=ends(e,r);
-    std::map<std::string,std::string> alias;int corner=0,zero=0;std::map<std::wstring,int> tags;
+    std::map<std::string,std::string> alias;int corner=0,zero=0,closed=0;std::map<std::wstring,int> tags;
     auto tagOf=[&](const tvsEquipment::Record& r){   // the tag, or prefix-nn for an untagged one
         if(!r.tag.empty())return utf8(r.tag);const std::wstring p=tvsEquipment::tagPrefix(r.kind);char b[16];std::snprintf(b,sizeof(b),"-%02d",++tags[p]);return utf8(p)+b;};
     auto node=[&](const std::string& n){std::map<std::string,std::string>::const_iterator i=alias.find(n);return i==alias.end()?n:i->second;};
     for(size_t q=0;q<r.d.size();++q){const tvsPressure::Dionica& d=r.d[q];
         const std::string from=node(utf8(d.from)),to=utf8(d.to);
+        if(bottomBranch(e,d)){   // resetka na dnu: vertical branch piece, the grille at its free end
+            const tvsPressure::Element& x=e[d.elements[0]];const tvsEquipment::Record& rec=x.parts[0].equipment;
+            Segment s;s.from=from;s.to=to;s.id=idOf(exhaust,static_cast<int>(out.size())+1);
+            s.opis="TVS dionica "+std::to_string(d.number)+" (resetka na dnu)";
+            s.round=d.s.round;s.q=d.flow;if(s.round)s.d=d.s.a;else{s.w=d.s.a;s.h=d.s.b;}
+            s.dz=-o.tapDrop;if(!(d.flow>0))++zero;
+            std::wstring w;Equip q=equipment(rec,x.flow,exhaust,tagOf(rec),warnings?&w:nullptr);q.pos=1;s.equipment.push_back(q);
+            if(warnings&&!w.empty())warnings->push_back(L"oprema "+(rec.tag.empty()?std::wstring(tvsEquipment::kindName(rec.kind)):rec.tag)+w);
+            out.push_back(s);continue;}
         const std::vector<XY> p=path(e,r,static_cast<int>(q),end,o);
         double total=0;for(size_t k=1;k<p.size();++k)total+=dist(p[k-1],p[k]);
         if(p.size()<2||total<o.minLength){alias[to]=from;
@@ -245,6 +266,16 @@ inline std::vector<Segment> segments(const std::vector<tvsPressure::Element>& e,
             if(!rec.terminal())for(size_t j=1;j<p.size();++j){double dj=0;const double t=along(p[j-1],p[j],c,dj);if(off<0||dj<off){off=dj;best=out.size()-pieces+j-1;pos=t;}}
             std::wstring w;Equip q=equipment(rec,x.flow,exhaust,tagOf(rec),warnings?&w:nullptr);q.pos=pos;out[best].equipment.push_back(q);
             if(warnings&&!w.empty())warnings->push_back(L"oprema "+(rec.tag.empty()?std::wstring(tvsEquipment::kindName(rec.kind)):rec.tag)+w);}
+        // resetka na dnu with the closed duct end beyond it (no element on the straight port)
+        {const int last=d.elements.back();const tvsPressure::Element& x=e[last];
+         if(x.parts.size()==1&&x.parts[0].kind==tvsPressure::BottomTap&&x.at.size()==3&&x.ports.size()==3&&x.parts[0].length>=o.minLength&&(x.entry==0||x.entry==1)){
+            bool on=false;for(size_t k=0;k<e.size();++k)if(e[k].parent==last&&e[k].via==1-x.entry)on=true;
+            const XY& a=x.at[x.entry];const XY& b=x.at[1-x.entry];const double l=dist(a,b);
+            if(!on&&l>0){Segment c;c.from=to;c.to="Z"+std::to_string(++closed);c.id=idOf(exhaust,static_cast<int>(out.size())+1);
+                c.opis="TVS dionica "+std::to_string(d.number)+" - zatvoren kraj (resetka na dnu)";
+                const tvsPressure::Section& s=x.ports[1-x.entry];c.round=s.round;if(s.round)c.d=s.a;else{c.w=s.a;c.h=s.b;}c.q=0;
+                c.dx=(b.x-a.x)/l*x.parts[0].length/1000.0;c.dy=(b.y-a.y)/l*x.parts[0].length/1000.0;out.push_back(c);
+                if(warnings)warnings->push_back(L"zatvoren kraj kanala iza re\u0161etke na dnu (dionica "+std::to_wstring(d.number)+L"): izvezen bez protoka, DuctPressDrop ga vidi kao T komad sa zatvorenim krakom");}}}
     }
     if(zero&&warnings)warnings->push_back(L"dionica bez protoka (Q = 0): "+std::to_wstring(zero));
     return out;

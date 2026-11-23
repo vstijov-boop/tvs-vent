@@ -35,32 +35,24 @@ inline void execute(){
     std::vector<tvsFlowNetwork::Element> el;tvsFlow::elements(net,el);
     // the end at the unit: a preselected element with one free end, else picked
     int root=-1,port=-1;
-    {ads_name pre;if(acedSSGet(L"_I",NULL,NULL,NULL,pre)==RTNORM){Adesk::Int32 n=0;acedSSLength(pre,&n);
-        if(n==1){ads_name en;AcDbObjectId id;if(acedSSName(pre,0,en)==RTNORM&&acdbGetObjectId(id,en)==Acad::eOk)
-            for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==id)root=net.owner[i];}
-        acedSSFree(pre);acedSSSetFirst(NULL,NULL);}}
-    if(root>=0&&root<static_cast<int>(el.size())){
+    std::vector<int> pre;
+    {ads_name sel;if(acedSSGet(L"_I",NULL,NULL,NULL,sel)==RTNORM){Adesk::Int32 n=0;acedSSLength(sel,&n);
+        if(n==1){ads_name en;AcDbObjectId id;if(acedSSName(sel,0,en)==RTNORM&&acdbGetObjectId(id,en)==Acad::eOk)
+            for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==id)pre.push_back(net.owner[i]);}
+        acedSSFree(sel);acedSSSetFirst(NULL,NULL);}}
+    if(!pre.empty()){   // the free ends of the element (a split duct, rešetka na dnu: of all its pieces)
         std::vector<std::vector<std::vector<std::pair<int,int> > > > c;tvsFlowNetwork::contacts(el,tol,c);
-        int openEnds=0,last=-1;for(size_t p=0;p<c[root].size();++p)if(c[root][p].empty()){++openEnds;last=static_cast<int>(p);}
-        if(openEnds==1)port=last;else root=-1;}
-    else root=-1;
+        int openEnds=0,last=-1,at=-1;
+        for(size_t k=0;k<pre.size();++k){const int o=pre[k];if(o<0||o>=static_cast<int>(el.size()))continue;
+            for(size_t p=0;p<c[o].size();++p)if(c[o][p].empty()){++openEnds;last=static_cast<int>(p);at=o;}}
+        if(openEnds==1){root=at;port=last;}}
     if(root<0){
         ads_name picked;ads_point at;
         if(acedEntSel(L"\nTVS_DPD_IZVOZ: izaberite kraj mreže kod jedinice (kliknite blizu slobodnog kraja kanala): ",picked,at)!=RTNORM)return;
         AcDbObjectId pickedId;if(acdbGetObjectId(pickedId,picked)!=Acad::eOk)return;
-        for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==pickedId)root=net.owner[i];
-        if(root<0||net.bodies[root].ports.empty()){acutPrintf(L"\nTVS_DPD_IZVOZ: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
         ads_point w;if(tvsCoordinates::transformPoint(at,1,0,w)!=RTNORM)return;
-        double nearest=0;
-        for(size_t p=0;p<net.bodies[root].ports.size();++p){const double d=std::hypot(net.bodies[root].ports[p].x-w[0],net.bodies[root].ports[p].y-w[1]);if(port<0||d<nearest){port=static_cast<int>(p);nearest=d;}}}
-    // koljeno gore / dolje: its ports carry the elevation in z, the duct ends often do not (as TVS_PAD)
-    for(size_t i=0;i<net.bodies.size()&&i<el.size();++i){
-        int only=-1,count=0;for(size_t j=0;j<net.nodes.size();++j)if(net.owner[j]==static_cast<int>(i)){only=static_cast<int>(j);++count;}
-        if(count!=1)continue;
-        {AcDbObjectPointer<TVS_TAP> t(net.nodes[only].id,AcDb::kForRead);if(t.openStatus()!=Acad::eOk||t->get_Form()==Form_Direct)continue;}
-        for(size_t p=0;p<el[i].ports.size();++p){bool done=false;
-            for(size_t k=0;k<el.size()&&!done;++k){if(k==i)continue;
-                for(size_t q=0;q<el[k].ports.size();++q){if(std::hypot(el[k].ports[q].x-el[i].ports[p].x,el[k].ports[q].y-el[i].ports[p].y)<=tol&&std::fabs(el[k].ports[q].z-el[i].ports[p].z)>tol){el[i].ports[p].z=el[k].ports[q].z;done=true;break;}}}}}
+        if(!tvsFlow::rootOf(net,pickedId,w[0],w[1],root,port)){acutPrintf(L"\nTVS_DPD_IZVOZ: izabrani objekat nije TVS kanal ili fiting mreže.");return;}}
+    tvsFlow::verticalJoints(net,el,tol);   // koljeno gore / dolje: joined with the duct in plan (as TVS_PAD)
     tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
     tvsFlow::equipmentFlows(net,el,r,root,port,tol,L"TVS_DPD_IZVOZ");   // oprema: terminal flows from the records
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}
@@ -84,6 +76,13 @@ inline void execute(){
         if(net.bodies[i].sections.size()==net.bodies[i].ports.size())for(size_t p=0;p<net.bodies[i].sections.size();++p)x.ports.push_back(tvsPad::section(net.bodies[i].sections[p],f));
         else if(x.parts.size()==1)x.ports=x.parts[0].sections;
         else if(!x.parts.empty()&&!x.parts[0].sections.empty())x.ports.assign(x.at.size(),x.parts[0].sections[0]);}
+    // rešetka na dnu: the length of the closed duct end beyond the tap (the piece that left the
+    // network, FlowNetwork dropDeadEnds) - exported as drawn, so DuctPressDrop derives a T komad
+    for(size_t i=0;i<pe.size()&&i<net.bodies.size();++i){tvsPressure::Element& x=pe[i];
+        if(x.parts.size()!=1||x.parts[0].kind!=tvsPressure::BottomTap||net.bodies[i].ports.size()!=3||(x.entry!=0&&x.entry!=1))continue;
+        const tvsMoveGeometry::Point& end=net.bodies[i].ports[1-x.entry];
+        for(size_t j=0;j<net.bodies.size()&&j<r.reached.size();++j){if(net.piece[j]<0||r.reached[j]||net.bodies[j].ports.size()!=2)continue;
+            if((net.bodies[j].ports[0]-end).length()<=tol||(net.bodies[j].ports[1]-end).length()<=tol)x.parts[0].length=(net.bodies[j].ports[1]-net.bodies[j].ports[0]).length()*f;}}
     tvsPressure::Options o;o.exhaust=exhaust();
     tvsPressure::Calculator calc(nullptr,o);
     const tvsPressure::Result res=calc.run(pe,root);

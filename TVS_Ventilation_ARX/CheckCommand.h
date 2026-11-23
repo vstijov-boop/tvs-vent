@@ -10,7 +10,7 @@
 #include <vector>
 namespace tvsCheck {
 inline const wchar_t* kindName(const tvsMove::Node& n){
-    if(n.flex)return L"flex";switch(n.kind){case 1:return L"kanal";case 2:return L"koljeno";case 3:return L"prelaz";case 4:return L"T komad";case 5:return L"oprema";default:return L"element";}
+    if(n.flex)return L"flex";switch(n.kind){case 1:return L"kanal";case 2:return L"koljeno";case 3:return L"prelaz";case 4:return L"T komad";case 5:return L"oprema";case 6:return L"rešetka na dnu (spoj)";default:return L"element";}
 }
 inline void section(wchar_t* out,size_t len,const tvsNetworkCheck::Section& s,double f){
     if(s.round)swprintf_s(out,len,L"Ø%.0f",s.a*f);else swprintf_s(out,len,L"%.0f×%.0f",s.a*f,s.b*f);
@@ -30,7 +30,8 @@ inline void describeIssue(const tvsNetworkCheck::Issue& e,const std::vector<tvsM
     case tvsNetworkCheck::Angle:acutPrintf(L"koljeno %.3f° – malo odstupa od standardnog ugla (TVS_KOLJENA_UGAO).",e.value);break;
     case tvsNetworkCheck::Short:acutPrintf(L"kanal dužine %.1f mm.",e.value);break;
     case tvsNetworkCheck::Equipment:
-        if(e.b>=0&&e.value>0)acutPrintf(L"oprema: priključak ne naliježe na kanal (najbliži kraj %.1f mm).",e.value);
+        if(e.bottom){if(e.b>=0&&e.value>0)acutPrintf(L"oprema: rešetka na dnu nije na osi kanala (najbliža osa %.1f mm).",e.value);else acutPrintf(L"oprema: rešetka na dnu nije na osi kanala.");}
+        else if(e.b>=0&&e.value>0)acutPrintf(L"oprema: priključak ne naliježe na kanal (najbliži kraj %.1f mm).",e.value);
         else if(e.b>=0)acutPrintf(L"oprema: priključak ne naliježe na kanal (%ls druge dimenzije ili kote).",b);
         else acutPrintf(L"oprema: priključak ne naliježe na kanal.");
         break;
@@ -56,14 +57,17 @@ inline void execute(){
     {ads_name ss;acutPrintf(L"\nIzaberite dio mreže za provjeru (Enter = cijeli crtež): ");
      const int rc=acedSSGet(NULL,NULL,NULL,NULL,ss);if(rc==RTCAN)return;
      if(rc==RTNORM){Int32 n=0;acedSSLength(ss,&n);for(Int32 i=0;i<n;++i){ads_name e;AcDbObjectId id;if(acedSSName(ss,i,e)==RTNORM&&acdbGetObjectId(id,e)==Acad::eOk)limit.insert(id);}acedSSFree(ss);}}
-    std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
-    if(!tvsMove::snapshot(db,nodes,labels)||!tvsEquipmentNodes::append(db,nodes,NULL,0)){acutPrintf(L"\nTVS_PROVJERA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
+    std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;std::vector<tvsEquipment::Record> recs;
+    const bool snapped=tvsMove::snapshot(db,nodes,labels);const size_t tvs=nodes.size();
+    if(!snapped||!tvsEquipmentNodes::append(db,nodes,&recs,0)){acutPrintf(L"\nTVS_PROVJERA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
     std::vector<tvsNetworkCheck::Item> items(nodes.size());
     for(size_t i=0;i<nodes.size();++i){const tvsMove::Node& n=nodes[i];tvsNetworkCheck::Item& it=items[i];
         it.kind=n.kind;it.flex=n.flex;
         for(size_t p=0;p<n.ports.size();++p){it.x.push_back(n.ports[p].x);it.y.push_back(n.ports[p].y);
             tvsNetworkCheck::Section s;if(p<n.sections.size()){s.a=n.sections[p].a;s.b=n.sections[p].b;s.round=n.sections[p].round;s.elevation=n.sections[p].elevation;s.known=!n.flex&&!tvsEquipmentNodes::isNode(n);}
             it.s.push_back(s);}
+        if(i>=tvs&&i-tvs<recs.size())it.bottom=recs[i-tvs].terminal()&&recs[i-tvs].mount==tvsEquipment::Bottom;   // rešetka na dnu: on a duct axis
+        {tvsEquipmentNodes::Outlet o;if(it.s.size()==2&&tvsEquipmentNodes::outlet(n,o)){it.s[1].vertical=true;it.s[1].outlet=o.level;}}   // koljeno gore / dolje: the outlet's level
         if(n.kind==2){AcDbObjectPointer<TVS_TAP> t(n.id,AcDb::kForRead);
             if(t.openStatus()==Acad::eOk&&t->Form==Form_Direct&&std::fabs(std::fabs(t->Normvector.z)-1)<1e-9)it.angle=t->Swectangle*180/M_PI;}
     }

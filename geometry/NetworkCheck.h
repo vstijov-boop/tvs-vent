@@ -11,22 +11,31 @@
 //   Equipment linked oprema (kind 5): a port not on an end of another element of its size and
 //             level (1 mm); value = distance to the nearest end within 5 mm (0: there, other size /
 //             level), b = that element or -1. Its ports are not compared by Size / Level / Miss.
+//             At the vertical outlet of a koljeno gore / dolje the outlet's level counts
+//             (Section::vertical). Resetka na dnu (Item::bottom): its port must lie on a duct axis
+//             (1 mm, inside the duct; tvsEquipmentFlow::onAxis), Issue::bottom; value = distance to
+//             the nearest axis within 5 mm. The closed duct end beyond it is no problem.
+#include "EquipmentFlow.h"
 #include <cmath>
 #include <map>
 #include <utility>
 #include <vector>
 namespace tvsNetworkCheck {
 enum Type {Size=1,Level=2,Miss=3,Middle=4,Angle=5,Short=6,Equipment=7};
-struct Section {double a,b,elevation;bool round,known;Section():a(0),b(0),elevation(0),round(false),known(false){}};
+struct Section {double a,b,elevation;bool round,known;
+    bool vertical;double outlet;   // vertical outlet of a koljeno gore / dolje: its level (oprema compares with it)
+    Section():a(0),b(0),elevation(0),round(false),known(false),vertical(false),outlet(0){}};
 struct Item {
     int kind;                    // 1 duct, 2 elbow, 3 prelaz, 4 T komad, 5 oprema (s: known = false), 0 other (flex ...)
     bool flex;
     std::vector<double> x,y;     // ports in plan
     std::vector<Section> s;      // section at each port (known = false: not compared)
     double angle;                // plan elbow: sweep in degrees, else < 0
-    Item():kind(0),flex(false),angle(-1){}
+    bool bottom;                 // oprema: resetka na dnu (port on a duct axis, not on an end)
+    Item():kind(0),flex(false),angle(-1),bottom(false){}
 };
-struct Issue {int type,a,b;double x,y,value;};   // a, b: items (b = -1), value: mm or degrees
+struct Issue {int type,a,b;double x,y,value;bool bottom;   // a, b: items (b = -1), value: mm or degrees; bottom: resetka na dnu off the axis
+    Issue():type(0),a(-1),b(-1),x(0),y(0),value(0),bottom(false){}};
 inline double standardAngle(double deg,double maxOff){
     static const double list[]={15,22.5,30,45,60,75,90};double best=-1,off=1e9;
     for(size_t i=0;i<sizeof(list)/sizeof(list[0]);++i){const double d=std::fabs(deg-list[i]);if(d<off){off=d;best=list[i];}}
@@ -72,6 +81,16 @@ inline void check(const std::vector<Item>& items,double f,std::vector<Issue>& ou
     // oprema: every port on an end of its size and level
     const double sizeTol=1.0/f;
     for(size_t i=0;i<items.size();++i){if(items[i].kind!=5)continue;
+        if(items[i].bottom){   // resetka na dnu: on a duct axis, inside the duct
+            for(size_t p=0;p<items[i].x.size();++p){const double x=items[i].x[p],y=items[i].y[p];bool ok=false;int closest=-1;double best=0;
+                for(size_t j=0;j<items.size()&&!ok;++j){if(j==i||items[j].kind!=1||items[j].x.size()!=2)continue;
+                    const double ax=items[j].x[0],ay=items[j].y[0],bx=items[j].x[1],by=items[j].y[1];
+                    if(tvsEquipmentFlow::onAxis(ax,ay,bx,by,x,y,sizeTol)>=0){ok=true;break;}
+                    const double l2=(bx-ax)*(bx-ax)+(by-ay)*(by-ay);if(!(l2>0))continue;
+                    double t=((x-ax)*(bx-ax)+(y-ay)*(by-ay))/l2;if(t<0)t=0;if(t>1)t=1;
+                    const double d=std::hypot(ax+(bx-ax)*t-x,ay+(by-ay)*t-y);if(d<=miss&&(closest<0||d<best)){closest=static_cast<int>(j);best=d;}}
+                if(!ok){Issue e;e.type=Equipment;e.bottom=true;e.a=static_cast<int>(i);e.b=closest;e.x=x;e.y=y;e.value=closest>=0?best*f:0;out.push_back(e);}}
+            continue;}
         for(size_t p=0;p<items[i].x.size()&&p<items[i].s.size();++p){const Section& a=items[i].s[p];
             bool ok=false;int closest=-1;double best=0;
             for(size_t j=0;j<items.size()&&!ok;++j){if(j==i)continue;
@@ -80,7 +99,8 @@ inline void check(const std::vector<Item>& items,double f,std::vector<Issue>& ou
                     if(d>join)continue;
                     const Section& b=items[j].s.size()>q?items[j].s[q]:Section();
                     if(!b.known&&items[j].kind!=5){ok=true;break;}   // flex: size not known, the joint is enough
-                    if(a.round==b.round&&std::fabs(a.a-b.a)<=sizeTol&&(a.round||std::fabs(a.b-b.b)<=sizeTol)&&std::fabs(a.elevation-b.elevation)<=sizeTol){ok=true;break;}}}
+                    const double level=b.vertical?b.outlet:b.elevation;   // koljeno gore / dolje: the outlet's level
+                    if(a.round==b.round&&std::fabs(a.a-b.a)<=sizeTol&&(a.round||std::fabs(a.b-b.b)<=sizeTol)&&std::fabs(a.elevation-level)<=sizeTol){ok=true;break;}}}
             if(!ok){Issue e;e.type=Equipment;e.a=static_cast<int>(i);e.b=closest;e.x=items[i].x[p];e.y=items[i].y[p];e.value=closest>=0&&best>join?best*f:0;out.push_back(e);}}}
     for(size_t i=0;i<items.size();++i){const Item& it=items[i];
         if(it.kind==2&&it.angle>0){const double s=standardAngle(it.angle,0.5);

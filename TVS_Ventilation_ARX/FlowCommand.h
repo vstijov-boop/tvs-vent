@@ -34,7 +34,89 @@ struct Net {
     AcDbObjectIdArray labels;
     std::vector<char> linked;          // oprema (EquipmentNodes.h): a linked block, its record below
     std::vector<tvsEquipment::Record> records;
+    // rešetka na dnu (splitBottom): nodes [real, size) are made by the readers, not in the drawing
+    // (duct pieces, tap junctions); piece[i]: the drawing duct a piece belongs to (also that duct
+    // itself), else -1; whole[i]: the drawing ports of a split duct / its grille (planning, joints)
+    size_t real;
+    std::vector<int> piece;
+    std::vector<std::vector<tvsMoveGeometry::Point> > whole;
+    Net():real(0){}
 };
+// Rešetka na dnu (tvsEquipment::Bottom, geometry/EquipmentFlow.h): its port is the tap point on a
+// duct axis, not a duct end. For the calculations only (the drawing is not changed) the duct is
+// split there: piece A (the duct itself, up to the tap), piece B (a copy, from the tap on) and a tap
+// junction (kind tvsEquipmentFlow::tapKind(), id of the grille; ports A side, B side, branch with
+// the neck section) between them and the grille, which becomes a zero-length branch (its section =
+// the neck: neckA x neckB / round, 0 = the duct). The junction ports lie tapOffset(tol) from the tap
+// point, so FlowNetwork joins each pair only. Pieces carry no flow of their own; a piece with
+// nothing further on is the closed end beyond the grille (closedEnds). A grille on no duct axis
+// (1 mm) stays as it is: not in the network (TVS_PROVJERA reports it).
+inline int splitBottom(Net& net,double f,double tol){
+    int placed=0;const double reach=1.0/f,s=tvsEquipmentFlow::tapOffset(tol);
+    for(size_t g=0;g<net.real;++g){
+        if(!net.linked[g]||!net.records[g].terminal()||net.records[g].mount!=tvsEquipment::Bottom||net.nodes[g].ports.size()!=1||net.bodies[g].ports.size()!=1)continue;
+        std::vector<tvsEquipmentFlow::Axis> axes;std::vector<int> index;   // plain ducts and the pieces made before
+        for(size_t d=0;d<net.nodes.size();++d){const tvsMove::Node& n=net.nodes[d];
+            if(n.kind!=1||n.flex||net.owner[d]!=static_cast<int>(d)||!net.members[d].empty()||net.linked[d]||net.bodies[d].ports.size()!=2)continue;
+            const tvsMoveGeometry::Point& a=net.bodies[d].ports[0];const tvsMoveGeometry::Point& b=net.bodies[d].ports[1];
+            const tvsEquipmentFlow::Axis x={a.x,a.y,b.x,b.y,n.sections.empty()?n.elevation:n.sections[0].elevation};axes.push_back(x);index.push_back(static_cast<int>(d));}
+        const tvsMoveGeometry::Point p=net.nodes[g].ports[0];double t=-1;
+        const int k=tvsEquipmentFlow::pickDuct(axes,p.x,p.y,net.nodes[g].sections.empty()?p.z:net.nodes[g].sections[0].elevation,reach,t);
+        if(k<0)continue;
+        const int d=index[k];
+        const tvsMoveGeometry::Point a=net.bodies[d].ports[0],b=net.bodies[d].ports[1];
+        tvsMoveGeometry::Point u(b.x-a.x,b.y-a.y,0);const double l=u.length();if(!(l>0))continue;u=u*(1.0/l);
+        const tvsMoveGeometry::Point x=a+(b-a)*t;   // the tap point on the axis (z between the ends)
+        const tvsMoveGeometry::Point xa=x-u*s,xb=x+u*s,xc=x+tvsMoveGeometry::Point(0,0,-s);
+        const tvsMoveNetwork::Section duct=net.nodes[d].sections.empty()?tvsMoveNetwork::Section(net.nodes[d].a,net.nodes[d].b,net.nodes[d].round,net.nodes[d].elevation):net.nodes[d].sections[0];
+        const tvsEquipment::Record& rec=net.records[g];
+        const tvsMoveNetwork::Section neck=rec.neckA>0?tvsMoveNetwork::Section(rec.neckA/f,rec.neckRound?0:rec.neckB/f,rec.neckRound,duct.elevation):duct;
+        if(static_cast<size_t>(d)<net.real&&net.whole[d].empty())net.whole[d]=net.bodies[d].ports;
+        if(net.whole[g].empty())net.whole[g]=net.bodies[g].ports;
+        const int duct0=net.piece[d]>=0?net.piece[d]:d;
+        // piece B: a copy of the duct (piece) from the tap on
+        tvsMove::Node nb=net.nodes[d];nb.ports.clear();nb.ports.push_back(xb);nb.ports.push_back(b);
+        tvsMoveNetwork::Body bb=net.bodies[d];bb.ports=nb.ports;
+        // piece A: the duct (piece) up to the tap
+        net.nodes[d].ports.resize(2);net.nodes[d].ports[0]=a;net.nodes[d].ports[1]=xa;net.bodies[d].ports[1]=xa;net.piece[d]=duct0;
+        // the tap junction
+        tvsMove::Node nj=net.nodes[g];nj.kind=tvsEquipmentFlow::tapKind();nj.middle=x;nj.elevation=duct.elevation;
+        nj.a=duct.a;nj.b=duct.b;nj.round=duct.round;
+        nj.ports.clear();nj.ports.push_back(xa);nj.ports.push_back(xb);nj.ports.push_back(xc);
+        nj.axes.clear();nj.axes.push_back(u);nj.axes.push_back(u);nj.axes.push_back(tvsMoveGeometry::Point(0,0,-1));
+        nj.sections.clear();nj.sections.push_back(duct);nj.sections.push_back(duct);nj.sections.push_back(neck);
+        tvsMoveNetwork::Body bj;bj.ports=nj.ports;bj.axes=nj.axes;bj.sections=nj.sections;
+        // the grille: a zero-length branch with the neck
+        net.nodes[g].ports[0]=xc;net.bodies[g].ports[0]=xc;net.nodes[g].middle=xc;
+        net.nodes[g].sections.assign(1,neck);net.bodies[g].sections.assign(1,neck);
+        const tvsMove::Node made[2]={nb,nj};const tvsMoveNetwork::Body body[2]={bb,bj};
+        for(int m=0;m<2;++m){net.nodes.push_back(made[m]);net.bodies.push_back(body[m]);net.members.push_back(std::vector<AcDbObjectId>());
+            net.owner.push_back(static_cast<int>(net.nodes.size())-1);net.old.push_back(0);net.linked.push_back(0);net.records.push_back(tvsEquipment::Record());
+            net.piece.push_back(m==0?duct0:-1);net.whole.push_back(std::vector<tvsMoveGeometry::Point>());}
+        ++placed;
+    }
+    return placed;
+}
+// the pieces of split ducts (FlowNetwork dropDeadEnds)
+inline std::vector<char> pieces(const Net& net){std::vector<char> p(net.piece.size(),0);for(size_t i=0;i<p.size();++i)p[i]=net.piece[i]>=0;return p;}
+// after every solve: the closed duct end beyond a rešetka na dnu leaves the network
+inline void closedEnds(const Net& net,tvsFlowNetwork::Result& r,int root){tvsFlowNetwork::dropDeadEnds(r,pieces(net),root);}
+// a split duct: its reached piece with the largest flow (the flow of the drawing duct), else i
+inline int pieceOf(const Net& net,const tvsFlowNetwork::Result& r,int i){
+    int best=i;if(i<0||i>=static_cast<int>(net.piece.size())||net.piece[i]<0)return i;
+    for(size_t j=net.real;j<net.piece.size()&&j<r.reached.size();++j)
+        if(net.piece[j]==i&&r.reached[j]&&(best<0||!r.reached[best]||r.flow[j]>r.flow[best]))best=static_cast<int>(j);
+    return best;
+}
+// the element of the picked object and its port nearest to (x, y) in plan; a split duct has
+// several pieces: the one with the nearest port
+inline bool rootOf(const Net& net,const AcDbObjectId& id,double x,double y,int& root,int& port){
+    root=-1;port=-1;double nearest=0;
+    for(size_t i=0;i<net.nodes.size();++i){if(net.nodes[i].id!=id)continue;const int o=net.owner[i];if(o<0||o>=static_cast<int>(net.bodies.size()))continue;
+        for(size_t p=0;p<net.bodies[o].ports.size();++p){const double d=std::hypot(net.bodies[o].ports[p].x-x,net.bodies[o].ports[p].y-y);
+            if(port<0||d<nearest){root=o;port=static_cast<int>(p);nearest=d;}}}
+    return root>=0;
+}
 inline bool read(AcDbDatabase* db,double tol,Net& net){
     if(!tvsMove::snapshot(db,net.nodes,net.labels))return false;
     const size_t tvs=net.nodes.size();std::vector<tvsEquipment::Record> recs;
@@ -50,15 +132,32 @@ inline bool read(AcDbDatabase* db,double tol,Net& net){
     for(size_t i=0;i<tvs;++i){AcDbObjectPointer<AcDbEntity> e(net.nodes[i].id,AcDb::kForRead);
         if(e.openStatus()!=Acad::eOk)return false;
         if(TVS_Entity* t=TVS_Entity::cast(e.object()))net.old[i]=t->get_Flow();}
+    net.real=n;net.piece.assign(n,-1);net.whole.assign(n,std::vector<tvsMoveGeometry::Point>());
+    splitBottom(net,tvsUnits::factor(db),tol);   // rešetka na dnu: the duct split at the tap point
     return true;
 }
-inline void elements(const Net& net,std::vector<tvsFlowNetwork::Element>& out){
+// whole: the drawing as it is (split ducts with their own ports, no pieces / tap junctions) - for
+// the joint checks of "Primijeni"
+inline void elements(const Net& net,std::vector<tvsFlowNetwork::Element>& out,bool whole=false){
     out.assign(net.bodies.size(),tvsFlowNetwork::Element());
     for(size_t i=0;i<net.bodies.size();++i){
         if(net.owner[i]!=static_cast<int>(i))continue;   // member of an etaz / obilazak: no ports of its own
-        for(size_t p=0;p<net.bodies[i].ports.size();++p){const tvsMoveGeometry::Point& q=net.bodies[i].ports[p];out[i].ports.push_back(tvsFlowNetwork::P(q.x,q.y,q.z));}
-        out[i].flow=net.old[i];
+        if(whole&&i>=net.real)continue;
+        const std::vector<tvsMoveGeometry::Point>& ps=whole&&i<net.whole.size()&&!net.whole[i].empty()?net.whole[i]:net.bodies[i].ports;
+        for(size_t p=0;p<ps.size();++p){const tvsMoveGeometry::Point& q=ps[p];out[i].ports.push_back(tvsFlowNetwork::P(q.x,q.y,q.z));}
+        out[i].flow=!whole&&i<net.piece.size()&&net.piece[i]>=0?0:net.old[i];   // a duct piece has no flow of its own
     }
+}
+// koljeno gore / dolje: its ports carry the elevation in z, the duct ends often do not; joined
+// when they meet in plan (only these elbows, only for the calculation: TVS_PROTOK, TVS_PAD, TVS_DPD_IZVOZ)
+inline void verticalJoints(const Net& net,std::vector<tvsFlowNetwork::Element>& el,double tol){
+    for(size_t i=0;i<net.bodies.size()&&i<el.size()&&i<net.real;++i){
+        int only=-1,count=0;for(size_t j=0;j<net.nodes.size();++j)if(net.owner[j]==static_cast<int>(i)){only=static_cast<int>(j);++count;}
+        if(count!=1||net.linked[only])continue;
+        {AcDbObjectPointer<TVS_TAP> t(net.nodes[only].id,AcDb::kForRead);if(t.openStatus()!=Acad::eOk||t->get_Form()==Form_Direct)continue;}
+        for(size_t p=0;p<el[i].ports.size();++p){bool done=false;
+            for(size_t k=0;k<el.size()&&!done;++k){if(k==i)continue;
+                for(size_t q=0;q<el[k].ports.size();++q){if(std::hypot(el[k].ports[q].x-el[i].ports[p].x,el[k].ports[q].y-el[i].ports[p].y)<=tol&&std::fabs(el[k].ports[q].z-el[i].ports[p].z)>tol){el[i].ports[p].z=el[k].ports[q].z;done=true;break;}}}}}
 }
 inline const wchar_t* name(const tvsMove::Node& n,bool assembly){return assembly?L"etaž / obilazak":tvsCheck::kindName(n);}
 inline const wchar_t* name(const Net& net,int i){return i>=0&&i<static_cast<int>(net.linked.size())&&net.linked[i]?tvsEquipment::kindName(net.records[i].kind):name(net.nodes[i],!net.members[i].empty());}
@@ -72,12 +171,13 @@ inline int equipmentFlows(const Net& net,std::vector<tvsFlowNetwork::Element>& e
     for(size_t i=0;i<net.linked.size()&&i<el.size();++i){
         if(!net.linked[i]||!net.records[i].terminal()||!r.reached[i]||static_cast<int>(i)==root)continue;
         const int p=r.parent[i];double duct=0;   // the flow on the duct before the link: a duct / flex with nothing else on it
-        if(p>=0&&kids[p]==1&&net.members[p].empty()&&!net.linked[p]&&(net.nodes[p].kind==1||net.nodes[p].flex))duct=net.old[p];
+        if(p>=0&&kids[p]==1&&net.members[p].empty()&&!net.linked[p]&&net.piece[p]<0&&(net.nodes[p].kind==1||net.nodes[p].flex))duct=net.old[p];
         bool conflict=false;const double q=tvsEquipmentFlow::terminalFlow(net.records[i].qTerminal,duct,conflict);
         if(conflict&&++conflicts&&!quiet){
             acutPrintf(L"\n%ls: %ls %ls – protok u opremi %.0f m³/h, na kanalu %.0f m³/h; uzet protok opreme.",command,tvsEquipment::kindName(net.records[i].kind),net.records[i].tag.c_str(),net.records[i].qTerminal,duct);}
         if(std::fabs(el[i].flow-q)>1e-9){el[i].flow=q;changed=true;}}
     if(changed)r=tvsFlowNetwork::solve(el,root,port,tol);
+    closedEnds(net,r,root);   // rešetka na dnu: the closed duct end beyond it
     return conflicts;
 }
 inline tvsMoveGeometry::Point centre(const tvsFlowNetwork::Element& e){
@@ -154,13 +254,16 @@ inline bool velocities(const Net& net,const tvsFlowNetwork::Result& r,const std:
      if(g==RTCAN||g==RTKWORD)return false;if(g==RTNORM)maximumVelocity()=v;}
     const double vmax=maximumVelocity();
     std::vector<int> group;const int count=tvsDuctSizing::dionice(r.parent,r.reached,group);
+    // rešetka na dnu: a split duct is one drawing duct, in the dionica of its piece with the largest flow
+    for(size_t i=0;i<net.real&&i<group.size();++i)if(net.piece[i]==static_cast<int>(i)){const int o=pieceOf(net,r,static_cast<int>(i));if(o!=static_cast<int>(i))group[i]=group[o];}
     std::vector<Dionica> all(count);for(int g=0;g<count;++g){all[g].worst=-1;all[g].v=0;}
-    for(size_t i=0;i<net.nodes.size();++i){const int o=net.owner[i];if(o>=0&&group[o]>=0)all[group[o]].all.push_back(net.nodes[i].id);}
-    for(size_t i=0;i<net.nodes.size();++i){const tvsMove::Node& n=net.nodes[i];
+    for(size_t i=0;i<net.real;++i){const int o=net.owner[i];if(o>=0&&group[o]>=0)all[group[o]].all.push_back(net.nodes[i].id);}
+    for(size_t i=0;i<net.real;++i){const tvsMove::Node& n=net.nodes[i];
         if(net.owner[i]!=static_cast<int>(i)||!net.members[i].empty()||n.kind!=1||n.flex||group[i]<0)continue;
         Dionica& d=all[group[i]];d.ducts.push_back(n.id);{const Manual m=manualOf(n.id);if(m.on&&!d.manual.on)d.manual=m;}
-        const double v=tvsDuctSizing::velocity(r.flow[i],n.a*f,n.b*f,n.round);
-        if(d.worst<0||v>d.v){d.worst=static_cast<int>(i);d.v=v;d.flow=r.flow[i];d.round=n.round;d.a=n.a*f;d.b=n.round?0:n.b*f;}}
+        const double q=r.flow[pieceOf(net,r,static_cast<int>(i))];
+        const double v=tvsDuctSizing::velocity(q,n.a*f,n.b*f,n.round);
+        if(d.worst<0||v>d.v){d.worst=static_cast<int>(i);d.v=v;d.flow=q;d.round=n.round;d.a=n.a*f;d.b=n.round?0:n.b*f;}}
     std::vector<Dionica> fast;
     for(int g=0;g<count;++g){Dionica& d=all[g];if(d.worst<0||d.v<=vmax+1e-9)continue;
         if(d.round)d.width=tvsDuctSizing::diameter(d.flow,vmax);
@@ -222,8 +325,10 @@ inline void planItems(const Net& net,const std::vector<int>& groups,double f,std
     const size_t n=net.nodes.size();items.assign(n,Item());
     for(size_t i=0;i<n;++i){Item& it=items[i];const tvsMove::Node& nd=net.nodes[i];
         if(net.owner[i]!=static_cast<int>(i))continue;   // member of an etaz / obilazak: no ports of its own
+        if(i>=net.real)continue;                           // rešetka na dnu: pieces / tap junctions are not in the drawing
         it.group=i<groups.size()?groups[i]:-1;
-        for(size_t p=0;p<net.bodies[i].ports.size();++p)it.ports.push_back(planUse::pt(net.bodies[i].ports[p]));
+        const std::vector<tvsMoveGeometry::Point>& ps=net.whole[i].empty()?net.bodies[i].ports:net.whole[i];   // a split duct: its drawing ends
+        for(size_t p=0;p<ps.size();++p)it.ports.push_back(planUse::pt(ps[p]));
         const Section own(nd.a,nd.round?0:nd.b,nd.round);
         it.s.assign(it.ports.size(),own);
         for(size_t p=0;p<nd.sections.size()&&p<it.s.size();++p)it.s[p]=Section(nd.sections[p].a,nd.sections[p].round?0:nd.sections[p].b,nd.sections[p].round);
@@ -271,10 +376,10 @@ inline const wchar_t* issueText(int code){
 }
 // Joints of the resized ducts that were joined before and are not now (plan, tol).
 inline int brokenJoints(AcDbDatabase* db,double tol,const std::vector<AcDbObjectId>& ids,const std::vector<int>& joinedBefore,tvsDionicaPlan::P& where){
-    Net net;if(!read(db,tol,net))return -1;std::vector<tvsFlowNetwork::Element> el;elements(net,el);
+    Net net;if(!read(db,tol,net))return -1;std::vector<tvsFlowNetwork::Element> el;elements(net,el,true);   // the drawing (rešetka na dnu: not split)
     std::vector<std::vector<std::vector<std::pair<int,int> > > > c;tvsFlowNetwork::contacts(el,tol,c);
     int broken=0;
-    for(size_t k=0;k<ids.size();++k){int i=-1;for(size_t j=0;j<net.nodes.size();++j)if(net.nodes[j].id==ids[k])i=static_cast<int>(j);if(i<0)continue;
+    for(size_t k=0;k<ids.size();++k){int i=-1;for(size_t j=0;j<net.real&&i<0;++j)if(net.nodes[j].id==ids[k])i=static_cast<int>(j);if(i<0)continue;
         int joined=0;for(size_t p=0;p<c[i].size();++p)if(!c[i][p].empty())++joined;else where=el[i].ports[p];
         if(joined<joinedBefore[k])broken+=joinedBefore[k]-joined;}
     return broken;
@@ -282,7 +387,7 @@ inline int brokenJoints(AcDbDatabase* db,double tol,const std::vector<AcDbObject
 inline bool applySize(AcDbDatabase* db,const Net& net,double f,double tol,const ApplyRequest& q,std::set<AcDbObjectId>& written){
     using namespace tvsDionicaPlan;
     std::vector<Item> items;planItems(net,q.groups,f,items);
-    int worst=-1;for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==q.worst)worst=static_cast<int>(i);
+    int worst=-1;for(size_t i=0;i<net.real&&worst<0;++i)if(net.nodes[i].id==q.worst)worst=static_cast<int>(i);
     if(worst<0||items[worst].kind!=Duct){acutPrintf(L"\nPrimijeni: kanal dionice nije prepoznat.");return false;}
     const Section was=items[worst].s[0],S(q.a/f,q.round?0:q.b/f,q.round);
     if(was.round!=S.round){acutPrintf(L"\nPrimijeni: promjena oblika (pravougaoni / okrugli) još nije podržana – Zadrži ručno i promijenite ručno.");return false;}
@@ -302,7 +407,7 @@ inline bool applySize(AcDbDatabase* db,const Net& net,double f,double tol,const 
      if(k==RTCAN||(k==RTNORM&&_wcsicmp(kw,L"Ne")==0)){acutPrintf(L"\nNišta nije promijenjeno.");return false;}}
     // joints of the resized ducts now, for the check afterwards
     std::vector<AcDbObjectId> resizedIds;std::vector<int> joinedBefore;
-    {std::vector<tvsFlowNetwork::Element> el;elements(net,el);std::vector<std::vector<std::vector<std::pair<int,int> > > > c;tvsFlowNetwork::contacts(el,tol,c);
+    {std::vector<tvsFlowNetwork::Element> el;elements(net,el,true);std::vector<std::vector<std::vector<std::pair<int,int> > > > c;tvsFlowNetwork::contacts(el,tol,c);
      for(size_t k=0;k<pl.resized.size();++k){const int i=pl.resized[k];if(items[i].kind!=Duct)continue;resizedIds.push_back(net.nodes[i].id);
         int j=0;for(size_t p=0;p<c[i].size();++p)if(!c[i][p].empty())++j;joinedBefore.push_back(j);}}
     const bool wasApplying=tvsSizeFollow::applying();tvsSizeFollow::applying()=true;
@@ -376,12 +481,9 @@ inline void sizes(AcDbDatabase* db,Net& net,tvsFlowNetwork::Result& r,std::vecto
                 if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
             if(labels)acutPrintf(L"\nAžurirano oznaka: %d.",labels);}
         Net again;if(!read(db,tol,again)){acutPrintf(L"\nTVS_PROTOK: crtež se ne može ponovo pročitati.");return;}
-        net=again;int root=-1;for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==rootId)root=net.owner[i];
-        if(root<0){acutPrintf(L"\nTVS_PROTOK: početni element mreže više ne postoji.");return;}
-        int port=-1;double nearest=0;
-        for(size_t p=0;p<net.bodies[root].ports.size();++p){const tvsMoveGeometry::Point& x=net.bodies[root].ports[p];
-            const double d=std::hypot(x.x-rootPoint.x,x.y-rootPoint.y);if(port<0||d<nearest){port=static_cast<int>(p);nearest=d;}}
-        elements(net,el);r=tvsFlowNetwork::solve(el,root,port,tol);
+        net=again;int root=-1,port=-1;
+        if(!rootOf(net,rootId,rootPoint.x,rootPoint.y,root,port)){acutPrintf(L"\nTVS_PROTOK: početni element mreže više ne postoji.");return;}
+        elements(net,el);verticalJoints(net,el,tol);r=tvsFlowNetwork::solve(el,root,port,tol);
         equipmentFlows(net,el,r,root,port,tol,L"TVS_PROTOK",true);
         if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
     }
@@ -395,20 +497,17 @@ inline void execute(UINT sizingDialog){
     AcDbObjectId pickedId;if(acdbGetObjectId(pickedId,picked)!=Acad::eOk)return;
     Net net;
     if(!read(db,tol,net)){acutPrintf(L"\nTVS_PROTOK: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
-    int root=-1;for(size_t i=0;i<net.nodes.size();++i)if(net.nodes[i].id==pickedId)root=net.owner[i];
-    if(root<0||net.bodies[root].ports.empty()){acutPrintf(L"\nTVS_PROTOK: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
     ads_point w;if(tvsCoordinates::transformPoint(at,1,0,w)!=RTNORM)return;
-    int port=-1;double nearest=0;
-    for(size_t p=0;p<net.bodies[root].ports.size();++p){const double d=std::hypot(net.bodies[root].ports[p].x-w[0],net.bodies[root].ports[p].y-w[1]);
-        if(port<0||d<nearest){port=static_cast<int>(p);nearest=d;}}
-    std::vector<tvsFlowNetwork::Element> el;elements(net,el);
+    int root=-1,port=-1;   // a split duct (rešetka na dnu): the piece with the nearest end
+    if(!rootOf(net,pickedId,w[0],w[1],root,port)){acutPrintf(L"\nTVS_PROTOK: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
+    std::vector<tvsFlowNetwork::Element> el;elements(net,el);verticalJoints(net,el,tol);
     tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
     if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
     equipmentFlows(net,el,r,root,port,tol,L"TVS_PROTOK");
     if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
     // terminals without a flow
     std::vector<int> missing;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))missing.push_back(r.terminals[k]);
-    int reached=0;for(size_t i=0;i<net.nodes.size();++i)if(r.reached[net.owner[i]])++reached;
+    int reached=0;for(size_t i=0;i<net.real;++i)if(r.reached[pieceOf(net,r,net.owner[i])])++reached;
     acutPrintf(L"\nTVS_PROTOK: mreža ima %d elemenata, krajnjih elemenata %d (bez protoka %d), ukupno %.0f m³/h.",
                reached,static_cast<int>(r.terminals.size()),static_cast<int>(missing.size()),r.total);
     if(!missing.empty()){
@@ -425,7 +524,7 @@ inline void execute(UINT sizingDialog){
                 if(g==RTKWORD)break;
                 if(g==RTNORM)el[i].flow=q;
             }
-            r=tvsFlowNetwork::solve(el,root,port,tol);
+            r=tvsFlowNetwork::solve(el,root,port,tol);closedEnds(net,r,root);
             if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
             int still=0;for(size_t k2=0;k2<r.terminals.size();++k2)if(!(el[r.terminals[k2]].flow>0))++still;
             acutPrintf(L"\nTVS_PROTOK: ukupno %.0f m³/h; krajnjih elemenata bez protoka %d.",r.total,still);
@@ -439,7 +538,7 @@ inline void execute(UINT sizingDialog){
     fastest(net,r,f);
     // what changes
     std::vector<int> change;
-    for(size_t i=0;i<net.nodes.size();++i){const int o=net.owner[i];if(net.linked[i]&&!net.records[i].terminal())continue;   // inline oprema keeps no flow
+    for(size_t i=0;i<net.real;++i){const int o=pieceOf(net,r,net.owner[i]);if(net.linked[i]&&!net.records[i].terminal())continue;   // inline oprema keeps no flow; a split duct: its upstream piece
         if(r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>1e-6)change.push_back(static_cast<int>(i));}
     if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return;}
     {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
@@ -451,12 +550,12 @@ inline void execute(UINT sizingDialog){
     {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
         if(net.linked[i]){   // linked terminal (oprema): the flow goes into its record (qTerminal), not into a duct
-            tvsEquipment::Record rec=net.records[i];rec.qTerminal=r.flow[net.owner[i]];AcDbEntity* b=tx.write(net.nodes[i].id);
+            tvsEquipment::Record rec=net.records[i];rec.qTerminal=r.flow[pieceOf(net,r,net.owner[i])];AcDbEntity* b=tx.write(net.nodes[i].id);
             if(!b||tvsEquipmentStore::write(b,rec)!=Acad::eOk){const tvsMoveGeometry::Point c=centre(el[net.owner[i]]);
                 acutPrintf(L"\nTVS_PROTOK: oprema kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return;}
             written.insert(net.nodes[i].id);continue;}
         TVS_Entity* t=TVS_Entity::cast(tx.write(net.nodes[i].id));
-        if(!t||t->put_Flow(r.flow[net.owner[i]])!=Acad::eOk){
+        if(!t||t->put_Flow(r.flow[pieceOf(net,r,net.owner[i])])!=Acad::eOk){
             const tvsMoveGeometry::Point c=centre(el[net.owner[i]]);
             acutPrintf(L"\nTVS_PROTOK: element kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return;}
         t->recordGraphicsModified();written.insert(net.nodes[i].id);}
