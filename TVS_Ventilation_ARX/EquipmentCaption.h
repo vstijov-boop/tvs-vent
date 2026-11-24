@@ -54,7 +54,9 @@ public:
         if(wd->regenType()==kAcGiForExplode||wd->regenType()==kAcGiSaveWorldDrawForProxy)return done;   // never into EXPLODE / proxy graphics
         AcDbDatabase* db=ref->database();if(!db||!tvsDuctCaption::enabled(db))return done;
         tvsEquipment::Record r;std::wstring text;int colour=3;
-        if(tvsEquipmentStore::read(ref,r))text=linkedText(r);
+        if(tvsEquipmentStore::read(ref,r)){
+            if(tvsEquipmentStore::detached(ref,r)){text=L"- "+(r.tag.empty()?nameOf(ref):r.tag)+L" odvojen (TVS_OPREMA)";colour=1;}   // moved / copied after linking
+            else text=linkedText(r);}
         else{const std::wstring n=nameOf(ref);tvsEquipment::Record d;
             if(n.empty()||n[0]==L'*'||!tvsEquipmentStore::readDefault(db,n.c_str(),d))return done;
             text=L"- "+n;colour=1;}

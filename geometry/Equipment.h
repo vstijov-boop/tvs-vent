@@ -83,11 +83,15 @@ struct Record {
     double qNominal;      // m3/h (Nominal)
     double qTerminal;     // m3/h, terminals: design flow (0 = not set, TVS_PROTOK)
     std::vector<std::pair<double,double> > curve;   // Curve: (q m3/h, dp Pa), q ascending
+    // anchor: block insertion point (drawing units) and rotation when it was linked (TVS_OPREMA /
+    // TVS_RESETKA). A block moved or copied afterwards (MOVE, COPY, grips) no longer matches its
+    // ports: it is "odvojen" - red caption, left out of the network until linked again.
+    bool anchored;double ax,ay,arot;
     int mount;            // Mount (terminals)
     double neckA,neckB;   // mm, grille connection (Bottom); 0 = take the duct size
     bool neckRound;
     Record():version(1),kind(Other),ports(2),mmPerUnit(1),round(false),a(0),b(0),lengthMm(0),
-             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false){}
+             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),anchored(false),ax(0),ay(0),arot(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false){}
     bool terminal()const{return ports==1;}
 };
 
@@ -103,6 +107,14 @@ inline double curveLoss(const std::vector<std::pair<double,double> >& c,double q
 // True when q is outside the catalogue range of a Curve record (extrapolated).
 inline bool curveOutside(const Record& r,double q){
     return r.model==Curve&&!r.curve.empty()&&(q<r.curve.front().first*(1-1e-9)||q>r.curve.back().first*(1+1e-9));
+}
+// True when a linked block is no longer where it was linked (moved / copied): insertion point
+// farther than tol (drawing units) or rotation different by more than 1e-6 rad.
+inline bool detached(const Record& r,double x,double y,double rot,double tol){
+    if(!r.anchored)return false;
+    if(std::hypot(x-r.ax,y-r.ay)>tol)return true;
+    const double twoPi=6.283185307179586;double d=std::fmod(std::fabs(rot-r.arot),twoPi);if(d>twoPi/2)d=twoPi-d;
+    return d>1e-6;
 }
 // Pressure loss [Pa] at flow q [m3/h]; pv = velocity pressure [Pa] of the duct at the port
 // (only the Zeta model needs it). Never negative.
@@ -139,6 +151,7 @@ inline std::wstring format(const Record& r){
     put(L"dpn",num(r.dpNominal));put(L"qn",num(r.qNominal));put(L"q",num(r.qTerminal));
     if(r.mount!=AtEnd)put(L"mount",num(r.mount));
     if(r.neckA>0){put(L"na",num(r.neckA));put(L"nb",num(r.neckB));put(L"nr",num(r.neckRound?1:0));}
+    if(r.anchored)put(L"anc",num(r.ax)+L","+num(r.ay)+L","+num(r.arot));
     if(!r.curve.empty()){std::wstring c;for(size_t i=0;i<r.curve.size();++i){if(i)c+=L",";c+=num(r.curve[i].first)+L":"+num(r.curve[i].second);}put(L"curve",c);}
     for(int k=0;k<2&&k<r.ports;++k){const wchar_t* p=k==0?L"p0":L"p1";const Port& t=r.port[k];
         put(p,num(t.x)+L","+num(t.y)+L","+num(t.z)+L","+num(t.dx)+L","+num(t.dy));}
@@ -180,6 +193,11 @@ inline bool parse(const std::wstring& s,Record& r){
         else if(key==L"na"&&n)r.neckA=v;
         else if(key==L"nb"&&n)r.neckB=v;
         else if(key==L"nr"&&n)r.neckRound=v!=0;
+        else if(key==L"anc"){
+            double c[3]={0,0,0};int k=0;std::wstring part;
+            for(size_t j=0;j<=val.size()&&k<3;++j){if(j==val.size()||val[j]==L','){double x=0;if(number(part,x))c[k]=x;++k;part.clear();}else part+=val[j];}
+            if(k==3){r.anchored=true;r.ax=c[0];r.ay=c[1];r.arot=c[2];}
+        }
         else if(key==L"curve"){
             std::wstring part;
             for(size_t j=0;j<=val.size();++j){

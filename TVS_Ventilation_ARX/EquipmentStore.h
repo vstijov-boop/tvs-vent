@@ -62,6 +62,17 @@ inline Acad::ErrorStatus write(AcDbObject* o,const tvsEquipment::Record& r){
     if(es==Acad::eOk)if(AcDbEntity* e=AcDbEntity::cast(o))e->recordGraphicsModified();
     return es;
 }
+// Anchor (geometry/Equipment.h): the block's insertion point and rotation now - only the link
+// commands set it, right before writing the record (the properties dialog / TVS_PROTOK keep it).
+inline void anchor(const AcDbObject* o,tvsEquipment::Record& r){
+    const AcDbBlockReference* b=AcDbBlockReference::cast(o);if(!b)return;
+    r.anchored=true;r.ax=b->position().x;r.ay=b->position().y;r.arot=b->rotation();
+}
+inline double anchorTol(){return 1e-4;}   // drawing units
+inline bool detached(const AcDbObject* o,const tvsEquipment::Record& r){
+    const AcDbBlockReference* b=AcDbBlockReference::cast(o);
+    return b&&tvsEquipment::detached(r,b->position().x,b->position().y,b->rotation(),anchorTol());
+}
 // Unlink: the record is removed, the block stays as it is.
 inline Acad::ErrorStatus remove(AcDbObject* o){
     if(!o||!o->isWriteEnabled())return Acad::eInvalidInput;const AcDbObjectId dictId=o->extensionDictionary();if(dictId.isNull())return Acad::eOk;

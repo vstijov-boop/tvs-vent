@@ -170,7 +170,7 @@ inline std::wstring validate(const tvsEquipment::Record& r){
 // ---- per block name ------------------------------------------------------------------------
 // Record stored as the default of a block name: without ports, tag and flow.
 inline tvsEquipment::Record typeDefault(const tvsEquipment::Record& r){
-    tvsEquipment::Record d=r;d.tag.clear();d.qTerminal=0;d.port[0]=tvsEquipment::Port();d.port[1]=tvsEquipment::Port();
+    tvsEquipment::Record d=r;d.tag.clear();d.qTerminal=0;d.port[0]=tvsEquipment::Port();d.port[1]=tvsEquipment::Port();d.anchored=false;
     return d;
 }
 // Kind, note and the loss model with its values from `from` onto `to`; true = `to` changed.

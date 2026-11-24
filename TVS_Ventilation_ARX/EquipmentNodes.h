@@ -48,14 +48,17 @@ inline bool describe(const AcDbBlockReference* b,double f,tvsMove::Node& n,tvsEq
 }
 // Appends the linked blocks to `nodes` (records: same order, optional). snapTol > 0: the port z
 // is taken from the end of another node lying on it in plan (within snapTol, drawing units).
-inline bool append(AcDbDatabase* db,std::vector<tvsMove::Node>& nodes,std::vector<tvsEquipment::Record>* records,double snapTol){
+// detached (optional): linked blocks moved / copied after linking - left out of the network.
+inline bool append(AcDbDatabase* db,std::vector<tvsMove::Node>& nodes,std::vector<tvsEquipment::Record>* records,double snapTol,std::vector<AcDbObjectId>* detached=NULL){
     if(!db)return false;const double f=tvsUnits::factor(db);const size_t before=nodes.size();
     AcDbObjectPointer<AcDbBlockTableRecord> space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return false;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return false;
     for(;!it->done();it->step()){
         AcDbEntity* e=NULL;if(it->getEntity(e,AcDb::kForRead)!=Acad::eOk)continue;
         if(const AcDbBlockReference* b=AcDbBlockReference::cast(e)){tvsMove::Node n;tvsEquipment::Record r;
-            if(describe(b,f,n,r)){nodes.push_back(n);if(records)records->push_back(r);}}
+            if(describe(b,f,n,r)){
+                if(tvsEquipmentStore::detached(b,r)){if(detached)detached->push_back(b->objectId());}   // moved / copied: not in the network
+                else{nodes.push_back(n);if(records)records->push_back(r);}}}
         e->close();
     }
     delete it;

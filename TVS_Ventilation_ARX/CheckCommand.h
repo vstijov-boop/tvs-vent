@@ -59,7 +59,8 @@ inline void execute(){
      if(rc==RTNORM){Int32 n=0;acedSSLength(ss,&n);for(Int32 i=0;i<n;++i){ads_name e;AcDbObjectId id;if(acedSSName(ss,i,e)==RTNORM&&acdbGetObjectId(id,e)==Acad::eOk)limit.insert(id);}acedSSFree(ss);}}
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;std::vector<tvsEquipment::Record> recs;
     const bool snapped=tvsMove::snapshot(db,nodes,labels);const size_t tvs=nodes.size();
-    if(!snapped||!tvsEquipmentNodes::append(db,nodes,&recs,0)){acutPrintf(L"\nTVS_PROVJERA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
+    std::vector<AcDbObjectId> detached;
+    if(!snapped||!tvsEquipmentNodes::append(db,nodes,&recs,0,&detached)){acutPrintf(L"\nTVS_PROVJERA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
     std::vector<tvsNetworkCheck::Item> items(nodes.size());
     for(size_t i=0;i<nodes.size();++i){const tvsMove::Node& n=nodes[i];tvsNetworkCheck::Item& it=items[i];
         it.kind=n.kind;it.flex=n.flex;
@@ -75,6 +76,9 @@ inline void execute(){
     for(size_t k=0;k<all.size();++k)if(limit.empty()||limit.count(nodes[all[k].a].id)||(all[k].b>=0&&limit.count(nodes[all[k].b].id)))issues.push_back(all[k]);
     int count[8]={0};for(size_t k=0;k<issues.size();++k)++count[issues[k].type];
     acutPrintf(L"\nTVS_PROVJERA: elemenata %d, problema %d.",static_cast<int>(limit.empty()?nodes.size():limit.size()),static_cast<int>(issues.size()));
+    for(size_t k=0;k<detached.size();++k){if(!limit.empty()&&!limit.count(detached[k]))continue;
+        AcDbHandle h=detached[k].handle();ACHAR hs[32]={0};h.getIntoAsciiBuffer(hs);
+        acutPrintf(L"\n  oprema (handle %ls): blok pomjeren ili kopiran poslije povezivanja – nije u mreži; ponovo TVS_OPREMA.",hs);}
     if(issues.empty())return;
     acutPrintf(L"\n  dimenzije bez prelaza: %d, kota: %d, promašen priključak: %d, kraj usred kanala: %d, ugao koljena: %d, kratki kanali: %d, oprema: %d",
                count[1],count[2],count[3],count[4],count[5],count[6],count[7]);

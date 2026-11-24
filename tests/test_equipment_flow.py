@@ -29,7 +29,7 @@ class EquipmentFlow(unittest.TestCase):
   s=text('TVS_Ventilation_ARX/SizeFollow.h')
   self.assertIn('return L"oprema";',s);self.assertEqual(s.count('tvsEquipmentNodes::append(db,nodes,NULL,0)'),2)
   c=text('TVS_Ventilation_ARX/CheckCommand.h')
-  self.assertIn('oprema: priključak ne naliježe na kanal',c);self.assertIn('tvsEquipmentNodes::append(db,nodes,&recs,0)',c);self.assertIn('int count[8]',c)
+  self.assertIn('oprema: priključak ne naliježe na kanal',c);self.assertIn('tvsEquipmentNodes::append(db,nodes,&recs,0,&detached)',c);self.assertIn('int count[8]',c)
   self.assertIn('oprema: rešetka na dnu nije na osi kanala',c);self.assertIn('recs[i-tvs].mount==tvsEquipment::Bottom',c)
   self.assertIn('tvsEquipmentNodes::outlet(n,o)',c);self.assertIn('it.s[1].vertical=true;it.s[1].outlet=o.level;',c)
  def test_elbow_outlet(self):   # terminal at the vertical outlet of a koljeno gore / dolje

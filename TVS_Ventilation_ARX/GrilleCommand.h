@@ -300,7 +300,7 @@ inline void execute(UINT idd,double collar){
         rec.neckA=dg.aMm;rec.neckB=dg.round?0:dg.bMm;rec.neckRound=dg.round;
         tvsEquipment::Port& q=rec.port[0];q.x=p.tap.x;q.y=p.tap.y;q.z=elev;q.dx=0;q.dy=0;
         tvsAction::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_RESETKA: transakcija nije pokrenuta. Ništa nije promijenjeno.");return;}
-        AcDbObject* b=tx.open(blockId,AcDb::kForWrite);const Acad::ErrorStatus es=b?tvsEquipmentStore::write(b,rec):tx.status;
+        AcDbObject* b=tx.open(blockId,AcDb::kForWrite);if(b)tvsEquipmentStore::anchor(b,rec);const Acad::ErrorStatus es=b?tvsEquipmentStore::write(b,rec):tx.status;
         if(es!=Acad::eOk||!tx.commit()){acutPrintf(L"\nTVS_RESETKA: zapis nije upisan (%ls). Ništa nije promijenjeno.",acadErrorStatusText(es!=Acad::eOk?es:tx.status));return;}
         CString neck;if(dg.round)neck.Format(L"Ø%.0f",dg.aMm);else neck.Format(L"%.0f×%.0f",dg.aMm,dg.bMm);
         acutPrintf(L"\nTVS_RESETKA: rešetka „%ls“ povezana na dnu kanala %ls (priključak %ls mm, %.0f mm od početka kanala); ništa nije nacrtano.",
@@ -324,6 +324,7 @@ inline void execute(UINT idd,double collar){
             const double turn=gc::turnAngle(gc::V(localDown.x,localDown.y),e.outward);
             const AcGeMatrix3d m=AcGeMatrix3d::translation(target-pos)*AcGeMatrix3d::rotation(turn,AcGeVector3d::kZAxis,pos);
             if(ref->transformBy(m)!=Acad::eOk){failed=L"blok se ne može pomjeriti";break;}
+            tvsEquipmentStore::anchor(ref,rec);
             if(tvsEquipmentStore::write(ref,rec)!=Acad::eOk){failed=L"zapis opreme nije upisan";break;}
         }while(false);
         if(failed||!tx.commit()){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",failed?failed:L"transakcija nije završena");return;}
@@ -385,6 +386,7 @@ inline void execute(UINT idd,double collar){
         const double turn=gc::turnAngle(gc::V(localDown.x,localDown.y),y.outward);
         const AcGeMatrix3d m=AcGeMatrix3d::translation(target-pos)*AcGeMatrix3d::rotation(turn,AcGeVector3d::kZAxis,pos);
         if(ref->transformBy(m)!=Acad::eOk){failed=L"blok se ne može pomjeriti";break;}
+        tvsEquipmentStore::anchor(ref,rec);
         if(tvsEquipmentStore::write(ref,rec)!=Acad::eOk){failed=L"zapis opreme nije upisan";break;}
     }while(false);
     if(failed||!tx.commit()){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",failed?failed:L"transakcija nije završena");return;}

@@ -101,6 +101,7 @@ inline bool readScene(AcDbDatabase* db,Scene& s){
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return false;
     for(;!it->done();it->step()){AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk||id.objectClass()!=AcDbBlockReference::desc())continue;
         tvsEquipment::Record r;if(!tvsEquipmentStore::read(id,r))continue;
+        {AcDbObjectPointer<AcDbBlockReference> b(id,AcDb::kForRead);if(b.openStatus()!=Acad::eOk||tvsEquipmentStore::detached(b.object(),r))continue;}   // moved / copied: its old ports are not taken
         for(int k=0;k<r.ports&&k<2;++k){EquipPort p;p.id=id;p.at=lk::Pt(r.port[k].x,r.port[k].y);s.equipment.push_back(p);}}
     delete it;return true;
 }
@@ -217,7 +218,8 @@ inline bool apply(const AcDbObjectId& blockId,const lk::Result& r,const std::vec
         if(p->put_Lastpoint(keep)!=Acad::eOk)return false;
         p->recordGraphicsModified();
     }
-    AcDbObject* b=tx.open(blockId,AcDb::kForWrite);if(!b||tvsEquipmentStore::write(b,rec)!=Acad::eOk)return false;
+    AcDbObject* b=tx.open(blockId,AcDb::kForWrite);if(b)tvsEquipmentStore::anchor(b,rec);   // where it was linked (moved / copied later = odvojen)
+    if(!b||tvsEquipmentStore::write(b,rec)!=Acad::eOk)return false;
     if(!tx.commit())return false;
     // the scene follows (next blocks of this command)
     for(size_t k=0;k<r.edits.size();++k){const lk::EndEdit& e=r.edits[k];tvsMove::Node& n=s.nodes[index[e.duct]];
@@ -270,7 +272,8 @@ inline void execute(){
     if(blocks.empty()){acutPrintf(L"\nTVS_OPREMA: nema izabranih blokova.");return;}
     Scene scene;if(!readScene(db,scene)){acutPrintf(L"\nTVS_OPREMA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
     // already linked: again only when asked
-    int linked=0;for(size_t k=0;k<blocks.size();++k){tvsEquipment::Record r;if(tvsEquipmentStore::read(blocks[k],r))++linked;}
+    int linked=0;for(size_t k=0;k<blocks.size();++k){AcDbObjectPointer<AcDbBlockReference> b(blocks[k],AcDb::kForRead);tvsEquipment::Record r;
+        if(b.openStatus()==Acad::eOk&&tvsEquipmentStore::read(b.object(),r)&&!tvsEquipmentStore::detached(b.object(),r))++linked;}   // odvojeni (moved / copied) are linked again without asking
     bool relink=false;
     if(linked){
         wchar_t prompt[160];swprintf_s(prompt,L"\nTVS_OPREMA: već povezanih blokova: %d. Povezati ih ponovo [Da/Ne] <Ne>: ",linked);
@@ -292,7 +295,7 @@ inline void execute(){
           if(btr->isFromExternalReference()||btr->isLayout()){++t.xref;continue;}}
          name=blockName(id,ref->blockTableRecord());
          wasLinked=tvsEquipmentStore::read(ref.object(),old);
-         if(wasLinked&&!relink){++t.skippedLinked;continue;}
+         if(wasLinked&&!relink&&!tvsEquipmentStore::detached(ref.object(),old)){++t.skippedLinked;continue;}
          at=lk::Pt(ref->position().x,ref->position().y);   // insertion point (WCS)
          if(std::fabs(std::fabs(ref->normal().z)-1)>1e-6)reason=NotPlan;
          else if(!footprint(ref.object(),block))reason=NoGeometry;}

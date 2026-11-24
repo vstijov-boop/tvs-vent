@@ -11,8 +11,14 @@ class Caption(unittest.TestCase):
   self.assertIn('isPlotGeneration()',s);self.assertIn('busy()=true;es=ref->getGeomExtents(ext);busy()=false;',s)
   self.assertIn('tvsDuctCaption::enabled(db)',s)
   self.assertIn('std::wstring s=L"+ ";',s);self.assertIn('text=L"- "+n;',s)
+  self.assertIn('tvsEquipmentStore::detached(ref,r)',s)   # moved / copied: red
   self.assertEqual(s.count('{'),s.count('}'))
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/EquipmentCaption.h').read_bytes().startswith(b'\xef\xbb\xbf'))
+ def test_anchor_set_by_link_commands(self):
+  for p,n in (('TVS_Ventilation_ARX/EquipmentLinkCommand.h',1),('TVS_Ventilation_ARX/GrilleCommand.h',3)):
+   self.assertEqual(text(p).count('tvsEquipmentStore::anchor('),n,p)
+  for p in ('TVS_Ventilation_ARX/EquipmentDialog.h','TVS_Ventilation_ARX/FlowCommand.h'):self.assertNotIn('tvsEquipmentStore::anchor(',text(p))
+  self.assertIn('if(tvsEquipmentStore::detached(b,r))',text('TVS_Ventilation_ARX/EquipmentNodes.h'))
  def test_registered(self):
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
   self.assertIn('#include "EquipmentCaption.h"',e)
