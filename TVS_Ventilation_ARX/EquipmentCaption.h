@@ -52,7 +52,11 @@ public:
         AcDbBlockReference* ref=AcDbBlockReference::cast(subject);
         if(!ref||!wd||busy()||wd->context()->isPlotGeneration())return done;
         if(wd->regenType()==kAcGiForExplode||wd->regenType()==kAcGiSaveWorldDrawForProxy)return done;   // never into EXPLODE / proxy graphics
-        AcDbDatabase* db=ref->database();if(!db||!tvsDuctCaption::enabled(db))return done;
+        // only blocks of the drawing being edited: never xref inserts / blocks inside xrefs (their
+        // database is not the working one) - big xref'd plans redraw a lot (user crash report 24.11.)
+        AcDbDatabase* db=ref->database();
+        if(!db||db!=acdbHostApplicationServices()->workingDatabase())return done;
+        if(!tvsDuctCaption::enabled(db))return done;
         tvsEquipment::Record r;std::wstring text;int colour=3;
         if(tvsEquipmentStore::read(ref,r)){
             if(tvsEquipmentStore::detached(ref,r)){text=L"- "+(r.tag.empty()?nameOf(ref):r.tag)+L" odvojen (TVS_OPREMA)";colour=1;}   // moved / copied after linking
