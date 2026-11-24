@@ -152,7 +152,7 @@ bool XRecordXdataHelper::getObjectIdXrecord(const AcDbObjectId &objectId, const 
 {
 	resbuf *rb;
 
-	if (!getXRecordResbuf(objectId, paramName, rb)) return false;
+	if (!getXRecordResbuf(objectId, paramName, rb) || !rb) return false;
 
 	if (rb->restype == AcDb::kDxfHardPointerId) {
 		if (acdbGetObjectId(objId, rb->resval.rlname) == Acad::eOk) {
@@ -187,28 +187,27 @@ bool XRecordXdataHelper::getXDataResbuf(const AcDbObjectPointer<AcDbObject> &pOb
 
 bool XRecordXdataHelper::getXRecordResbuf(const AcDbObjectId &objectId, const ACHAR * paramName, resbuf *&rb)
 {
-	//create or get extension dictionary
+	// Read only (2026-11-24): the old version opened every object for WRITE and, for an object whose
+	// extension dictionary has no such entry (annotative MLeaders, bound xrefs, other add-ons), called
+	// rbChain on an uninitialised pointer -> AutoCAD crash in TVS_DIM_PRATI (label refresh).
+	rb = NULL;
 	AcDbObjectId dictId;
 	{
-		AcDbObjectPointer<AcDbObject> pobj(objectId, AcDb::kForWrite);
+		AcDbObjectPointer<AcDbObject> pobj(objectId, AcDb::kForRead);
 		if (pobj.openStatus() != Acad::eOk) return false;
 		dictId = pobj->extensionDictionary();
 	}
-
-	//Add xrecord to extension dictionary
-	AcDbObjectId xrecid;
-	AcDbXrecord * pXrec;
+	if (dictId.isNull()) return false;
+	AcDbObjectId xrecId;
 	{
-		AcDbObjectPointer<AcDbDictionary> pDict(dictId, AcDb::kForWrite);
+		AcDbObjectPointer<AcDbDictionary> pDict(dictId, AcDb::kForRead);
 		if (pDict.openStatus() != Acad::eOk) return false;
-		pDict->getAt(paramName, (AcDbObject*&)pXrec,
-			AcDb::kForRead);
+		if (pDict->getAt(paramName, xrecId) != Acad::eOk || xrecId.isNull()) return false;
 	}
-
-	//read xrecord
-	pXrec->rbChain(&rb);
-	pXrec->close();
-	return true;
+	AcDbObjectPointer<AcDbXrecord> pXrec(xrecId, AcDb::kForRead);
+	if (pXrec.openStatus() != Acad::eOk) return false;   // entry is not an xrecord
+	if (pXrec->rbChain(&rb) != Acad::eOk) { rb = NULL; return false; }
+	return rb != NULL;
 }
 
 resbuf* XRecordXdataHelper::findSubXdata(int tag, resbuf* xdata)
