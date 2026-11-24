@@ -39,3 +39,5 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–6 su urađene i na masteru; u 7
     - Redoslijed: prvo pouzdan dijalog T komada (cijeli čvor na jednom mjestu), tek onda ponovo dijalog dionice (stavka 14) – njegovi problemi (stajanje na koljenu, oblik koljena, redukcija na ogranku) su u logici obilaska, ne samo u zaključanim poljima.
     - Pregledati i ostale dijaloge (Svojstva, Etaž) na ista ograničenja.
 23. **MIRROR (AutoCAD) za okrugla koljena** *(prijavljeno 23. 11.; za jedan od sljedećih buildova)* – AutoCAD komanda MIRROR ne preslikava ispravno okrugla koljena (TVS_TAP, okrugla). Provjeriti `transformBy` / `getTransformedCopy` za okruglo koljeno pri preslikavanju (obrnut smjer luka / normala, radijus, priključci MA / MC i spoj sa kanalima), kao što radi za pravougaona koljena; test sa koljenom 30/45/60/90° i oba tipa radijusa.
+
+24. **TVS_POPRAVI** *(24. 11.)* – pregled i popravka zapisa crteža starijih buildova (RepairCommand.h); svaka nova promjena formata zapisa dobija ovdje svoju stavku.

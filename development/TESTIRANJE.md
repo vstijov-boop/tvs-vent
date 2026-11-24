@@ -357,3 +357,5 @@ Napomena: AutoCAD pri lijepljenju preračunava po INSUNITS (Drawing Units → In
 - **Kriva Q–Δp:** VAV blok → TVS_OPREMA_SVOJSTVA → Kriva Q–Δp, zalijepi iz Excela dvije kolone (npr. 500 20 / 1000 80 / 1500 200) → Primijeni; ponovo otvori dijalog: tačke se vide sortirane; TVS_PAD: red Oprema – Δp za protok dionice, napomena „van opsega“ kad je Q izvan tačaka; pogrešan unos (jedan broj, Q = 0, isti Q dvaput) → poruka, dijalog ostaje otvoren.
 
 - **Odvojen blok opreme:** TVS_NATPIS uključen; kopiraj povezan difuzor van kanala → kopija crvena „- … odvojen“, original zelen; MOVE povezanog bloka → crven; U → opet zelen; TVS_OPREMA na pomjerenom bloku → povezuje ga na novom mjestu; TVS_PAD ne računa kopiju dvaput; TVS_PROVJERA navodi odvojene blokove.
+
+- **TVS_POPRAVI (crtež starijeg builda):** otvori crtež rađen starijim buildom → TVS_POPRAVI: izvještaj (štucne sa zaostalim podatkom, zapisi T komada, konektori prema obrisanim objektima, oprema bez tačke povezivanja) → Da → „popravljeno n“; jedan U vraća sve. Zatim TVS_PROVJERA i operacije koje su rušile AutoCAD (spajanje koljenom).

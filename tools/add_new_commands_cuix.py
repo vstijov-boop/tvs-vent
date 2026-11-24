@@ -36,6 +36,7 @@ CMDS = [
  ('OPREMA_ODVEZI', 'Odveži opremu', 'Uklanja vezu bloka opreme sa mrežom kanala; blok i kanali ostaju u crtežu.', 'Crtanje kanala', 'Crtanje kanala', 'OO'),
  ('OPREMA_SVOJSTVA', 'Svojstva opreme', 'Vrsta, oznaka, opis / tip, model pada pritiska (Δp / ζ / Δp_n pri Q_n) i protok povezanih blokova opreme; primjena na sve blokove istog naziva.', 'Crtanje kanala', 'Crtanje kanala', 'OS'),
  ('RESETKA', 'Priključenje rešetke', 'Priključuje blok rešetke na kanal: bočno T komadom / štucnom sa ravnim ogrankom (blok se postavlja na kraj ogranka) ili u dno kanala (bez crtanja); povezuje rešetku u mrežu.', 'Crtanje kanala', 'Crtanje kanala', 'RS'),
+ ('POPRAVI', 'Popravka crteža', 'Pregled crteža rađenog starijim buildom: zaostali podaci štucni, nevažeći zapisi T komada, konektori prema obrisanim objektima, oprema bez tačke povezivanja – izvještaj, pa popravka (jedan U).', 'Crtanje kanala', 'Crtanje kanala', 'PC'),
 ]
 def clone(e, cmd, label, key):
     t = copy.deepcopy(e)

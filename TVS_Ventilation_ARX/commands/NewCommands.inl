@@ -110,6 +110,13 @@
         syncTVSGlobalUnits();
         tvsCheck::execute();
     }
+    // TVS_POPRAVI: crtež starijeg builda - zapisi koje nove funkcije drugačije čitaju (RepairCommand.h).
+    static void Ventilation_ARXTVS_POPRAVI(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsRepair::execute();
+    }
     // TVS_OZNAKE: printed duct labels size/flow on layer AT-DIM_KANAL (LabelCommand.h).
     static void Ventilation_ARXTVS_OZNAKE(void)
     {

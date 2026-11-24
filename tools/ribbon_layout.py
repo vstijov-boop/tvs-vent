@@ -22,7 +22,7 @@ LAYOUT = [
                              'Preračunaj jedinice']),
     ('Flex', None, ['Flex manžetne', 'Flex manžetna uklj/isklj']),
     ('Oprema', 'Oprema na mreži', ['Priključenje rešetke', 'Svojstva opreme', 'Odveži opremu']),
-    ('Proračun', 'Pad pritiska', ['Protoci mreže', 'Provjera mreže', 'Izvoz u DuctPressDrop']),
+    ('Proračun', 'Pad pritiska', ['Protoci mreže', 'Provjera mreže', 'Popravka crteža', 'Izvoz u DuctPressDrop']),
     ('Oznake', 'Oznaka elementa', ['Ažuriranje oznaka', 'Oznake kanala', 'Natpis kanala', 'Prikaz kota',
                                    'Poprečni presjek', 'Detalj obilaska']),
     ('Specifikacija', 'Specifikacija', ['Izvoz specifikacije u Excel', 'Izvoz bez TVS']),
