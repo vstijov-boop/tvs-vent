@@ -27,6 +27,7 @@
 #include "PortGrips.h"
 #include "LevelLabels.h"
 #include "TVS_WYE.h"
+#include "TeeOpenEnds.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_WYE::kCurrentVersionNumber =TVS_Version ;
@@ -337,6 +338,14 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 		massforarray2[6]=pG;
 		massforarray2[7]=pH;
 
+		if (tvsTeeOpenEnds::read(this)) {
+			// TK0 of a side grille (TVS_RESETKA): no cross lines at the run ends A-H and B-C,
+			// the duct walls run through (A-B far wall, C..H branch side)
+			setMainProperty(new AcDbLine(pA, pB));
+			AcDbPolyline* side = new AcDbPolyline;
+			for (int i = 2; i < 8; i++) side->addVertexAt(i - 2, AcGePoint2d(massforarray2[i].x, massforarray2[i].y));
+			setMainProperty(side);
+		} else {
 		AcDbPolyline*pLn=new AcDbPolyline;
 		for (int i=0;i<8; i++)
 		{
@@ -344,6 +353,7 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 		}
 		pLn->setClosed(true);
 		setMainProperty(pLn);
+		}
 		if (ThisRoundpr==true)//начало dпр-круглый
 		{
 

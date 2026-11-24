@@ -21,6 +21,7 @@
 #include "EquipmentStore.h"
 #include "DecimalText.h"
 #include "../TVS_Ventilation_DBX/TVS_WYE.h"
+#include "../TVS_Ventilation_DBX/TeeOpenEnds.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../geometry/GrilleConnect.h"
@@ -371,6 +372,9 @@ inline void execute(UINT idd,double collar){
             tvsTeeData::Record r;r.type=tvsTee::Tap;r.l=y.lengthPl;r.second=y.cone;r.radius2=o.margin;
             if(tvsTeeData::write(w,r)!=Acad::eOk){failed=L"tip štucne nije upisan";break;}}
         w->recordGraphicsModified();
+        // TK0 at the side: no cross lines at the run ends, the duct reads as continuous (user 2026-11-24;
+        // drawing only - the T komad stays in the network, specification and pressure drop)
+        if(y.teeType==tvsTee::Straight&&tvsTeeOpenEnds::write(w,true)!=Acad::eOk){failed=L"zapis T komada (bez krajeva) nije upisan";break;}
         if(y.teeType==tvsTee::Straight){const tvsTeeFit::Ports q=tvsTeeFit::ports(w);   // TK0: the TVS ports must be where the ducts go (stucna: tapRun, GrilleConnect.h)
          const AcGePoint3d inlet(y.runStart.x,y.runStart.y,z),outlet(y.runEnd.x,y.runEnd.y,z);
          if(!q.ok||tvsTeeFit::planDistance(q.p[0],inlet)>tol||tvsTeeFit::planDistance(q.p[1],outlet)>tol||tvsTeeFit::planDistance(q.p[2],branchPort)>tol){
