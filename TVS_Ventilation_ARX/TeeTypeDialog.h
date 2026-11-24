@@ -443,8 +443,9 @@ inline void apply(const Dialog& d){
         w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w->SizeAotv),w->SizeAotv);}
      else if(d.choice==Pants){w->SizeApr=b.tee.a;w->SizeBpr=w->SizeBotv;r.second=c.tee.a;r.radius2=tvsTee::defaultRadius(r.second);
         w->LengthPl=tvsTee::pantsLengthPl(r.l,w->SizeApr,r.second);}
-     else{w->ThisRoundotv=b.tee.round;w->SizeAotv=b.tee.a;w->SizeBotv=b.tee.round?0:b.tee.b;
-        if(d.choice==Tap){tvsTeeData::Record was;const bool cone=b.tee.round&&tvsTeeData::read(w.object(),was)&&tvsTeeCommand::conicalOf(was);   // konusna stays konusna
+     else{tvsTeeData::Record was;const bool wasCone=tvsTeeData::read(w.object(),was)&&tvsTeeCommand::conicalOf(was,w->SizeAotv);
+        w->ThisRoundotv=b.tee.round;w->SizeAotv=b.tee.a;w->SizeBotv=b.tee.round?0:b.tee.b;
+        if(d.choice==Tap){const bool cone=b.tee.round&&wasCone;   // konusna stays konusna
             tvsTeeCommand::tapRecord(r,w->SizeAotv,b.tee.round,cone,f);r.radius2=tvsTeeCommand::tapMargin(f);w->LengthPl=r.l;}else r.type=0;}
      if(d.flipped)w->Vectpr=-w->Vectpr;
      const Acad::ErrorStatus es=tvsTeeData::write(w.object(),r);

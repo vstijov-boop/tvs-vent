@@ -520,8 +520,9 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         AcDbObjectPointer<TVS_WYE> w(nodes[t.node].id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)continue;
         tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
         w->assertWriteEnabled();   // before the fields change (UNDO)
-        if(t.port==2){w->ThisRoundotv=round;w->SizeAotv=A;w->SizeBotv=round?0:B;   // D5b: the branch takes the shape too
-            if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,A,round,round&&tvsTeeCommand::conicalOf(r),f);w->LengthPl=r.l;}
+        if(t.port==2){const bool cone=typed&&tvsTeeCommand::conicalOf(r,w->SizeAotv);
+            w->ThisRoundotv=round;w->SizeAotv=A;w->SizeBotv=round?0:B;   // D5b: the branch takes the shape too
+            if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,A,round,round&&cone,f);w->LengthPl=r.l;}
             else if(typed&&r.type==tvsTee::Branch)w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(A),A);}
         else if(typed&&r.type==tvsTee::Branch){
             if(t.port==0){if(!(r.second>0))r.second=w->SizeApr;w->SizeApr=A;w->SizeBpr=round?0:B;}   // C keeps its width

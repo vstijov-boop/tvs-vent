@@ -1181,7 +1181,7 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 	tee = tvsTee::Tee(); tee.type = r.type; tee.l = r.l; tee.flange = tvsTeeData::flangeMm() / tvsUnits::factor(this);
 	if (r.type == tvsTee::Tap) {   // stucna SR5-3: collar = LengthPl, straight main
 		tee.A = SizeApr; tee.C = SizeApr; tee.w1 = SizeAotv; tee.l = LengthPl;
-		tee.round = ThisRoundotv; tee.cone = ThisRoundotv && r.second > 0 ? r.second : 0;   // okrugla / konusna stucna
+		tee.round = ThisRoundotv; tee.cone = ThisRoundotv && tvsTee::isCone(r.second, SizeAotv, r.l) ? r.second : 0;   // okrugla / konusna stucna
 		tee.margin = r.radius2 > 0 ? r.radius2 : 0;   // short run (25 mm beyond the footprint), 0 = old 2 L + w
 		double before = 0, after = 0; tvsTee::tapRun(tee, before, after);
 		origin = Basepoint - u * before; ey = u; ex = v;

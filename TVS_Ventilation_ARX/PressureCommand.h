@@ -69,7 +69,7 @@ inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
     if(TVS_TRANS* p=TVS_TRANS::cast(e.object())){t.kind=tvsPressure::Transition;t.length=p->LengthTr*f;return true;}
     if(TVS_WYE* p=TVS_WYE::cast(e.object())){t.kind=tvsPressure::Tee;
         tvsTeeData::Record rec;t.tee=tvsPressure::TeePlain;
-        if(tvsTeeData::read(p,rec)){t.cone=rec.type==tvsTee::Tap&&rec.second>0&&p->ThisRoundotv;}
+        if(tvsTeeData::read(p,rec)){t.cone=rec.type==tvsTee::Tap&&p->ThisRoundotv&&tvsTee::isCone(rec.second,p->SizeAotv,rec.l);}
         if(tvsTeeData::read(p,rec))t.tee=rec.type==tvsTee::Branch?tvsPressure::TeeBranch:rec.type==tvsTee::Pants?tvsPressure::TeePants:rec.type==tvsTee::Tap?tvsPressure::TeeTap:tvsPressure::TeePlain;
         if(n.ports.size()==3){const tvsPressure::XY m(p->Basepoint.x*f,p->Basepoint.y*f);t.line.clear();
             if(t.tee==tvsPressure::TeePants){t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}

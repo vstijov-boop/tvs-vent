@@ -42,6 +42,12 @@ inline double runLength(const Tee& t){if(t.type==Tap){double b,a;tapRun(t,b,a);r
 inline double tapLength(double w,double minimum){return 0.25*w>minimum?0.25*w:minimum;} // SR5-3: L = 0.25 w, >= 75 mm
 inline double coneLengthMm(){return 100;}                        // SR5-12: L = 4 in (100 mm)
 inline double coneBase(double d,double l){return d+2*l*0.26794919243112270;}   // sides at 15 deg
+// A stucna record is conical only when its "second" is the cone base of THIS branch and length
+// (as tapRecord writes it). Older drawings may carry another number there (e.g. the prolaz width C
+// kept from a TK-O changed to a stucna) - that must not turn into a cone (user report 2026-11-24).
+inline bool isCone(double second,double d,double l){
+    return second>0&&d>0&&l>0&&second-coneBase(d,l)<=1e-3*(d+l)&&coneBase(d,l)-second<=1e-3*(d+l);
+}
 inline bool valid(const Tee& t){
     if(t.type==Tap)return t.A>0&&t.w1>0&&t.l>0&&(!(t.cone>0)||(t.round&&t.cone>t.w1&&t.cone<=t.w1+2*t.l));
     if(!(t.A>0)||!(t.w1>0)||!(t.l>0)||!(t.R1>t.w1))return false;

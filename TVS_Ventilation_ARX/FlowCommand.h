@@ -426,7 +426,8 @@ inline bool applySize(AcDbDatabase* db,const Net& net,double f,double tol,const 
             tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
             w->assertWriteEnabled();
             if(x.op==TeeMain){w->SizeApr=S.a;w->SizeBpr=S.round?0:S.b;}
-            else{w->SizeAotv=S.a;w->SizeBotv=S.round?0:S.b;if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,S.a,S.round,tvsTeeCommand::conicalOf(r),f);w->LengthPl=r.l;}}
+            else{const bool cone=typed&&tvsTeeCommand::conicalOf(r,w->SizeAotv);
+                w->SizeAotv=S.a;w->SizeBotv=S.round?0:S.b;if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,S.a,S.round,cone,f);w->LengthPl=r.l;}}
             if(typed)tvsTeeData::write(w.object(),r);
             w->recordGraphicsModified();
             const tvsTeeFit::Ports ps=tvsTeeFit::ports(w.object());

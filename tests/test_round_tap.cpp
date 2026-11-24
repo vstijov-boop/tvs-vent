@@ -31,5 +31,11 @@ int main(){
     yes(entry,"45 deg entry starts 25 mm after the run start");
     Tee mk=k;mk.margin=25;tapRun(mk,be,af);yes(eqd(be,25+mk.cone/2)&&eqd(af,be),"round margin run symmetric");
     Tee old=c;tapRun(old,be,af);yes(eqd(be,c.l+c.w1/2)&&eqd(af,be),"old run unchanged");
+    // isCone: only the base tapRecord writes for this branch and length (old records: prolaz C in "second")
+    yes(isCone(coneBase(250,100),250,100),"cone record");
+    yes(!isCone(400,250,100),"old prolaz width is not a cone");
+    yes(!isCone(coneBase(250,100),315,100),"cone of another branch");
+    yes(!isCone(0,250,100)&&!isCone(-1,250,100),"no cone");
+    yes(isCone(coneBase(0.25,0.1),0.25,0.1),"metres");
     if(fails)return 1;std::printf("OK\n");return 0;
 }

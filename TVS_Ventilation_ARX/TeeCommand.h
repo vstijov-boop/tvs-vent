@@ -40,7 +40,8 @@ inline void tapRecord(tvsTeeData::Record& r,double branch,bool round,bool conica
     if(round&&conical){r.l=tvsTee::coneLengthMm()/f;r.second=tvsTee::coneBase(branch,r.l);}
     else{r.l=tapLength(branch,f);r.second=0;}
 }
-inline bool conicalOf(const tvsTeeData::Record& r){return r.type==tvsTee::Tap&&r.second>0;}
+// d: the branch size the record was written for (before a resize changes SizeAotv)
+inline bool conicalOf(const tvsTeeData::Record& r,double d){return r.type==tvsTee::Tap&&tvsTee::isCone(r.second,d,r.l);}
 // Stucna run margin (record radius2): 25 mm beyond the footprint on the main.
 inline double tapMargin(double f){return tvsTee::tapMarginMm()/f;}
 // Reverse the run direction (TK-O: inlet A <-> outlet C side; TK-G: left <-> right branch).
@@ -85,7 +86,7 @@ inline bool chooseType(const AcDbObjectId& id){
         {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)return false;tvsTeeData::read(w.object(),current);}
         const int def=current.type?current.type:lastType();
         const int shown=round&&def!=tvsTee::Tap&&def!=tvsTee::Straight?tvsTee::Tap:def;
-        const bool coneNow=conicalOf(current)||(current.type==0&&coneLast());
+        const bool coneNow=conicalOf(current,sizeAotv)||(current.type==0&&coneLast());
         wchar_t prompt[200];
         typeLegend(round);
         if(round)swprintf_s(prompt,L"\nTip T komada, okrugli ogranak [Stucna/Konusna/Ravni/oKreni] <%ls>: ",shown==tvsTee::Tap&&coneNow?L"Konusna":typeKeyword(shown));
