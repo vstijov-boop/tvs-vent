@@ -102,6 +102,10 @@ inline void execute(){
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}
     int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;
     if(missing)acutPrintf(L"\nTVS_PAD: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",missing);
+    {   // flows written in the drawing (labels, Properties) vs the sums used here (user 2026-11-24): a reminder for TVS_PROTOK
+        int stale=0;for(size_t i=0;i<net.real;++i){if(net.linked[i]&&!net.records[i].terminal())continue;
+            const int o=tvsFlow::pieceOf(net,r,net.owner[i]);if(o>=0&&o<static_cast<int>(r.reached.size())&&r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>0.5)++stale;}
+        if(stale)acutPrintf(L"\nTVS_PAD: protok upisan u crtežu se razlikuje od zbira krajnjih elemenata na %d elemenata – proračun koristi zbir; oznake i protoci u crtežu nisu ažurni (TVS_PROTOK ih upisuje).",stale);}
     // system and data
     std::wstring dir=folder();
     for(;;){
