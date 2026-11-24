@@ -25,6 +25,7 @@
 #include "../TVS_Ventilation_DBX/TeeData.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../geometry/GrilleConnect.h"
+#include "../geometry/EquipmentFlow.h"
 #include "../geometry/NumericField.h"
 #include "adui.h"
 #include <dbents.h>
@@ -215,6 +216,58 @@ inline bool pickDuct(const AcDbObjectId& nearest,AcDbObjectId& out){
         out=id;return true;
     }
 }
+// Previous connection of an already linked side grille (user 2026-11-24: re-connecting refused
+// "preblizu kraju" because the old T komad still cut the duct). Found from the old record: the stub
+// starts at the grille port, ends on the branch port of a TVS_WYE (TK0 / štucna); the run ducts sit
+// on the T komad run ports. Re-connecting removes stub and T komad and joins the run (`in` is kept,
+// its end at the T komad goes to `joinTo`, `out` is erased) in the same transaction (one U).
+inline double stubLimitMm(){return 500;}   // longer: the grille sits on an ordinary branch duct, kept
+struct Previous {bool ok;AcDbObjectId stub,tee,in,out;AcGePoint3d joinTo;bool inLast;const wchar_t* why;
+    Previous():ok(false),inLast(true),why(NULL){}};
+inline Previous findPrevious(const tvsEquipmentLinkCmd::Scene& scene,const tvsEquipment::Record& old,double f){
+    Previous r;if(!old.terminal()||old.mount==tvsEquipment::Bottom||old.ports<1)return r;
+    const double tol=1.0/f,s=tvsEquipmentFlow::unitScale(old.mmPerUnit,f);
+    const AcGePoint3d port(old.port[0].x*s,old.port[0].y*s,0);
+    AcGePoint3d other;
+    for(size_t k=0;k<scene.nodes.size()&&r.stub.isNull();++k){const tvsMove::Node& n=scene.nodes[k];if(!tvsEquipmentLinkCmd::isDuct(n))continue;
+        AcDbObjectPointer<TVS_Pipe> d(n.id,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)continue;
+        if(tvsTeeFit::planDistance(d->FirstPoint,d->LastPoint)*f>stubLimitMm())continue;   // a real duct, not a TVS_RESETKA stub
+        if(tvsTeeFit::planDistance(d->FirstPoint,port)<=tol){r.stub=n.id;other=d->LastPoint;}
+        else if(tvsTeeFit::planDistance(d->LastPoint,port)<=tol){r.stub=n.id;other=d->FirstPoint;}}
+    if(r.stub.isNull())return r;
+    tvsTeeFit::Ports q;
+    for(size_t k=0;k<scene.nodes.size()&&r.tee.isNull();++k){const tvsMove::Node& n=scene.nodes[k];if(n.kind!=4)continue;
+        AcDbObjectPointer<TVS_WYE> w(n.id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)continue;
+        const tvsTeeFit::Ports t=tvsTeeFit::ports(w.object());if(t.ok&&tvsTeeFit::planDistance(t.p[2],other)<=tol){r.tee=n.id;q=t;}}
+    if(r.tee.isNull())return r;
+    AcDbObjectId run[2];bool last[2]={false,false};AcGePoint3d farEnd[2];
+    for(int e=0;e<2;++e)for(size_t k=0;k<scene.nodes.size()&&run[e].isNull();++k){const tvsMove::Node& n=scene.nodes[k];
+        if(!tvsEquipmentLinkCmd::isDuct(n)||n.id==r.stub)continue;
+        AcDbObjectPointer<TVS_Pipe> d(n.id,AcDb::kForRead);if(d.openStatus()!=Acad::eOk)continue;
+        if(tvsTeeFit::planDistance(d->LastPoint,q.p[e])<=tol){run[e]=n.id;last[e]=true;farEnd[e]=d->FirstPoint;}
+        else if(tvsTeeFit::planDistance(d->FirstPoint,q.p[e])<=tol){run[e]=n.id;last[e]=false;farEnd[e]=d->LastPoint;}}
+    if(run[0].isNull()&&run[1].isNull()){r.why=L"uz stari T komad nema kanala";return r;}
+    const int keep=run[0].isNull()?1:0,gone=1-keep;
+    r.in=run[keep];r.inLast=last[keep];r.out=run[gone];r.joinTo=run[gone].isNull()?q.p[gone]:farEnd[gone];
+    if(!r.out.isNull()){   // the two run ducts must make one duct: same size, same level, in line
+        AcDbObjectPointer<TVS_Pipe> a(r.in,AcDb::kForRead),b(r.out,AcDb::kForRead);if(a.openStatus()!=Acad::eOk||b.openStatus()!=Acad::eOk){r.why=L"kanal uz stari T komad se ne može otvoriti";return r;}
+        AcGeVector3d u=a->LastPoint-a->FirstPoint,v=b->LastPoint-b->FirstPoint;u.z=v.z=0;
+        const bool line=u.length()>1e-9&&v.length()>1e-9&&std::fabs(u.normal().crossProduct(v.normal()).z)<1e-6;
+        if(std::fabs(a->SizeA-b->SizeA)>tol||std::fabs(a->SizeB-b->SizeB)>tol||a->ThisRound!=b->ThisRound||std::fabs(a->Elev-b->Elev)>tol||!line){
+            r.why=L"kanali uz stari T komad nisu iste dimenzije / kote / ose";return r;}}
+    r.ok=true;return r;
+}
+// In the open transaction: the run joined, the old stub, T komad and the second run duct erased.
+inline const wchar_t* removePrevious(tvsAction::Transaction& tx,const Previous& p){
+    if(!p.ok)return NULL;
+    TVS_Pipe* d=TVS_Pipe::cast(tx.open(p.in,AcDb::kForWrite));if(!d)return L"kanal starog priključka se ne može mijenjati";
+    const AcGePoint3d end=p.inLast?d->LastPoint:d->FirstPoint,to(p.joinTo.x,p.joinTo.y,end.z);
+    if((p.inLast?d->put_Lastpoint(to):d->put_FirstPoint(to))!=Acad::eOk)return L"kanal starog priključka se ne može spojiti";
+    d->recordGraphicsModified();
+    const AcDbObjectId gone[3]={p.out,p.tee,p.stub};
+    for(int k=0;k<3;++k)if(!gone[k].isNull()){AcDbObject* o=tx.open(gone[k],AcDb::kForWrite);if(!o||o->erase()!=Acad::eOk)return L"stari T komad / ogranak se ne može obrisati";}
+    return NULL;
+}
 inline void execute(UINT idd,double collar){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db);
@@ -239,22 +292,29 @@ inline void execute(UINT idd,double collar){
     if(!(wasLinked||hasDefault))rec.kind=tvsEquipment::Grille;
     // ---- the duct ----
     tvsEquipmentLinkCmd::Scene scene;if(!tvsEquipmentLinkCmd::readScene(db,scene)){acutPrintf(L"\nTVS_RESETKA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
+    const Previous prev=wasLinked?findPrevious(scene,old,f):Previous();
+    if(!prev.ok&&prev.why)acutPrintf(L"\nTVS_RESETKA: stari priključak bloka se ne uklanja (%ls) – obrišite ga ručno ako treba.",prev.why);
+    auto oldPiece=[&](const AcDbObjectId& id){return prev.ok&&(id==prev.stub||id==prev.out||id==prev.tee);};
     AcDbObjectId nearest;double best=-1;const tvsEquipmentLink::Pt at(ins.x,ins.y);
     for(size_t k=0;k<scene.nodes.size();++k){const tvsMove::Node& n=scene.nodes[k];if(!tvsEquipmentLinkCmd::isDuct(n)||n.flex)continue;
         const double dist=tvsEquipmentLinkCmd::segmentDistance(at,tvsEquipmentLink::Pt(n.ports[0].x,n.ports[0].y),tvsEquipmentLink::Pt(n.ports[1].x,n.ports[1].y));
         if(best<0||dist<best){best=dist;nearest=n.id;}}
+    if(oldPiece(nearest))nearest=prev.in;
     AcDbObjectId ductId;if(!pickDuct(nearest,ductId))return;
+    if(oldPiece(ductId))ductId=prev.in;   // the old stub / second run piece: the run that is joined again
     AcGePoint3d first,last;double A=0,B=0,elev=0;bool roundDuct=false;
     {AcDbObjectPointer<TVS_Pipe> d(ductId,AcDb::kForRead);if(d.openStatus()!=Acad::eOk){acutPrintf(L"\nTVS_RESETKA: kanal se ne može otvoriti.");return;}
      if(d->isA()!=TVS_Pipe::desc()||d->getDuctType()==DuctTypeFlex){acutPrintf(L"\nTVS_RESETKA: izaberite pravi TVS kanal (ne flex).");return;}
      if(d->ownerId()!=db->currentSpaceId()){acutPrintf(L"\nTVS_RESETKA: kanal nije u trenutnom prostoru crteža.");return;}
      first=d->FirstPoint;last=d->LastPoint;A=d->SizeA;B=d->SizeB;elev=d->Elev;roundDuct=d->ThisRound||d->SizeB<=0;}
+    const bool joined=prev.ok&&ductId==prev.in;   // plan on the run as it will be after the old T komad is removed
+    if(joined){if(prev.inLast)last=AcGePoint3d(prev.joinTo.x,prev.joinTo.y,last.z);else first=AcGePoint3d(prev.joinTo.x,prev.joinTo.y,first.z);}
     if(tvsEquipmentLinkCmd::inAssembly(ductId)){acutPrintf(L"\nTVS_RESETKA: kanal je dio etaža / obilaska.");return;}
     gc::Duct duct;duct.p0=v2(first);duct.p1=v2(last);duct.a=A;duct.b=roundDuct?0:B;duct.round=roundDuct;
     {   // free ends: no other element (TVS port, linked block port other than this block) on them
         const double tolEnd=1.0/f;const gc::V ends[2]={duct.p0,duct.p1};
         for(int e=0;e<2;++e){bool taken=false;
-            for(size_t k=0;k<scene.nodes.size()&&!taken;++k){const tvsMove::Node& n=scene.nodes[k];if(n.id==ductId)continue;
+            for(size_t k=0;k<scene.nodes.size()&&!taken;++k){const tvsMove::Node& n=scene.nodes[k];if(n.id==ductId||oldPiece(n.id))continue;
                 for(size_t q=0;q<n.ports.size();++q)if(std::hypot(n.ports[q].x-ends[e].x,n.ports[q].y-ends[e].y)<=tolEnd){taken=true;break;}}
             for(size_t q=0;q<scene.equipment.size()&&!taken;++q)
                 if(scene.equipment[q].id!=blockId&&std::hypot(scene.equipment[q].at.x-ends[e].x,scene.equipment[q].at.y-ends[e].y)<=tolEnd)taken=true;
@@ -282,7 +342,7 @@ inline void execute(UINT idd,double collar){
     CString size;if(roundDuct)size.Format(L"Ø%.0f",A*f);else size.Format(L"%.0f×%.0f",A*f,B*f);
     dg.banner.Format(L"Blok „%ls“  ·  kanal %ls mm",name.c_str(),size.GetString());
     dg.facts.Format(L"Kanal dužine %.0f mm. Tačka priključenja (projekcija tačke umetanja) %.0f mm od početka kanala; blok %.0f mm %ls ose.%ls",
-        duct.len()*f,pi.t*f,std::fabs(pi.offset)*f,pi.offset>=0?L"lijevo od":L"desno od",wasLinked?L"\nBlok je već povezan – zapis se zamjenjuje.":L"");
+        duct.len()*f,pi.t*f,std::fabs(pi.offset)*f,pi.offset>=0?L"lijevo od":L"desno od",prev.ok?L"\nBlok je već povezan – stari T komad / štucna i ogranak se uklanjaju, kanal se spaja.":wasLinked?L"\nBlok je već povezan – zapis se zamjenjuje.":L"");
     INT_PTR rc;
     {CAcModuleResourceOverride resources;rc=dg.DoModal();}
     if(rc!=IDOK)return;
@@ -293,7 +353,8 @@ inline void execute(UINT idd,double collar){
     const gc::Check k=gc::validate(duct,p,c,o);
     if(k.error!=gc::Ok){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",gc::errorText(k.error));return;}
     // ---- preflight: block and duct can be written ----
-    std::vector<AcDbObjectId> touched;touched.push_back(blockId);if(!bottom)touched.push_back(ductId);
+    std::vector<AcDbObjectId> touched;touched.push_back(blockId);if(!bottom||joined)touched.push_back(ductId);
+    if(prev.ok){touched.push_back(prev.in);touched.push_back(prev.tee);touched.push_back(prev.stub);if(!prev.out.isNull())touched.push_back(prev.out);}
     if(!tvsAction::writable(touched)){acutPrintf(L"\nTVS_RESETKA: kanal ili blok je na zaključanom sloju. Ništa nije promijenjeno.");return;}
     rec.version=1;rec.ports=1;rec.mmPerUnit=f;rec.lengthMm=0;rec.port[1]=tvsEquipment::Port();
     if(bottom){
@@ -301,6 +362,7 @@ inline void execute(UINT idd,double collar){
         rec.neckA=dg.aMm;rec.neckB=dg.round?0:dg.bMm;rec.neckRound=dg.round;
         tvsEquipment::Port& q=rec.port[0];q.x=p.tap.x;q.y=p.tap.y;q.z=elev;q.dx=0;q.dy=0;
         tvsAction::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_RESETKA: transakcija nije pokrenuta. Ništa nije promijenjeno.");return;}
+        if(const wchar_t* why=removePrevious(tx,prev)){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",why);return;}
         AcDbObject* b=tx.open(blockId,AcDb::kForWrite);if(b)tvsEquipmentStore::anchor(b,rec);const Acad::ErrorStatus es=b?tvsEquipmentStore::write(b,rec):tx.status;
         if(es!=Acad::eOk||!tx.commit()){acutPrintf(L"\nTVS_RESETKA: zapis nije upisan (%ls). Ništa nije promijenjeno.",acadErrorStatusText(es!=Acad::eOk?es:tx.status));return;}
         CString neck;if(dg.round)neck.Format(L"Ø%.0f",dg.aMm);else neck.Format(L"%.0f×%.0f",dg.aMm,dg.bMm);
@@ -317,6 +379,7 @@ inline void execute(UINT idd,double collar){
         tvsAction::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_RESETKA: transakcija nije pokrenuta. Ništa nije promijenjeno.");return;}
         const wchar_t* failed=NULL;
         do{
+            if((failed=removePrevious(tx,prev))!=NULL)break;
             TVS_Pipe* d=TVS_Pipe::cast(tx.open(ductId,AcDb::kForWrite));if(!d){failed=L"kanal se ne može mijenjati";break;}
             if(want>0){Acad::ErrorStatus es=c.end==1?d->put_Lastpoint(AcGePoint3d(e.at.x,e.at.y,d->LastPoint.z)):d->put_FirstPoint(AcGePoint3d(e.at.x,e.at.y,d->FirstPoint.z));
                 if(es!=Acad::eOk){failed=L"kanal se ne može skratiti / produžiti";break;}d->recordGraphicsModified();}
@@ -341,6 +404,7 @@ inline void execute(UINT idd,double collar){
     tvsAction::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_RESETKA: transakcija nije pokrenuta. Ništa nije promijenjeno.");return;}
     const wchar_t* failed=NULL;
     do{
+        if((failed=removePrevious(tx,prev))!=NULL)break;
         TVS_Pipe* d=TVS_Pipe::cast(tx.open(ductId,AcDb::kForWrite));if(!d){failed=L"kanal se ne može mijenjati";break;}
         AcDbBlockTableRecord* space=AcDbBlockTableRecord::cast(tx.open(d->ownerId(),AcDb::kForWrite));if(!space){failed=L"prostor crteža se ne može mijenjati";break;}
         const double z=d->LastPoint.z;

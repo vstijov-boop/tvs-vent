@@ -15,6 +15,8 @@ class Repair(unittest.TestCase):
  def test_open_ends(self):
   w=text('TVS_Ventilation_DBX/TVS_WYE.cpp');self.assertIn('if (tvsTeeOpenEnds::read(this)) {',w)
   g=text('TVS_Ventilation_ARX/GrilleCommand.h');self.assertIn('tvsTeeOpenEnds::write(w,true)',g)
+  # re-connecting a linked side grille removes the old T komad + stub first (same transaction)
+  self.assertEqual(g.count('removePrevious(tx,prev)'),3);self.assertIn('if(oldPiece(ductId))ductId=prev.in;',g);self.assertEqual(g.count('{'),g.count('}'))
   h=(ROOT/'TVS_Ventilation_DBX/TeeOpenEnds.h').read_bytes();self.assertTrue(all(c<128 for c in h))
  def test_registered(self):
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
