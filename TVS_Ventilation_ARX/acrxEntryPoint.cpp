@@ -74,6 +74,7 @@
 #include "ElbowAngleCommand.h"
 #include "ScaleWindow.h"
 #include "JointFix.h"
+#include "EquipmentFollow.h"
 #include "CheckCommand.h"
 #include "RepairCommand.h"   // TVS_POPRAVI: popravka zapisa crteža starijeg builda
 #include "Trace.h"           // TVS_TRAG: trag za dijagnostiku rušenja
@@ -147,6 +148,7 @@ public:
 		tvsEquipmentCaption::start();   // TVS_NATPIS: natpis blokova opreme (overrule)
 		tvsSizeFollow::start();   // prelaz i kanal dijele dimenziju na spoju (TVS_DIM_PRATI)
 		tvsJointFix::install();   // TVS_STRETCH / TVS_MOVE: ponuda popravke spoja
+		tvsEquipmentFollow::install();   // TVS_STRETCH / TVS_MOVE: oprema na mreži ide sa mrežom
 		tvsScaleWindow::start();  // jedinice crteža pri kopiranju / umetanju (ScaleWindow.h)
 		tvsSizeFollow::enableTeeFollow(IDD_RUN, IDD_TEETYPE);   // TVS_TK_TIP: dionica iza kanala nove dimenzije
 		ftTransType = tvsTransAlignCmd::loadPlan();   // tip novih prelaza u tlocrtu (TVS_SETTINGS)

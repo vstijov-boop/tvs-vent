@@ -98,3 +98,9 @@ Odluka: dva priključka na plenumskoj kutiji rade **paralelno** – svaki dobija
 - **Povezivanje:** nacrtati kanale / flex do priključaka (krajevi iznad kutije), pa TVS_OPREMA. Tačno dva slobodna kraja unutar gabarita bloka = terminal sa 2 priključka (zapis `twin=1`, ports = 2; nepoznat naziv → Difuzor). Dva kanala na istoj osi okrenuta jedan prema drugom (blok između njih) nisu linijski difuzor; kod nepoznate vrste prednost ima oprema u liniji. TVS_RESETKA takav blok ne priključuje (poruka).
 - **Mreža:** čitači (TVS_PROTOK, TVS_PAD, TVS_DPD_IZVOZ, TVS_PROVJERA, TVS_DIM_PRATI) vide blok kao dva terminala sa po 1 priključkom (`tvsEquipment::half`: Q/2, `loss` računa polovinu na 2×Q). TVS_PROTOK upisuje u blok zbir oba priključka. DuctPressDrop: dva terminalna fitinga, oznaka „… (1/2)“ / „(2/2)“.
 - **Specifikacija:** jedan blok = jedan komad. Dijalog svojstava: „Priključci: 2 na kutiji (linijski difuzor)“, protok = ukupni Q.
+
+### Oprema ide sa mrežom – TVS_STRETCH / TVS_MOVE (24.11.)
+Do sada komande nisu vidjele povezane blokove, pa je blok čiji su se kanali pomjerili postajao „odvojen“ (crven). Sada (EquipmentFollow.h, hookovi u TVSMoveCommand.h):
+- **oprema u liniji** (2 priključka) je kruto tijelo mreže: TVS_MOVE je gura kao fiting, TVS_STRETCH je pomjera kad okvir obuhvati oba priključka (okvir koji je presijeca = „Okvir presijeca fiting“);
+- **terminali** (rešetka, difuzor, polovine linijskog difuzora) idu sa krajem kanala / flex-a na kom su; rešetka na dnu ide sa kanalom kad se kanal pomjera cio; linijski difuzor čiji se priključci ne pomjeraju jednako ostaje (poruka, odvojen);
+- zapis bloka (priključci, tačka povezivanja) se ažurira u istoj transakciji – blok ostaje povezan (zelen). TVS_ALIGN i obični MOVE / STRETCH AutoCAD-a: kao do sada.

@@ -18,6 +18,7 @@
 #include "OffsetAssemblyData.h"
 #include "BypassAssemblyData.h"
 #include "../geometry/RoundElbow.h"
+#include "../geometry/EquipmentFlow.h"
 #endif
 
 namespace tvsMove {
@@ -361,6 +362,28 @@ inline void sideBranchProblem(const std::vector<Node>& nodes,const tvsMoveNetwor
 // Repair offered for a refused joint (JointFix.h sets it; TeePort.h includes this header).
 typedef bool (*JointFix)(const std::vector<Node>&,const std::vector<tvsMoveNetwork::Body>&,int,int,int,int,const ACHAR*);
 inline JointFix& jointFixHook(){static JointFix h=NULL;return h;}
+// Oprema na mrezi in TVS_MOVE (network) / TVS_STRETCH (user 2026-11-24: linked blocks
+// move with the network instead of becoming "odvojen"). EquipmentFollow.h sets both hooks:
+// read appends the linked blocks after the TVS elements (kind 5, EquipmentNodes.h): an inline block
+// (2 ports) is a rigid body of the planner, a terminal (1 port: resetka, difuzor, half of a linijski
+// difuzor, resetka na dnu) is invisible to it, like a flex; follow then moves the blocks in the open
+// transaction (terminals with the duct / flex end or the duct they sit on) and updates their records.
+typedef bool (*EquipmentRead)(AcDbDatabase*,std::vector<Node>&);
+typedef int (*EquipmentFollow)(Transaction&,const std::vector<Node>&,const std::vector<tvsMoveNetwork::Body>&,
+                               const tvsMoveNetwork::Result&,const std::vector<int>*,const Point&,double,const ACHAR*);
+inline EquipmentRead& equipmentReadHook(){static EquipmentRead h=NULL;return h;}
+inline EquipmentFollow& equipmentFollowHook(){static EquipmentFollow h=NULL;return h;}
+inline bool isEquipment(const Node& n){return n.kind==tvsEquipmentFlow::nodeKind();}
+inline void hideTerminals(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies){
+    for(size_t i=0;i<nodes.size()&&i<bodies.size();++i)if(isEquipment(nodes[i])&&nodes[i].ports.size()!=2){
+        bodies[i].ports.clear();bodies[i].axes.clear();bodies[i].sections.clear();bodies[i].junctions.clear();bodies[i].kind=tvsMoveNetwork::Blocked;}
+}
+inline bool withEquipment(AcDbDatabase* db,std::vector<Node>& nodes){return !equipmentReadHook()||equipmentReadHook()(db,nodes);}
+// the TVS part of a snapshot with oprema (the blocks are appended at the end)
+inline bool sameTvs(const std::vector<Node>& nodes,const std::vector<Node>& current,double epsilon){
+    size_t n=nodes.size();while(n>0&&isEquipment(nodes[n-1]))--n;
+    const std::vector<Node> head(nodes.begin(),nodes.begin()+n);return sameSnapshot(head,current,epsilon);
+}
 // SectionMismatch: both sides of the joint (size, height, axis level in mm), so the cause can be seen.
 inline void sectionProblem(const std::vector<Node>& nodes,const std::vector<tvsMoveNetwork::Body>& bodies,const tvsMoveNetwork::Result& r,const ACHAR* command){
     if(r.error!=tvsMoveNetwork::SectionMismatch||r.problem<0||r.other<0||static_cast<size_t>(r.problem)>=bodies.size()||static_cast<size_t>(r.other)>=bodies.size())return;
@@ -593,7 +616,7 @@ inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
         roundBranchAlert(nodes,result.problem,result.error,tol);acutPrintf(L"\n%ls: %s",command,networkError(result.error));sectionProblem(nodes,bodies,result,command);
         sideBranchProblem(nodes,result,command);return false;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
-    if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
+    if(!snapshot(db,current,currentLabels)||!sameTvs(nodes,current,1e-10/factor)){
         acutPrintf(L"\n%ls: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.",command);return false;}
     Transaction tx;if(!tx.good())return false;
     std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
@@ -616,11 +639,14 @@ inline bool applyNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
     }
     const int flexMoved=followFlex(tx,nodes,bodies,result,NULL,delta,2.0/factor);
     if(flexMoved<0){acutPrintf(L"\n%ls: flex crijevo je zaključano ili nedostupno. Izmjena je poništena.",command);return false;}
+    const int equipment=equipmentFollowHook()?equipmentFollowHook()(tx,nodes,bodies,result,NULL,delta,2.0/factor,command):0;
+    if(equipment<0)return false;
     const std::vector<char> carried=carriedBy(nodes,members,result.masks);
     if(!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
         acutPrintf(L"\n%ls: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.",command);return false;}
     if(!tx.commit())return false;
     acutPrintf(L"\n%ls: povezana mreža — %d elemenata; prilagođeno dužina: %d; flex crijeva: %d. Pomjeraj: %.2f mm.",command,result.changed,stretched,flexMoved,delta.length()*factor);
+    if(equipment)acutPrintf(L"\n%ls: oprema pomjerena sa mrežom: %d.",command,equipment);
     return true;
 }
 inline void executeNetwork(AcDbDatabase* db,const std::vector<Node>& nodes,
@@ -651,6 +677,8 @@ inline void execute(){
     std::vector<tvsMoveNetwork::Body> bodies;std::vector<std::vector<AcDbObjectId> > members;
     bodiesFor(nodes,bodies,members,tol);
     if(!simpleChain(nodes,center,tol)){
+        if(!withEquipment(db,nodes)){acutPrintf(L"\nTVS_MOVE: oprema na mreži se ne može pročitati.");return;}   // oprema follows (EquipmentFollow.h)
+        bodiesFor(nodes,bodies,members,tol);hideTerminals(nodes,bodies);
         executeNetwork(db,nodes,bodies,members,center,picked,factor,tol,minimum);return;
     }
     const Node& main=nodes[center];Contact elbows[2],neighbors[2];int neighborPorts[2];
@@ -833,8 +861,9 @@ inline void executeStretch(){
     if(acedGetCorner(corner1,L"\nSuprotni ugao okvira: ",corner2)!=RTNORM)return;
     std::vector<Node> nodes;AcDbObjectIdArray labels;
     if(!snapshot(db,nodes,labels))return;
+    if(!withEquipment(db,nodes)){acutPrintf(L"\nTVS_STRETCH: oprema na mreži se ne može pročitati.");return;}   // oprema follows (EquipmentFollow.h)
     std::vector<tvsMoveNetwork::Body> bodies;std::vector<int> masks;
-    std::vector<std::vector<AcDbObjectId> > members;bodiesFor(nodes,bodies,members,tol);
+    std::vector<std::vector<AcDbObjectId> > members;bodiesFor(nodes,bodies,members,tol);hideTerminals(nodes,bodies);
     // flex crijeva: not part of the rigid network (they bend); an end in the frame moves with the
     // frame, an end on a port of a moved element follows that port (after the plan, below)
     auto inFrame=[&](const Point& p,bool& in){ads_point w={p.x,p.y,p.z},u;if(tvsCoordinates::transformPoint(w,0,1,u)!=RTNORM)return false;
@@ -877,7 +906,7 @@ inline void executeStretch(){
     else if(!tvsMoveNetwork::planSelection(bodies,masks,delta,minimum,tol,result)){
         roundBranchAlert(nodes,result.problem,result.error,tol);sectionProblem(nodes,bodies,result,L"TVS_STRETCH");stretchProblem(nodes,result.problem,networkError(result.error));return;}
     std::vector<Node> current;AcDbObjectIdArray currentLabels;
-    if(!snapshot(db,current,currentLabels)||!sameSnapshot(nodes,current,1e-10/factor)){
+    if(!snapshot(db,current,currentLabels)||!sameTvs(nodes,current,1e-10/factor)){
         acutPrintf(L"\nTVS_STRETCH: crtež se promijenio tokom unosa. Pokrenite komandu ponovo.");return;}
     Transaction tx;if(!tx.good())return;
     std::vector<AcDbEntity*> entities(nodes.size(),static_cast<AcDbEntity*>(NULL));
@@ -912,10 +941,13 @@ inline void executeStretch(){
     }
     const int flexMoved=followFlex(tx,nodes,bodies,result,&flexMask,delta,2.0/factor);
     if(flexMoved<0){acutPrintf(L"\nTVS_STRETCH: flex crijevo je zaključano ili nedostupno. Izmjena je poništena.");return;}
+    const int equipment=equipmentFollowHook()?equipmentFollowHook()(tx,nodes,bodies,result,&flexMask,delta,2.0/factor,L"TVS_STRETCH"):0;
+    if(equipment<0)return;
     const std::vector<char> carried=carriedBy(nodes,members,result.masks);
     if(anyRigid&&!networkLabels(tx,nodes,currentLabels,result,delta,&carried)){
         acutPrintf(L"\nTVS_STRETCH: povezanu oznaku nije moguće ažurirati. Izmjena je poništena.");return;}
     if(!tx.commit())return;
     acutPrintf(L"\nTVS_STRETCH: povezana mreža — %d elemenata; prilagođeno dužina: %d; flex crijeva: %d. Pomjeraj: %.2f mm.",result.changed,stretched,flexMoved,delta.length()*factor);
+    if(equipment)acutPrintf(L"\nTVS_STRETCH: oprema pomjerena sa mrežom: %d.",equipment);
 }
 }
