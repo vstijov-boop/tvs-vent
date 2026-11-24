@@ -8,10 +8,15 @@
 //  3. konektori koji pokazuju na obrisan / nepostojeći / ne-TVS objekat -> prazni;
 //  4. povezana oprema bez zapamćene tačke povezivanja (stariji build): tačka se upiše kad priključci
 //     leže na bloku; inače se navede (blok pomjeren poslije povezivanja -> TVS_OPREMA).
+//  5. ravni T komad (TK0) bočne rešetke iz starijeg builda: ogranak T komada je kanal koji na drugom
+//     kraju ima priključak rešetke / difuzora -> zapis TVS_TEE_OPEN_V1 (bez poprečnih linija na
+//     krajevima, kao TVS_RESETKA od 24.11.).
 // Samo navodi (izabrani na kraju): elementi sa nevažećom geometrijom (NaN, dimenzija <= 0).
 #include "TVSMoveCommand.h"
 #include "EquipmentStore.h"
 #include "CheckCommand.h"
+#include "TeeNeighbours.h"
+#include "../TVS_Ventilation_DBX/TeeOpenEnds.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../geometry/TeeShape.h"
@@ -22,9 +27,9 @@ namespace tvsRepair {
 inline bool bad(double v){return !std::isfinite(v);}
 inline bool badPoint(const AcGePoint3d& p){return bad(p.x)||bad(p.y)||bad(p.z);}
 struct Found {
-    std::vector<AcDbObjectId> tapSecond,teeRecord,connector,anchor,detached,geometry;
+    std::vector<AcDbObjectId> tapSecond,teeRecord,connector,anchor,detached,geometry,openEnds;
     int connectors;Found():connectors(0){}
-    bool any()const{return !tapSecond.empty()||!teeRecord.empty()||!connector.empty()||!anchor.empty();}
+    bool any()const{return !tapSecond.empty()||!teeRecord.empty()||!connector.empty()||!anchor.empty()||!openEnds.empty();}
 };
 // A connector target that is not a live TVS element.
 inline bool deadTarget(const AcDbObjectId& id){
@@ -48,6 +53,8 @@ inline void scan(AcDbDatabase* db,Found& out){
     const double f=tvsUnits::factor(db);
     AcDbBlockTableRecordPointer space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
+    struct Tk0 {AcDbObjectId id;AcGePoint3d branch;};std::vector<Tk0> tk0;   // TK0 without TVS_TEE_OPEN_V1
+    std::vector<std::pair<AcGePoint3d,AcGePoint3d> > ducts;std::vector<AcGePoint3d> terminals;
     for(;!it->done();it->step()){
         AcDbEntity* e=NULL;if(it->getEntity(e,AcDb::kForRead)!=Acad::eOk)continue;
         const AcDbObjectId id=e->objectId();
@@ -61,21 +68,32 @@ inline void scan(AcDbDatabase* db,Found& out){
                 if(teeRecordBad(r))out.teeRecord.push_back(id);
                 else if(r.type==tvsTee::Tap&&r.second>0&&!(w->ThisRoundotv&&tvsTee::isCone(r.second,w->SizeAotv,r.l)))out.tapSecond.push_back(id);
             }
+            else if(!w->This1D&&!tvsTeeOpenEnds::read(w)){const tvsTeeFit::Ports q=tvsTeeFit::ports(w);if(q.ok){Tk0 t={id,q.p[2]};tk0.push_back(t);}}
             if(badPoint(w->Basepoint)||bad(w->SizeApr)||bad(w->SizeAotv)||!(w->SizeApr>0)||!(w->SizeAotv>0))out.geometry.push_back(id);
         }
         else if(TVS_Pipe* p=TVS_Pipe::cast(e)){
             if(badPoint(p->FirstPoint)||badPoint(p->LastPoint)||bad(p->SizeA)||!(p->SizeA>0))out.geometry.push_back(id);
+            else ducts.push_back(std::make_pair(p->FirstPoint,p->LastPoint));
         }
         else if(TVS_TAP* a=TVS_TAP::cast(e)){
             if(badPoint(a->MiddlePoint)||bad(a->SizeA)||!(a->SizeA>0)||bad(a->Swectangle))out.geometry.push_back(id);
         }
         else if(AcDbBlockReference* b=AcDbBlockReference::cast(e)){
             tvsEquipment::Record r;
-            if(tvsEquipmentStore::read(b,r)&&!r.anchored){if(portsOnBlock(b,r,f))out.anchor.push_back(id);else out.detached.push_back(id);}
+            const bool linked=tvsEquipmentStore::read(b,r);
+            if(linked&&!r.anchored){if(portsOnBlock(b,r,f))out.anchor.push_back(id);else out.detached.push_back(id);}
+            if(linked&&r.terminal()&&r.mount!=tvsEquipment::Bottom){const double s=tvsEquipmentFlow::unitScale(r.mmPerUnit,f);
+                terminals.push_back(AcGePoint3d(r.port[0].x*s,r.port[0].y*s,0));}
         }
         e->close();
     }
     delete it;
+    // TK0 whose branch is a duct ending at a grille / diffuser port: a side grille (TVS_RESETKA)
+    const double tol=1.0/f;
+    auto terminalAt=[&](const AcGePoint3d& q){for(size_t k=0;k<terminals.size();++k)if(tvsTeeFit::planDistance(terminals[k],q)<=tol)return true;return false;};
+    for(size_t k=0;k<tk0.size();++k)for(size_t d=0;d<ducts.size();++d){
+        const AcGePoint3d& a=ducts[d].first;const AcGePoint3d& b=ducts[d].second;
+        if((tvsTeeFit::planDistance(a,tk0[k].branch)<=tol&&terminalAt(b))||(tvsTeeFit::planDistance(b,tk0[k].branch)<=tol&&terminalAt(a))){out.openEnds.push_back(tk0[k].id);break;}}
 }
 inline int fix(const Found& w){
     int n=0;
@@ -98,6 +116,8 @@ inline int fix(const Found& w){
     for(size_t k=0;k<w.anchor.size();++k){AcDbObjectPointer<AcDbBlockReference> b(w.anchor[k],AcDb::kForWrite);if(b.openStatus()!=Acad::eOk)continue;
         tvsEquipment::Record r;if(!tvsEquipmentStore::read(b.object(),r))continue;tvsEquipmentStore::anchor(b.object(),r);
         if(tvsEquipmentStore::write(b.object(),r)==Acad::eOk)++n;}
+    for(size_t k=0;k<w.openEnds.size();++k){AcDbObjectPointer<TVS_WYE> t(w.openEnds[k],AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
+        if(tvsTeeOpenEnds::write(t.object(),true)==Acad::eOk)++n;}
     return n;
 }
 inline void execute(){
@@ -108,6 +128,7 @@ inline void execute(){
     acutPrintf(L"\n  zapisi T komada sa nevažećim brojevima: %d",static_cast<int>(w.teeRecord.size()));
     acutPrintf(L"\n  konektori prema obrisanom / nepostojećem objektu: %d (elemenata %d)",w.connectors,static_cast<int>(w.connector.size()));
     acutPrintf(L"\n  oprema povezana starijim buildom (upisuje se tačka povezivanja): %d",static_cast<int>(w.anchor.size()));
+    acutPrintf(L"\n  ravni T komadi bočnih rešetaka (crtaju se bez poprečnih linija na krajevima): %d",static_cast<int>(w.openEnds.size()));
     if(!w.detached.empty())acutPrintf(L"\n  oprema pomjerena poslije povezivanja (ponovo TVS_OPREMA): %d",static_cast<int>(w.detached.size()));
     if(!w.geometry.empty())acutPrintf(L"\n  elementi sa nevažećom geometrijom (NaN / dimenzija <= 0) – samo navedeni, izabrani na kraju: %d",static_cast<int>(w.geometry.size()));
     if(w.any()){

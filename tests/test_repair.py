@@ -8,9 +8,14 @@ class Repair(unittest.TestCase):
   self.assertIn('tvsTee::isCone(r.second,w->SizeAotv,r.l)',s)
   self.assertIn('t->connectors[c].connectionID=AcDbObjectId::kNull',s)
   self.assertIn('tvsEquipmentStore::anchor(b.object(),r)',s)
+  self.assertIn('tvsTeeOpenEnds::write(t.object(),true)',s);self.assertIn('r.terminal()&&r.mount!=tvsEquipment::Bottom',s)
   self.assertIn('Popraviti? [Da/Ne] <Da>: ',s);self.assertIn('acedInitGet(0,L"Da Ne")',s)
   self.assertEqual(s.count('{'),s.count('}'))
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/RepairCommand.h').read_bytes().startswith(b'\xef\xbb\xbf'))
+ def test_open_ends(self):
+  w=text('TVS_Ventilation_DBX/TVS_WYE.cpp');self.assertIn('if (tvsTeeOpenEnds::read(this)) {',w)
+  g=text('TVS_Ventilation_ARX/GrilleCommand.h');self.assertIn('tvsTeeOpenEnds::write(w,true)',g)
+  h=(ROOT/'TVS_Ventilation_DBX/TeeOpenEnds.h').read_bytes();self.assertTrue(all(c<128 for c in h))
  def test_registered(self):
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp')
   self.assertIn('#include "RepairCommand.h"',e);self.assertIn('Ventilation_ARX, TVS_POPRAVI, TVS_POPRAVI, ACRX_CMD_MODAL, NULL)',e)
