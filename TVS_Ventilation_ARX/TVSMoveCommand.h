@@ -1,4 +1,5 @@
 ﻿#pragma once
+#include "Trace.h"
 #include "CoordinateInput.h"
 #include "MoveGeometry.h"
 #include "MoveNetworkGeometry.h"
@@ -125,7 +126,7 @@ inline bool section(const Node& a,const Node& b,double tol){
         && std::fabs(a.a-b.a)<=tol && (a.round||std::fabs(a.b-b.b)<=tol)
         && std::fabs(a.elevation-b.elevation)<=tol;
 }
-inline bool snapshot(AcDbDatabase* db,std::vector<Node>& nodes,AcDbObjectIdArray& labels){
+inline bool snapshot(AcDbDatabase* db,std::vector<Node>& nodes,AcDbObjectIdArray& labels){tvsTrace::Scope trace_("tvsMove::snapshot");
     AcDbObjectPointer<AcDbBlockTableRecord> space(db->currentSpaceId(),AcDb::kForRead);
     if(space.openStatus()!=Acad::eOk)return false;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return false;

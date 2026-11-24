@@ -6,6 +6,7 @@
 //                                 default) but this one is not linked
 // Drawn by an AcGiDrawableOverrule on AcDbBlockReference: the block draws itself, the caption is
 // added; nothing is stored in the drawing. Text and switch as tvsDuctCaption (DuctCaption.h).
+#include "Trace.h"
 #include "rxoverrule.h"
 #include "drawable.h"
 #include "dbents.h"
@@ -47,7 +48,7 @@ inline bool& busy(){static bool b=false;return b;}   // no caption while the cap
 class Overrule : public AcGiDrawableOverrule {
 public:
     virtual bool isApplicable(const AcRxObject* subject) const {return AcDbBlockReference::cast(subject)!=NULL;}
-    virtual Adesk::Boolean worldDraw(AcGiDrawable* subject,AcGiWorldDraw* wd){
+    virtual Adesk::Boolean worldDraw(AcGiDrawable* subject,AcGiWorldDraw* wd){tvsTrace::Scope trace_("EquipmentCaption::worldDraw");
         const Adesk::Boolean done=AcGiDrawableOverrule::worldDraw(subject,wd);
         AcDbBlockReference* ref=AcDbBlockReference::cast(subject);
         if(!ref||!wd||busy()||wd->context()->isPlotGeneration())return done;

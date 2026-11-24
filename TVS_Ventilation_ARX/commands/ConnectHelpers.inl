@@ -122,7 +122,7 @@
 	static bool ConnectWithTap(AcDbEntity *pEnt1,
 		AcDbEntity  *pEnt2, ads_point pnt1, ads_point pnt2)
 
-	{
+	{tvsTrace::Scope trace_("ConnectWithTap");
 		//Проверка
 		if (TVSClassCheck(pEnt1) != isTVS_Pipe)
 		{
@@ -293,7 +293,7 @@
 	static bool ConnectWithWye(AcDbEntity *pEnt1,
 		AcDbEntity  *pEnt2, ads_point pnt1, ads_point pnt2)
 
-	{
+	{tvsTrace::Scope trace_("ConnectWithWye");
 		//Проверка
 		if (TVSClassCheck(pEnt1) != isTVS_Pipe)
 		{

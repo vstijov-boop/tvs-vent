@@ -7,6 +7,7 @@
 // changed side follow (horizontal length of the etaz changes), the changed duct's end follows
 // its elbow along the axis. Geometry: the same solver/adapter that validates the assembly.
 #ifdef TVS_OFFSET_INTEGRATION
+#include "Trace.h"
 #include "BuildTransaction.h"
 #include "OffsetService.h"
 #include "BypassAssemblyData.h"
@@ -45,7 +46,7 @@ public:
         if(o->isUndoing()||!plainDuct(o))return;
         opened()[o->objectId()]=TVS_Pipe::cast(o)->Elev;   // value at this open (each open/close pair)
     }
-    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){
+    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){tvsTrace::Scope trace_("OffsetRefit::objectModified");
         std::map<AcDbObjectId,double>::iterator it=opened().find(o->objectId());if(it==opened().end())return;
         const double was=it->second;opened().erase(it);
         if(o->isUndoing()||!plainDuct(o))return;
@@ -72,7 +73,7 @@ inline void detachAll(){
     attached().clear();
 }
 // Editor commandEnded: queued changes from a command are settled by TVS_ETAZ_KOTA.
-inline void commandEnded(const ACHAR* command){
+inline void commandEnded(const ACHAR* command){tvsTrace::Scope trace_("OffsetRefit::commandEnded");
     if(!command)return;
     if(_wcsicmp(command,L"TVS_ETAZ_KOTA")==0||_wcsicmp(command,L"U")==0||_wcsicmp(command,L"UNDO")==0||_wcsicmp(command,L"REDO")==0||_wcsicmp(command,L"MREDO")==0){
         if(_wcsicmp(command,L"TVS_ETAZ_KOTA")!=0)forget(acdbHostApplicationServices()->workingDatabase());return;}   // UNDO: this drawing only
@@ -96,7 +97,7 @@ inline bool plan(const TVS_TAP* a,const TVS_Pipe* p,double elevA,double elevB,do
     tvsOffsetAdapter::Placement place(tvsOffset::WorldPoint(m.x,m.y,m.z),std::atan2(axis.y,axis.x),f,elevA*f);
     d=tvsOffsetAdapter::adapt(in,g,place);return d.ready();
 }
-inline bool assemblies(AcDbDatabase* db,std::vector<Assembly>& out){
+inline bool assemblies(AcDbDatabase* db,std::vector<Assembly>& out){tvsTrace::Scope trace_("OffsetRefit::assemblies");
     out.clear();const double f=tvsUnits::factor(db);
     AcDbObjectPointer<AcDbBlockTableRecord> space(tvsOffsetProof::modelId(db),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return false;
     AcDbBlockTableRecordIterator* raw=NULL;if(space->newIterator(raw)!=Acad::eOk)return false;std::unique_ptr<AcDbBlockTableRecordIterator> it(raw);

@@ -117,6 +117,11 @@
         syncTVSGlobalUnits();
         tvsRepair::execute();
     }
+    // TVS_TRAG: trag u %TEMP%\TVS_trag.log za dijagnostiku rušenja (Trace.h).
+    static void Ventilation_ARXTVS_TRAG(void)
+    {
+        tvsTrace::toggle();
+    }
     // TVS_OZNAKE: printed duct labels size/flow on layer AT-DIM_KANAL (LabelCommand.h).
     static void Ventilation_ARXTVS_OZNAKE(void)
     {

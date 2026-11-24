@@ -11,6 +11,7 @@
 // (new radius, the duct ends follow the elbow ports along their axes). It stops at an etaz,
 // obilazak, T komad, vertical or round elbow it cannot recompute, or an element of another
 // size, and says where. A linked oprema block (EquipmentNodes.h) is a boundary "oprema".
+#include "Trace.h"
 #include <rxmfcapi.h>
 #include "BuildTransaction.h"
 #include "ActionTransaction.h"
@@ -81,7 +82,7 @@ inline bool waiting(AcDbDatabase* db){
     for(std::map<AcDbObjectId,int>::const_iterator it=pending().begin();it!=pending().end();++it)if(it->first.database()==db)return true;
     return false;
 }
-inline void post(){
+inline void post(){tvsTrace::Scope trace_("SizeFollow::post");
     AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(!doc)return;
     if(posted()&&tvsSpiro::nowMs()-postedAt()<5000)return;   // a posted run that never came (drawing closed) does not block for ever
     const bool sizesWait=waiting(doc->database());
@@ -123,7 +124,7 @@ public:
     virtual void objectOpenedForModify(const AcDbDatabase*,const AcDbObject* o){
         if(applying()||o->isUndoing())return;Sizes s;if(sizes(o,s))opened()[o->objectId()]=s;
     }
-    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){
+    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){tvsTrace::Scope trace_("SizeFollow::objectModified");
         if(!o->isUndoing()&&TVS_Entity::cast(o)){touched().insert(o->objectId());
             if(!applying()){AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(doc&&doc->isQuiescent())schedule();}}
         std::map<AcDbObjectId,Sizes>::iterator it=opened().find(o->objectId());if(it==opened().end())return;
@@ -149,8 +150,8 @@ inline void DbReactor::goodbye(const AcDbDatabase* db){
 }
 class EdReactor : public AcEditorReactor {
 public:
-    virtual void commandWillStart(const ACHAR* c){command()=c?c:L"";}
-    virtual void commandEnded(const ACHAR* c){
+    virtual void commandWillStart(const ACHAR* c){command()=c?c:L"";tvsTrace::mark("komanda",c);}
+    virtual void commandEnded(const ACHAR* c){tvsTrace::Scope trace_("SizeFollow::commandEnded");
         command().Empty();
         if(c&&(!_wcsicmp(c,L"U")||!_wcsicmp(c,L"UNDO")||!_wcsicmp(c,L"REDO")||!_wcsicmp(c,L"MREDO"))){pending().clear();previous().clear();touched().clear();return;}
         if(c&&_wcsicmp(c,L"TVS_DIM_PRATI"))post();
@@ -674,7 +675,7 @@ inline void preview(const std::vector<tvsMove::Node>& nodes,const std::vector<in
         for(int j=0;j<2;++j){tvsRunSketch::Mark m;m.at=tvsTeeSketch::Pt(n.ports[j].x,n.ports[j].y);m.text=j==0?L"1":L"2";m.below=true;pv.sketch.marks.push_back(m);}}
 }
 inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work);
-inline void run(UINT runDialog=0,UINT teeDialog=0){
+inline void run(UINT runDialog=0,UINT teeDialog=0){tvsTrace::Scope trace_("SizeFollow::run");
     if(runDialog)ids().run=runDialog;if(teeDialog)ids().tee=teeDialog;
     posted()=false;
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();

@@ -76,6 +76,7 @@
 #include "JointFix.h"
 #include "CheckCommand.h"
 #include "RepairCommand.h"   // TVS_POPRAVI: popravka zapisa crteža starijeg builda
+#include "Trace.h"           // TVS_TRAG: trag za dijagnostiku rušenja
 #include "FlowCommand.h"
 #include "PantsJoinCommand.h"
 #include "BranchJoinCommand.h"
@@ -404,6 +405,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_KOLJENA
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PRERACUNAJ, TVS_PRERACUNAJ, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PROVJERA, TVS_PROVJERA, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_POPRAVI, TVS_POPRAVI, ACRX_CMD_MODAL, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_TRAG, TVS_TRAG, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PROTOK, TVS_PROTOK, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SPOJ_TKG, TVS_SPOJ_TKG, ACRX_CMD_MODAL, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_SPOJ_TKO, TVS_SPOJ_TKO, ACRX_CMD_MODAL, NULL)
