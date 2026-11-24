@@ -218,8 +218,9 @@ inline bool apply(const AcDbObjectId& blockId,const lk::Result& r,const std::vec
         if(p->put_Lastpoint(keep)!=Acad::eOk)return false;
         p->recordGraphicsModified();
     }
-    AcDbObject* b=tx.open(blockId,AcDb::kForWrite);if(b)tvsEquipmentStore::anchor(b,rec);   // where it was linked (moved / copied later = odvojen)
-    if(!b||tvsEquipmentStore::write(b,rec)!=Acad::eOk)return false;
+    AcDbObject* b=tx.open(blockId,AcDb::kForWrite);
+    tvsEquipment::Record anchored=rec;if(b)tvsEquipmentStore::anchor(b,anchored);   // where it was linked (moved / copied later = odvojen)
+    if(!b||tvsEquipmentStore::write(b,anchored)!=Acad::eOk)return false;
     if(!tx.commit())return false;
     // the scene follows (next blocks of this command)
     for(size_t k=0;k<r.edits.size();++k){const lk::EndEdit& e=r.edits[k];tvsMove::Node& n=s.nodes[index[e.duct]];
