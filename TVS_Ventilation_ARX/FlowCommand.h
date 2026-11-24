@@ -551,7 +551,12 @@ inline void execute(UINT sizingDialog){
     {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
         if(net.linked[i]){   // linked terminal (oprema): the flow goes into its record (qTerminal), not into a duct
-            tvsEquipment::Record rec=net.records[i];rec.qTerminal=r.flow[pieceOf(net,r,net.owner[i])];AcDbEntity* b=tx.write(net.nodes[i].id);
+            tvsEquipment::Record rec=net.records[i];rec.qTerminal=r.flow[pieceOf(net,r,net.owner[i])];
+            if(rec.half>=0){   // linijski difuzor: the record of the block, qTerminal = sum of its two connections
+                if(written.count(net.nodes[i].id))continue;
+                double sum=0;for(size_t j=0;j<net.real;++j)if(net.linked[j]&&net.nodes[j].id==net.nodes[i].id){const int o=pieceOf(net,r,net.owner[j]);if(r.reached[o])sum+=r.flow[o];}
+                tvsEquipment::Record whole;if(!tvsEquipmentStore::read(net.nodes[i].id,whole))continue;whole.qTerminal=sum;rec=whole;}
+            AcDbEntity* b=tx.write(net.nodes[i].id);
             if(!b||tvsEquipmentStore::write(b,rec)!=Acad::eOk){const tvsMoveGeometry::Point c=centre(el[net.owner[i]]);
                 acutPrintf(L"\nTVS_PROTOK: oprema kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return;}
             written.insert(net.nodes[i].id);continue;}

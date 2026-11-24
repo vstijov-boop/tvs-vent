@@ -106,10 +106,10 @@ struct Values {
     int model;                        // -1 = different
     std::wstring dp,zeta,dpn,qn,q;    // exact number text, differentText(); q empty = not terminals
     std::wstring curve;               // formatCurve or differentText()
-    int ports;                        // 1, 2; 0 = mixed
+    int ports;                        // 1, 2; 3 = twin terminal (2 on the box); 0 = mixed
     std::wstring size,length;         // read-only info (mm) or differentText()
     Values():kind(-1),model(-1),ports(0){}
-    bool terminals()const{return ports==1;}
+    bool terminals()const{return ports==1||ports==3;}
 };
 inline Values merge(const std::vector<tvsEquipment::Record>& rs){
     Values v;if(rs.empty())return v;
@@ -120,13 +120,13 @@ inline Values merge(const std::vector<tvsEquipment::Record>& rs){
         model=model&&r.model==f.model;
         dp=dp&&tvsNumeric::same(r.dp,f.dp);zeta=zeta&&tvsNumeric::same(r.zeta,f.zeta);
         dpn=dpn&&tvsNumeric::same(r.dpNominal,f.dpNominal);qn=qn&&tvsNumeric::same(r.qNominal,f.qNominal);
-        q=q&&tvsNumeric::same(r.qTerminal,f.qTerminal);ports=ports&&r.ports==f.ports;curve=curve&&r.curve==f.curve;
+        q=q&&tvsNumeric::same(r.qTerminal,f.qTerminal);ports=ports&&r.ports==f.ports&&r.twin==f.twin;curve=curve&&r.curve==f.curve;
         size=size&&sizeText(r,L"D")==sizeText(f,L"D");length=length&&tvsNumeric::same(r.lengthMm,f.lengthMm);}
     const std::wstring diff=differentText();
     v.kind=kind?f.kind:-1;v.tag=tag?trim(f.tag):diff;v.note=note?trim(f.note):diff;v.model=model?f.model:-1;
     v.dp=dp?tvsNumeric::exact(f.dp):diff;v.zeta=zeta?tvsNumeric::exact(f.zeta):diff;
     v.dpn=dpn?tvsNumeric::exact(f.dpNominal):diff;v.qn=qn?tvsNumeric::exact(f.qNominal):diff;
-    v.ports=ports?f.ports:0;v.curve=curve?formatCurve(f.curve):diff;
+    v.ports=ports?(f.twin?3:f.ports):0;v.curve=curve?formatCurve(f.curve):diff;
     v.q=!v.terminals()?std::wstring():q?tvsNumeric::exact(f.qTerminal):diff;
     v.size=size?sizeText(f,L"\u00d8"):diff;
     v.length=length?tvsNumeric::formatG(f.lengthMm,6):diff;

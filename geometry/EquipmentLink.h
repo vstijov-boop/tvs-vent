@@ -80,8 +80,9 @@ struct Result {
     double detail;        // the number behind a refusal (gap / piece length / offset)
     int mount;            // tvsEquipment::AtEnd / Bottom (terminals)
     int outlet;           // input index of the elbow outlet at the port (-1: a duct end / none)
+    bool twin;            // terminal with 2 connections on the box (linijski difuzor): ports = 2, both free ends
     Result():error(Ok),ports(0),linkCase(0),ux(1),uy(0),length(0),cutDuct(-1),a(0),b(0),round(false),level(0),
-             offset(0),detailDuct(-1),detail(0),mount(tvsEquipment::AtEnd),outlet(-1){duct[0]=duct[1]=-1;}
+             offset(0),detailDuct(-1),detail(0),mount(tvsEquipment::AtEnd),outlet(-1),twin(false){duct[0]=duct[1]=-1;}
 };
 
 inline const wchar_t* reasonText(int e){
@@ -266,8 +267,46 @@ inline void footprintMm(const std::vector<Pt>& block,double mmPerUnit,double& wi
 // free vertical elbow outlets. Not for Inline; for Any the extents decide when they find ducts on
 // both sides (an inline block whose base point happens to be on a duct end stays inline).
 // Otherwise (base point not on a free end) the extents logic above.
+// Point inside the convex footprint, or within tol of it.
+inline bool insideBlock(const std::vector<Pt>& block,const Pt& q,double tol){
+    if(block.size()<3)return false;
+    double sign=0;
+    for(size_t k=0;k<block.size();++k){const Pt& a=block[k];const Pt& b=block[(k+1)%block.size()];
+        const double l=length(sub(b,a));if(l<=0)continue;const double c=cross(sub(b,a),sub(q,a))/l;   // signed distance from the edge
+        if(sign==0&&std::fabs(c)>tol)sign=c>0?1:-1;
+        if(sign!=0&&c*sign<-tol)return false;}
+    return true;
+}
+// Linijski difuzor (user 2026-11-24): exactly two free duct / flex ends inside the block footprint
+// (the spigots on its plenum box) -> a terminal with 2 connections (twin). For a block of an unknown
+// kind (Any) an inline link through the block wins (a damper between two ducts); two ducts on one
+// axis facing each other are never a twin (found = -2: the rules below decide).
+inline Result twinLink(const std::vector<Pt>& block,const std::vector<Duct>& ducts,const Options& o,int& found){
+    Result t;found=0;
+    for(size_t i=0;i<ducts.size();++i)for(int e=0;e<2;++e){
+        const Duct& d=ducts[i];if(d.others[e]!=0)continue;
+        const Pt at=e==0?d.p0:d.p1;if(!insideBlock(block,at,o.tol))continue;
+        const Pt v=e==0?sub(d.p0,d.p1):sub(d.p1,d.p0);const double l=length(v);if(l<=o.tol)continue;
+        if(found<2){tvsEquipment::Port& p=t.port[found];p.x=at.x;p.y=at.y;p.z=d.level;p.dx=-v.x/l;p.dy=-v.y/l;t.duct[found]=static_cast<int>(i);
+            if(found==0){t.a=d.a;t.b=d.round?0:d.b;t.round=d.round;t.level=d.level;t.ux=v.x/l;t.uy=v.y/l;}}
+        ++found;
+    }
+    if(found!=2)return t;
+    // two ducts on one axis facing each other (block between them): not a box with two spigots
+    const Pt u0(t.port[0].dx,t.port[0].dy),u1(t.port[1].dx,t.port[1].dy),gap=sub(Pt(t.port[1].x,t.port[1].y),Pt(t.port[0].x,t.port[0].y));
+    if(length(gap)<=o.tol||(dot(u0,u1)<-0.9&&std::fabs(cross(u0,gap))<=o.axisTol)){found=-2;return t;}   // one point / one axis
+    t.error=Ok;t.ports=2;t.twin=true;t.linkCase=Touching;t.mount=tvsEquipment::AtEnd;t.length=0;t.detailDuct=-1;
+    return t;
+}
 inline Result link(const std::vector<Pt>& block,const Pt& base,const std::vector<Duct>& ducts,
                    const std::vector<Outlet>& outlets,const Options& o){
+    if(o.expect!=Inline){
+        int ends=0;const Result w=twinLink(block,ducts,o,ends);
+        if(ends==2){
+            if(o.expect==Any){const Result x=link(block,ducts,o);if(x.error==Ok&&x.ports==2)return x;}
+            return w;
+        }
+    }
     if(o.expect!=Inline){
         Result t;int found=0;
         for(size_t i=0;i<ducts.size();++i)for(int e=0;e<2;++e){

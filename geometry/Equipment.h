@@ -35,6 +35,12 @@ enum Model {NoLoss=0,FixedDp=1,Zeta=2,Nominal=3,Curve=4};
 //           Idelchik tables (branch = neck, straight = duct) plus the grille's own loss
 //           (user decision 2026-11-23).
 enum Mount {AtEnd=0,Bottom=1};
+// Terminal with two connections on its plenum box (linijski difuzor, user decision 2026-11-24):
+// twin = true, ports = 2, both ports are free duct ends of the network. The two spigots work in
+// parallel: each gets qTerminal / 2, and the loss of the diffuser (model at the TOTAL flow) is the
+// same on both paths - not halved. The network readers split the block into two 1-port terminals
+// (half(): ports = 1, half = 0 / 1, qTerminal / 2; loss() evaluates a half at twice its flow);
+// the specification counts the block once.
 
 inline int kindCount(){return 10;}
 // Names shown in the dialogs / specification (BCS, \u escapes keep this file ASCII).
@@ -90,9 +96,11 @@ struct Record {
     int mount;            // Mount (terminals)
     double neckA,neckB;   // mm, grille connection (Bottom); 0 = take the duct size
     bool neckRound;
+    bool twin;            // terminal with 2 ports on the box (see above); persisted as twin=1
+    int half;             // -1; 0 / 1: one connection of a twin terminal (made by half(), never stored)
     Record():version(1),kind(Other),ports(2),mmPerUnit(1),round(false),a(0),b(0),lengthMm(0),
-             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),anchored(false),ax(0),ay(0),arot(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false){}
-    bool terminal()const{return ports==1;}
+             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),anchored(false),ax(0),ay(0),arot(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false),twin(false),half(-1){}
+    bool terminal()const{return ports==1||twin;}
 };
 
 inline double curveLoss(const std::vector<std::pair<double,double> >& c,double q){
@@ -119,7 +127,7 @@ inline bool detached(const Record& r,double x,double y,double rot,double tol){
 // Pressure loss [Pa] at flow q [m3/h]; pv = velocity pressure [Pa] of the duct at the port
 // (only the Zeta model needs it). Never negative.
 inline double loss(const Record& r,double q,double pv){
-    double v=0;
+    double v=0;if(r.twin&&r.half>=0)q*=2;   // one connection of a twin terminal: the box loss at the total flow
     switch(r.model){
     case Curve:v=curveLoss(r.curve,q);break;
     case FixedDp:v=r.dp;break;
@@ -128,6 +136,12 @@ inline double loss(const Record& r,double q,double pv){
     default:v=0;
     }
     return v>0&&std::isfinite(v)?v:0;
+}
+
+// One connection of a twin terminal as a 1-port terminal (k = 0 / 1): its port, half the flow.
+inline Record half(const Record& r,int k){
+    Record h=r;if(k<0||k>1)k=0;h.ports=1;h.port[0]=r.port[k];h.port[1]=Port();h.qTerminal=r.qTerminal/2;h.half=k;h.twin=true;
+    return h;
 }
 
 // ---- text form (one string in the XRecord, also used for the per-block defaults) ----
@@ -150,6 +164,7 @@ inline std::wstring format(const Record& r){
     put(L"model",num(r.model));put(L"dp",num(r.dp));put(L"zeta",num(r.zeta));
     put(L"dpn",num(r.dpNominal));put(L"qn",num(r.qNominal));put(L"q",num(r.qTerminal));
     if(r.mount!=AtEnd)put(L"mount",num(r.mount));
+    if(r.twin&&r.ports==2)put(L"twin",num(1));
     if(r.neckA>0){put(L"na",num(r.neckA));put(L"nb",num(r.neckB));put(L"nr",num(r.neckRound?1:0));}
     if(r.anchored)put(L"anc",num(r.ax)+L","+num(r.ay)+L","+num(r.arot));
     if(!r.curve.empty()){std::wstring c;for(size_t i=0;i<r.curve.size();++i){if(i)c+=L",";c+=num(r.curve[i].first)+L":"+num(r.curve[i].second);}put(L"curve",c);}
@@ -190,6 +205,7 @@ inline bool parse(const std::wstring& s,Record& r){
         else if(key==L"qn"&&n)r.qNominal=v;
         else if(key==L"q"&&n)r.qTerminal=v;
         else if(key==L"mount"&&n)r.mount=v==Bottom?Bottom:AtEnd;
+        else if(key==L"twin"&&n)r.twin=v!=0;
         else if(key==L"na"&&n)r.neckA=v;
         else if(key==L"nb"&&n)r.neckB=v;
         else if(key==L"nr"&&n)r.neckRound=v!=0;
@@ -214,6 +230,7 @@ inline bool parse(const std::wstring& s,Record& r){
     }
     if(r.kind<0||r.kind>=kindCount())r.kind=Other;
     if(r.model<NoLoss||r.model>Curve)r.model=NoLoss;
+    if(r.ports!=2)r.twin=false;
     return any&&r.version==1;
 }
 }

@@ -86,9 +86,10 @@ public:
         CString facts;
         if(shown.ports==1)facts=L"Priključak: 1 (krajnji element)";
         else if(shown.ports==2)facts=L"Priključci: 2 (u liniji kanala)";
+        else if(shown.ports==3)facts=L"Priključci: 2 na kutiji (linijski difuzor) – Q/2 po priključku, Δp za ukupni Q";
         else facts=L"Priključci: različito";
         facts+=L"\nDimenzija: ";facts+=shown.size.empty()?CString(L"–"):CString(shown.size.c_str())+(shown.size==tvsEquipmentEdit::differentText()?L"":L" mm");
-        if(shown.ports!=1){facts+=L"  ·  dužina: ";facts+=CString(shown.length.c_str())+(shown.length==tvsEquipmentEdit::differentText()?L"":L" mm");}
+        if(shown.ports==2||shown.ports==0){facts+=L"  ·  dužina: ";facts+=CString(shown.length.c_str())+(shown.length==tvsEquipmentEdit::differentText()?L"":L" mm");}
         SetDlgItemText(IdFacts,facts);
         SetDlgItemText(IdInfo,banner);SetDlgItemText(IdAll,allText);
         SetDlgItemText(IdStatus,records.size()>1?L"Različito: ostaje kako je u svakom bloku dok se ne promijeni":L"Upisuje se u blok (jedan UNDO korak)");

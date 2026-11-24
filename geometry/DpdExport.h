@@ -228,7 +228,9 @@ inline std::vector<Segment> segments(const std::vector<tvsPressure::Element>& e,
     std::vector<Segment> out;const std::vector<XY> end=ends(e,r);
     std::map<std::string,std::string> alias;int corner=0,zero=0,closed=0;std::map<std::wstring,int> tags;
     auto tagOf=[&](const tvsEquipment::Record& r){   // the tag, or prefix-nn for an untagged one
-        if(!r.tag.empty())return utf8(r.tag);const std::wstring p=tvsEquipment::tagPrefix(r.kind);char b[16];std::snprintf(b,sizeof(b),"-%02d",++tags[p]);return utf8(p)+b;};
+        const char* part=r.half==0?" (1/2)":r.half==1?" (2/2)":"";   // linijski difuzor: one connection
+        if(!r.tag.empty())return utf8(r.tag)+part;const std::wstring p=tvsEquipment::tagPrefix(r.kind);char b[16];
+        std::snprintf(b,sizeof(b),"-%02d",r.half==1?tags[p]:++tags[p]);return utf8(p)+b+part;};
     auto node=[&](const std::string& n){std::map<std::string,std::string>::const_iterator i=alias.find(n);return i==alias.end()?n:i->second;};
     for(size_t q=0;q<r.d.size();++q){const tvsPressure::Dionica& d=r.d[q];
         const std::string from=node(utf8(d.from)),to=utf8(d.to);

@@ -83,7 +83,7 @@ inline void scan(AcDbDatabase* db,Found& out){
             const bool linked=tvsEquipmentStore::read(b,r);
             if(linked&&!r.anchored){if(portsOnBlock(b,r,f))out.anchor.push_back(id);else out.detached.push_back(id);}
             if(linked&&r.terminal()&&r.mount!=tvsEquipment::Bottom){const double s=tvsEquipmentFlow::unitScale(r.mmPerUnit,f);
-                terminals.push_back(AcGePoint3d(r.port[0].x*s,r.port[0].y*s,0));}
+                for(int k=0;k<(r.twin?2:1);++k)terminals.push_back(AcGePoint3d(r.port[k].x*s,r.port[k].y*s,0));}
         }
         e->close();
     }

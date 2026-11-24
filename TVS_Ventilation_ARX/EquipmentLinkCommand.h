@@ -345,9 +345,10 @@ inline void execute(){
             refuse(t,id,name,assembly?Assembly:Locked,0,false);
             if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
             continue;}
-        if(!known)rec.kind=r.ports==1?tvsEquipment::Grille:tvsEquipment::Other;
+        if(!known)rec.kind=r.twin?tvsEquipment::Diffuser:r.ports==1?tvsEquipment::Grille:tvsEquipment::Other;
+        rec.twin=r.twin;   // linijski difuzor: 2 priključka na kutiji (Equipment.h)
         rec.version=1;rec.ports=r.ports;rec.mmPerUnit=f;rec.round=r.round;rec.a=r.a;rec.b=r.round?0:r.b;
-        rec.lengthMm=r.ports==2?r.length*f:0;
+        rec.lengthMm=r.ports==2&&!r.twin?r.length*f:0;
         for(int p=0;p<2;++p)rec.port[p]=p<r.ports?r.port[p]:tvsEquipment::Port();
         rec.mount=r.ports==1?r.mount:tvsEquipment::AtEnd;
         bool neckGuessed=false;
@@ -360,7 +361,9 @@ inline void execute(){
             refuse(t,id,name,WriteFailed,0,false);
             if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
             continue;}
-        if(r.ports==2)++t.inl;else ++t.term;
+        if(r.ports==2&&!r.twin)++t.inl;else ++t.term;
+        if(r.twin)acutPrintf(L"\n  blok %ls [%ls]: 2 priključka na kutiji (linijski difuzor) – protok Q/2 po priključku, pad pritiska difuzora za ukupni Q na obje putanje.",
+            name.c_str(),handleText(id).c_str());
         t.ends+=static_cast<int>(r.edits.size());if(r.linkCase==lk::Cut)++t.cuts;
         if(rec.mount==tvsEquipment::Bottom&&r.ports==1)++t.bottom;
         if(neckGuessed)acutPrintf(L"\n  blok %ls [%ls]: rešetka na dnu kanala, priključak %.0f×%.0f mm uzet iz gabarita bloka – provjeriti u TVS_OPREMA_SVOJSTVA.",

@@ -289,6 +289,8 @@ inline void execute(UINT idd,double collar){
     tvsEquipment::Record rec=wasLinked?old:hasDefault?def:tvsEquipment::Record();
     if((wasLinked||hasDefault)&&!tvsEquipment::terminalKind(rec.kind)&&rec.kind!=tvsEquipment::Other){
         acutPrintf(L"\nTVS_RESETKA: blok „%ls“ je zapisan kao %ls (oprema u liniji), ne kao krajnji element. Promijenite vrstu (TVS_OPREMA_SVOJSTVA).",name.c_str(),tvsEquipment::kindName(rec.kind));return;}
+    if((wasLinked&&old.twin)||(hasDefault&&def.twin)){
+        acutPrintf(L"\nTVS_RESETKA: blok „%ls“ ima 2 priključka na kutiji (linijski difuzor) – kanale / flex do priključaka nacrtajte pa povežite sa TVS_OPREMA.",name.c_str());return;}
     if(!(wasLinked||hasDefault))rec.kind=tvsEquipment::Grille;
     // ---- the duct ----
     tvsEquipmentLinkCmd::Scene scene;if(!tvsEquipmentLinkCmd::readScene(db,scene)){acutPrintf(L"\nTVS_RESETKA: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}

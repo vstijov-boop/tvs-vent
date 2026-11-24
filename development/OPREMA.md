@@ -92,3 +92,9 @@ Ne radi (još): ogranak naniže (T komad na dnu), ogranak drugačije kote, linij
 
 ### Ponovno priključenje bočne rešetke (24.11.)
 Blok koji je već priključen bočno (zapis: krajnji element, ne dno): TVS_RESETKA nalazi stari priključak – ogranak (kanal ≤ 500 mm od priključka bloka) i T komad / štucnu na čijem je priključku ogranka – i u ISTOJ transakciji (jedan U) briše ogranak i T komad, a kanale uz T komad spaja u jedan (iste dimenzije, kote i ose; inače poruka i stari priključak ostaje). Planiranje novog priključka radi na spojenom kanalu, pa „preblizu kraju kanala“ više ne smeta. Dijalog to navodi.
+
+### Linijski difuzor – 2 priključka na kutiji (24.11.)
+Odluka: dva priključka na plenumskoj kutiji rade **paralelno** – svaki dobija Q/2, a pad pritiska difuzora (model za UKUPNI Q, kako katalozi daju za difuzor) važi **cijeli na obje putanje**, ne pola.
+- **Povezivanje:** nacrtati kanale / flex do priključaka (krajevi iznad kutije), pa TVS_OPREMA. Tačno dva slobodna kraja unutar gabarita bloka = terminal sa 2 priključka (zapis `twin=1`, ports = 2; nepoznat naziv → Difuzor). Dva kanala na istoj osi okrenuta jedan prema drugom (blok između njih) nisu linijski difuzor; kod nepoznate vrste prednost ima oprema u liniji. TVS_RESETKA takav blok ne priključuje (poruka).
+- **Mreža:** čitači (TVS_PROTOK, TVS_PAD, TVS_DPD_IZVOZ, TVS_PROVJERA, TVS_DIM_PRATI) vide blok kao dva terminala sa po 1 priključkom (`tvsEquipment::half`: Q/2, `loss` računa polovinu na 2×Q). TVS_PROTOK upisuje u blok zbir oba priključka. DuctPressDrop: dva terminalna fitinga, oznaka „… (1/2)“ / „(2/2)“.
+- **Specifikacija:** jedan blok = jedan komad. Dijalog svojstava: „Priključci: 2 na kutiji (linijski difuzor)“, protok = ukupni Q.

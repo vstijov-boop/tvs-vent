@@ -39,6 +39,14 @@ int main(){
     {Record a;a.anchored=true;a.ax=100;a.ay=200;a.arot=0.5;Record b;assert(parse(format(a),b)&&b.anchored&&b.ax==100&&b.ay==200&&b.arot==0.5);
      assert(!detached(b,100,200,0.5,1e-4)&&detached(b,100.01,200,0.5,1e-4)&&detached(b,100,200,0.6,1e-4)&&!detached(b,100,200,0.5+6.283185307179586,1e-4));
      Record old;assert(!detached(old,5,5,1,1e-4));}
+    // twin terminal (linijski difuzor): 2 ports on the box, Q/2 each, loss at the total flow on both
+    {Record l;l.kind=Diffuser;l.ports=2;l.twin=true;l.qTerminal=600;l.model=Nominal;l.dpNominal=20;l.qNominal=600;
+     l.port[0].x=1;l.port[1].x=2;assert(l.terminal());
+     Record m;assert(parse(format(l),m)&&m.twin&&m.ports==2&&m.terminal()&&m.port[1].x==2);
+     Record h=half(m,1);assert(h.ports==1&&h.half==1&&h.port[0].x==2&&h.qTerminal==300&&h.terminal());
+     assert(std::fabs(loss(h,300,0)-20)<1e-9&&std::fabs(loss(m,600,0)-20)<1e-9);   // not halved
+     Record one;one.ports=1;one.twin=true;Record o2;assert(parse(format(one),o2)&&!o2.twin);   // twin only with 2 ports
+     Record inl;assert(!inl.terminal());}
     std::puts("equipment OK");
     return 0;
 }

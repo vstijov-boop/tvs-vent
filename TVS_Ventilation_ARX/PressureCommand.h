@@ -76,7 +76,12 @@ inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
             else{t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}}
         return true;}
     if(const AcDbBlockReference* b=AcDbBlockReference::cast(e.object())){   // oprema (EquipmentNodes.h): loss from its record
-        tvsEquipment::Record rec;if(tvsEquipmentStore::read(b,rec)){t.kind=tvsPressure::Equipment;t.equipment=rec;return true;}}
+        tvsEquipment::Record rec;if(tvsEquipmentStore::read(b,rec)){
+            if(rec.twin&&rec.ports==2&&n.ports.size()==1){   // one connection of a linijski difuzor: its half (loss at the total flow)
+                const double s=tvsEquipmentFlow::unitScale(rec.mmPerUnit,f);int k=0;double best=-1;
+                for(int j=0;j<2;++j){const double d=std::hypot(rec.port[j].x*s-n.ports[0].x,rec.port[j].y*s-n.ports[0].y);if(best<0||d<best){best=d;k=j;}}
+                rec=tvsEquipment::half(rec,k);}
+            t.kind=tvsPressure::Equipment;t.equipment=rec;return true;}}
     t.kind=tvsPressure::Other;return true;
 }
 inline void execute(){

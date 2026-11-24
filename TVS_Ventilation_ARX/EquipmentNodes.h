@@ -48,6 +48,7 @@ inline bool describe(const AcDbBlockReference* b,double f,tvsMove::Node& n,tvsEq
 }
 // Appends the linked blocks to `nodes` (records: same order, optional). snapTol > 0: the port z
 // is taken from the end of another node lying on it in plan (within snapTol, drawing units).
+// A twin terminal (linijski difuzor, 2 ports on the box) is appended as two 1-port terminals.
 // detached (optional): linked blocks moved / copied after linking - left out of the network.
 inline bool append(AcDbDatabase* db,std::vector<tvsMove::Node>& nodes,std::vector<tvsEquipment::Record>* records,double snapTol,std::vector<AcDbObjectId>* detached=NULL){
     if(!db)return false;const double f=tvsUnits::factor(db);const size_t before=nodes.size();
@@ -58,6 +59,9 @@ inline bool append(AcDbDatabase* db,std::vector<tvsMove::Node>& nodes,std::vecto
         if(const AcDbBlockReference* b=AcDbBlockReference::cast(e)){tvsMove::Node n;tvsEquipment::Record r;
             if(describe(b,f,n,r)){
                 if(tvsEquipmentStore::detached(b,r)){if(detached)detached->push_back(b->objectId());}   // moved / copied: not in the network
+                else if(r.twin&&n.ports.size()==2){   // linijski difuzor: two 1-port terminals (same block id), Equipment.h half()
+                    for(int k=0;k<2;++k){tvsMove::Node h=n;h.ports.assign(1,n.ports[k]);h.axes.assign(1,n.axes[k]);h.sections.assign(1,n.sections[k]);
+                        h.elevation=n.ports[k].z;h.middle=n.ports[k];nodes.push_back(h);if(records)records->push_back(tvsEquipment::half(r,k));}}
                 else{nodes.push_back(n);if(records)records->push_back(r);}}}
         e->close();
     }

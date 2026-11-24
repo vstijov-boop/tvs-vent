@@ -217,6 +217,19 @@ int main(){
     // two free ends at the base point: ambiguous
     {std::vector<Duct> d;d.push_back(duct(0,0,1000,0));d.push_back(duct(1000,0,1000,-800));
      assert(link(box(1100,0,200,600,0),Pt(1000,0),d,none,o).error==Ambiguous);}
+    // linijski difuzor: plenum box 1200 x 150 at (0,0), two flex / ducts from +y ending over the box
+    {std::vector<Outlet> no;std::vector<Duct> d;d.push_back(duct(-300,1000,-300,20,200,0));d.push_back(duct(300,1000,300,-10,200,0));
+     d[0].round=d[1].round=true;
+     Options t=o;t.expect=Terminal;Result r=link(box(0,0,1200,150,0),Pt(-600,0),d,no,t);
+     assert(r.error==Ok&&r.twin&&r.ports==2&&r.linkCase==Touching&&r.edits.empty());
+     assert(at(r.port[0],-300,20)&&at(r.port[1],300,-10)&&eq(r.port[0].dy,1)&&eq(r.port[1].dy,1)&&r.duct[0]==0&&r.duct[1]==1);
+     Options any=o;Result q=link(box(0,0,1200,150,0),Pt(-600,0),d,no,any);assert(q.error==Ok&&q.twin);   // not inline: kind unknown, still twin
+     Options in=o;in.expect=Inline;assert(!link(box(0,0,1200,150,0),Pt(-600,0),d,no,in).twin);
+     // one end only over the box: an ordinary terminal (base point rule)
+     std::vector<Duct> one(1,d[0]);Result s1=link(box(0,0,1200,150,0),Pt(-300,20),one,no,t);assert(s1.error==Ok&&!s1.twin&&s1.ports==1);
+     // inline damper between two ducts (Any): inline wins over twin
+     std::vector<Duct> l;l.push_back(duct(0,0,1000,0));l.push_back(duct(1500,0,3000,0));
+     Result x=link(box(1250,0,500,450,0),Pt(1000,0),l,no,any);assert(x.error==Ok&&x.ports==2&&!x.twin);}
     for(int e=1;e<errorCount;++e)assert(reasonText(e)[0]!=0);
     std::puts("equipment link OK");
     return 0;
