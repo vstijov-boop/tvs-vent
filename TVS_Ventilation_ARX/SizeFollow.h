@@ -124,7 +124,7 @@ public:
     virtual void objectOpenedForModify(const AcDbDatabase*,const AcDbObject* o){
         if(applying()||o->isUndoing())return;Sizes s;if(sizes(o,s))opened()[o->objectId()]=s;
     }
-    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){tvsTrace::Scope trace_("SizeFollow::objectModified");
+    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){
         if(!o->isUndoing()&&TVS_Entity::cast(o)){touched().insert(o->objectId());
             if(!applying()){AcApDocument* doc=acDocManager?acDocManager->curDocument():NULL;if(doc&&doc->isQuiescent())schedule();}}
         std::map<AcDbObjectId,Sizes>::iterator it=opened().find(o->objectId());if(it==opened().end())return;
@@ -506,10 +506,12 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
      for(size_t k=0;k<run.etazes.size();++k){const tvsOffsetRefit::Assembly& s=etazes[run.etazes[k].index];w.push_back(s.a);w.push_back(s.b);w.push_back(s.p);}
 #endif
      if(!tvsAction::writable(w)){acutPrintf(L"\nDionica nije promijenjena: element dionice je na zaključanom sloju ili nije dostupan.");return false;}}   // prijedlog 3: shared preflight (ActionTransaction.h)
+    tvsTrace::mark("applyRun","upis");
     // write: etazi, elbows, T komadi, ducts
 #ifdef TVS_OFFSET_INTEGRATION
     for(size_t k=0;k<run.etazes.size();++k)if(!etazResize(etazes[run.etazes[k].index],A,B,f)){acutPrintf(L"\nEtaž nije preračunat; dionica je promijenjena samo do njega.");return false;}
 #endif
+    tvsTrace::mark("applyRun","koljena");
     for(size_t k=0;k<run.elbows.size();++k){
         AcDbObjectPointer<TVS_TAP> t(nodes[run.elbows[k]].id,AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
         const ElbowRule r=elbowRule(t.object(),round);
@@ -517,6 +519,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
             t->put_RadiusVariableParameter(r.k);t->put_RadiusConst(r.constant);}
         t->put_SizeA(A);if(!round)t->put_SizeB(B);else if(r.convert)t->put_SizeB(0);t->recordGraphicsModified();
     }
+    tvsTrace::mark("applyRun","T komadi");
     for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];
         AcDbObjectPointer<TVS_WYE> w(nodes[t.node].id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)continue;
         tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
@@ -533,6 +536,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         w->recordGraphicsModified();
         tees[k].after=tvsTeeFit::ports(w.object());
     }
+    tvsTrace::mark("applyRun","portovi T komada");
     // T komad ports that moved: ducts on them follow (before the run ducts are written)
     for(size_t k=0;k<tees.size();++k)if(tees[k].after.ok)for(int m=0;m<3;++m){
         const tvsMove::Point from=tvsMove::point(tees[k].before.p[m]),to=tvsMove::point(tees[k].after.p[m]);
@@ -555,6 +559,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
     }
 #ifdef TVS_SIZE_BYPASS
     // obilasci last: the TVS_BYPASS dialog with the new size on the (already resized) inlet/outlet
+    tvsTrace::mark("applyRun","obilasci");
     for(size_t k=0;k<run.bypasses.size();++k){
         TVSBypassRadius radius;radius.mode=globalRadiusTypeRect;radius.roundMode=globalRadiusTypeRound;radius.typeRoundTap=globalTypeRoundTap;
         radius.k=globalTapRadiusVariableParameter;radius.constant=globalTapRadiusConst;
@@ -565,6 +570,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
     }
 #endif
     // prelaz back to the old size behind a T komad (option Prelaz)
+    tvsTrace::mark("applyRun","prelaz iza T komada");
     for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];if(t.mode!=2||!tees[k].after.ok)continue;
         const int other=t.port==0?1:0;const AcGePoint3d at=tees[k].after.p[other];
         for(size_t q=0;q<nodes.size();++q){if(nodes[q].kind!=1)continue;
@@ -684,10 +690,10 @@ inline void run(UINT runDialog=0,UINT teeDialog=0){tvsTrace::Scope trace_("SizeF
     for(std::map<AcDbObjectId,int>::iterator it=pending().begin();it!=pending().end();){
         if(it->first.database()==db){work.insert(*it);pending().erase(it++);}else ++it;}
     if(db&&!work.empty())settle(db,work);
-    if(db)refreshLabels(db);   // after the sizes: their own changes are in the set too
+    tvsTrace::mark("run","refreshLabels");if(db)refreshLabels(db);tvsTrace::mark("run","refreshLabels gotovo");   // after the sizes: their own changes are in the set too
     touched().clear();
 }
-inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
+inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){tvsTrace::Scope trace_("SizeFollow::settle");
     const double f=tvsUnits::factor(db),tol=1.0/f;
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
     if(!tvsMove::snapshot(db,nodes,labels)||!tvsEquipmentNodes::append(db,nodes,NULL,0)){acutPrintf(L"\nTVS_DIM_PRATI: mreža se ne može pročitati (objekat otvoren u drugoj komandi?); dimenzije na spojevima nisu prilagođene.");return;}
@@ -705,6 +711,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
 #ifdef TVS_OFFSET_INTEGRATION
         tvsOffsetRefit::assemblies(db,etazes);
 #endif
+        tvsTrace::mark("settle","etaze procitane");
         std::vector<int> starts;   // edited plain ducts with a known old size
         for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w){const int i=index(w->first);
             if(old.count(w->first)&&i>=0&&nodes[i].kind==1&&nodes[i].ports.size()==2)starts.push_back(i);}
@@ -718,7 +725,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
         if(!wholeRun()){int n=0;   // samo kanal <-> prelaz; spoj sa elementom stare dimenzije: upozorenje
             for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,false);
             if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza.",n);
-        }else{collect(ch);
+        }else{tvsTrace::mark("settle","collect");collect(ch);tvsTrace::mark("settle","collect gotovo");
             if(!anything()){int n=0;   // D4: nothing to follow, but a joint without a prelaz is still reported
                 for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,false);
                 if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza.",n);}}
@@ -736,6 +743,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 if(starts.size()>1){CString more;more.Format(L"   (+ %d)",static_cast<int>(starts.size())-1);banner+=more;}}
             if(ids().run)++dialogsShown();
             bool reverted=false;
+            tvsTrace::mark("settle","dijalog dionice");
             if(ids().run&&!tvsRunDialog::show(survey,banner,ch,ids().run)){ch=tvsRunDialog::Choices();ch.scope=cancelScope();
                 if(cancelScope()==tvsRunDialog::Only){   // D6, user decision 2026-11-16: Otkaži undoes the edit of the duct too
                     int back=0;
@@ -746,17 +754,18 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                     reverted=true;dirty=true;
                     acutPrintf(L"\nOtkazano: kanal vraćen na staru dimenziju (%d).",back);
                 }else acutPrintf(L"\nDionica nije mijenjana; izabrani kanal zadržava novu dimenziju.");}
+            tvsTrace::mark("settle","dijalog zatvoren");
             if(reverted){}
             else if(ch.scope==tvsRunDialog::Only||ch.scope==tvsRunDialog::OnlyPrelaz){
                 const bool insert=ch.scope==tvsRunDialog::OnlyPrelaz;int n=0;
-                for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,insert);
+                tvsTrace::mark("settle","joints");for(size_t k=0;k<starts.size();++k)n+=joints(nodes,starts[k],old[nodes[starts[k]].id],tol,f,insert);tvsTrace::mark("settle","joints gotovo");
                 if(insert){if(n)dirty=true;else acutPrintf(L"\nPrelaz na spoju nije umetnut (spoj sa više elemenata, T komad ili element druge dimenzije).");}
                 else if(n)acutPrintf(L"\nUPOZORENJE: na %d spoj(eva) kanal nove dimenzije naliježe na element stare dimenzije bez prelaza (obuhvat „kanal + prelaz na spoju“ ga umeće).",n);
             }else{
                 collect(ch);int changed=0;
                 struct Arrival {AcDbObjectId tee;int port;tvsTeePort::Section in;};std::vector<Arrival> arrivals;
                 for(size_t k=0;k<runs.size();++k){const Run& r=runs[k].second;if(r.empty())continue;std::vector<AcDbObjectId> resized;
-                    if(!applyRun(nodes,runs[k].first,r,etazes,tol,resized))continue;
+                    tvsTrace::mark("settle","applyRun");if(!applyRun(nodes,runs[k].first,r,etazes,tol,resized))continue;tvsTrace::mark("settle","applyRun gotovo");
                     changed+=static_cast<int>(r.elbows.size()+r.tees.size()+r.etazes.size()+resized.size());
                     for(size_t j=0;j<resized.size();++j)if(done.insert(resized[j]).second)queue.push_back(std::make_pair(resized[j],3));
                     AcDbObjectPointer<TVS_Pipe> p(nodes[runs[k].first].id,AcDb::kForRead);if(p.openStatus()!=Acad::eOk)continue;
@@ -765,12 +774,12 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
                 if(changed){acutPrintf(L"\nDionica promijenjena: elemenata %d.",changed);dirty=true;}
                 // TK-O / TK-G on the run: their own dialog, with the new size on the port the run arrived at
                 for(size_t k=0;k<arrivals.size();++k){
-                    if(tvsTeeDialog::openArriving(arrivals[k].tee,ids().tee,arrivals[k].port,arrivals[k].in))dirty=true;
+                    tvsTrace::mark("settle","dijalog T komada");if(tvsTeeDialog::openArriving(arrivals[k].tee,ids().tee,arrivals[k].port,arrivals[k].in))dirty=true;
                     else acutPrintf(L"\nT komad nije mijenjan: na priključku ostaje prelaz na njegovu dimenziju.");}
             }
         }
     }
-    bool shapeNote=false;
+    bool shapeNote=false;tvsTrace::mark("settle","red prelaza");
     for(size_t q=0;q<queue.size();++q){
         if(q>=5000){acutPrintf(L"\nTVS_DIM_PRATI: prekinuto poslije 5000 elemenata; ostatak mreže nije prilagođen.");break;}
         if(!fresh())break;
@@ -829,7 +838,7 @@ inline void settle(AcDbDatabase* db,std::map<AcDbObjectId,int>& work){
         for(std::map<AcDbObjectId,int>::const_iterator w=work.begin();w!=work.end();++w)changed.insert(w->first);
         for(std::set<AcDbObjectId>::const_iterator c=changed.begin();c!=changed.end();++c){
             AcDbObjectPointer<AcDbEntity> e(*c,AcDb::kForRead);if(e.openStatus()!=Acad::eOk||!plainDuct(e.object()))continue;
-            e.close();tvsTeePort::afterDuct(db,*c);}
+            e.close();tvsTrace::mark("settle","afterDuct");tvsTeePort::afterDuct(db,*c);tvsTrace::mark("settle","afterDuct gotovo");}
     }
         applying()=wasApplying;
     if(ducts||transitions)acutPrintf(L"\nDimenzije na spojevima: prilagodjeno prelaza %d, kanala %d.",transitions,ducts);

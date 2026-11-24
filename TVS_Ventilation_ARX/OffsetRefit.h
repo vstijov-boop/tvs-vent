@@ -46,7 +46,7 @@ public:
         if(o->isUndoing()||!plainDuct(o))return;
         opened()[o->objectId()]=TVS_Pipe::cast(o)->Elev;   // value at this open (each open/close pair)
     }
-    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){tvsTrace::Scope trace_("OffsetRefit::objectModified");
+    virtual void objectModified(const AcDbDatabase*,const AcDbObject* o){
         std::map<AcDbObjectId,double>::iterator it=opened().find(o->objectId());if(it==opened().end())return;
         const double was=it->second;opened().erase(it);
         if(o->isUndoing()||!plainDuct(o))return;

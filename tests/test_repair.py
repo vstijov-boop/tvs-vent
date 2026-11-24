@@ -18,7 +18,7 @@ class Repair(unittest.TestCase):
  def test_trace(self):
   t=text('TVS_Ventilation_ARX/Trace.h');self.assertIn('std::fflush(file());',t);self.assertIn('TVS_trag.log',t)
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp');self.assertIn('Ventilation_ARX, TVS_TRAG, TVS_TRAG, ACRX_CMD_MODAL, NULL)',e)
-  for p,n in (('TVS_Ventilation_ARX/commands/ConnectHelpers.inl','ConnectWithTap'),('TVS_Ventilation_ARX/SizeFollow.h','SizeFollow::commandEnded'),
+  for p,n in (('TVS_Ventilation_ARX/commands/ConnectHelpers.inl','ConnectWithTap'),('TVS_Ventilation_ARX/SizeFollow.h','SizeFollow::commandEnded'),('TVS_Ventilation_ARX/SizeFollow.h','SizeFollow::settle'),
               ('TVS_Ventilation_ARX/OffsetRefit.h','OffsetRefit::commandEnded'),('TVS_Ventilation_ARX/EquipmentCaption.h','EquipmentCaption::worldDraw')):
    self.assertIn('tvsTrace::Scope trace_("'+n+'");',text(p),p)
 if __name__=='__main__':unittest.main()
