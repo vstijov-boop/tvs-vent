@@ -31,6 +31,7 @@
 #endif
 #include "TVS_TAP.h"
 #include "FlexCuffData.h"
+#include "../geometry/RoundElbow.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_TAP::kCurrentVersionNumber = TVS_Version;
@@ -2319,6 +2320,16 @@ TVS_TAP *TVS_TAP::add_new(double &pSizeA,
 
 
 
+// MIRROR of a koljeno gore / dolje (user 2026-11-23: round ones came out wrong): the plan figure is
+// mirrored about its own axis line - Startvector from the mirrored run direction, MiddlePoint from
+// the mirrored axis point (geometry/RoundElbow.h mirrorVertical, tests/test_elbow_mirror.cpp).
+void TVS_TAP::mirrorVerticalPlan(const AcGeMatrix3d & xform, tvsRoundElbow::P & middle, tvsRoundElbow::P & start)
+{
+	setRadius();
+	const tvsRoundElbow::Map m = { xform(0, 0), xform(0, 1), xform(1, 0), xform(1, 1), xform(0, 3), xform(1, 3) };
+	tvsRoundElbow::mirrorVertical(ThisRound != 0, tvsRoundElbow::P(MiddlePoint.x, MiddlePoint.y), tvsRoundElbow::P(Startvector.x, Startvector.y),
+		Swectangle, Radius + SizeA / 2, m, middle, start);
+}
 // -----------------------------------------------------------------------------
 Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 {
@@ -2331,10 +2342,15 @@ Acad::ErrorStatus TVS_TAP::subTransformBy(const AcGeMatrix3d & xform)
 	Acad::ErrorStatus retCode = AcDbEntity::subTransformBy(xform);
 	// MIRROR (negative determinant): the arc of a plan elbow runs the other way, so the
 	// mirrored end direction becomes the start direction (same sweep angle).
-	if (xform.det() < 0 && std::fabs(std::fabs(Normvector.z) - 1) < 1e-8)
+	const bool planMirror = xform.det() < 0 && xform(0, 0) * xform(1, 1) - xform(0, 1) * xform(1, 0) < 0;
+	if (planMirror && Form == Form_Direct && std::fabs(std::fabs(Normvector.z) - 1) < 1e-8)
 		Startvector.rotateBy(Swectangle, Normvector);
+	const bool verticalMirror = planMirror && Form != Form_Direct;   // koljeno gore / dolje: mirrorVerticalPlan
+	tvsRoundElbow::P mirroredMiddle, mirroredStart;
+	if (verticalMirror) mirrorVerticalPlan(xform, mirroredMiddle, mirroredStart);
 	MiddlePoint.transformBy(xform);
 	Startvector.transformBy(xform);
+	if (verticalMirror) { MiddlePoint.x = mirroredMiddle.x; MiddlePoint.y = mirroredMiddle.y; Startvector.x = mirroredStart.x; Startvector.y = mirroredStart.y; }
 	if (scale != 1) { tvsTransform::scaleCommon(this, scale); Radius *= scale; RadiusConst *= scale; Startvector /= scale; }   // direction keeps its length
 	return (Acad::eOk);
 }

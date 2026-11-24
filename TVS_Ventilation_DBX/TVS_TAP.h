@@ -47,6 +47,7 @@
 //-----------------------------------------------------------------------------
 
 #include "TVS_Entity.h"
+#include "../geometry/RoundElbow.h"
 #define RadiusTypeRound_RadiusVariable 3
 #define RadiusTypeRound_RadiusConstant 2
 #define RadiusTypeRound_RadiusSpecific 1
@@ -260,6 +261,7 @@ public:
 	Acad::ErrorStatus put_Form(int newVal);
 	int get_Form(void) const;
 	void setRadius();
+	void mirrorVerticalPlan(const AcGeMatrix3d & xform, tvsRoundElbow::P & middle, tvsRoundElbow::P & start);   // MIRROR of a koljeno gore / dolje
 	void checkRadiusTypeRound();
 	void checkRadiusTypeRect();
 	void checkTypeRoundTap();

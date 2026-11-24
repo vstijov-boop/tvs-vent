@@ -14,7 +14,7 @@ class Guard(unittest.TestCase):
    self.assertIn('if (scale != 1)',s[i:i+1600],c)                                    # dimenzije prate dozvoljenu razmjeru
  def test_mirror_kept(self):
   self.assertIn('if (xform.det() < 0) { if (TransType == 2) TransType = 3;',text('TVS_Ventilation_DBX/TVS_TRANS.cpp'))
-  self.assertIn('if (xform.det() < 0 && std::fabs(std::fabs(Normvector.z) - 1) < 1e-8)',text('TVS_Ventilation_DBX/TVS_TAP.cpp'))
+  self.assertIn('if (planMirror && Form == Form_Direct && std::fabs(std::fabs(Normvector.z) - 1) < 1e-8)',text('TVS_Ventilation_DBX/TVS_TAP.cpp'))
  def test_zero_length(self):
   s=text('TVS_Ventilation_DBX/TVS_Pipe.cpp')
   self.assertNotIn('curViewUnitSize / Length;',s);self.assertNotIn('SizeA/Length/2',s);self.assertNotIn(')/Length/2',s)
