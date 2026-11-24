@@ -17,7 +17,7 @@ class FollowExport(unittest.TestCase):
   self.assertEqual(s.count('{'),s.count('}'))
  def test_export(self):
   s=text('TVS_Ventilation_ARX/ExportCommand.h')
-  self.assertIn('db->wblock(raw)',s);self.assertIn('o->explode(parts)',s);self.assertIn('copy->saveAs(path)',s)
+  self.assertIn('db->wblock(raw)',s);self.assertIn('o->explode(parts)',s);self.assertIn('(clean?clean.get():copy.get())->saveAs(path)',s);self.assertIn('copy->wblock(second)',s)
   self.assertNotIn('acdbEntDel',s)                            # the open drawing is never changed
   with zipfile.ZipFile(ROOT/'Installer/TVS_VENT/TVS_VENT.cuix') as z:
    self.assertIn('^C^C_TVS_IZVOZ;',z.read('MenuGroup.cui').decode('utf-8'))

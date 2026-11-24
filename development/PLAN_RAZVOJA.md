@@ -8,7 +8,7 @@ Redoslijed po dogovoru (5. 11. 2026). Stavke 1–6 su urađene i na masteru; u 7
 3. **Izvoz crteža bez TVS_VENT** – kopija DWG-a sa razbijenim TVS objektima; original ostaje netaknut.
 
 ## Otvoreno (poslije prioritetnih stavki)
-- **TVS_IZVOZ sa obilaskom:** izvoz crteža koji ima TVS_BYPASS uspije, ali AutoCAD pri snimanju kopije javi „An error occurred during save. We recommend that you run RECOVER“ (AUDIT ne nalazi greške). Uklanjanje TVS zapisa iz NOD-a kopije nije pomoglo. Crtež bez obilaska se izvozi bez upozorenja. Sumnja: kloniranje članova obilaska (subWblockClone / remapClones) ili njihovi zapisi u kopiji.
+- **TVS_IZVOZ sa obilaskom:** izvoz crteža koji ima TVS_BYPASS uspije, ali AutoCAD pri snimanju kopije javi „An error occurred during save. We recommend that you run RECOVER“ (AUDIT ne nalazi greške). Uklanjanje TVS zapisa iz NOD-a kopije nije pomoglo. Crtež bez obilaska se izvozi bez upozorenja. Sumnja: kloniranje članova obilaska (subWblockClone / remapClones) ili njihovi zapisi u kopiji. *24. 11.: pokušaj – kopija se poslije zamjene još jednom WBLOCK-uje i snima se ta „čista“ (samo živi objekti, bez obrisanih TVS elemenata i pokazivača na njih); čeka provjeru na crtežu sa obilaskom.*
 
 ## Sljedeće (redom)
 4. *(urađeno, potvrđeno 5. 11.)* **Promjena kote tokom crtanja → etaž** – kad se u dijalogu dimenzija tokom TVS_DRAW/TVS_PIPE promijeni kota, ponuditi „Umetnuti etaž? [Da/Ne]“ (isti put kao opcija Z: tvsOffsetIntegration); ako se mijenja i dimenzija, prvo etaž na postojećoj dimenziji, pa prelaz.

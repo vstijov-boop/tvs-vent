@@ -113,7 +113,21 @@ inline void run(){
         for(;it&&!it->done();it->next())if(!_wcsnicmp(it->name(),L"TVS_",4))keys.push_back(it->name());
         for(size_t k=0;k<keys.size();++k){AcDbObjectId id;if(nod->getAt(keys[k],id)==Acad::eOk){   // erasing removes the entry
             AcDbObjectPointer<AcDbObject> o(id,AcDb::kForWrite);if(o.openStatus()==Acad::eOk)o->erase();}}}}
-    const Acad::ErrorStatus es=copy->saveAs(path);
+    // Second pass (plan "Otvoreno": AutoCAD reported "error occurred during save" for drawings with
+    // an obilazak, AUDIT clean, removing the NOD records did not help): the copy is wblocked once more,
+    // so only live objects reach the file - the erased TVS elements, their records and every pointer
+    // to them stay behind. Falls back to the first copy if the second wblock fails.
+    std::unique_ptr<AcDbDatabase> clean;
+    {AcDbDatabase* second=NULL;Acad::ErrorStatus w2;
+        {
+#ifdef TVS_OFFSET_INTEGRATION
+            tvsOffsetData::WriteScope scope;
+#endif
+            w2=copy->wblock(second);
+        }
+        if(w2==Acad::eOk&&second)clean.reset(second);
+        else acutPrintf(L"\nTVS_IZVOZ: druga kopija (ciscenje) nije napravljena (%ls); snima se prva.",acadErrorStatusText(w2));}
+    const Acad::ErrorStatus es=(clean?clean.get():copy.get())->saveAs(path);
     if(es!=Acad::eOk){acutPrintf(L"\nIzvoz nije sacuvan (%ls).",acadErrorStatusText(es));return;}
     acutPrintf(L"\nTVS_IZVOZ: %d TVS elemenata zamijenjeno crtezom; sacuvano u %ls.",replaced,path.GetString());
     if(missing)acutPrintf(L"\n%d TVS elemenata nije povezano sa originalom i ostali su TVS objekti.",missing);
