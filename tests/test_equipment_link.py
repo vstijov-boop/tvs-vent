@@ -20,7 +20,7 @@ class EquipmentLink(unittest.TestCase):
   self.assertNotIn('setPosition',c);self.assertNotRegex(c,r'ref->transformBy|b->transformBy')
   # one transaction per block, preflight before it, record through the shared store
   self.assertIn('tvsAction::Transaction tx;',c);self.assertIn('tvsAction::writable(touched)',c)
-  self.assertIn('tvsEquipmentStore::write(b,rec)',c);self.assertIn('tvsEquipmentStore::readDefault(db,name.c_str(),def)',c)
+  self.assertIn('tvsEquipmentStore::write(b,anchored)',c);self.assertIn('tvsEquipmentStore::readDefault(db,name.c_str(),def)',c)
   self.assertIn('tvsEquipmentStore::remove(ref.object())',c)
   self.assertIn('rec.mmPerUnit=f;',c);self.assertIn('ref->blockTransform()',c)
   self.assertIn('AcDbAttributeDefinition::cast(e)',c)          # attribute definitions not in the footprint
