@@ -23,7 +23,8 @@ class Repair(unittest.TestCase):
   self.assertIn('#include "RepairCommand.h"',e);self.assertIn('Ventilation_ARX, TVS_POPRAVI, TVS_POPRAVI, ACRX_CMD_MODAL, NULL)',e)
   self.assertIn('tvsRepair::execute();',text('TVS_Ventilation_ARX/commands/NewCommands.inl'))
  def test_trace(self):
-  t=text('TVS_Ventilation_ARX/Trace.h');self.assertIn('std::fflush(file());',t);self.assertIn('TVS_trag.log',t)
+  t=text('TVS_Ventilation_DBX/Trace.h');self.assertIn('std::fflush(file());',t);self.assertIn('TVS_trag.log',t);self.assertIn('GetEnvironmentVariableW(L"TVS_TRAG_ON"',t)
+  for f in ('TVS_Pipe.cpp','TVS_WYE.cpp','TVS_TRANS.cpp','TVS_TAP.cpp','GripImp.cpp'):self.assertIn('tvsTrace::Scope trace_("grip: ',text('TVS_Ventilation_DBX/'+f))
   e=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp');self.assertIn('Ventilation_ARX, TVS_TRAG, TVS_TRAG, ACRX_CMD_MODAL, NULL)',e)
   for p,n in (('TVS_Ventilation_ARX/commands/ConnectHelpers.inl','ConnectWithTap'),('TVS_Ventilation_ARX/SizeFollow.h','SizeFollow::commandEnded'),('TVS_Ventilation_ARX/SizeFollow.h','SizeFollow::settle'),
               ('TVS_Ventilation_ARX/OffsetRefit.h','OffsetRefit::commandEnded'),('TVS_Ventilation_ARX/EquipmentCaption.h','EquipmentCaption::worldDraw')):

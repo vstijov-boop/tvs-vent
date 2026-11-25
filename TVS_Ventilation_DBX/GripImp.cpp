@@ -22,6 +22,7 @@
 //Implements Grip Enhancement and Dynamic Dimensioning call back methods
 #include "StdAfx.h"
 #include "GripImp.h"
+#include "Trace.h"
 #if defined(_DEBUG) && !defined(AC_FULL_DEBUG)
 #error _DEBUG should not be defined except in internal Adesk debug builds
 #endif
@@ -113,9 +114,8 @@ GripCback::hotGripfunc(AcDbGripData			*pthis,
 					   const AcDbObjectId	&entId,
 						int					 contextFlags)
 {
+	tvsTrace::Scope trace_("grip: hot (crtanje od priklj.)");
 	AcDbGripOperations::ReturnValue gripStat(AcDbGripOperations::eOk);
-
-
 	int index = intptr_t(pthis->appData());
 	
 	
@@ -276,6 +276,7 @@ GripCback::WorldDrawfunc(AcDbGripData		 *pThis,
 			  AcGePoint3d					 *cursor,
 			  double						  dGripSize)
 {
+	tvsTrace::Scope trace_("grip: crtanje gripa");
 	static const Adesk::UInt16 kRed =10;
 	AcGePoint3d			point = pThis->gripPoint();
 	AcGeVector3d		normal(0,0,1);
@@ -299,24 +300,24 @@ GripCback::WorldDrawfunc(AcDbGripData		 *pThis,
 	verticles.append(AcGePoint2d(point.x - a,point.y-a));  bulges.append(0.0);
 	verticles.append(AcGePoint2d(point.x - 3*a,point.y-a));  bulges.append(0.0);
 	verticles.append(AcGePoint2d(point.x - 3*a,point.y+a));  bulges.append(0.0);
-	   AcDbPolyline* pCoolGrips = new AcDbPolyline;
-	  
+	// stack objects (25.11.: three AcDbPolyline were leaked on every grip redraw)
+	AcDbPolyline coolGrips;
 	for (int i = 0; i < verticles.length(); i++)
-		pCoolGrips->addVertexAt(i,verticles.at(i));
+		coolGrips.addVertexAt(i,verticles.at(i));
 
 	pWd->subEntityTraits().setColor(10);
-	 AcDbPolyline* pPoly1 = new AcDbPolyline;
-	 pPoly1->addVertexAt(0,AcGePoint2d(point.x - 3*a,point.y),0.0,2*a,2*a);
-	 pPoly1->addVertexAt(0,AcGePoint2d(point.x + 3*a,point.y),0.0,2*a,2*a);
-	 pWd->geometry().pline(*pPoly1);
+	AcDbPolyline poly1;
+	poly1.addVertexAt(0,AcGePoint2d(point.x - 3*a,point.y),0.0,2*a,2*a);
+	poly1.addVertexAt(0,AcGePoint2d(point.x + 3*a,point.y),0.0,2*a,2*a);
+	pWd->geometry().pline(poly1);
 
-	 AcDbPolyline* pPoly2 = new AcDbPolyline;
-	 pPoly2->addVertexAt(0,AcGePoint2d(point.x,point.y-3*a),0.0,2*a,2*a);
-	 pPoly2->addVertexAt(0,AcGePoint2d(point.x,point.y+3*a),0.0,2*a,2*a);
-	 pWd->geometry().pline(*pPoly2);
+	AcDbPolyline poly2;
+	poly2.addVertexAt(0,AcGePoint2d(point.x,point.y-3*a),0.0,2*a,2*a);
+	poly2.addVertexAt(0,AcGePoint2d(point.x,point.y+3*a),0.0,2*a,2*a);
+	pWd->geometry().pline(poly2);
 
-	 pWd->subEntityTraits().setColor(7);
-	 pWd->geometry().pline(*pCoolGrips);
+	pWd->subEntityTraits().setColor(7);
+	pWd->geometry().pline(coolGrips);
 	//pWd->geometry().circle(point,dGripSize,normal);
 	return true;
 }

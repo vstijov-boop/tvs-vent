@@ -77,7 +77,7 @@
 #include "EquipmentFollow.h"
 #include "CheckCommand.h"
 #include "RepairCommand.h"   // TVS_POPRAVI: popravka zapisa crteža starijeg builda
-#include "Trace.h"           // TVS_TRAG: trag za dijagnostiku rušenja
+#include "../TVS_Ventilation_DBX/Trace.h"           // TVS_TRAG: trag za dijagnostiku rušenja
 #include "FlowCommand.h"
 #include "PantsJoinCommand.h"
 #include "BranchJoinCommand.h"

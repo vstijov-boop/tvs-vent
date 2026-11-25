@@ -2,12 +2,14 @@
 // TVS_TRAG (dijagnostika rušenja, korisnik 24.11.): uključen trag upisuje u %TEMP%\TVS_trag.log
 // kratku liniju na ulazu / izlazu iz TVS reaktora, natpisa i komandi spajanja - svaka linija se
 // odmah predaje sistemu (fflush), pa poslije rušenja AutoCAD-a zadnja linija kaže gdje je stalo.
-// Isključen: jedna provjera bool-a, ništa se ne piše.
+// Isključen: jedna provjera, ništa se ne piše. Stanje je varijabla procesa TVS_TRAG_ON, pa ga vide i
+// ARX i DBX (gripovi, 25.11.: rušenje pri radu sa gripovima); svaki modul ima svoj fajl-handle, oba
+// dopisuju u isti fajl.
 #include "acutads.h"
 #include <cstdio>
 #include <cwchar>
 namespace tvsTrace {
-inline bool& on(){static bool b=false;return b;}
+inline bool on(){wchar_t b[4];return GetEnvironmentVariableW(L"TVS_TRAG_ON",b,4)>0;}
 inline FILE*& file(){static FILE* f=NULL;return f;}
 inline const wchar_t* path(){static wchar_t p[MAX_PATH+32]={0};if(!p[0]){GetTempPathW(MAX_PATH,p);wcscat_s(p,L"TVS_trag.log");}return p;}
 inline void mark(const char* where,const char* what){
@@ -26,7 +28,7 @@ struct Scope {
     ~Scope(){mark(n,"izlaz");}
 };
 inline void toggle(){
-    on()=!on();
+    SetEnvironmentVariableW(L"TVS_TRAG_ON",on()?NULL:L"1");
     if(on()){mark("TVS_TRAG","ukljucen");acutPrintf(L"\nTVS_TRAG uključen: %ls (ponovi radnju koja ruši AutoCAD, pa pošalji ovaj fajl).",path());}
     else{if(file()){std::fclose(file());file()=NULL;}acutPrintf(L"\nTVS_TRAG isključen (%ls).",path());}
 }

@@ -6,7 +6,7 @@
 //                                 default) but this one is not linked
 // Drawn by an AcGiDrawableOverrule on AcDbBlockReference: the block draws itself, the caption is
 // added; nothing is stored in the drawing. Text and switch as tvsDuctCaption (DuctCaption.h).
-#include "Trace.h"
+#include "../TVS_Ventilation_DBX/Trace.h"
 #include "rxoverrule.h"
 #include "drawable.h"
 #include "dbents.h"

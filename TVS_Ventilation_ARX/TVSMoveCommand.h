@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "Trace.h"
+#include "../TVS_Ventilation_DBX/Trace.h"
 #include "CoordinateInput.h"
 #include "MoveGeometry.h"
 #include "MoveNetworkGeometry.h"

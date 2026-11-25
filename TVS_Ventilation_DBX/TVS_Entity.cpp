@@ -805,7 +805,7 @@ bool TVS_Entity::correctAnother(const TVS_Connector& con,const AcGeVector3d& off
 		cout<<"correcting..."<<endl;
 		if ( (pTVS = TVS_Entity::cast(pEnt)) != NULL )
 		{
-			if(!pTVS->correctConnector(con.cTypeAnother,offset)) return false;
+			if(!pTVS->correctConnector(con.cTypeAnother,offset)) { pEnt->close(); return false; }   // was left open for write
 		}
 		pEnt->close();
 	}

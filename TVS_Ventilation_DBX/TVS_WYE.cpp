@@ -614,6 +614,7 @@ Acad::ErrorStatus TVS_WYE::subGetGripPoints (
 	const AcGeVector3d &curViewDir, const int bitflags
 ) const {
 	assertReadEnabled () ;
+	tvsTrace::Scope trace_("grip: get (T komad)");
 	// ordinary grips (moved by index) + connector grips on free ports (PortGrips.h)
 	AcGePoint3dArray points; AcDbIntArray osnaps, geoms;
 	if (subGetGripPoints(points, osnaps, geoms) != Acad::eOk) return Acad::eOk;
@@ -627,6 +628,7 @@ Acad::ErrorStatus TVS_WYE::subMoveGripPointsAt (
 	const int bitflags
 ) {
 	assertWriteEnabled () ;
+	tvsTrace::Scope trace_("grip: move (T komad)");
 	AcDbIntArray idx; tvsPortGrip::indices(gripAppData, idx);   // connector grips do not move anything
 	if (idx.isEmpty()) return Acad::eOk;
 	return subMoveGripPointsAt(idx, offset);

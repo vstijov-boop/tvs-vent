@@ -655,6 +655,7 @@ Acad::ErrorStatus TVS_TRANS::subGetGripPoints (
 	const AcGeVector3d &curViewDir, const int bitflags
 	) const {
 	assertReadEnabled () ;
+	tvsTrace::Scope trace_("grip: get (prelaz)");
 	// ordinary grips (moved by index) + connector grips on free ports (PortGrips.h)
 	AcGePoint3dArray points; AcDbIntArray osnaps, geoms;
 	if (subGetGripPoints(points, osnaps, geoms) != Acad::eOk) return Acad::eOk;

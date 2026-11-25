@@ -2022,7 +2022,7 @@ Acad::ErrorStatus TVS_TAP::subGetGripPoints(
     if(tvsOffsetData::marked(this))return Acad::eOk;
 #endif
 	assertReadEnabled();
-
+	tvsTrace::Scope trace_("grip: get (koljeno)");
 	// ordinary grips (moved by index) + connector grips on free ports (PortGrips.h)
 	AcGePoint3dArray points; AcDbIntArray osnaps, geoms;
 	if (subGetGripPoints(points, osnaps, geoms) != Acad::eOk) return Acad::eOk;
@@ -2039,7 +2039,7 @@ Acad::ErrorStatus TVS_TAP::subMoveGripPointsAt(
     if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
 #endif
 	assertWriteEnabled();
-
+	tvsTrace::Scope trace_("grip: move (koljeno)");
 	AcDbIntArray idx; tvsPortGrip::indices(gripAppData, idx);   // connector grips do not move anything
 	if (idx.isEmpty()) return Acad::eOk;
 	return subMoveGripPointsAt(idx, offset);

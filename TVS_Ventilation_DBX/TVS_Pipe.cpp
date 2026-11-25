@@ -23,6 +23,7 @@
 //----- TVS_Pipe.cpp : Implementation of TVS_Pipe
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include "Trace.h"
 #include "TransformGuard.h"
 #include "LevelLabels.h"
 #include "DuctCaption.h"
@@ -725,11 +726,8 @@ Acad::ErrorStatus TVS_Pipe::subGetGripPoints (
 #ifdef TVS_OFFSET_INTEGRATION
     if(tvsOffsetData::marked(this))return Acad::eOk;
 #endif
-	//assertReadEnabled () ;
-
-	//appDataType::iterator appIter = putAppData();
+	tvsTrace::Scope trace_("grip: get (kanal / flex)");
 	int appIter=0;
-	AcDbGripData* gpd=new AcDbGripData();
 	//appDataType appIter;
 	//All the GripData pointer are deallocated automatically
 	AcDbGripData *pFirst = new AcDbGripData();
@@ -807,10 +805,7 @@ Acad::ErrorStatus TVS_Pipe::subMoveGripPointsAt (
     if(tvsOffsetData::marked(this))return Acad::eNotApplicable;
 #endif
 	assertWriteEnabled () ;
-
-	//----- If you return eNotImplemented here, that will force AutoCAD to call
-	//----- the older getGripPoints() implementation. The call below may return
-	//----- eNotImplemented depending of your base class.
+	tvsTrace::Scope trace_("grip: move (kanal / flex)");
 	for(int i=0; i<gripAppData.length(); i++)
 	{
 
@@ -1461,11 +1456,8 @@ Acad::ErrorStatus TVS_FlexDuct::subGetGripPoints( AcGePoint3dArray &gripPoints, 
 
 Acad::ErrorStatus TVS_FlexDuct::subGetGripPoints( AcDbGripDataPtrArray &grips, const double curViewUnitSize, const int gripSize, const AcGeVector3d &curViewDir, const int bitflags ) const
 {
-	//assertReadEnabled () ;
-
-	//appDataType::iterator appIter = putAppData();
+	tvsTrace::Scope trace_("grip: get (kanal / flex)");
 	int appIter=0;
-	AcDbGripData* gpd=new AcDbGripData();
 	//appDataType appIter;
 	//All the GripData pointer are deallocated automatically
 	AcDbGripData *pFirst = new AcDbGripData();
@@ -1548,10 +1540,7 @@ Acad::ErrorStatus TVS_FlexDuct::subMoveGripPointsAt( const AcDbIntArray &indices
 Acad::ErrorStatus TVS_FlexDuct::subMoveGripPointsAt( const AcDbVoidPtrArray &gripAppData, const AcGeVector3d &offset, const int bitflags )
 {
 	assertWriteEnabled () ;
-
-	//----- If you return eNotImplemented here, that will force AutoCAD to call
-	//----- the older getGripPoints() implementation. The call below may return
-	//----- eNotImplemented depending of your base class.
+	tvsTrace::Scope trace_("grip: move (kanal / flex)");
 	for(int i=0; i<gripAppData.length(); i++)
 	{
 

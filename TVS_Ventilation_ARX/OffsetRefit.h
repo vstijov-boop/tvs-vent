@@ -7,7 +7,7 @@
 // changed side follow (horizontal length of the etaz changes), the changed duct's end follows
 // its elbow along the axis. Geometry: the same solver/adapter that validates the assembly.
 #ifdef TVS_OFFSET_INTEGRATION
-#include "Trace.h"
+#include "../TVS_Ventilation_DBX/Trace.h"
 #include "BuildTransaction.h"
 #include "OffsetService.h"
 #include "BypassAssemblyData.h"

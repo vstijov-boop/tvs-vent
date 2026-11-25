@@ -11,7 +11,7 @@
 // (new radius, the duct ends follow the elbow ports along their axes). It stops at an etaz,
 // obilazak, T komad, vertical or round elbow it cannot recompute, or an element of another
 // size, and says where. A linked oprema block (EquipmentNodes.h) is a boundary "oprema".
-#include "Trace.h"
+#include "../TVS_Ventilation_DBX/Trace.h"
 #include <rxmfcapi.h>
 #include "BuildTransaction.h"
 #include "ActionTransaction.h"

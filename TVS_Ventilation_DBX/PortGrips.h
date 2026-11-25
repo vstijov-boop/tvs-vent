@@ -11,6 +11,7 @@
 #include "TVS_WYE.h"
 #include "GripImp.h"
 #include "DrawingUnits.h"
+#include "Trace.h"
 #include "dbobjptr.h"
 #include <cmath>
 #include <chrono>
@@ -64,6 +65,7 @@ inline long long cellKey(double x,double y,double cell){const long long i=static
 inline void rebuild(const AcDbObjectId& spaceId,double tol){
     Cache& c=cache();const unsigned long long now=nowMs();
     if(c.space==spaceId&&c.cell==tol&&now-c.at<1500)return;
+    tvsTrace::Scope trace_("grip: slobodni prikljucci (pregled crteza)");
     c.grid.clear();c.space=spaceId;c.cell=tol>0?tol:1;c.at=now;
     AcDbObjectPointer<AcDbBlockTableRecord> space(spaceId,AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
