@@ -28,6 +28,8 @@
 #include "LevelLabels.h"
 #include "TVS_WYE.h"
 #include "TeeOpenEnds.h"
+#include "SpiroCatalog.h"
+#include "DrawingUnits.h"
 #include "TVS_Ventilation_DBX_i.h"
 //-----------------------------------------------------------------------------
 Adesk::UInt32 TVS_WYE::kCurrentVersionNumber =TVS_Version ;
@@ -254,7 +256,31 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 					setMainProperty(new AcDbArc(world(c.c), AcGeVector3d(0, 0, 1), c.r, ccw ? s0 : s1, ccw ? s1 : s0));
 				}
 				// no centre lines on TK-O / TK-G (as in the block)
+				AcArray<AcDbEntity*> spigots;   // kosa racva: as the spiro prelazi (TVS_TRANS) - sicka 5 mm, axes, dashed spigots
+				if (tee.lateral > 0) {
+					for (size_t j = 0; j < shape.axis.size(); ++j) {
+						AcDbLine* ax = new AcDbLine(world(shape.axis[j].a), world(shape.axis[j].b)); setCenterProperty(ax); }
+					AcGePoint3d ports[3]; double widths[3];
+					if (teePorts(ports, widths)) {
+						const tvsSpiro::Settings ss = tvsSpiro::read(database());
+						const double f = tvsUnits::factor(database()), bead = 5.0 / f;
+						AcGeVector3d dirs[3] = { -ey, ey, Vectotv }; dirs[2].z = 0; dirs[2].normalize();
+						for (int k = 0; k < 3; ++k) {
+							const AcGeVector3d dir = dirs[k], n(-dir.y, dir.x, 0); const double r = widths[k] / 2; const AcGePoint3d P = ports[k];
+							setThinProperty(new AcDbLine(P - dir * bead + n * r, P - dir * bead - n * r));
+							const double sp = (tvsSpiro::spigot(widths[k] * f) - ss.cMm) / f;
+							if (ss.catalog && ss.dashed && sp > 1e-9) {
+								const AcGePoint3d q[4] = { P + n * r, P + dir * sp + n * r, P + dir * sp - n * r, P - n * r };
+								AcDbPolyline* pl = new AcDbPolyline;
+								for (int i = 0; i < 4; i++) pl->addVertexAt(i, AcGePoint2d(q[i].x, q[i].y));
+								pl->setElevation(P.z); pl->setLineWeight(AcDb::LineWeight(15)); pl->setLayer(layerId()); pl->setColor(color());
+								setAuxLinetype(pl, _T("tvs_hidden")); spigots.append(pl);
+							}
+						}
+					}
+				}
 				for each (AcDbEntity * var in ListOfEntity) mode->geometry().draw(var);
+				for (int i = 0; i < spigots.length(); i++) { mode->geometry().draw(spigots[i]); delete spigots[i]; }   // drawn only, no osnaps
 				return Adesk::kTrue;
 			}
 		}

@@ -121,6 +121,7 @@ inline bool shape(const Tee& t,Shape& out){
          out.lines.push_back(Seg(P(a,before+y0),apex));out.lines.push_back(Seg(apex,P(a,before+y1)));}
         out.lines.push_back(Seg(P(up.x+n.x*f,up.y+n.y*f),P(down.x-n.x*f,down.y-n.y*f)));
         out.axis.push_back(Seg(P(a,before+(y0+y1)/2),mid));
+        out.axis.push_back(Seg(P(0,0),P(0,Lr)));   // main axis (drawn for the kosa racva, as the spiro prelazi)
         return true;
     }
     if(t.type==Tap){

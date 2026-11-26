@@ -13,7 +13,7 @@ int main(){
     for(int i=0;i<3;++i)for(int j=0;j<3;++j)for(int k=0;k<3;++k){
         Tee t;t.type=Tap;t.round=true;t.A=As[i];t.C=As[i];t.w1=ws[j];t.l=75;t.margin=25;t.lateral=degs[k];t.flange=10;
         if(t.w1>t.A)continue;
-        assert(valid(t));Shape s;assert(shape(t,s));assert(s.lines.size()==9&&s.axis.size()==1);
+        assert(valid(t));Shape s;assert(shape(t,s));assert(s.lines.size()==9&&s.axis.size()==2);
         double before,after;tapRun(t,before,after);
         const double a=t.A/2,th=t.lateral*pi()/180,L=lateralLengthPl(t.A,t.w1,t.lateral,t.l);
         assert(eq(lateralCollar(t.A,t.w1,t.lateral,L),t.l));
