@@ -539,7 +539,8 @@
 			AcGePoint3d o0 = fromBranch ? run1 : branch, o1 = o0 + (fromBranch ? u : branchDir) * (300 / f);
 			double wa = fromBranch ? A : w, wb = 0;
 			TVS_Pipe* stub = pipie.add_new(o0, o1, wa, wb, false, true);
-			if (stub) SetPropertyLikePipe(pipi, stub);
+			if (stub) { const AcDbObjectId sid = stub->id(); SetPropertyLikePipe(pipi, stub);   // copies the size: set it back
+				AcDbObjectPointer<TVS_Pipe> q(sid, AcDb::kForWrite); if (q.openStatus() == Acad::eOk) { q->ThisRound = true; q->put_SizeA(wa); q->put_SizeB(0); } }
 		}
 		AcGePoint3d c0 = fromBranch ? branch : run1, c1 = c0 + (fromBranch ? branchDir : u) * (100 / f);
 		double ca = fromBranch ? w : A, cb = 0;
@@ -547,7 +548,9 @@
 		tvsTeeCommand::lastType() = tvsTee::Tap;
 		acutPrintf(L"\nKosa stucna 45°%ls umetnuta; crtanje se nastavlja iz %ls.", elbow ? L" i koljeno 45°" : L"", fromBranch ? L"ogranka" : L"prolaza");
 		if (!next) return true;
+		const AcDbObjectId nid = next->id();
 		SetPropertyLikePipe(pipi, next);
+		{ AcDbObjectPointer<TVS_Pipe> q(nid, AcDb::kForWrite); if (q.openStatus() == Acad::eOk) { q->ThisRound = true; q->put_SizeA(ca); q->put_SizeB(0); } }
 		globSizeA = ca;
 		pipi = next; A1 = c0; A2 = c1;
 		pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
