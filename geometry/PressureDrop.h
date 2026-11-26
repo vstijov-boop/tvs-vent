@@ -49,10 +49,11 @@ struct Part {
     double angle,radius;  // elbow: deflection (deg), axis radius (mm)
     int tee;              // TeeType
     bool cone;            // stucna with a round conical branch (SR5-12)
+    bool lateral;         // kosa stucna 45, round on round (SD5-1 / ED5-2)
     std::vector<Section> sections;   // per port (a single part: the element's ports)
     std::vector<XY> line;            // plan polyline for the schematic, mm
     tvsEquipment::Record equipment;  // kind Equipment: the record of the linked block
-    Part():kind(Other),flex(false),length(0),angle(0),radius(0),tee(TeePlain),cone(false){}
+    Part():kind(Other),flex(false),length(0),angle(0),radius(0),tee(TeePlain),cone(false),lateral(false){}
 };
 struct Element {
     std::vector<Part> parts;          // one, or the members of an etaz / obilazak
@@ -111,7 +112,8 @@ inline std::string transitionKey(bool exhaust,const Section& up,const Section& d
     const bool oneSide=std::fabs(up.a-down.a)<0.5||std::fabs(up.b-down.b)<0.5;
     return exhaust?(oneSide?"ER4-1":"ER4-2"):(oneSide?"SR4-1":"SR4-2");
 }
-inline std::string junctionKey(bool exhaust,int tee,const Section& common,const Section& branch,bool cone=false){
+inline std::string junctionKey(bool exhaust,int tee,const Section& common,const Section& branch,bool cone=false,bool lateral=false){
+    if(common.round&&branch.round&&lateral)return exhaust?"ED5-2":"SD5-1";   // kosa stucna: wye 45
     if(common.round)return branch.round?(exhaust?"ED5-3":"SD5-9"):std::string();
     if(tee==TeePants)return exhaust?"ER5-4":"SR5-14";
     if(branch.round)return exhaust?"ER5-2":cone?"SR5-12":"SR5-11";   // round tap: cylindrical / conical
@@ -446,7 +448,7 @@ private:
         if(!pants&&kids[i].empty()){q[branchPort]=x.flow;child[branchPort]=i;capped=L", kraj mre\u017Ee: izlaz kroz ogranak, prolaz zatvoren (\u010Dep)";}
         else if(!pants&&child[straightPort]<0&&child[branchPort]>=0)capped=L", prolaz zatvoren (\u010Dep)";
         else if(!pants&&child[branchPort]<0&&child[straightPort]>=0)capped=L", ogranak zatvoren (\u010Dep)";
-        const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,branchPort),t.cone);
+        const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,branchPort),t.cone,t.lateral);
         // exhaust, rectangular, TK0 / stucna outside ER5-3 (Ab/Ac 0.4..0.6): Idelchik, sharp T (user 2026-11-15)
         {const Section& br=port(x,branchPort);const double ac=area(common),beta=ac>0?area(br)/ac:0;
          // supply TK0 whose branch height differs from the run: SR5-5 assumes Hb = H -> KanCalc 0.7 / 0.6

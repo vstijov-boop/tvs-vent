@@ -533,6 +533,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
             else r.second=A;}
         else{w->SizeApr=A;w->SizeBpr=round?0:B;}
         if(typed)tvsTeeData::write(w.object(),r);
+        if(typed)tvsTeeFit::lateralLength(w.object(),r);   // kosa stucna
         w->recordGraphicsModified();
         tees[k].after=tvsTeeFit::ports(w.object());
     }

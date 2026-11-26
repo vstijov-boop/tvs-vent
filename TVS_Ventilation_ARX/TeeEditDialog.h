@@ -43,7 +43,8 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
     if(branchWidth&&!lengthChanged){
         const double w1=r.type!=tvsTee::Pants?w->SizeAotv:w->SizeApr;
         const double w2=r.second>0?r.second:w->SizeApr;
-        if(r.type==tvsTee::Tap){const double L=tvsTee::tapLength(w1,tvsTeeData::tapMinimumMm()/tvsUnits::factor(w));w->put_Length(L);r.l=L;w->assertWriteEnabled();tvsTeeData::write(w,r);}
+        if(r.type==tvsTee::Tap){const double L=tvsTee::tapLength(w1,tvsTeeData::tapMinimumMm()/tvsUnits::factor(w));w->put_Length(L);r.l=L;w->assertWriteEnabled();tvsTeeData::write(w,r);
+            tvsTeeFit::lateralLength(w,r);}   // kosa stucna: L is the collar, LengthPl follows
         else w->put_Length(r.type==tvsTee::Branch?tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1):tvsTee::pantsLengthPl(r.l,w1,w2));
     }
     if(r.type==tvsTee::Pants&&!tvsTee::pantsFeasible(w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,r.l))

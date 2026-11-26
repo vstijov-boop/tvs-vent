@@ -429,6 +429,7 @@ inline bool applySize(AcDbDatabase* db,const Net& net,double f,double tol,const 
             else{const bool cone=typed&&tvsTeeCommand::conicalOf(r,w->SizeAotv);
                 w->SizeAotv=S.a;w->SizeBotv=S.round?0:S.b;if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,S.a,S.round,cone,f);w->LengthPl=r.l;}}
             if(typed)tvsTeeData::write(w.object(),r);
+            if(typed)tvsTeeFit::lateralLength(w.object(),r);   // kosa stucna
             w->recordGraphicsModified();
             const tvsTeeFit::Ports ps=tvsTeeFit::ports(w.object());
             if(ps.ok)for(int m=0;m<3;++m)moves.push_back(std::make_pair(items[x.item].ports[m],planUse::pt(ps.p[m])));

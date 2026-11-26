@@ -26,6 +26,11 @@ inline Ports ports(const TVS_WYE* w){
     r.w[0]=r.w[1]=w->SizeApr;r.w[2]=w->SizeAotv;r.ok=true;return r;
 }
 inline double planDistance(const AcGePoint3d& a,const AcGePoint3d& b){return std::hypot(a.x-b.x,a.y-b.y);}
+// Kosa stucna (record neck = angle): LengthPl follows the main / branch diameters, the collar
+// (record l) stays (call after a size change; geometry/TeeShape.h lateralLengthPl).
+inline void lateralLength(TVS_WYE* w,const tvsTeeData::Record& r){
+    if(w&&r.type==tvsTee::Tap&&r.neck>0){w->assertWriteEnabled();w->LengthPl=tvsTee::lateralLengthPl(w->SizeApr,w->SizeAotv,r.neck,r.l);}
+}
 struct End {AcDbObjectId id;bool first;};
 // TVS ducts with an end on `at` (plan, tolerance tol) in the space that owns the T komad.
 inline std::vector<End> ductsAt(const TVS_WYE* w,const AcGePoint3d& at,double tol,int& others){

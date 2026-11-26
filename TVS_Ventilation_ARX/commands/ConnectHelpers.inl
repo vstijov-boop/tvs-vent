@@ -119,6 +119,74 @@
 
 
 
+	// Kosa stucna 45 (user 2026-11-26): round branch on a round main, the branch duct drawn at 45 deg
+	// to the main. One step: T komad (stucna, record neck = 45) at the axis crossing, the main split
+	// around its run (25 mm beyond the footprint), the branch duct ends on the face. geometry/TeeShape.h.
+	static bool lateralAngle(const AcGePoint3d& p1, const AcGePoint3d& p2, const AcGePoint3d& p3, const AcGePoint3d& p4)
+	{
+		const double ax = p2.x - p1.x, ay = p2.y - p1.y, bx = p4.x - p3.x, by = p4.y - p3.y;
+		const double la = std::hypot(ax, ay), lb = std::hypot(bx, by); if (la < 1e-9 || lb < 1e-9) return false;
+		const double c = std::fabs(ax * bx + ay * by) / (la * lb);
+		return std::fabs(std::acos(c > 1 ? 1 : c) * 180 / 3.14159265358979323846 - tvsTee::lateralDeg()) <= 1.5;
+	}
+	static bool ConnectLateral(TVS_Pipe* pPipe1, TVS_Pipe* pPipe2)
+	{
+		tvsTrace::Scope trace_("ConnectLateral");
+		const double f = tvsUnits::factor(), deg = tvsTee::lateralDeg();
+		const AcGePoint3d p1 = pPipe1->FirstPoint, p2 = pPipe1->LastPoint, p3 = pPipe2->FirstPoint, p4 = pPipe2->LastPoint;
+		const double ex = p2.x - p1.x, ey = p2.y - p1.y, mx = p4.x - p3.x, my = p4.y - p3.y, den = ex * my - ey * mx;
+		if (std::fabs(den) < 1e-12) return false;
+		const double sm = ((p1.x - p3.x) * ey - (p1.y - p3.y) * ex) / (mx * ey - my * ex);   // crossing on the main
+		const AcGePoint3d X = p3 + (p4 - p3) * sm;
+		const bool firstNear = std::hypot(p1.x - X.x, p1.y - X.y) < std::hypot(p2.x - X.x, p2.y - X.y);
+		const AcGePoint3d farEnd = firstNear ? p2 : p1;
+		AcGeVector3d d(farEnd.x - X.x, farEnd.y - X.y, 0), u(mx, my, 0);
+		if (d.length() < 1e-9 || u.length() < 1e-9) return false;
+		d.normalize(); u.normalize(); if (u.dotProduct(d) < 0) u = -u;
+		const double A = pPipe2->SizeA, w = pPipe1->SizeA;
+		if (w > A + 1e-9) { acutPrintf(L"\nKosa stucna: ogranak (%.0f mm) je veci od kanala (%.0f mm). Spoj nije napravljen.", w * f, A * f); return false; }
+		tvsTeeData::Record r; r.type = tvsTee::Tap; r.l = tvsTeeCommand::tapLength(w, f); r.second = 0; r.radius2 = tvsTeeCommand::tapMargin(f); r.neck = deg;
+		tvsTee::Tee t; t.type = tvsTee::Tap; t.round = true; t.A = A; t.C = A; t.w1 = w; t.l = r.l; t.margin = r.radius2; t.lateral = deg;
+		double before = 0, after = 0; tvsTee::tapRun(t, before, after);
+		double L = tvsTee::lateralLengthPl(A, w, deg, r.l);
+		const AcGePoint3d run0 = X - u * before, run1 = X + u * after, face = X + d * (A / 2 + L);
+		// the branch duct reaches beyond the face, the main runs through the whole run
+		if ((farEnd - X).dotProduct(d) <= A / 2 + L + 1 / f) { acutPrintf(L"\nKosa stucna: ogranak je prekratak (potrebno vise od %.0f mm od ose kanala). Spoj nije napravljen.", (A / 2 + L) * f); return false; }
+		const double m3 = (p3 - X).dotProduct(u), m4 = (p4 - X).dotProduct(u);
+		if ((m3 < m4 ? m3 : m4) > -before - 1 / f || (m3 > m4 ? m3 : m4) < after + 1 / f) {
+			acutPrintf(L"\nKosa stucna: kanal mora prolaziti kroz cijelo mjesto spoja (%.0f mm uzvodno i %.0f mm nizvodno od ose ogranka). Spoj nije napravljen.", before * f, after * f); return false; }
+		AcGeVector3d vpr = u, votv = d; AcGePoint3d base = X; double sa = pPipe2->SizeA, sb = pPipe2->SizeB, ta = pPipe1->SizeA, tb = pPipe1->SizeB;
+		TVS_WYE* pWye = NULL;
+		pWye = pWye->add_new(sa, sb, ta, tb, L, vpr, votv, base, true, true, false);
+		SetGlobalProperty(pWye);
+		SetPropertyLikePipe(pPipe2, pWye);
+		const AcDbObjectId wyeId = pWye->id();
+		{AcDbObjectPointer<TVS_WYE> wy(wyeId, AcDb::kForWrite);
+		 if (wy.openStatus() != Acad::eOk) { acutPrintf(L"\nKosa stucna: T komad se ne moze upisati."); return false; }
+		 wy->LengthPl = L; wy->Vectpr = vpr; wy->Vectotv = votv; wy->Basepoint = base;
+		 if (tvsTeeData::write(wy.object(), r) != Acad::eOk) { acutPrintf(L"\nKosa stucna: zapis T komada nije upisan."); return false; }
+		 wy->recordGraphicsModified();}
+		// main: the part on the -u side keeps the duct, the +u side becomes a new duct (drawing direction kept)
+		const bool firstUp = m3 < m4;
+		if (!reopen(pPipe2)) return false;
+		pPipe2->assertWriteEnabled();
+		// p3 -> (run0 or run1, whichever is on p3's side) stays this duct, the other run end -> p4 is new
+		const AcGePoint3d mine = firstUp ? run0 : run1, other = firstUp ? run1 : run0;
+		pPipe2->put_Lastpoint(AcGePoint3d(mine.x, mine.y, p4.z));
+		pPipe2->close();
+		{TVS_Pipe* tempPipe = NULL;
+		 AcGePoint3d a(other.x, other.y, p4.z), b = p4;
+		 tempPipe = tempPipe->add_new(a, b, globSizeA, globSizeB);
+		 SetPropertyLikePipe(pPipe2, tempPipe);}
+		// branch: its near end on the face
+		if (!reopen(pPipe1)) return false;
+		pPipe1->assertWriteEnabled();
+		if (firstNear) pPipe1->put_FirstPoint(AcGePoint3d(face.x, face.y, p1.z)); else pPipe1->put_Lastpoint(AcGePoint3d(face.x, face.y, p2.z));
+		pPipe1->close();
+		acutPrintf(L"\nKosa stucna 45 (ASHRAE SD5-1 / ED5-2): okrugli ogranak %.0f na kanalu %.0f, L = %.0f mm.", w * f, A * f, r.l * f);
+		return true;
+	}
+
 	static bool ConnectWithTap(AcDbEntity *pEnt1,
 		AcDbEntity  *pEnt2, ads_point pnt1, ads_point pnt2)
 
@@ -337,6 +405,14 @@
 		AcDbEntity * pEnt;
 		AcDbObjectId wyeId;
 #pragma region  line intersection
+		// round on round, branch drawn at 45 deg: kosa stucna (or, as before, a perpendicular duct + koljeno)
+		if (LineStatus == TVSisIntersection && pPipe1->ThisRound && pPipe2->ThisRound && !pPipe1->This1D && !pPipe2->This1D && lateralAngle(p1, p2, p3, p4))
+		{
+			acedInitGet(0, L"Kosa Koljeno"); ACHAR kw[16] = L"";
+			const int rc = acedGetKword(L"\nOgranak pod 45° – kosa stucna ili koljeno: [Kosa/Koljeno] <Kosa>: ", kw, 16);
+			if (rc == RTCAN) return false;
+			if (rc == RTNONE || (rc == RTNORM && _wcsicmp(kw, L"Kosa") == 0)) return ConnectLateral(pPipe1, pPipe2);
+		}
 		if (LineStatus == TVSisPerpendicular || LineStatus == TVSisIntersection)
 		{
 			int teeType = tvsTee::Straight; double teeSecond = 0;

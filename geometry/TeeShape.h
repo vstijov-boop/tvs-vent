@@ -21,19 +21,35 @@ enum Type {Straight=0,Branch=1,Pants=2,Tap=3};   // 0 = existing TVS_WYE drawing
 // margin (record radius2, user 2026-11-15): the main of the stucna reaches only `margin` (25 mm)
 // beyond its footprint on the main (rect: 45 deg entry + w, round: cone base / D); 0 = the old
 // run 2 L + w. TVS_WYE: Basepoint on the branch axis, run ends `before` upstream / `after` down.
+// Kosa stucna (lateral, user 2026-11-26): round branch on a round main, branch axis at `lateral`
+// degrees (45) to the main axis, leaning downstream (+y). TVS_WYE: Basepoint = where the branch axis
+// meets the main axis, Vectotv = branch axis (not perpendicular), branch port = Basepoint + Vectotv
+// (A/2 + LengthPl). The collar l is measured along the axis beyond the point where the downstream
+// branch wall meets the main wall (LengthPl = lateralLengthPl). Record TVS_TEE_V1: type stucna,
+// neck = the angle (ASHRAE SD5-1 diverging / ED5-2 converging).
 struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
 struct Shape {std::vector<Seg> lines;std::vector<Arc> arcs;std::vector<Seg> axis;};
-struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone,margin;   // round / cone: stucna with a round branch; margin: short run   // e1 / e2: TK-G "vrat", extra straight inlet wall
+struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone,margin,lateral;   // lateral: kosa stucna, deg (0 = perpendicular); round / cone: stucna with a round branch; margin: short run   // e1 / e2: TK-G "vrat", extra straight inlet wall
     // xo: TK-O prolaz axis across the run (+x = branch side; prolaz edge in line with the inlet: +-(a - c))
-    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0),round(false),cone(0),margin(0){}};   // before branch 1 / 2 (its axis that much farther)
+    Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0),round(false),cone(0),margin(0),lateral(0){}};   // before branch 1 / 2 (its axis that much farther)
 inline double pi(){return 3.14159265358979323846;}
 inline double defaultRadius(double w){return 1.5*w;}           // outer radius: centre line R - w/2 = w
 inline double lengthPl(double l,double R,double w){return l+R-w;} // TVS_WYE equivalent
 inline double tapMarginMm(){return 25;}
+inline double lateralDeg(){return 45;}
+// kosa stucna: along the branch axis from the main axis to the face, and back to the collar
+inline double lateralReach(double A,double w,double deg,double l){const double t=deg*pi()/180;return (A/2+w/2*std::cos(t))/std::sin(t)+l;}
+inline double lateralLengthPl(double A,double w,double deg,double l){return lateralReach(A,w,deg,l)-A/2;}
+inline double lateralCollar(double A,double w,double deg,double lengthPl){return A/2+lengthPl-lateralReach(A,w,deg,0);}
+// footprint of the branch on the main wall, along the main from the Basepoint: [y0, y1]
+inline void lateralFootprint(double A,double w,double deg,double& y0,double& y1){
+    const double t=deg*pi()/180,c=A/2*std::cos(t)/std::sin(t),h=w/2/std::sin(t);y0=c-h;y1=c+h;
+}
 // Stucna run from the branch axis: upstream (before) and downstream (after).
 inline void tapRun(const Tee& t,double& before,double& after){
+    if(t.lateral>0){double y0,y1;lateralFootprint(t.A,t.w1,t.lateral,y0,y1);const double m=t.margin>0?t.margin:0;before=m-y0;after=y1+m;return;}
     if(t.margin>0){if(t.round){const double h=(t.cone>0?t.cone:t.w1)/2;before=after=t.margin+h;}
         else{before=t.margin+t.l+t.w1/2;after=t.margin+t.w1/2;}}
     else before=after=t.l+t.w1/2;
@@ -49,6 +65,7 @@ inline bool isCone(double second,double d,double l){
     return second>0&&d>0&&l>0&&second-coneBase(d,l)<=1e-3*(d+l)&&coneBase(d,l)-second<=1e-3*(d+l);
 }
 inline bool valid(const Tee& t){
+    if(t.type==Tap&&t.lateral>0)return t.round&&t.A>0&&t.w1>0&&t.l>0&&t.lateral>=15&&t.lateral<90&&t.cone<=0;
     if(t.type==Tap)return t.A>0&&t.w1>0&&t.l>0&&(!(t.cone>0)||(t.round&&t.cone>t.w1&&t.cone<=t.w1+2*t.l));
     if(!(t.A>0)||!(t.w1>0)||!(t.l>0)||!(t.R1>t.w1))return false;
     if(t.type==Branch&&!(t.C>0))return false;
@@ -88,6 +105,18 @@ inline bool pantsFeasible(double A,double w1,double w2,double l){
 inline bool shape(const Tee& t,Shape& out){
     out=Shape();if(!valid(t))return false;
     const double a=t.A/2,l=t.l,f=t.flange;
+    if(t.type==Tap&&t.lateral>0){
+        // kosa stucna: continuous main, branch walls from the main wall to the face, axis line
+        double before,after;tapRun(t,before,after);const double Lr=before+after,th=t.lateral*pi()/180;
+        const P B(0,before),d(std::sin(th),std::cos(th)),n(std::cos(th),-std::sin(th));   // n: upstream side
+        const double w=t.w1,s=lateralReach(t.A,w,t.lateral,l);double y0,y1;lateralFootprint(t.A,w,t.lateral,y0,y1);
+        const P up(B.x+n.x*w/2+d.x*s,B.y+n.y*w/2+d.y*s),down(B.x-n.x*w/2+d.x*s,B.y-n.y*w/2+d.y*s),mid(B.x+d.x*s,B.y+d.y*s);   // face
+        out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,0),P(a,Lr)));
+        out.lines.push_back(Seg(P(a,before+y0),up));out.lines.push_back(Seg(P(a,before+y1),down));
+        out.lines.push_back(Seg(P(up.x+n.x*f,up.y+n.y*f),P(down.x-n.x*f,down.y-n.y*f)));
+        out.axis.push_back(Seg(P(a,before+(y0+y1)/2),mid));
+        return true;
+    }
     if(t.type==Tap){
         // The main looks continuous (SR5-3 sits on an unbroken duct): both walls y = 0..2L+w,
         // no end lines, nothing inside the main. On it the stucna only: 45 deg entry

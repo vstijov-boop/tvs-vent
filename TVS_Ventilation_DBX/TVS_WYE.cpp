@@ -1195,6 +1195,10 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 		tee.A = SizeApr; tee.C = SizeApr; tee.w1 = SizeAotv; tee.l = LengthPl;
 		tee.round = ThisRoundotv; tee.cone = ThisRoundotv && tvsTee::isCone(r.second, SizeAotv, r.l) ? r.second : 0;   // okrugla / konusna stucna
 		tee.margin = r.radius2 > 0 ? r.radius2 : 0;   // short run (25 mm beyond the footprint), 0 = old 2 L + w
+		if (r.neck > 0 && ThisRoundpr && ThisRoundotv) {   // kosa stucna: Vectotv = branch axis, ex = its side across the main
+			tee.lateral = r.neck; tee.cone = 0; tee.l = tvsTee::lateralCollar(SizeApr, SizeAotv, r.neck, LengthPl);
+			v = v - u * v.dotProduct(u); if (v.length() < 1e-9) return false; v.normalize();
+		}
 		double before = 0, after = 0; tvsTee::tapRun(tee, before, after);
 		origin = Basepoint - u * before; ey = u; ex = v;
 	}

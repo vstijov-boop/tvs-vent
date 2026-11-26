@@ -542,6 +542,9 @@ inline bool writable(const Source& s){
 }
 inline bool open(const AcDbObjectId& id,UINT idd){
     Source s;if(!readSource(id,s)){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
+    {tvsTeeData::Record r;AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);
+     if(w.openStatus()==Acad::eOk&&tvsTeeData::read(w.object(),r)&&r.type==tvsTee::Tap&&r.neck>0){   // kosa stucna: the branch is at 45 deg
+        acutPrintf(L"\nKosa štucna 45°: tip se ovdje ne mijenja (ogranak je pod uglom). Za drugi spoj obrišite je i spojite ponovo.");return true;}}
     if(!writable(s))return true;
     Dialog dg(s,idd);
     {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return true;}

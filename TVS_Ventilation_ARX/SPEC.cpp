@@ -290,6 +290,16 @@ bool SPEC::add(AcDbEntity * pEnt)
 				appendLable(_T(" (L="));
 				appendLable(tvsUnits::mm(pWye->LengthPl, pWye));
 				appendLable(_T(" mm)"));
+				// kosa stucna 45 (round on round, record neck = angle): own name, D / d (L = collar)
+				{
+					tvsTee::Tee lat; AcGePoint3d lo; AcGeVector3d lx, ly;
+					if (pWye->ThisRoundpr && pWye->ThisRoundotv && pWye->teeShape(lat, lo, lx, ly) && lat.lateral > 0) {
+						status = TeeTap; Extra = lat.l * tvsUnits::factor(pWye);
+						setName(L"Kosa štucna 45° SD5-1, okrugli ogranak");
+						setLable(d); appendLable(SizeA); appendLable(_T(" / ")); appendLable(d); appendLable(SizeA2);
+						appendLable(_T(" (L=")); appendLable(Extra); appendLable(_T(" mm)"));
+					}
+				}
 				// T komad TK-O / TK-G (TVS_TEE_V1): own name, sizes, radius and sheet area.
 				{
 					tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
