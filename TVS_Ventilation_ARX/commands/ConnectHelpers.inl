@@ -129,7 +129,10 @@
 		const double c = std::fabs(ax * bx + ay * by) / (la * lb);
 		return std::fabs(std::acos(c > 1 ? 1 : c) * 180 / 3.14159265358979323846 - tvsTee::lateralDeg()) <= 1.5;
 	}
-	static bool ConnectLateral(TVS_Pipe* pPipe1, TVS_Pipe* pPipe2)
+	// perpendicular (user 2026-11-26: branch drawn square to the main): kosa stucna leaning along the
+	// main as drawn (= air flow) + koljeno 45 that turns into the branch; the stucna is placed so that
+	// the koljeno comes out on the branch axis.
+	static bool ConnectLateral(TVS_Pipe* pPipe1, TVS_Pipe* pPipe2, bool perpendicular = false)
 	{
 		tvsTrace::Scope trace_("ConnectLateral");
 		const double f = tvsUnits::factor(), deg = tvsTee::lateralDeg();
@@ -142,20 +145,33 @@
 		const AcGePoint3d farEnd = firstNear ? p2 : p1;
 		AcGeVector3d d(farEnd.x - X.x, farEnd.y - X.y, 0), u(mx, my, 0);
 		if (d.length() < 1e-9 || u.length() < 1e-9) return false;
-		d.normalize(); u.normalize(); if (u.dotProduct(d) < 0) u = -u;
+		d.normalize(); u.normalize();
+		const AcGeVector3d v = d;   // the branch, outwards
+		if (perpendicular) { d = u + v; d.normalize(); }
+		else if (u.dotProduct(d) < 0) u = -u;
 		const double A = pPipe2->SizeA, w = pPipe1->SizeA;
 		if (w > A + 1e-9) { acutPrintf(L"\nKosa stucna: ogranak (%.0f mm) je veci od kanala (%.0f mm). Spoj nije napravljen.", w * f, A * f); return false; }
 		tvsTeeData::Record r; r.type = tvsTee::Tap; r.l = tvsTeeCommand::tapLength(w, f); r.second = 0; r.radius2 = tvsTeeCommand::tapMargin(f); r.neck = deg;
 		tvsTee::Tee t; t.type = tvsTee::Tap; t.round = true; t.A = A; t.C = A; t.w1 = w; t.l = r.l; t.margin = r.radius2; t.lateral = deg;
 		double before = 0, after = 0; tvsTee::tapRun(t, before, after);
 		double L = tvsTee::lateralLengthPl(A, w, deg, r.l);
-		const AcGePoint3d run0 = X - u * before, run1 = X + u * after, face = X + d * (A / 2 + L);
-		// the branch duct reaches beyond the face, the main runs through the whole run
-		if ((farEnd - X).dotProduct(d) <= A / 2 + L + 1 / f) { acutPrintf(L"\nKosa stucna: ogranak je prekratak (potrebno vise od %.0f mm od ose kanala). Spoj nije napravljen.", (A / 2 + L) * f); return false; }
-		const double m3 = (p3 - X).dotProduct(u), m4 = (p4 - X).dotProduct(u);
+		// koljeno 45: tangent length T of its axis (radius as planElbow / the drawing settings)
+		double T = 0; AcGePoint3d B = X;
+		if (perpendicular) {
+			double radius = globalTapRadiusConst;
+			if (globalRadiusTypeRound == RadiusTypeRound_RadiusVariable) radius = w * globalTapRadiusVariableParameter;
+			else if (globalRadiusTypeRound == RadiusTypeRound_RadiusSpecific) radius = w * f < 355 ? w : w / 2;
+			T = (radius + w / 2) * std::tan(3.14159265358979323846 / 8);
+			B = X - u * ((A / 2 + L + T) / std::sqrt(2.0));   // the koljeno exit then lies on the branch axis
+		}
+		const AcGePoint3d run0 = B - u * before, run1 = B + u * after, face = B + d * (A / 2 + L);
+		const AcGePoint3d reach = perpendicular ? face + d * T + v * T : face;   // where the branch duct starts
+		// the branch duct reaches beyond it, the main runs through the whole run
+		if ((farEnd - reach).dotProduct(v) <= 1 / f) { acutPrintf(L"\nKosa stucna: ogranak je prekratak (potrebno vise od %.0f mm od ose kanala). Spoj nije napravljen.", (reach - X).dotProduct(v) * f); return false; }
+		const double m3 = (p3 - B).dotProduct(u), m4 = (p4 - B).dotProduct(u);
 		if ((m3 < m4 ? m3 : m4) > -before - 1 / f || (m3 > m4 ? m3 : m4) < after + 1 / f) {
 			acutPrintf(L"\nKosa stucna: kanal mora prolaziti kroz cijelo mjesto spoja (%.0f mm uzvodno i %.0f mm nizvodno od ose ogranka). Spoj nije napravljen.", before * f, after * f); return false; }
-		AcGeVector3d vpr = u, votv = d; AcGePoint3d base = X; double sa = pPipe2->SizeA, sb = pPipe2->SizeB, ta = pPipe1->SizeA, tb = pPipe1->SizeB;
+		AcGeVector3d vpr = u, votv = d; AcGePoint3d base = B; double sa = pPipe2->SizeA, sb = pPipe2->SizeB, ta = pPipe1->SizeA, tb = pPipe1->SizeB;
 		TVS_WYE* pWye = NULL;
 		pWye = pWye->add_new(sa, sb, ta, tb, L, vpr, votv, base, true, true, false);
 		SetGlobalProperty(pWye);
@@ -178,12 +194,21 @@
 		 AcGePoint3d a(other.x, other.y, p4.z), b = p4;
 		 tempPipe = tempPipe->add_new(a, b, globSizeA, globSizeB);
 		 SetPropertyLikePipe(pPipe2, tempPipe);}
-		// branch: its near end on the face
+		// koljeno 45 on the face, turning into the branch
+		AcGePoint3d start = face;
+		if (perpendicular) {
+			tvsTeeDialog::Section sec; sec.a = w; sec.b = 0; sec.round = true;
+			AcGePoint3d exit; AcGeVector3d out;
+			const double turn = (d.x * v.y - d.y * v.x) > 0 ? 3.14159265358979323846 / 4 : -3.14159265358979323846 / 4;
+			if (!tvsTeeDialog::planElbow(wyeId, face, d, turn, sec, pPipe2->Elev, f, exit, out)) { acutPrintf(L"\nKosa stucna: koljeno 45 nije napravljeno (ogranak ostaje nepovezan)."); return false; }
+			start = exit;
+		}
+		// branch: its near end on the face (or the koljeno)
 		if (!reopen(pPipe1)) return false;
 		pPipe1->assertWriteEnabled();
-		if (firstNear) pPipe1->put_FirstPoint(AcGePoint3d(face.x, face.y, p1.z)); else pPipe1->put_Lastpoint(AcGePoint3d(face.x, face.y, p2.z));
+		if (firstNear) pPipe1->put_FirstPoint(AcGePoint3d(start.x, start.y, p1.z)); else pPipe1->put_Lastpoint(AcGePoint3d(start.x, start.y, p2.z));
 		pPipe1->close();
-		acutPrintf(L"\nKosa stucna 45 (ASHRAE SD5-1 / ED5-2): okrugli ogranak %.0f na kanalu %.0f, L = %.0f mm.", w * f, A * f, r.l * f);
+		acutPrintf(L"\nKosa stucna 45%ls (ASHRAE SD5-1 / ED5-2): okrugli ogranak %.0f na kanalu %.0f, L = %.0f mm.", perpendicular ? L" + koljeno 45" : L"", w * f, A * f, r.l * f);
 		return true;
 	}
 
@@ -412,6 +437,14 @@
 			const int rc = acedGetKword(L"\nOgranak pod 45° – kosa stucna ili koljeno: [Kosa/Koljeno] <Kosa>: ", kw, 16);
 			if (rc == RTCAN) return false;
 			if (rc == RTNONE || (rc == RTNORM && _wcsicmp(kw, L"Kosa") == 0)) return ConnectLateral(pPipe1, pPipe2);
+		}
+		// round on round, branch square to the main: kosa stucna + koljeno 45 (default) or the plain T komad
+		if (LineStatus == TVSisPerpendicular && pPipe1->ThisRound && pPipe2->ThisRound && !pPipe1->This1D && !pPipe2->This1D)
+		{
+			acedInitGet(0, L"Kosa Ravni"); ACHAR kw[16] = L"";
+			const int rc = acedGetKword(L"\nOkrugli ogranak: kosa stucna 45° + koljeno 45° ili ravni T komad [Kosa/Ravni] <Kosa>: ", kw, 16);
+			if (rc == RTCAN) return false;
+			if (rc == RTNONE || (rc == RTNORM && _wcsicmp(kw, L"Kosa") == 0)) return ConnectLateral(pPipe1, pPipe2, true);
 		}
 		if (LineStatus == TVSisPerpendicular || LineStatus == TVSisIntersection)
 		{

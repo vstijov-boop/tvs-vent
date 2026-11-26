@@ -477,6 +477,82 @@
 		return true;
 	}
 #endif
+	// Kosa stucna 45 while drawing a round duct (user 2026-11-26, option Tkomad): at the end of the
+	// duct being drawn, leaning along the drawing direction, branch to the chosen side; with or
+	// without koljeno 45 (asked every time); drawing goes on from prolaz or ogranak, the other
+	// outlet gets a short duct. Geometry: geometry/TeeShape.h (lateral), koljeno: tvsTeeDialog::planElbow.
+	static bool lateralDuringDrawing(AcGePoint3d &A1, AcGePoint3d &A2, TVS_Pipe *&pipi, ads_point &pt1)
+	{
+		tvsTrace::Scope trace_("lateralDuringDrawing");
+		const AcDbObjectId pipeId = pipi->objectId();
+		AcGePoint3d s0, s1; double A = 0, elev = 0; bool oneD = false;
+		{
+			AcDbObjectPointer<TVS_Pipe> p(pipeId, AcDb::kForRead);
+			if (p.openStatus() != Acad::eOk) return false;
+			s0 = p->FirstPoint; s1 = p->LastPoint; A = p->SizeA; elev = p->Elev; oneD = p->This1D;
+		}
+		if (oneD) { acutPrintf(L"\nKosa stucna: nije za 1D kanale."); return false; }
+		const double f = tvsUnits::factor(), deg = tvsTee::lateralDeg(), pi = 3.14159265358979323846;
+		AcGeVector3d u = s1 - s0; u.z = 0; if (u.length() < 1e-9) return false; u.normalize();
+		double wMm = 0;
+		if (!tvsTeeCommand::askWidth(L"\nKosa stucna 45° – precnik ogranka, mm", A * f, wMm)) return false;
+		const double w = wMm / f;
+		if (w > A + 1e-9) { acutPrintf(L"\nKosa stucna: ogranak je veci od kanala."); return false; }
+		acedInitGet(0, L"Lijevo Desno"); ACHAR kw[32] = L"";
+		int rc = acedGetKword(L"\nStrana ogranka [Lijevo/Desno] <Desno>: ", kw, 32);
+		if (rc != RTNORM && rc != RTNONE) return false;
+		const bool left = rc == RTNORM && _wcsicmp(kw, L"Lijevo") == 0;
+		acedInitGet(0, L"Koljeno Bez"); kw[0] = 0;
+		rc = acedGetKword(L"\nKoljeno 45° na stucni (ogranak okomito na kanal) [Koljeno/Bez] <Koljeno>: ", kw, 32);
+		if (rc != RTNORM && rc != RTNONE) return false;
+		const bool elbow = !(rc == RTNORM && _wcsicmp(kw, L"Bez") == 0);
+		const AcGeVector3d v = left ? AcGeVector3d(-u.y, u.x, 0) : AcGeVector3d(u.y, -u.x, 0);
+		AcGeVector3d d = u + v; d.normalize();
+		tvsTeeData::Record r; r.type = tvsTee::Tap; r.l = tvsTeeCommand::tapLength(w, f); r.second = 0; r.radius2 = tvsTeeCommand::tapMargin(f); r.neck = deg;
+		tvsTee::Tee t; t.type = tvsTee::Tap; t.round = true; t.A = A; t.C = A; t.w1 = w; t.l = r.l; t.margin = r.radius2; t.lateral = deg;
+		double before = 0, after = 0; tvsTee::tapRun(t, before, after);
+		double L = tvsTee::lateralLengthPl(A, w, deg, r.l);
+		const AcGePoint3d B = s1 + u * before, run1 = B + u * after, face = B + d * (A / 2 + L);   // the run starts at the duct end
+		double sa = A, sb = 0, ta = w, tb = 0; AcGeVector3d vpr = u, votv = d; AcGePoint3d base = B;
+		TVS_WYE* pWye = TVS_WYE::add_new(sa, sb, ta, tb, L, vpr, votv, base, true, true, false);
+		if (!pWye) return false;
+		const AcDbObjectId wyeId = pWye->id();
+		SetGlobalProperty(pWye);
+		SetPropertyLikePipe(pipi, pWye);
+		{
+			AcDbObjectPointer<TVS_WYE> wy(wyeId, AcDb::kForWrite);
+			if (wy.openStatus() != Acad::eOk) return false;
+			wy->LengthPl = L; wy->Vectpr = vpr; wy->Vectotv = votv; wy->Basepoint = base;
+			if (tvsTeeData::write(wy.object(), r) == Acad::eOk) wy->recordGraphicsModified();
+		}
+		AcGePoint3d branch = face; AcGeVector3d branchDir = d;
+		if (elbow) {
+			tvsTeeDialog::Section sec; sec.a = w; sec.b = 0; sec.round = true; AcGePoint3d exit; AcGeVector3d out;
+			if (tvsTeeDialog::planElbow(wyeId, face, d, left ? pi / 4 : -pi / 4, sec, elev, f, exit, out)) { branch = exit; branchDir = out; }
+			else acutPrintf(L"\nKosa stucna: koljeno 45 nije napravljeno; ogranak ide pod 45°.");
+		}
+		acedInitGet(0, L"Prolaz Ogranak"); ACHAR nk[32] = L"";
+		const int nrc = acedGetKword(L"\nNastavak crtanja [Prolaz/Ogranak] <Prolaz>: ", nk);
+		const bool fromBranch = nrc == RTNORM && _wcsicmp(nk, L"Ogranak") == 0;
+		TVS_Pipe pipie;
+		{	// short duct on the other outlet, to be continued later
+			AcGePoint3d o0 = fromBranch ? run1 : branch, o1 = o0 + (fromBranch ? u : branchDir) * (300 / f);
+			double wa = fromBranch ? A : w, wb = 0;
+			TVS_Pipe* stub = pipie.add_new(o0, o1, wa, wb, false, true);
+			if (stub) SetPropertyLikePipe(pipi, stub);
+		}
+		AcGePoint3d c0 = fromBranch ? branch : run1, c1 = c0 + (fromBranch ? branchDir : u) * (100 / f);
+		double ca = fromBranch ? w : A, cb = 0;
+		TVS_Pipe* next = pipie.add_new(c0, c1, ca, cb, false, true);
+		tvsTeeCommand::lastType() = tvsTee::Tap;
+		acutPrintf(L"\nKosa stucna 45°%ls umetnuta; crtanje se nastavlja iz %ls.", elbow ? L" i koljeno 45°" : L"", fromBranch ? L"ogranka" : L"prolaza");
+		if (!next) return true;
+		SetPropertyLikePipe(pipi, next);
+		globSizeA = ca;
+		pipi = next; A1 = c0; A2 = c1;
+		pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
+		return true;
+	}
 	// T komad faza 2 (TVS_DRAW / TVS_PIPE option Tkomad): TK-O / TK-G placed on the duct being
 	// drawn with a preview (TeeInsert.h); the duct is extended or shortened to the inlet face,
 	// the other outlet gets a short duct, drawing continues from the chosen outlet.
@@ -488,7 +564,7 @@
 		{
 			AcDbObjectPointer<TVS_Pipe> p(pipeId, AcDb::kForRead);
 			if (p.openStatus() != Acad::eOk) return false;
-			if (p->ThisRound || p->SizeB <= 0) { acutPrintf(L"\nTK-O/TK-G su za pravougaone kanale."); return false; }
+			if (p->ThisRound || p->SizeB <= 0) { p.close(); return lateralDuringDrawing(A1, A2, pipi, pt1); }   // okrugli: kosa stucna
 			in.start = p->FirstPoint; in.end = p->LastPoint; in.A = p->SizeA; in.B = p->SizeB;
 		}
 		const double f = tvsUnits::factor();

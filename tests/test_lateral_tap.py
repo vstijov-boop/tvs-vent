@@ -9,7 +9,7 @@ class Lateral(unittest.TestCase):
    self.assertIn('OK',subprocess.run([str(exe)],check=True,capture_output=True,text=True).stdout)
  def test_wiring(self):
   w=text('TVS_Ventilation_DBX/TVS_WYE.cpp');self.assertIn('tee.lateral = r.neck;',w)
-  c=text('TVS_Ventilation_ARX/commands/ConnectHelpers.inl');self.assertIn('return ConnectLateral(pPipe1, pPipe2);',c);self.assertIn('r.neck = deg;',c)
+  c=text('TVS_Ventilation_ARX/commands/ConnectHelpers.inl');self.assertIn('return ConnectLateral(pPipe1, pPipe2);',c);self.assertIn('r.neck = deg;',c);self.assertIn('return ConnectLateral(pPipe1, pPipe2, true);',c);self.assertIn('tvsTeeDialog::planElbow(wyeId, face, d, turn, sec,',c)
   p=text('geometry/PressureDrop.h');self.assertIn('return exhaust?"ED5-2":"SD5-1";',p)
   self.assertIn('t.lateral=rec.type==tvsTee::Tap&&rec.neck>0',text('TVS_Ventilation_ARX/PressureCommand.h'))
   for f in ('SizeFollow.h','FlowCommand.h','TeeEditDialog.h'):self.assertIn('tvsTeeFit::lateralLength(',text('TVS_Ventilation_ARX/'+f))
