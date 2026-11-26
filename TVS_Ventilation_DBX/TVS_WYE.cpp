@@ -256,7 +256,7 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 					setMainProperty(new AcDbArc(world(c.c), AcGeVector3d(0, 0, 1), c.r, ccw ? s0 : s1, ccw ? s1 : s0));
 				}
 				// no centre lines on TK-O / TK-G (as in the block)
-				AcArray<AcDbEntity*> spigots;   // kosa racva: as the spiro prelazi (TVS_TRANS) - sicka 5 mm, axes, dashed spigots
+				AcArray<AcDbEntity*> spigots;   // kosa racva / Y45: as the spiro prelazi (TVS_TRANS) - sicka 5 mm, axes, dashed spigots
 				if (tee.lateral > 0) {
 					for (size_t j = 0; j < shape.axis.size(); ++j) {
 						AcDbLine* ax = new AcDbLine(world(shape.axis[j].a), world(shape.axis[j].b)); setCenterProperty(ax); }
@@ -265,6 +265,10 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 						const tvsSpiro::Settings ss = tvsSpiro::read(database());
 						const double f = tvsUnits::factor(database()), bead = 5.0 / f;
 						AcGeVector3d dirs[3] = { -ey, ey, Vectotv }; dirs[2].z = 0; dirs[2].normalize();
+						if (tee.type == tvsTee::Pants) {   // Y45: out of each port
+							tvsTee::P lp[3], ld[3]; tvsTee::wyePorts(tee, lp, ld);
+							for (int k = 0; k < 3; ++k) { dirs[k] = ex * ld[k].x + ey * ld[k].y; dirs[k].z = 0; dirs[k].normalize(); }
+						}
 						for (int k = 0; k < 3; ++k) {
 							const AcGeVector3d dir = dirs[k], n(-dir.y, dir.x, 0); const double r = widths[k] / 2; const AcGePoint3d P = ports[k];
 							setThinProperty(new AcDbLine(P - dir * bead + n * r, P - dir * bead - n * r));
@@ -1234,6 +1238,11 @@ bool TVS_WYE::teeShape(tvsTee::Tee &tee, AcGePoint3d &origin, AcGeVector3d &ex, 
 		tee.xo = r.neck;   // prolaz offset across the run (TVS_SPOJ_TKO: an edge in line with the inlet)
 		origin = Basepoint - u * (LengthPl + tee.w1 / 2); ey = u; ex = v;
 	}
+	else if (r.neck > 0 && ThisRoundpr && ThisRoundotv) {   // gacasta racva Y45 (Soko): l = L2, radius2 = inlet straight
+		tee.A = SizeAotv; tee.w1 = SizeApr; tee.w2 = r.second > 0 ? r.second : SizeApr; tee.round = true;
+		tee.lateral = r.neck; tee.margin = r.radius2 > 0 ? r.radius2 : 0;
+		origin = Basepoint + v * (SizeApr / 2 + LengthPl); ey = -v; ex = u;
+	}
 	else {
 		tee.A = SizeAotv; tee.w1 = SizeApr; tee.w2 = r.second > 0 ? r.second : SizeApr;
 		// Branch axes on one line Y = LengthPl + w1/2 from the inlet face: the branch with the
@@ -1267,6 +1276,11 @@ bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
 		const double half = LengthPl + SizeAotv / 2;
 		ports[0] = Basepoint - u * half; ports[1] = Basepoint + u * half + v * tee.xo;
 		widths[0] = tee.A; widths[1] = tee.C; widths[2] = tee.w1;
+	}
+	else if (tee.lateral > 0) {   // Y45: faces from the shape
+		tvsTee::P lp[3], ld[3]; tvsTee::wyePorts(tee, lp, ld);
+		for (int k = 0; k < 3; ++k) ports[k] = o + ex * lp[k].x + ey * lp[k].y;
+		widths[0] = tee.w2; widths[1] = tee.w1; widths[2] = tee.A;
 	}
 	else {   // +u = first branch (w1), -u = left branch (w2); fixed collars l
 		const double a = tee.A / 2;

@@ -552,7 +552,9 @@ inline bool open(const AcDbObjectId& id,UINT idd){
     Source s;if(!readSource(id,s)){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
     {tvsTeeData::Record r;AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);
      if(w.openStatus()==Acad::eOk&&tvsTeeData::read(w.object(),r)&&r.type==tvsTee::Tap&&r.neck>0){   // kosa stucna: the branch is at 45 deg
-        acutPrintf(L"\nKosa štucna 45°: tip se ovdje ne mijenja (ogranak je pod uglom). Za drugi spoj obrišite je i spojite ponovo.");return true;}}
+        acutPrintf(L"\nKosa štucna 45°: tip se ovdje ne mijenja (ogranak je pod uglom). Za drugi spoj obrišite je i spojite ponovo.");return true;}
+     if(w.openStatus()==Acad::eOk&&tvsTeeFit::isWye(w.object(),r)){   // Y45: branches at 45 deg
+        acutPrintf(L"\nRačva Y45: tip se ovdje ne mijenja (ogranci su pod uglom). Prečnike mijenjajte sa TVS_CHANGE ili obrišite i umetnite ponovo.");return true;}}
     if(!writable(s))return true;
     Dialog dg(s,idd);
     {CAcModuleResourceOverride resources;if(dg.DoModal()!=IDOK)return true;}
@@ -591,6 +593,8 @@ inline bool forSelection(const ads_name sset,UINT idd){
     Adesk::Int32 n=0;if(acedSSLength(sset,&n)!=RTNORM||n!=1)return false;
     ads_name e;if(acedSSName(sset,0,e)!=RTNORM)return false;AcDbObjectId id;if(acdbGetObjectId(id,e)!=Acad::eOk)return false;
     if(id.objectClass()!=TVS_WYE::desc())return false;
+    {tvsTeeData::Record r;AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);   // Y45: the general dialog (diameters)
+     if(w.openStatus()==Acad::eOk&&tvsTeeData::read(w.object(),r)&&tvsTeeFit::isWye(w.object(),r))return false;}
     return open(id,idd);
 }
 }

@@ -31,7 +31,7 @@ struct P {double x,y;P(double a=0,double b=0):x(a),y(b){}};
 struct Seg {P a,b;Seg(P p=P(),P q=P()):a(p),b(q){}};
 struct Arc {P c;double r,a0,a1;Arc(P p=P(),double rr=0,double s=0,double e=0):c(p),r(rr),a0(s),a1(e){}}; // CCW a0->a1
 struct Shape {std::vector<Seg> lines;std::vector<Arc> arcs;std::vector<Seg> axis;};
-struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone,margin,lateral;   // lateral: kosa stucna, deg (0 = perpendicular); round / cone: stucna with a round branch; margin: short run   // e1 / e2: TK-G "vrat", extra straight inlet wall
+struct Tee {int type;double A,C,w1,w2,R1,R2,l,flange,e1,e2,xo;bool round;double cone,margin,lateral;   // lateral: kosa stucna / Y45 (Pants), deg (0 = perpendicular); Y45 margin = inlet straight; round / cone: stucna with a round branch; margin: short run   // e1 / e2: TK-G "vrat", extra straight inlet wall
     // xo: TK-O prolaz axis across the run (+x = branch side; prolaz edge in line with the inlet: +-(a - c))
     Tee():type(Branch),A(0),C(0),w1(0),w2(0),R1(0),R2(0),l(0),flange(0),e1(0),e2(0),xo(0),round(false),cone(0),margin(0),lateral(0){}};   // before branch 1 / 2 (its axis that much farther)
 inline double pi(){return 3.14159265358979323846;}
@@ -64,7 +64,52 @@ inline double coneBase(double d,double l){return d+2*l*0.26794919243112270;}   /
 inline bool isCone(double second,double d,double l){
     return second>0&&d>0&&l>0&&second-coneBase(d,l)<=1e-3*(d+l)&&coneBase(d,l)-second<=1e-3*(d+l);
 }
+// Gacasta racva Y45 (Soko "Spiro Y45", user 2026-11-26): type Pants with lateral = 45 and round
+// ducts. Local frame as TK-G: inlet A (y=0) straight up to y = margin (s = spigot of the inlet),
+// branch w1 on +x / w2 on -x, axes at `lateral` deg to the inlet axis. Each outer branch wall starts
+// at the inlet corner (+-a, s); the inner walls meet at the crotch. l = L2: along each branch axis
+// from where it crosses the inlet axis (O) to the branch face (Soko table, geometry/SokoPants.h).
+// TVS_WYE: Basepoint = O of branch 1, LengthPl = O1.y - w1/2 (TK-G port model: inlet face at
+// Basepoint + Vectotv (SizeApr/2 + LengthPl)); record TVS_TEE_V1: type gacasti, l = L2,
+// second = w2, radius2 = s, neck = the angle (45).
+struct WyeBranch {P q,o,d,n,face,outer,inner;double w;};   // q: outer wall start, o: axis on the inlet axis, n: inner side
+inline WyeBranch wyeBranch(double A,double w,double s,double deg,double L2,int side){
+    const double th=deg*pi()/180,sn=std::sin(th),cs=std::cos(th),a=A/2;WyeBranch b;b.w=w;
+    b.q=P(side*a,s);b.d=P(side*sn,cs);b.n=P(-side*cs,sn);
+    const double t=(cs*w/2-a)/sn;b.o=P(0,s+sn*w/2+t*cs);
+    b.face=P(b.o.x+b.d.x*L2,b.o.y+b.d.y*L2);
+    b.outer=P(b.face.x-b.n.x*w/2,b.face.y-b.n.y*w/2);b.inner=P(b.face.x+b.n.x*w/2,b.face.y+b.n.y*w/2);
+    return b;
+}
+inline double wyeAxisY(double A,double w,double s,double deg){return wyeBranch(A,w,s,deg,0,1).o.y;}
+// crotch: the inner walls (q + n w + t d) of both branches meet
+inline bool wyeCrotch(double A,double w1,double w2,double s,double deg,P& k){
+    const WyeBranch b1=wyeBranch(A,w1,s,deg,0,1),b2=wyeBranch(A,w2,s,deg,0,-1);
+    const P p1(b1.q.x+b1.n.x*w1,b1.q.y+b1.n.y*w1),p2(b2.q.x+b2.n.x*w2,b2.q.y+b2.n.y*w2);
+    const double det=b1.d.x*(-b2.d.y)-b1.d.y*(-b2.d.x);if(std::fabs(det)<1e-12)return false;
+    const double rx=p2.x-p1.x,ry=p2.y-p1.y,tt=(rx*(-b2.d.y)-ry*(-b2.d.x))/det;
+    k=P(p1.x+b1.d.x*tt,p1.y+b1.d.y*tt);return true;
+}
+// shortest L2 of branch `side` (+1: w1, -1: w2): its inner face corner at the crotch
+inline double wyeMinL2(double A,double w1,double w2,double s,double deg,int side){
+    P k;if(!wyeCrotch(A,w1,w2,s,deg,k))return 0;const WyeBranch b=wyeBranch(A,side>0?w1:w2,s,deg,0,side);
+    return (k.x-b.o.x)*b.d.x+(k.y-b.o.y)*b.d.y;
+}
+inline bool wyeValid(const Tee& t){
+    if(!(t.round&&t.A>0&&t.w1>0&&t.w2>0&&t.l>0&&t.margin>=0&&t.lateral>=15&&t.lateral<90))return false;
+    P k;if(!wyeCrotch(t.A,t.w1,t.w2,t.margin,t.lateral,k)||!(k.y>t.margin+1e-9))return false;
+    for(int side=1;side>=-1;side-=2){const WyeBranch b=wyeBranch(t.A,side>0?t.w1:t.w2,t.margin,t.lateral,t.l,side);
+        if(!(t.l>wyeMinL2(t.A,t.w1,t.w2,t.margin,t.lateral,side)+1e-9))return false;
+        if(!((b.outer.x-b.q.x)*b.d.x+(b.outer.y-b.q.y)*b.d.y>1e-9))return false;}
+    return true;
+}
+// ports in the TVS order: 0 = branch w2 (-x), 1 = branch w1 (+x), 2 = inlet; dir: out of the fitting
+inline void wyePorts(const Tee& t,P port[3],P dir[3]){
+    const WyeBranch b1=wyeBranch(t.A,t.w1,t.margin,t.lateral,t.l,1),b2=wyeBranch(t.A,t.w2,t.margin,t.lateral,t.l,-1);
+    port[0]=b2.face;dir[0]=b2.d;port[1]=b1.face;dir[1]=b1.d;port[2]=P(0,0);dir[2]=P(0,-1);
+}
 inline bool valid(const Tee& t){
+    if(t.type==Pants&&t.lateral>0)return wyeValid(t);
     if(t.type==Tap&&t.lateral>0)return t.round&&t.A>0&&t.w1>0&&t.l>0&&t.lateral>=15&&t.lateral<90&&t.cone<=0;
     if(t.type==Tap)return t.A>0&&t.w1>0&&t.l>0&&(!(t.cone>0)||(t.round&&t.cone>t.w1&&t.cone<=t.w1+2*t.l));
     if(!(t.A>0)||!(t.w1>0)||!(t.l>0)||!(t.R1>t.w1))return false;
@@ -105,6 +150,18 @@ inline bool pantsFeasible(double A,double w1,double w2,double l){
 inline bool shape(const Tee& t,Shape& out){
     out=Shape();if(!valid(t))return false;
     const double a=t.A/2,l=t.l,f=t.flange;
+    if(t.type==Pants&&t.lateral>0){   // gacasta racva Y45: inlet, outer walls, inner walls to the crotch, faces, axes
+        const WyeBranch b1=wyeBranch(t.A,t.w1,t.margin,t.lateral,l,1),b2=wyeBranch(t.A,t.w2,t.margin,t.lateral,l,-1);
+        P k;wyeCrotch(t.A,t.w1,t.w2,t.margin,t.lateral,k);const double s=t.margin;
+        out.lines.push_back(Seg(P(-a,0),P(a,0)));
+        if(s>1e-12){out.lines.push_back(Seg(P(-a,0),P(-a,s)));out.lines.push_back(Seg(P(a,0),P(a,s)));}
+        out.lines.push_back(Seg(b1.q,b1.outer));out.lines.push_back(Seg(b2.q,b2.outer));
+        out.lines.push_back(Seg(k,b1.inner));out.lines.push_back(Seg(k,b2.inner));
+        out.lines.push_back(Seg(b1.outer,b1.inner));out.lines.push_back(Seg(b2.outer,b2.inner));
+        out.axis.push_back(Seg(P(0,0),P(0,b1.o.y<b2.o.y?b1.o.y:b2.o.y)));
+        out.axis.push_back(Seg(b1.o,b1.face));out.axis.push_back(Seg(b2.o,b2.face));
+        return true;
+    }
     if(t.type==Tap&&t.lateral>0){
         // kosa stucna: continuous main, branch walls from the main wall to the face, axis line
         double before,after;tapRun(t,before,after);const double Lr=before+after,th=t.lateral*pi()/180;
@@ -199,6 +256,8 @@ inline double arm(double w,double R,double bb,double l){return perimeter(w,bb)*(
 inline double area(const Tee& t,double b,double bb){
     if(!valid(t))return 0;
     double s=0;
+    if(t.type==Pants&&t.lateral>0)   // Y45: inlet cylinder + both branches over L2 (approximation)
+        return pi()*(t.A*t.margin+t.w1*t.l+t.w2*t.l)/1e6;
     if(t.type==Tap){   // main minus opening (w + L) + two trapezoids, downstream wall, 45 deg wall
         const double L=runLength(t),w=t.w1,l=t.l;
         if(t.round){const double r1=(t.cone>0?t.cone:w)/2,r2=w/2;   // opening on the main + cylinder / cone

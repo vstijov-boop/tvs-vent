@@ -1,5 +1,6 @@
 #pragma once
 #include "../geometry/SokoLateral.h"
+#include "../geometry/SokoPants.h"
 // T komad faza 3: after TVS_TK_TIP or the Svojstva dialog changed a TK-O / TK-G, the TVS duct
 // (TVS_Pipe) connected to each port follows it: its end moves to the drawn face (TK-G narrower
 // branch with a fixed collar) and its width becomes the port width (TK-O prolaz C, TK-G left
@@ -34,7 +35,21 @@ inline bool lateralRecord(tvsTeeData::Record& r,double A,double w,double f){
     double m=0,c=0,L=0,L2=0;const bool soko=tvsSokoLateral::dims(A*f,w*f,m,c,L,L2);
     r.type=tvsTee::Tap;r.l=c/f;r.second=0;r.radius2=m/f;r.neck=tvsTee::lateralDeg();return soko;
 }
+// Gacasta racva Y45 (record type gacasti, neck = 45, both sides round; geometry/SokoPants.h): L2 from
+// the Soko table (d3 = d4), else d3 + spigot(d3); inlet straight radius2 = spigot(inlet). A: inlet,
+// w1 / w2: branches (drawing units). lengthPl: the TK-G port model value (O1.y - w1/2).
+inline bool isWye(const TVS_WYE* w,const tvsTeeData::Record& r){return w&&r.type==tvsTee::Pants&&r.neck>0&&w->ThisRoundpr&&w->ThisRoundotv;}
+inline bool wyeRecord(tvsTeeData::Record& r,double A,double w1,double w2,double f,double& lengthPl){
+    const double deg=tvsTee::lateralDeg(),s=tvsSokoPants::spigotMm(A*f);
+    const double m1=tvsTee::wyeMinL2(A*f,w1*f,w2*f,s,deg,1),m2=tvsTee::wyeMinL2(A*f,w1*f,w2*f,s,deg,-1);
+    double L2=0;const bool soko=tvsSokoPants::length(A*f,w1>w2?w1*f:w2*f,w1>w2?w2*f:w1*f,m1>m2?m1:m2,L2);
+    r.type=tvsTee::Pants;r.l=L2/f;r.second=w2;r.radius2=s/f;r.neck=deg;
+    lengthPl=tvsTee::wyeAxisY(A,w1,s/f,deg)-w1/2;return soko;
+}
 inline void lateralLength(TVS_WYE* w,tvsTeeData::Record& r){
+    if(isWye(w,r)){   // Y45: L2, inlet straight and LengthPl for the new sizes (Basepoint = O1 stays)
+        w->assertWriteEnabled();double L=0;wyeRecord(r,w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,tvsUnits::factor(w),L);
+        w->LengthPl=L;tvsTeeData::write(w,r);return;}
     if(!w||r.type!=tvsTee::Tap||!(r.neck>0))return;
     w->assertWriteEnabled();lateralRecord(r,w->SizeApr,w->SizeAotv,tvsUnits::factor(w));
     w->LengthPl=tvsTee::lateralLengthPl(w->SizeApr,w->SizeAotv,r.neck,r.l);tvsTeeData::write(w,r);

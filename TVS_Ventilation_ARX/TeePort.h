@@ -23,6 +23,8 @@ inline bool port(const TVS_WYE* w,int k,Port& out){
     if(!w||k<0||k>2)return false;const tvsTeeFit::Ports ps=tvsTeeFit::ports(w);if(!ps.ok)return false;
     AcGeVector3d u=w->Vectpr,v=w->Vectotv;u.z=v.z=0;if(u.length()<1e-12||v.length()<1e-12)return false;u.normalize();v.normalize();
     out.p=ps.p[k];out.out=k==0?-u:k==1?u:v;
+    {tvsTee::Tee t;AcGePoint3d o;AcGeVector3d ex,ey;   // Y45: the branches leave at 45 deg
+     if(w->teeShape(t,o,ex,ey)&&t.type==tvsTee::Pants&&t.lateral>0){tvsTee::P lp[3],ld[3];tvsTee::wyePorts(t,lp,ld);out.out=ex*ld[k].x+ey*ld[k].y;out.out.z=0;out.out.normalize();}}
     const bool run=k<2;out.s.a=ps.w[k];out.s.round=run?w->ThisRoundpr:w->ThisRoundotv;out.s.b=out.s.round?0:(run?w->SizeBpr:w->SizeBotv);
     return true;
 }

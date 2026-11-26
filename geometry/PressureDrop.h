@@ -113,7 +113,7 @@ inline std::string transitionKey(bool exhaust,const Section& up,const Section& d
     return exhaust?(oneSide?"ER4-1":"ER4-2"):(oneSide?"SR4-1":"SR4-2");
 }
 inline std::string junctionKey(bool exhaust,int tee,const Section& common,const Section& branch,bool cone=false,bool lateral=false){
-    if(common.round&&branch.round&&lateral)return exhaust?"ED5-2":"SD5-1";   // kosa stucna: wye 45
+    if(common.round&&branch.round&&lateral)return exhaust?"ED5-2":"SD5-1";   // kosa stucna: wye 45; Y45 (TeePants): each leg as its branch
     if(common.round)return branch.round?(exhaust?"ED5-3":"SD5-9"):std::string();
     if(tee==TeePants)return exhaust?"ER5-4":"SR5-14";
     if(branch.round)return exhaust?"ER5-2":cone?"SR5-12":"SR5-11";   // round tap: cylindrical / conical
@@ -432,7 +432,7 @@ private:
     void junction(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,const std::vector<int>& of,Result& r,int i){
         const Element& x=e[i];const Part& t=x.parts[0];if(x.ports.size()<3)return;
         const bool pants=t.tee==TeePants;
-        static const wchar_t* names[]={L"TK0",L"TK-O",L"TK-G",L"\u0161tucna"};const std::wstring type=t.tee>=0&&t.tee<=3?names[t.tee]:L"T";
+        static const wchar_t* names[]={L"TK0",L"TK-O",L"TK-G",L"\u0161tucna"};const std::wstring type=pants&&t.lateral?std::wstring(L"Y45"):t.tee>=0&&t.tee<=3?names[t.tee]:L"T";
         if(!pants&&x.entry==2){bullhead(e,kids,of,r,i,type);return;}   // air in through the ogranak, out both ways
         if(pants?x.entry!=2:x.entry==2){
             for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];
@@ -472,9 +472,11 @@ private:
             std::map<std::string,double> in;double pv=0;std::wstring note=type+(main?L", prolaz":L", ogranak")+capped;
             if(eng_&&!key.empty()&&eng_->has(key)){
                 if(pants){   // dovetail: C of this branch's Ab / Ac, on this branch's own pd (ASHRAE: equal split)
-                    in=seedJunction(eng_->params(key),common,port(x,leg),port(x,leg),x.flow,q[leg],q[leg]);
+                    if(t.lateral)in=seedJunction(eng_->params(key),common,port(x,leg),port(x,1-leg),x.flow,q[leg],q[1-leg]);   // Y45: the other leg is the "prolaz"
+                    else in=seedJunction(eng_->params(key),common,port(x,leg),port(x,leg),x.flow,q[leg],q[leg]);
                     const double s=area(port(x,leg)),v=s>0?q[leg]/3600.0/s:0;pv=o_.rho*v*v/2;
-                    if(x.flow>0&&std::fabs(q[leg]/x.flow-0.5)>0.1)note+=L", ASHRAE pretpostavlja jednaku podjelu protoka";}
+                    if(t.lateral)note+=L", ra\u010Dva Y45: krak kao ogranak ra\u010Dve 45\u00B0";
+                    else if(x.flow>0&&std::fabs(q[leg]/x.flow-0.5)>0.1)note+=L", ASHRAE pretpostavlja jednaku podjelu protoka";}
                 else in=seedJunction(eng_->params(key),common,port(x,branchPort),port(x,straightPort),x.flow,q[branchPort],q[straightPort]);}
             add(r,c==i?of[i]:of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,pv,!capped.empty());}
     }

@@ -25,7 +25,7 @@ class TeeContract(unittest.TestCase):
   self.assertEqual(f.count('tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);'),2)
   r=text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc');self.assertIn('EDITTEXT        1050,187,86,40,12',r);self.assertIn('"Prolaz C",10050',r)
   g=text('TVS_Ventilation_ARX/dgAllEdit.cpp');self.assertIn('DDX_MillimetreString(pDX, IDC_TeeSecond, TeeSecond);',g);self.assertIn('L"Lijevi ogr."',g)
-  a=text('TVS_Ventilation_ARX/TeeEditDialog.h');self.assertIn('if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);',a)
+  a=text('TVS_Ventilation_ARX/TeeEditDialog.h');self.assertIn('if(r.type==tvsTee::Pants&&!tvsTeeFit::isWye(w,r))r.radius2=tvsTee::defaultRadius(v);',a)
   self.assertIn('tvsTee::pantsLengthPl(r.l,w1,w2)',a)
   # Faza 3: drawn TK ports feed the move/offset port model; connected ducts follow the ports.
   self.assertIn('bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const',w)

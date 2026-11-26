@@ -293,11 +293,21 @@ bool SPEC::add(AcDbEntity * pEnt)
 				// kosa stucna 45 (round on round, record neck = angle): own name, D / d (L = collar)
 				{
 					tvsTee::Tee lat; AcGePoint3d lo; AcGeVector3d lx, ly;
-					if (pWye->ThisRoundpr && pWye->ThisRoundotv && pWye->teeShape(lat, lo, lx, ly) && lat.lateral > 0) {
+					if (pWye->ThisRoundpr && pWye->ThisRoundotv && pWye->teeShape(lat, lo, lx, ly) && lat.lateral > 0 && lat.type == tvsTee::Tap) {
 						status = TeeTap; Extra = lat.l * tvsUnits::factor(pWye);
 						setName(L"Kosa račva TK 45° (Soko), okrugla");
 						setLable(d); appendLable(SizeA); appendLable(_T(" / ")); appendLable(d); appendLable(SizeA2);
 						appendLable(_T(" (L=")); appendLable((lat.margin * 2 + lat.w1 * std::sqrt(2.0)) * tvsUnits::factor(pWye)); appendLable(_T(" mm)"));
+					}
+					else if (pWye->ThisRoundpr && pWye->ThisRoundotv && lat.lateral > 0 && lat.type == tvsTee::Pants) {   // racva Y45: inlet / branches (L2)
+						const double f = tvsUnits::factor(pWye);
+						tvsTee::Tee mm = lat; mm.A *= f; mm.w1 *= f; mm.w2 *= f; mm.l *= f; mm.margin *= f;
+						status = TeePants; Extra = mm.w2;
+						setName(L"Račva Y45 (Soko), okrugla");
+						setLable(d); appendLable(SizeA2); appendLable(_T(" / ")); appendLable(d); appendLable(SizeA);
+						appendLable(_T(", ")); appendLable(d); appendLable(mm.w2);
+						appendLable(_T(" (L2=")); appendLable(mm.l); appendLable(_T(" mm)"));
+						Area = tvsTee::area(mm, 0, 0);
 					}
 				}
 				// T komad TK-O / TK-G (TVS_TEE_V1): own name, sizes, radius and sheet area.

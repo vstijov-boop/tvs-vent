@@ -72,12 +72,42 @@
 		//if(drawStep2(pt1,pt2,pipi)==false)return;
 
 	}
+	// Grip menu (plan 19 faza 2, user 2026-11-26): a popup at the cursor when a connector grip is
+	// clicked - Nastavi crtanje / Nastavi drugom dimenzijom (prelaz) / Umetni koljeno (ugao, strana).
+	// Returns 0 cancel, 1 draw, 2 dimension, 100 + deg (+ 1000 left) for an elbow.
+	static int portGripMenu()
+	{
+		HMENU menu = CreatePopupMenu(), elbow = CreatePopupMenu();
+		if (!menu || !elbow) { if (menu) DestroyMenu(menu); if (elbow) DestroyMenu(elbow); return 1; }
+		const int degs[4] = { 90, 60, 45, 30 };
+		for (int i = 0; i < 4; ++i) {
+			wchar_t t[32];
+			swprintf_s(t, L"%d° lijevo", degs[i]); AppendMenuW(elbow, MF_STRING, 1100 + degs[i], t);
+			swprintf_s(t, L"%d° desno", degs[i]); AppendMenuW(elbow, MF_STRING, 100 + degs[i], t);
+		}
+		AppendMenuW(menu, MF_STRING, 1, L"Nastavi crtanje");
+		AppendMenuW(menu, MF_STRING, 2, L"Nastavi drugom dimenzijom (prelaz)...");
+		AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(elbow), L"Umetni koljeno");
+		AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
+		AppendMenuW(menu, MF_STRING, 0, L"Odustani");
+		SetMenuDefaultItem(menu, 1, FALSE);
+		POINT pt; GetCursorPos(&pt);
+		HWND owner = adsw_acadMainWnd();
+		SetForegroundWindow(owner);
+		const int cmd = static_cast<int>(TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN, pt.x + 8, pt.y + 8, 0, owner, NULL));
+		PostMessage(owner, WM_NULL, 0, 0);
+		DestroyMenu(menu);   // destroys the submenu too
+		return cmd;
+	}
 	// Connector grip on a free fitting port: options before the first duct
 	//   Dimenzija - another size / shape: a prelaz right at the port (spiro by catalogue), then that size;
 	//   Koljeno   - 30 / 45 / 60 / 90 deg left / right in plan at the port, the duct leaves the elbow.
 	// The first duct leaves along the (last) direction; a point to the side is projected onto it.
 	static void drawFromPort(const AcDbObjectId& id, int k)
 	{
+		tvsTrace::Scope trace_("drawFromPort");
+		const int choice = portGripMenu();
+		if (choice == 0) { acutPrintf(_T("\nOdustano.")); return; }
 		tvsPortGrip::Port P[3]; int n = 0; double elev = 0; AcDbDatabase* db = NULL;
 		{
 			AcDbEntity* e = NULL;
@@ -93,6 +123,26 @@
 		globSizeA = sec.a; globSizeB = sec.round ? 0 : sec.b; globRound = sec.round; globalElevMid = elev; globalElev = elev;
 		ads_point pick;
 		AcGePoint3d end;
+		auto dimension = [&]() {   // prelaz right at the port, then the new size
+			if (!changesize()) return;
+			globalElevMid = elev; globalElev = elev;   // the plan prelaz keeps the elevation of the fitting
+			tvsTeePort::Section to; to.a = globSizeA; to.round = globRound; to.b = globRound ? 0 : globSizeB;
+			if (tvsTeePort::same(sec, to, 1e-9)) return;
+			const double L = tvsTeePort::prelazLength(db, sec, to, f);
+			if (!tvsTeeDialog::prelaz(db, id, at, dir, sec, to, L, elev)) { acutPrintf(_T("\nPrelaz nije napravljen.")); return; }
+			wchar_t a1[32], a2[32]; tvsTeePort::sizeText(a1, 32, sec, f); tvsTeePort::sizeText(a2, 32, to, f);
+			acutPrintf(_T("\nPrelaz %ls -> %ls mm, dužine %.0f mm."), a1, a2, L * f);
+			at += dir * L; sec = to;
+		};
+		auto elbow = [&](double deg, bool left) {
+			const double ang = deg * 3.14159265358979323846 / 180;
+			AcGePoint3d exit; AcGeVector3d out;
+			if (!tvsTeeDialog::planElbow(id, at, dir, left ? ang : -ang, sec, elev, f, exit, out)) { acutPrintf(_T("\nKoljeno nije napravljeno.")); return; }
+			acutPrintf(_T("\nKoljeno %.0f° %ls."), deg, left ? _T("lijevo") : _T("desno"));
+			at = exit; dir = out;
+		};
+		if (choice == 2) dimension();
+		else if (choice >= 100) elbow(choice % 1000 - 100, choice >= 1000);
 		for (;;)
 		{
 			ads_point base = { at.x, at.y, at.z };
@@ -101,18 +151,7 @@
 			if (st == RTKWORD)
 			{
 				ACHAR kw[64] = _T(""); acedGetInput(kw);
-				if (_wcsicmp(kw, _T("Dimenzija")) == 0 || _wcsicmp(kw, _T("D")) == 0)
-				{
-					if (!changesize()) continue;
-					globalElevMid = elev; globalElev = elev;   // the plan prelaz keeps the elevation of the fitting
-					tvsTeePort::Section to; to.a = globSizeA; to.round = globRound; to.b = globRound ? 0 : globSizeB;
-					if (tvsTeePort::same(sec, to, 1e-9)) continue;
-					const double L = tvsTeePort::prelazLength(db, sec, to, f);
-					if (!tvsTeeDialog::prelaz(db, id, at, dir, sec, to, L, elev)) { acutPrintf(_T("\nPrelaz nije napravljen.")); continue; }
-					wchar_t a1[32], a2[32]; tvsTeePort::sizeText(a1, 32, sec, f); tvsTeePort::sizeText(a2, 32, to, f);
-					acutPrintf(_T("\nPrelaz %ls -> %ls mm, dužine %.0f mm."), a1, a2, L * f);
-					at += dir * L; sec = to;
-				}
+				if (_wcsicmp(kw, _T("Dimenzija")) == 0 || _wcsicmp(kw, _T("D")) == 0) dimension();
 				else if (_wcsicmp(kw, _T("Koljeno")) == 0 || _wcsicmp(kw, _T("K")) == 0)
 				{
 					ACHAR ak[16] = _T(""); acedInitGet(0, _T("30 45 60 90"));
@@ -122,12 +161,7 @@
 					ACHAR sk[16] = _T(""); acedInitGet(0, _T("Lijevo Desno"));
 					const int ss = acedGetKword(_T("\nSmjer [Lijevo/Desno] <Desno>: "), sk, 16);
 					if (ss != RTNORM && ss != RTNONE) continue;
-					const bool left = ss == RTNORM && _wcsicmp(sk, _T("Lijevo")) == 0;
-					const double ang = deg * 3.14159265358979323846 / 180;
-					AcGePoint3d exit; AcGeVector3d out;
-					if (!tvsTeeDialog::planElbow(id, at, dir, left ? ang : -ang, sec, elev, f, exit, out)) { acutPrintf(_T("\nKoljeno nije napravljeno.")); continue; }
-					acutPrintf(_T("\nKoljeno %.0f° %ls."), deg, left ? _T("lijevo") : _T("desno"));
-					at = exit; dir = out;
+					elbow(deg, ss == RTNORM && _wcsicmp(sk, _T("Lijevo")) == 0);
 				}
 				continue;
 			}

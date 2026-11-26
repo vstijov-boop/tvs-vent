@@ -44,7 +44,10 @@ inline int ports(const TVS_Entity* e,Port out[3]){
         AcGePoint3d p[3];double wd[3];
         if(!w->teePorts(p,wd)){const double half=w->LengthPl+w->SizeAotv/2;
             p[0]=w->Basepoint-u*half;p[1]=w->Basepoint+u*half;p[2]=w->Basepoint+v*(w->SizeApr/2+w->LengthPl);wd[0]=wd[1]=w->SizeApr;wd[2]=w->SizeAotv;}
-        const AcGeVector3d dir[3]={-u,u,v};
+        AcGeVector3d dir[3]={-u,u,v};
+        {tvsTee::Tee t;AcGePoint3d o;AcGeVector3d ex,ey;   // racva Y45: the branches leave at 45 deg
+         if(w->teeShape(t,o,ex,ey)&&t.type==tvsTee::Pants&&t.lateral>0){tvsTee::P lp[3],ld[3];tvsTee::wyePorts(t,lp,ld);
+            for(int k=0;k<3;++k){AcGeVector3d d=ex*ld[k].x+ey*ld[k].y;if(!unit(d,dir[k]))return 0;}}}
         for(int k=0;k<3;++k){out[k].p=p[k];out[k].dir=dir[k];out[k].a=wd[k];
             out[k].round=k<2?w->ThisRoundpr:w->ThisRoundotv;out[k].b=out[k].round?0:(k<2?w->SizeBpr:w->SizeBotv);}
         return 3;

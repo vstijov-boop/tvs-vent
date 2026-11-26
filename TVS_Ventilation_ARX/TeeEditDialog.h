@@ -36,18 +36,19 @@ inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChan
     bool changed=false;
     double v=0;   // by number, not by text (N1): untouched / same number -> no change
     if(tvsNumeric::differs(g.text().GetString(),dg.TeeSecond.GetString(),v)&&v>0){
-        r.second=v;if(r.type==tvsTee::Pants)r.radius2=tvsTee::defaultRadius(v);changed=true;}
+        r.second=v;if(r.type==tvsTee::Pants&&!tvsTeeFit::isWye(w,r))r.radius2=tvsTee::defaultRadius(v);changed=true;}
     // TK-G: both branch widths set L (axes on one line); TK-O: the branch width.
-    const bool branchWidth=r.type!=tvsTee::Pants?widthA2Changed:(widthAChanged||changed);
+    const bool branchWidth=r.type!=tvsTee::Pants?widthA2Changed:(widthAChanged||changed||(tvsTeeFit::isWye(w,r)&&widthA2Changed));   // Y45: the inlet too
     if(changed){w->assertWriteEnabled();if(tvsTeeData::write(w,r)!=Acad::eOk)return;}
     if(branchWidth&&!lengthChanged){
         const double w1=r.type!=tvsTee::Pants?w->SizeAotv:w->SizeApr;
         const double w2=r.second>0?r.second:w->SizeApr;
-        if(r.type==tvsTee::Tap){const double L=tvsTee::tapLength(w1,tvsTeeData::tapMinimumMm()/tvsUnits::factor(w));w->put_Length(L);r.l=L;w->assertWriteEnabled();tvsTeeData::write(w,r);
+        if(tvsTeeFit::isWye(w,r))tvsTeeFit::lateralLength(w,r);   // Y45: L2 (Soko) and LengthPl
+        else if(r.type==tvsTee::Tap){const double L=tvsTee::tapLength(w1,tvsTeeData::tapMinimumMm()/tvsUnits::factor(w));w->put_Length(L);r.l=L;w->assertWriteEnabled();tvsTeeData::write(w,r);
             tvsTeeFit::lateralLength(w,r);}   // kosa stucna: L is the collar, LengthPl follows
         else w->put_Length(r.type==tvsTee::Branch?tvsTee::lengthPl(r.l,tvsTee::defaultRadius(w1),w1):tvsTee::pantsLengthPl(r.l,w1,w2));
     }
-    if(r.type==tvsTee::Pants&&!tvsTee::pantsFeasible(w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,r.l))
+    if(r.type==tvsTee::Pants&&!tvsTeeFit::isWye(w,r)&&!tvsTee::pantsFeasible(w->SizeAotv,w->SizeApr,r.second>0?r.second:w->SizeApr,r.l))
         acutPrintf(L"\nGacasti T komad: ogranci su preuski za ulaz (potrebno priblizno lijevi + desni >= ulaz); prikazan je kao obican T-komad.");
     if(changed||branchWidth)w->recordGraphicsModified();
     std::map<AcDbObjectId,tvsTeeFit::Ports>::const_iterator old=g.before.find(w->objectId());
