@@ -65,7 +65,7 @@ public:
     enum {IdType=1301,IdFlip=1302,IdTabB=1304,IdTabC=1305,IdTabA=1326,IdTeeShape=1306,IdTeeA=1307,IdTeeB=1308,IdTeeALabel=1319,IdTeeBLabel=1320,
           IdElbow=1321,IdTurn=1322,IdTurnLabel=1325,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
-    Source src;int choice;bool flipped;Side side[3];int current;   // side 2: Ulaz (TK-O / TK-G, user 2026-11-26)bool loading,valid;CString problem;
+    Source src;int choice;bool flipped;Side side[3];int current;bool loading,valid;CString problem;   // side 2: Ulaz (TK-O / TK-G, user 2026-11-26)
     double heightNew;   // TK-O / TK-G: height typed in B (all ports and the inlet duct), 0 = as it is
     bool newInlet;Section inletNew;int inletChoice;   // TVS_DIM_PRATI: the run arrived on the inlet with this section (openArriving)
     int arriveK;Section arrive;                       // ... or on port arriveK (ogranak / prolaz): that port starts with its width
