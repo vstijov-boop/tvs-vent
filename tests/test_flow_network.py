@@ -32,8 +32,10 @@ class Flow(unittest.TestCase):
   self.assertLess(t.index('if(x.neighbour==2&&!tvsTeePort::same'),t.index('        tvsTeePort::ensure(s.id,x.k,x.lengthMm);'))
  def test_tee_dialog_common_height(self):   # PLAN 22: visina TK-O / TK-G otkljucana, ulazni kanal je preuzima
   t=text('TVS_Ventilation_ARX/TeeTypeDialog.h')
-  self.assertIn('enable(IdTeeB,!d.tee.round);',t);self.assertIn('if(d.lockB){heightNew=v/f;',t)
-  self.assertIn('if(heightChanged){',t);self.assertIn('p->put_SizeB(d.heightNew);',t)
+  # 26.11.: the common height is set on the Ulaz tab (side 2), B / C show it locked
+  self.assertIn('enable(IdTeeB,!d.tee.round&&(current==2||!d.lockB));',t);self.assertIn('if(d.lockB){heightNew=v/f;',t)
+  self.assertIn('if(heightChanged&&!d.side[2].used){',t);self.assertIn('Side& u=side[2];u.used=true;u.k=choice==Pants?2:0;u.tee=in;u.lockB=true;',t)
+  self.assertIn('"Ulaz",1326',text('TVS_Ventilation_ARX/TVS_Ventilation_ARX.rc'));self.assertIn('p->put_SizeB(d.heightNew);',t)
   self.assertLess(t.index('w->SizeBotv=d.heightNew;else w->SizeBpr=d.heightNew;'),t.index('if(d.choice==Branch){w->SizeAotv=b.tee.a;w->SizeBotv=w->SizeBpr;'))
  def test_dialog(self):
   d=text('TVS_Ventilation_ARX/SizingDialog.h');self.assertTrue((ROOT/'TVS_Ventilation_ARX/SizingDialog.h').read_bytes().startswith(b'\xef\xbb\xbf'))

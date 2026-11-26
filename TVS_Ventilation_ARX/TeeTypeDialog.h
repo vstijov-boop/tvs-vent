@@ -62,10 +62,10 @@ inline bool farEndFree(const TVS_WYE* w,const AcDbObjectId& ductId,int nearEnd,d
 
 class Dialog : public CAdUiBaseDialog {
 public:
-    enum {IdType=1301,IdFlip=1302,IdTabB=1304,IdTabC=1305,IdTeeShape=1306,IdTeeA=1307,IdTeeB=1308,IdTeeALabel=1319,IdTeeBLabel=1320,
+    enum {IdType=1301,IdFlip=1302,IdTabB=1304,IdTabC=1305,IdTabA=1326,IdTeeShape=1306,IdTeeA=1307,IdTeeB=1308,IdTeeALabel=1319,IdTeeBLabel=1320,
           IdElbow=1321,IdTurn=1322,IdTurnLabel=1325,IdDuctShape=1310,IdDuctALabel=1311,IdDuctA=1312,IdDuctBLabel=1313,IdDuctB=1314,
           IdOrder=1323,IdLength=1315,IdSketch=1317,IdDescription=1318,IdSizes=1324,IdStatus=1309};
-    Source src;int choice;bool flipped;Side side[2];int current;bool loading,valid;CString problem;
+    Source src;int choice;bool flipped;Side side[3];int current;   // side 2: Ulaz (TK-O / TK-G, user 2026-11-26)bool loading,valid;CString problem;
     double heightNew;   // TK-O / TK-G: height typed in B (all ports and the inlet duct), 0 = as it is
     bool newInlet;Section inletNew;int inletChoice;   // TVS_DIM_PRATI: the run arrived on the inlet with this section (openArriving)
     int arriveK;Section arrive;                       // ... or on port arriveK (ogranak / prolaz): that port starts with its width
@@ -91,8 +91,8 @@ public:
         d.neighbour=n.kind==0?0:3;
     }
     void build(){
-        const Section in=inlet();Side keep[2]={side[0],side[1]};
-        for(int i=0;i<2;++i)side[i]=Side();
+        const Section in=inlet();Side keep[3]={side[0],side[1],side[2]};
+        for(int i=0;i<3;++i)side[i]=Side();
         Side& b=side[0];Side& c=side[1];
         if(choice==Branch){
             b.used=true;b.k=2;b.tee.a=src.Aotv;b.tee.b=in.b;b.lockB=true;
@@ -103,11 +103,13 @@ public:
         }else{
             b.used=true;b.k=2;b.tee.a=src.Aotv;b.tee.round=src.roundOtv;b.tee.b=src.roundOtv?0:src.Botv;b.shapeFree=true;
         }
-        for(int i=0;i<2;++i)if(side[i].used&&side[i].k==arriveK){Side& x=side[i];   // the run arrived here: the port takes its size
+        if(choice==Branch||choice==Pants){   // Ulaz: its width and the common height (all ports) are set here
+            Side& u=side[2];u.used=true;u.k=choice==Pants?2:0;u.tee=in;u.lockB=true;}
+        for(int i=0;i<3;++i)if(side[i].used&&side[i].k==arriveK){Side& x=side[i];   // the run arrived here: the port takes its size
             if(x.shapeFree){x.tee=arrive;}else if(arrive.round==x.tee.round){x.tee.a=arrive.a;if(!x.lockB)x.tee.b=arrive.round?0:arrive.b;}}
-        for(int i=0;i<2;++i)if(side[i].used){neighbourOf(side[i]);side[i].lengthMm=tvsTeeFit::transitionMm();
+        for(int i=0;i<3;++i)if(side[i].used){neighbourOf(side[i]);side[i].lengthMm=tvsTeeFit::transitionMm();
             side[i].elbow=keep[i].elbow;side[i].turn=keep[i].turn;side[i].order=keep[i].order;}
-        if(current>0&&!side[1].used)current=0;
+        if(current>0&&!side[current].used)current=0;
     }
     bool hasDuct(const Side& d)const{return d.neighbour==1||d.neighbour==2;}
     bool needsPrelaz(const Side& d)const{return hasDuct(d)&&!tvsTeePort::same(d.tee,d.duct,1e-6);}
@@ -115,7 +117,7 @@ public:
     double prelazMm(const Side& d)const{
         if(spiro(d))return tvsSpiro::drawnMm(d.tee.a*src.f,d.duct.a*src.f,tvsSpiro::read(NULL));
         return d.lengthMm>0?d.lengthMm:tvsTeeFit::transitionMm();}
-    const wchar_t* tabName(int i)const{return i==0?L"Ogranak B":choice==Pants?L"Ogranak C":L"Prolaz C";}
+    const wchar_t* tabName(int i)const{return i==2?L"Ulaz":i==0?L"Ogranak B":choice==Pants?L"Ogranak C":L"Prolaz C";}
 
     // ---------------------------------------------------------------- fields
     static bool number(CWnd* w,double& v){
@@ -134,14 +136,14 @@ public:
     void shapes(){
         const Side& d=side[current];
         SetDlgItemText(IdTeeALabel,d.tee.round?L"Ø [mm]":L"A [mm]");show(IdTeeB,!d.tee.round);show(IdTeeBLabel,!d.tee.round);
-        enable(IdTeeB,!d.tee.round);   // TK-O / TK-G: the common height (inlet too)
+        enable(IdTeeB,!d.tee.round&&(current==2||!d.lockB));   // TK-O / TK-G: the common height only on Ulaz
         SetDlgItemText(IdDuctALabel,d.duct.round?L"Ø [mm]":L"A [mm]");show(IdDuctB,!d.duct.round);show(IdDuctBLabel,!d.duct.round);
         enable(IdDuctB,(d.neighbour==1||d.neighbour==2)&&!d.duct.round);
     }
     void load(){   // the whole side into the fields (tab, type, Okreni)
         loading=true;const Side& d=side[current];const double f=src.f;
-        SetDlgItemText(IdTabC,tabName(1));show(IdTabC,side[1].used);
-        if(CWnd* t=GetDlgItem(IdTabB))t->Invalidate();if(CWnd* t=GetDlgItem(IdTabC))t->Invalidate();
+        SetDlgItemText(IdTabC,tabName(1));show(IdTabC,side[1].used);show(IdTabA,side[2].used);
+        if(CWnd* t=GetDlgItem(IdTabB))t->Invalidate();if(CWnd* t=GetDlgItem(IdTabC))t->Invalidate();if(CWnd* t=GetDlgItem(IdTabA))t->Invalidate();
         setSel(IdTeeShape,d.tee.round?1:0);enable(IdTeeShape,d.shapeFree&&rectTee());
         SetDlgItemText(IdTeeA,L"");setNumber(IdTeeA,d.tee.a*f);
         if(!d.tee.round)setNumber(IdTeeB,d.tee.b*f);
@@ -155,13 +157,16 @@ public:
         shapes();loading=false;refresh();
     }
     void readFields(){   // fields -> side[current]; nothing is written back into the field being typed
-        Side& d=side[current];const double f=src.f;double v=0;
+        Side& d=side[current];const double f=src.f;double v=0;const Section teeWas=d.tee;
         if(d.shapeFree&&rectTee()){const bool round=sel(IdTeeShape)==1;
             if(round!=d.tee.round){d.tee.round=round;d.tee.b=round?0:(src.Botv>0?src.Botv:d.tee.a);
                 loading=true;if(!round)setNumber(IdTeeB,d.tee.b*f);shapes();loading=false;}}
         if(number(GetDlgItem(IdTeeA),v))d.tee.a=v/f;
-        if(!d.tee.round&&number(GetDlgItem(IdTeeB),v)){d.tee.b=v/f;
-            if(d.lockB){heightNew=v/f;for(int i=0;i<2;++i)if(side[i].used&&side[i].lockB)side[i].tee.b=v/f;}}
+        if(!d.tee.round&&(current==2||!d.lockB)&&number(GetDlgItem(IdTeeB),v)){d.tee.b=v/f;
+            if(d.lockB){heightNew=v/f;for(int i=0;i<3;++i)if(side[i].used&&side[i].lockB)side[i].tee.b=v/f;}}
+        // Ulaz: the inlet duct (dionica) follows the inlet when it had its size; TVS_DIM_PRATI takes it on
+        if(current==2&&hasDuct(d)&&tvsTeePort::same(teeWas,d.duct,1e-6)&&!tvsTeePort::same(teeWas,d.tee,1e-9)){
+            d.duct=d.tee;loading=true;setNumber(IdDuctA,d.duct.a*f);if(!d.duct.round)setNumber(IdDuctB,d.duct.b*f);loading=false;}
         d.elbow=elbowDeg(sel(IdElbow));if(sel(IdTurn)>=0)d.turn=sel(IdTurn);if(sel(IdOrder)>=0)d.order=sel(IdOrder);
         if(d.neighbour==1||d.neighbour==2){
             const bool round=sel(IdDuctShape)==1;
@@ -176,15 +181,16 @@ public:
         const double f=src.f;
         if(!rectTee()&&choice!=Plain){why=L"TK-O, TK-G i štucna su za pravougaoni glavni kanal.";return false;}
         if(src.roundOtv&&(choice==Branch||choice==Pants)){why=L"Okrugli ogranak: izaberite štucnu ili TK0.";return false;}
-        for(int i=0;i<2;++i){const Side& d=side[i];if(!d.used)continue;
+        for(int i=0;i<3;++i){const Side& d=side[i];if(!d.used)continue;
             if(!(d.tee.a>0)||(!d.tee.round&&!(d.tee.b>0))||((d.neighbour==1||d.neighbour==2)&&(!(d.duct.a>0)||(!d.duct.round&&!(d.duct.b>0))))){why=L"Unesite pozitivne dimenzije.";return false;}
             if(d.elbow){
                 if(d.neighbour==2||d.neighbour==3){why.Format(L"%ls: na priključku je prelaz ili drugi element - koljeno nije moguće.",tabName(i));return false;}
                 if(d.neighbour==1&&!d.farFree){why.Format(L"%ls: iza kanala je mreža - koljeno bi pomjerilo cijelu mrežu.",tabName(i));return false;}
                 if((d.turn==Up||d.turn==Down)&&d.neighbour!=0){why.Format(L"%ls: koljeno gore / dolje traži slobodan priključak.",tabName(i));return false;}
             }}
-        if(choice==Pants&&!tvsTee::pantsFeasible(src.Aotv,side[0].tee.a,side[1].tee.a,tvsTeeData::collarMm()/f)){
-            why.Format(L"Gaćasti T komad nije moguć: ogranci su preuski za ulaz %.0f mm.",src.Aotv*f);return false;}
+        const double inletA=side[2].used?side[2].tee.a:src.Aotv;
+        if(choice==Pants&&!tvsTee::pantsFeasible(inletA,side[0].tee.a,side[1].tee.a,tvsTeeData::collarMm()/f)){
+            why.Format(L"Gaćasti T komad nije moguć: ogranci su preuski za ulaz %.0f mm.",inletA*f);return false;}
         return true;
     }
     void refresh(){   // derived values, enable state, description, status, sketch
@@ -234,10 +240,10 @@ public:
         if(!loading){
             if(id==IdType&&code==CBN_SELCHANGE){const int s=sel(IdType);if(s>=0&&s<=3&&s!=choice){readFields();choice=s;current=0;build();load();}return TRUE;}
             if(id==IdFlip&&code==BN_CLICKED){readFields();flipped=!flipped;
-                for(int i=0;i<2;++i)if(side[i].used){const Side keep=side[i];neighbourOf(side[i]);
+                for(int i=0;i<3;++i)if(side[i].used){const Side keep=side[i];neighbourOf(side[i]);
                     side[i].tee=keep.tee;side[i].lengthMm=keep.lengthMm;side[i].elbow=keep.elbow;side[i].turn=keep.turn;side[i].order=keep.order;}
                 load();return TRUE;}
-            if((id==IdTabB||id==IdTabC)&&code==BN_CLICKED){const int want=id==IdTabB?0:1;
+            if((id==IdTabB||id==IdTabC||id==IdTabA)&&code==BN_CLICKED){const int want=id==IdTabB?0:id==IdTabC?1:2;
                 if(want!=current&&side[want].used){readFields();current=want;load();}return TRUE;}
             if((id==IdTeeA||id==IdTeeB||id==IdDuctA||id==IdDuctB||id==IdLength)&&code==EN_CHANGE){readFields();refresh();return TRUE;}
             if((id==IdTeeA||id==IdTeeB||id==IdDuctA||id==IdDuctB||id==IdLength)&&code==EN_KILLFOCUS){readFields();
@@ -282,7 +288,7 @@ public:
         const bool disabled=(it->itemState&ODS_DISABLED)!=0,down=(it->itemState&ODS_SELECTED)!=0;
         COLORREF face=RGB(255,255,255),edge=RGB(173,187,207),text=RGB(6,71,119);
         if(id==IDOK){face=disabled?RGB(160,180,200):down?RGB(19,78,125):RGB(27,100,156);edge=face;text=RGB(255,255,255);}
-        else if((id==IdTabB&&current==0)||(id==IdTabC&&current==1)){face=RGB(225,239,255);edge=RGB(0,102,178);text=RGB(0,91,164);}
+        else if((id==IdTabB&&current==0)||(id==IdTabC&&current==1)||(id==IdTabA&&current==2)){face=RGB(225,239,255);edge=RGB(0,102,178);text=RGB(0,91,164);}
         else if(down)face=RGB(234,244,253);
         dc->FillSolidRect(r,face);CPen p(PS_SOLID,1,edge);CPen* op=dc->SelectObject(&p);CBrush* ob=static_cast<CBrush*>(dc->SelectStockObject(NULL_BRUSH));
         dc->Rectangle(r);dc->SelectObject(op);dc->SelectObject(ob);
@@ -295,7 +301,7 @@ public:
         if(msg==WM_ERASEBKGND){paintBack(CDC::FromHandle(reinterpret_cast<HDC>(wp)));return TRUE;}
         if(msg==WM_DRAWITEM){LPDRAWITEMSTRUCT it=reinterpret_cast<LPDRAWITEMSTRUCT>(lp);
             if(wp==IdSketch){draw(it);return TRUE;}
-            if(wp==IdTabB||wp==IdTabC||wp==IDOK){drawButton(it);return TRUE;}}
+            if(wp==IdTabB||wp==IdTabC||wp==IdTabA||wp==IDOK){drawButton(it);return TRUE;}}
         if(msg==WM_CTLCOLORSTATIC){HWND h=reinterpret_cast<HWND>(lp);wchar_t cls[16]=L"";::GetClassNameW(h,cls,16);
             if(!_wcsicmp(cls,L"Static")){HDC dc=reinterpret_cast<HDC>(wp);const int id=::GetDlgCtrlID(h);
                 const bool card=id==IdDescription||id==IdSizes;::SetBkMode(dc,TRANSPARENT);
@@ -308,7 +314,7 @@ public:
     void draw(LPDRAWITEMSTRUCT item){
         if(!item)return;CDC* dc=CDC::FromHandle(item->hDC);CRect r(item->rcItem);
         dc->FillSolidRect(r,RGB(255,255,255));
-        tvsTeeSketch::Input in;in.type=choice;in.flipped=flipped;in.selected=current;
+        tvsTeeSketch::Input in;in.type=choice;in.flipped=flipped;in.selected=current<2?current:-1;   // Ulaz: no port chain in the sketch
         for(int i=0;i<2;++i){const Side& s=side[i];tvsTeeSketch::Side& t=in.side[i];
             t.used=s.used;t.hasDuct=hasDuct(s);t.prelaz=needsPrelaz(s);t.elbow=s.elbow;t.turn=s.turn;t.order=s.order;}
         std::vector<tvsTeeSketch::Prim> p;tvsTeeSketch::build(in,p);double x0,y0,x1,y1;tvsTeeSketch::bounds(p,x0,y0,x1,y1);
@@ -430,6 +436,8 @@ inline void apply(const Dialog& d){
      if(d.newInlet&&(d.choice==Pants)==(d.inletChoice==Pants)){   // inlet takes the size of the run that arrived (TVS_DIM_PRATI)
         if(d.choice==Pants){w->SizeAotv=d.inletNew.a;w->SizeBotv=d.inletNew.round?0:d.inletNew.b;}
         else{w->SizeApr=d.inletNew.a;w->SizeBpr=d.inletNew.round?0:d.inletNew.b;}}
+     if(d.side[2].used&&(d.choice==Pants||d.choice==Branch)){const Section& in=d.side[2].tee;   // Ulaz tab: width (height below, heightNew)
+        if(d.choice==Pants)w->SizeAotv=in.a;else w->SizeApr=in.a;}
      const double was=d.choice==Pants?w->SizeBotv:w->SizeBpr;
      if(d.heightNew>0&&(d.choice==Pants||d.choice==Branch)){if(d.choice==Pants)w->SizeBotv=d.heightNew;else w->SizeBpr=d.heightNew;}
      heightChanged=d.heightNew>0&&std::fabs(d.heightNew-was)>1e-9;
@@ -471,7 +479,7 @@ inline void apply(const Dialog& d){
     }
         // per side: elbow chain, or the duct size and the prelaz at the port
     struct Follow {AcDbObjectId duct;Section was;bool first;};std::vector<Follow> follow;
-    for(int i=0;i<2;++i){const Side& x=d.side[i];if(!x.used)continue;
+    for(int i=0;i<3;++i){const Side& x=d.side[i];if(!x.used)continue;
         if(x.elbow){chain(d,x,tol);continue;}
         if(x.neighbour==1&&!tvsTeePort::same(x.duct,x.ductWas,1e-9)){bool first=false;
             {AcDbObjectPointer<TVS_Pipe> p(x.ductId,AcDb::kForWrite);if(p.openStatus()!=Acad::eOk)continue;
@@ -507,7 +515,7 @@ inline void apply(const Dialog& d){
         }
         tvsTeePort::ensure(s.id,x.k,x.lengthMm);
     }
-    if(heightChanged){   // the inlet duct takes the height of the T komad (its width stays)
+    if(heightChanged&&!d.side[2].used){   // the inlet duct takes the height of the T komad (its width stays); Ulaz tab: done above
         const int inletPort=d.choice==Pants?2:0;
         AcDbObjectPointer<TVS_WYE> w(s.id,AcDb::kForRead);
         if(w.openStatus()==Acad::eOk){const AcGePoint3d at=after.ok?after.p[inletPort]:before.p[inletPort];
