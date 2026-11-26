@@ -15,6 +15,7 @@
 		AcDbObjectId id;
 		TVS_Pipe::GetParamsForDraw(id, index);
 		TVS_Pipe::SetParamsForDraw(AcDbObjectId::kNull, 0);   // one grip start only; a plain TVS_Draw starts fresh
+		pendingStep3().clear(); pendingTee().clear();   // grip menu answers belong to this start only
 		if (index >= tvsPortGrip::base && index < tvsPortGrip::base + 3)
 		{	// connector grip on a free fitting port (PortGrips.h): the first duct leaves the port along its axis
 			drawFromPort(id, index - tvsPortGrip::base);
@@ -84,10 +85,12 @@
 	// Grip menu (plan 19 faza 2, user 2026-11-26): a popup at the cursor when a connector grip is
 	// clicked - Nastavi crtanje / Nastavi drugom dimenzijom (prelaz) / Umetni koljeno (ugao, strana).
 	// Returns 0 cancel, 1 draw, 2 dimension, 100 + deg (+ 1000 left) for an elbow.
-	static int portGripMenu()
+	// Duct end (duct = true) also: Spoji koljenom / račvom, T komad (podmeni po obliku), Z, Gore,
+	// Nadolje, Obilazak - the options of the drawing prompt (drawStep3), ids 3..8 and 21..25.
+	static int portGripMenu(bool duct = false, bool round = false)
 	{
-		HMENU menu = CreatePopupMenu(), elbow = CreatePopupMenu();
-		if (!menu || !elbow) { if (menu) DestroyMenu(menu); if (elbow) DestroyMenu(elbow); return 1; }
+		HMENU menu = CreatePopupMenu(), elbow = CreatePopupMenu(), tee = CreatePopupMenu(), level = CreatePopupMenu();
+		if (!menu || !elbow || !tee || !level) { for (HMENU h : { menu, elbow, tee, level }) if (h) DestroyMenu(h); return 1; }
 		const int degs[4] = { 90, 60, 45, 30 };
 		for (int i = 0; i < 4; ++i) {
 			wchar_t t[32];
@@ -97,6 +100,22 @@
 		AppendMenuW(menu, MF_STRING, 1, L"Nastavi crtanje");
 		AppendMenuW(menu, MF_STRING, 2, L"Nastavi drugom dimenzijom (prelaz)...");
 		AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(elbow), L"Umetni koljeno");
+		if (duct) {
+			if (round) { AppendMenuW(tee, MF_STRING, 24, L"Kosa račva TK 45°"); AppendMenuW(tee, MF_STRING, 25, L"Račva Y45"); }
+			else { AppendMenuW(tee, MF_STRING, 21, L"TK-O sa ogrankom"); AppendMenuW(tee, MF_STRING, 22, L"TK-G gaćasti"); AppendMenuW(tee, MF_STRING, 23, L"Štucna 45° SR5-3"); }
+			AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(tee), round ? L"Račva" : L"T komad");
+			AppendMenuW(level, MF_STRING, 5, L"Z (etaž)...");
+			AppendMenuW(level, MF_STRING, 6, L"Koljeno gore");
+			AppendMenuW(level, MF_STRING, 7, L"Koljeno nadolje");
+#ifdef TVS_BYPASS_PREVIEW
+			AppendMenuW(level, MF_STRING, 8, L"Obilazak...");
+#endif
+			AppendMenuW(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(level), L"Promjena visine");
+			AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
+			AppendMenuW(menu, MF_STRING, 3, L"Spoji sa kanalom koljenom...");
+			AppendMenuW(menu, MF_STRING, 4, L"Spoji sa kanalom račvom...");
+		}
+		else { DestroyMenu(tee); DestroyMenu(level); }
 		AppendMenuW(menu, MF_SEPARATOR, 0, NULL);
 		AppendMenuW(menu, MF_STRING, 0, L"Odustani");
 		SetMenuDefaultItem(menu, 1, FALSE);
@@ -105,7 +124,7 @@
 		SetForegroundWindow(owner);
 		const int cmd = static_cast<int>(TrackPopupMenu(menu, TPM_RETURNCMD | TPM_NONOTIFY | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN, pt.x + 8, pt.y + 8, 0, owner, NULL));
 		PostMessage(owner, WM_NULL, 0, 0);
-		DestroyMenu(menu);   // destroys the submenu too
+		DestroyMenu(menu);   // destroys the submenus too
 		return cmd;
 	}
 	// Connector grip on a free fitting port: options before the first duct
@@ -134,9 +153,16 @@
 	// 1: continue as before (the caller), 2: done here.
 	static int ductEndMenu(const AcDbObjectId& id, bool atLast)
 	{
-		const int choice = portGripMenu();
+		bool round = false;
+		{ AcDbObjectPointer<TVS_Pipe> p(id, AcDb::kForRead); if (p.openStatus() == Acad::eOk) round = p->ThisRound || p->SizeB <= 0; }
+		const int choice = portGripMenu(true, round);
 		if (choice == 0) { acutPrintf(_T("\nOdustano.")); return 0; }
 		if (choice == 1) return 1;
+		static const wchar_t* step[] = { NULL, NULL, NULL, L"Koljeno", L"Račva", L"Z", L"Gore", L"Nadolje", L"Obilazak" };
+		if (choice >= 3 && choice <= 8) { pendingStep3() = step[choice]; return 1; }   // as typed at the drawing prompt
+		if (choice >= 21 && choice <= 25) {
+			static const wchar_t* type[] = { L"Ogranak", L"Gacasti", L"Stucna", L"Kosa", L"Y45" };
+			pendingStep3() = L"Tkomad"; pendingTee() = type[choice - 21]; return 1; }
 		AcGePoint3d at; AcGeVector3d dir; tvsTeePort::Section sec; double elev = 0; AcDbDatabase* db = NULL;
 		{
 			AcDbObjectPointer<TVS_Pipe> p(id, AcDb::kForRead);
@@ -327,6 +353,8 @@
 		return true;
 	}
 
+	// An option chosen in the grip menu: answers the first drawing prompt of drawStep3 once.
+	static std::wstring& pendingStep3() { static std::wstring s; return s; }
 	static bool drawStep3(ads_point &pt1, ads_point &pt2, TVS_Pipe *&pipi)
 	{
 
@@ -349,15 +377,19 @@
 		{
 
 
+			bool fromMenu = false;
+			if (!pendingStep3().empty()) { wcscpy_s(resultss, pendingStep3().c_str()); pendingStep3().clear(); Astat = RTKWORD; fromMenu = true; }   // grip menu
+			else {
 			acedInitGet(RSG_NONULL, _T("Dimenzija D Koljeno K Račva R Tkomad T Z Gore G Nadolje N Obilazak O"));
 			Astat = tvsCoordinates::getPoint(pt1, _T("\nZadajte sljedeću tačku ili [Dimenzija/Koljeno/Račva/Tkomad/Z/Gore/Nadolje/Obilazak]: "), pt2);
+			}
 			switch (Astat)
 			{
 			case RTCAN:
 				return false;
 				break;
 			case RTKWORD:
-				acedGetInput(resultss);
+				if (!fromMenu) acedGetInput(resultss);
 				break;
 			case RTNORM:
 				A3 = asPnt3d(pt2);

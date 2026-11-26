@@ -639,12 +639,23 @@
 		pt1[0] = A2.x; pt1[1] = A2.y; pt1[2] = A2.z;
 		return true;
 	}
+	// Tee type chosen in the grip menu (Draw.inl portGripMenu): answers the type prompt once.
+	static std::wstring& pendingTee() { static std::wstring s; return s; }
+	static bool takePendingTee(const wchar_t* a, const wchar_t* b, const wchar_t* c, ACHAR* kw, size_t n)
+	{
+		std::wstring t = pendingTee(); pendingTee().clear();
+		if (t.empty() || !((a && t == a) || (b && t == b) || (c && t == c))) return false;
+		wcscpy_s(kw, n, t.c_str()); return true;
+	}
 	// Round duct: kosa racva TK (stucna 45) or racva Y45 (asked every time).
 	static bool roundTeeDuringDrawing(AcGePoint3d &A1, AcGePoint3d &A2, TVS_Pipe *&pipi, ads_point &pt1)
 	{
 		const bool wasWye = tvsTeeCommand::lastType() == tvsTee::Pants;
-		acedInitGet(0, L"Kosa Y45"); ACHAR kw[32] = L"";
-		const int rc = acedGetKword(wasWye ? L"\nRačva [Kosa/Y45] <Y45>: " : L"\nRačva [Kosa/Y45] <Kosa>: ", kw, 32);
+		ACHAR kw[32] = L""; int rc = RTNORM;
+		if (!takePendingTee(L"Kosa", L"Y45", NULL, kw, 32)) {
+			acedInitGet(0, L"Kosa Y45");
+			rc = acedGetKword(wasWye ? L"\nRačva [Kosa/Y45] <Y45>: " : L"\nRačva [Kosa/Y45] <Kosa>: ", kw, 32);
+		}
 		if (rc != RTNORM && rc != RTNONE) return false;
 		const bool wye = rc == RTNONE ? wasWye : _wcsicmp(kw, L"Y45") == 0;
 		return wye ? wyeDuringDrawing(A1, A2, pipi, pt1) : lateralDuringDrawing(A1, A2, pipi, pt1);
@@ -669,8 +680,8 @@
 		const int def = last == tvsTee::Pants || last == tvsTee::Tap ? last : tvsTee::Branch;
 		acutPrintf(L"\nOgranak = TK-O, Gacasti = TK-G, Stucna = SR5-3.");
 		wchar_t prompt[160]; swprintf_s(prompt, L"\nTip T komada [Ogranak/Gacasti/Stucna] <%ls>: ", tvsTeeCommand::typeKeyword(def));
-		acedInitGet(0, L"Ogranak Gacasti Stucna TK-O TK-G SR5-3"); ACHAR kw[32] = L"";
-		const int rc = acedGetKword(prompt, kw);
+		ACHAR kw[32] = L""; int rc = RTNORM;
+		if (!takePendingTee(L"Ogranak", L"Gacasti", L"Stucna", kw, 32)) { acedInitGet(0, L"Ogranak Gacasti Stucna TK-O TK-G SR5-3"); rc = acedGetKword(prompt, kw); }
 		if (rc == RTNORM) tvsTeeCommand::typeAlias(kw, 32);
 		if (rc != RTNORM && rc != RTNONE) return false;
 		in.type = rc == RTNONE ? def : (_wcsicmp(kw, L"Gacasti") == 0 ? tvsTee::Pants : _wcsicmp(kw, L"Stucna") == 0 ? tvsTee::Tap : tvsTee::Branch);
