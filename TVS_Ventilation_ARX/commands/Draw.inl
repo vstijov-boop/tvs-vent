@@ -42,6 +42,15 @@
 
 				if ((pipi = TVS_Pipe::cast(pEnt)) != NULL)
 				{
+					if (index == 101 || index == 102)
+					{	// grip menu (user 2026-11-26); 101 sits beyond LastPoint, 102 beyond FirstPoint
+						pEnt->close();
+						const int m = ductEndMenu(id, index == 101);
+						if (m != 1) return;
+						pEnt = NULL;
+						if (acdbOpenAcDbEntity(pEnt, id, AcDb::kForWrite) != eOk) return;
+						if ((pipi = TVS_Pipe::cast(pEnt)) == NULL) { pEnt->close(); return; }
+					}
 					InstallGlobalProperty(pipi);
 					if (index == 102)
 					{
@@ -117,9 +126,35 @@
 			e->close();
 		}
 		if (k < 0 || k >= n || !db) return;
-		const double f = tvsUnits::factor(db);
-		AcGePoint3d at = P[k].p; AcGeVector3d dir = P[k].dir;
 		tvsTeePort::Section sec; sec.a = P[k].a; sec.b = P[k].b; sec.round = P[k].round;
+		drawFromEnd(id, P[k].p, P[k].dir, sec, elev, db, choice);
+	}
+	// Grip menu on a duct end (user 2026-11-26): Nastavi crtanje = the usual continuation (drawStep3);
+	// another size / an elbow start right at the duct end, as on a fitting port. 0: cancelled,
+	// 1: continue as before (the caller), 2: done here.
+	static int ductEndMenu(const AcDbObjectId& id, bool atLast)
+	{
+		const int choice = portGripMenu();
+		if (choice == 0) { acutPrintf(_T("\nOdustano.")); return 0; }
+		if (choice == 1) return 1;
+		AcGePoint3d at; AcGeVector3d dir; tvsTeePort::Section sec; double elev = 0; AcDbDatabase* db = NULL;
+		{
+			AcDbObjectPointer<TVS_Pipe> p(id, AcDb::kForRead);
+			if (p.openStatus() != Acad::eOk) return 0;
+			if (p->This1D || p->DuctType == DuctTypeFlex) { acutPrintf(_T("\n1D / flex kanal: nastavlja se obično crtanje.")); return 1; }
+			at = atLast ? p->LastPoint : p->FirstPoint; dir = atLast ? p->LastPoint - p->FirstPoint : p->FirstPoint - p->LastPoint; dir.z = 0;
+			if (dir.length() < 1e-9) return 1;
+			dir.normalize();
+			sec.a = p->SizeA; sec.round = p->ThisRound || p->SizeB <= 0; sec.b = sec.round ? 0 : p->SizeB;
+			elev = p->get_Elevation(); db = p->database(); InstallGlobalProperty(p.object());
+		}
+		if (!db) return 0;
+		drawFromEnd(id, at, dir, sec, elev, db, choice);
+		return 2;
+	}
+	static void drawFromEnd(const AcDbObjectId& id, AcGePoint3d at, AcGeVector3d dir, tvsTeePort::Section sec, double elev, AcDbDatabase* db, int choice)
+	{
+		const double f = tvsUnits::factor(db);
 		globSizeA = sec.a; globSizeB = sec.round ? 0 : sec.b; globRound = sec.round; globalElevMid = elev; globalElev = elev;
 		ads_point pick;
 		AcGePoint3d end;

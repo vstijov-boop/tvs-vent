@@ -9,6 +9,7 @@ class PortGripMenu(unittest.TestCase):
   for t in ('Nastavi crtanje','Nastavi drugom dimenzijom (prelaz)...','Umetni koljeno','Odustani'):self.assertIn(t,d)
   self.assertIn('if (choice == 2) dimension();',d);self.assertIn('elbow(choice % 1000 - 100, choice >= 1000);',d)
   self.assertIn('TPM_RETURNCMD',d)
+  self.assertIn('const int m = ductEndMenu(id, index == 101);',d);self.assertIn('drawFromEnd(id, at, dir, sec, elev, db, choice);',d)
  def test_wye_directions(self):
   self.assertIn('tvsTee::wyePorts(t,lp,ld);',text('TVS_Ventilation_DBX/PortGrips.h'))
   self.assertIn('tvsTee::wyePorts(t,lp,ld);out.out=',text('TVS_Ventilation_ARX/TeePort.h'))
