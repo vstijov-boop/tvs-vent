@@ -295,9 +295,9 @@ bool SPEC::add(AcDbEntity * pEnt)
 					tvsTee::Tee lat; AcGePoint3d lo; AcGeVector3d lx, ly;
 					if (pWye->ThisRoundpr && pWye->ThisRoundotv && pWye->teeShape(lat, lo, lx, ly) && lat.lateral > 0) {
 						status = TeeTap; Extra = lat.l * tvsUnits::factor(pWye);
-						setName(L"Kosa štucna 45° SD5-1, okrugli ogranak");
+						setName(L"Kosa račva TK 45° (Soko), okrugla");
 						setLable(d); appendLable(SizeA); appendLable(_T(" / ")); appendLable(d); appendLable(SizeA2);
-						appendLable(_T(" (L=")); appendLable(Extra); appendLable(_T(" mm)"));
+						appendLable(_T(" (L=")); appendLable((lat.margin * 2 + lat.w1 * std::sqrt(2.0)) * tvsUnits::factor(pWye)); appendLable(_T(" mm)"));
 					}
 				}
 				// T komad TK-O / TK-G (TVS_TEE_V1): own name, sizes, radius and sheet area.

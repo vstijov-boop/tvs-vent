@@ -1,4 +1,5 @@
 #pragma once
+#include "../geometry/SokoLateral.h"
 // T komad faza 3: after TVS_TK_TIP or the Svojstva dialog changed a TK-O / TK-G, the TVS duct
 // (TVS_Pipe) connected to each port follows it: its end moves to the drawn face (TK-G narrower
 // branch with a fixed collar) and its width becomes the port width (TK-O prolaz C, TK-G left
@@ -26,10 +27,17 @@ inline Ports ports(const TVS_WYE* w){
     r.w[0]=r.w[1]=w->SizeApr;r.w[2]=w->SizeAotv;r.ok=true;return r;
 }
 inline double planDistance(const AcGePoint3d& a,const AcGePoint3d& b){return std::hypot(a.x-b.x,a.y-b.y);}
-// Kosa stucna (record neck = angle): LengthPl follows the main / branch diameters, the collar
-// (record l) stays (call after a size change; geometry/TeeShape.h lateralLengthPl).
-inline void lateralLength(TVS_WYE* w,const tvsTeeData::Record& r){
-    if(w&&r.type==tvsTee::Tap&&r.neck>0){w->assertWriteEnabled();w->LengthPl=tvsTee::lateralLengthPl(w->SizeApr,w->SizeAotv,r.neck,r.l);}
+// Kosa racva TK (record neck = angle; geometry/SokoLateral.h): run beyond the footprint (radius2) and
+// collar (l) from the Soko table for the diameters (else 60 / 60 mm), LengthPl from them; writes the
+// record (call after a size change).
+inline bool lateralRecord(tvsTeeData::Record& r,double A,double w,double f){
+    double m=0,c=0,L=0,L2=0;const bool soko=tvsSokoLateral::dims(A*f,w*f,m,c,L,L2);
+    r.type=tvsTee::Tap;r.l=c/f;r.second=0;r.radius2=m/f;r.neck=tvsTee::lateralDeg();return soko;
+}
+inline void lateralLength(TVS_WYE* w,tvsTeeData::Record& r){
+    if(!w||r.type!=tvsTee::Tap||!(r.neck>0))return;
+    w->assertWriteEnabled();lateralRecord(r,w->SizeApr,w->SizeAotv,tvsUnits::factor(w));
+    w->LengthPl=tvsTee::lateralLengthPl(w->SizeApr,w->SizeAotv,r.neck,r.l);tvsTeeData::write(w,r);
 }
 struct End {AcDbObjectId id;bool first;};
 // TVS ducts with an end on `at` (plan, tolerance tol) in the space that owns the T komad.

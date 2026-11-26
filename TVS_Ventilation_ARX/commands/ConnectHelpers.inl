@@ -151,7 +151,7 @@
 		else if (u.dotProduct(d) < 0) u = -u;
 		const double A = pPipe2->SizeA, w = pPipe1->SizeA;
 		if (w > A + 1e-9) { acutPrintf(L"\nKosa stucna: ogranak (%.0f mm) je veci od kanala (%.0f mm). Spoj nije napravljen.", w * f, A * f); return false; }
-		tvsTeeData::Record r; r.type = tvsTee::Tap; r.l = tvsTeeCommand::tapLength(w, f); r.second = 0; r.radius2 = tvsTeeCommand::tapMargin(f); r.neck = deg;
+		tvsTeeData::Record r; const bool soko = tvsTeeFit::lateralRecord(r, A, w, f);   // Soko TK (L, L2) or 60 / 60 mm
 		tvsTee::Tee t; t.type = tvsTee::Tap; t.round = true; t.A = A; t.C = A; t.w1 = w; t.l = r.l; t.margin = r.radius2; t.lateral = deg;
 		double before = 0, after = 0; tvsTee::tapRun(t, before, after);
 		double L = tvsTee::lateralLengthPl(A, w, deg, r.l);
@@ -208,7 +208,8 @@
 		pPipe1->assertWriteEnabled();
 		if (firstNear) pPipe1->put_FirstPoint(AcGePoint3d(start.x, start.y, p1.z)); else pPipe1->put_Lastpoint(AcGePoint3d(start.x, start.y, p2.z));
 		pPipe1->close();
-		acutPrintf(L"\nKosa stucna 45%ls (ASHRAE SD5-1 / ED5-2): okrugli ogranak %.0f na kanalu %.0f, L = %.0f mm.", perpendicular ? L" + koljeno 45" : L"", w * f, A * f, r.l * f);
+		acutPrintf(L"\nKosa racva TK 45%ls (ASHRAE SD5-1 / ED5-2): %.0f / %.0f, L = %.0f mm, L2 = %.0f mm%ls.", perpendicular ? L" + koljeno 45" : L"", A * f, w * f,
+			(before + after) * f, tvsTee::lateralReach(A, w, deg, r.l) * f, soko ? L" (Soko)" : L" (nije u Soko tabeli: 60 / 60 mm)");
 		return true;
 	}
 

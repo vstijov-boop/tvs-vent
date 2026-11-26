@@ -508,7 +508,7 @@
 		const bool elbow = !(rc == RTNORM && _wcsicmp(kw, L"Bez") == 0);
 		const AcGeVector3d v = left ? AcGeVector3d(-u.y, u.x, 0) : AcGeVector3d(u.y, -u.x, 0);
 		AcGeVector3d d = u + v; d.normalize();
-		tvsTeeData::Record r; r.type = tvsTee::Tap; r.l = tvsTeeCommand::tapLength(w, f); r.second = 0; r.radius2 = tvsTeeCommand::tapMargin(f); r.neck = deg;
+		tvsTeeData::Record r; const bool soko = tvsTeeFit::lateralRecord(r, A, w, f);   // Soko TK (L, L2) or 60 / 60 mm
 		tvsTee::Tee t; t.type = tvsTee::Tap; t.round = true; t.A = A; t.C = A; t.w1 = w; t.l = r.l; t.margin = r.radius2; t.lateral = deg;
 		double before = 0, after = 0; tvsTee::tapRun(t, before, after);
 		double L = tvsTee::lateralLengthPl(A, w, deg, r.l);
@@ -546,7 +546,8 @@
 		double ca = fromBranch ? w : A, cb = 0;
 		TVS_Pipe* next = pipie.add_new(c0, c1, ca, cb, false, true);
 		tvsTeeCommand::lastType() = tvsTee::Tap;
-		acutPrintf(L"\nKosa stucna 45°%ls umetnuta; crtanje se nastavlja iz %ls.", elbow ? L" i koljeno 45°" : L"", fromBranch ? L"ogranka" : L"prolaza");
+		acutPrintf(L"\nKosa račva TK 45°%ls umetnuta (%.0f / %.0f, L = %.0f mm%ls); crtanje se nastavlja iz %ls.", elbow ? L" i koljeno 45°" : L"", A * f, w * f,
+			(before + after) * f, soko ? L", Soko" : L", nije u Soko tabeli: 60 / 60 mm", fromBranch ? L"ogranka" : L"prolaza");
 		if (!next) return true;
 		const AcDbObjectId nid = next->id();
 		SetPropertyLikePipe(pipi, next);

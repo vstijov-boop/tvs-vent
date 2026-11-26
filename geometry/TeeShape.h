@@ -21,7 +21,7 @@ enum Type {Straight=0,Branch=1,Pants=2,Tap=3};   // 0 = existing TVS_WYE drawing
 // margin (record radius2, user 2026-11-15): the main of the stucna reaches only `margin` (25 mm)
 // beyond its footprint on the main (rect: 45 deg entry + w, round: cone base / D); 0 = the old
 // run 2 L + w. TVS_WYE: Basepoint on the branch axis, run ends `before` upstream / `after` down.
-// Kosa stucna (lateral, user 2026-11-26): round branch on a round main, branch axis at `lateral`
+// Kosa stucna / kosa racva TK (lateral, user 2026-11-26): round branch on a round main, branch axis at `lateral`
 // degrees (45) to the main axis, leaning downstream (+y). TVS_WYE: Basepoint = where the branch axis
 // meets the main axis, Vectotv = branch axis (not perpendicular), branch port = Basepoint + Vectotv
 // (A/2 + LengthPl). The collar l is measured along the axis beyond the point where the downstream
@@ -113,6 +113,12 @@ inline bool shape(const Tee& t,Shape& out){
         const P up(B.x+n.x*w/2+d.x*s,B.y+n.y*w/2+d.y*s),down(B.x-n.x*w/2+d.x*s,B.y-n.y*w/2+d.y*s),mid(B.x+d.x*s,B.y+d.y*s);   // face
         out.lines.push_back(Seg(P(-a,0),P(-a,Lr)));out.lines.push_back(Seg(P(a,0),P(a,Lr)));
         out.lines.push_back(Seg(P(a,before+y0),up));out.lines.push_back(Seg(P(a,before+y1),down));
+        // kosa racva TK (Soko, 26.11.): the main is the fitting's own piece - ends drawn; the branch
+        // meets the main along a curve, drawn as two lines to the point where the branch's top
+        // generator pierces the main (on the branch axis, sqrt(a^2 - r^2) from the main axis)
+        out.lines.push_back(Seg(P(-a,0),P(a,0)));out.lines.push_back(Seg(P(-a,Lr),P(a,Lr)));
+        {const double r=w/2<a?w/2:a,x=std::sqrt(a*a-r*r),tt=x/std::sin(th);const P apex(B.x+d.x*tt,B.y+d.y*tt);
+         out.lines.push_back(Seg(P(a,before+y0),apex));out.lines.push_back(Seg(apex,P(a,before+y1)));}
         out.lines.push_back(Seg(P(up.x+n.x*f,up.y+n.y*f),P(down.x-n.x*f,down.y-n.y*f)));
         out.axis.push_back(Seg(P(a,before+(y0+y1)/2),mid));
         return true;
