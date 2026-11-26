@@ -301,6 +301,14 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
                 const double pa=branch?w->SizeAotv:(port==1&&r.type==tvsTee::Branch&&r.second>0?r.second:w->SizeApr);
                 const double pb=branch?w->SizeBotv:w->SizeBpr;const bool pr=branch?w->ThisRoundotv:w->ThisRoundpr;
                 // TK-O / TK-G keep their sizes: the duct on the port gets a prelaz there (TeePort.h, after the run)
+                // plan 14 (user 2026-11-26): through the prolaz of a TK-O only when the prolaz had the inlet's
+                // size (C = A): arriving on the inlet or on the prolaz, both main sides take the new size, the
+                // run goes on behind it; the branch keeps its width (height = inlet height, prelaz on its port)
+                if(r.type==tvsTee::Branch&&!branch&&!reshape&&!(r.second>0&&std::fabs(r.second-w->SizeApr)>1e-6)&&same(w->SizeApr,w->SizeBpr,w->ThisRoundpr)){
+                    if(ch.tee==1){stop(L"T komad (Stani)");break;}
+                    seen.insert(next);TeeStep t={next,port,ch.tee==2?2:1};run.tees.push_back(t);
+                    if(t.mode==2)break;
+                    e.close();prev=next;at=n.ports[port==0?1:0];continue;}
                 if(r.type==tvsTee::Pants||r.type==tvsTee::Branch){
                     if(ch.tee==0){TeeStep t={next,port,3};run.dialogs.push_back(t);seen.insert(next);stop(L"T komad TK-O / TK-G (njegov dijalog)");break;}
                     stop(L"T komad TK-O / TK-G (ostaje; prelaz na priključku)");break;}
@@ -520,6 +528,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
         t->put_SizeA(A);if(!round)t->put_SizeB(B);else if(r.convert)t->put_SizeB(0);t->recordGraphicsModified();
     }
     tvsTrace::mark("applyRun","T komadi");
+    std::vector<AcDbObjectId> branchHeight;   // TK-O passed through: the ogranak duct gets a prelaz if its height differs
     for(size_t k=0;k<run.tees.size();++k){const TeeStep& t=run.tees[k];
         AcDbObjectPointer<TVS_WYE> w(nodes[t.node].id,AcDb::kForWrite);if(w.openStatus()!=Acad::eOk)continue;
         tvsTeeData::Record r;const bool typed=tvsTeeData::read(w.object(),r);
@@ -528,6 +537,8 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
             w->ThisRoundotv=round;w->SizeAotv=A;w->SizeBotv=round?0:B;   // D5b: the branch takes the shape too
             if(typed&&r.type==tvsTee::Tap){tvsTeeCommand::tapRecord(r,A,round,round&&cone,f);w->LengthPl=r.l;}
             else if(typed&&r.type==tvsTee::Branch)w->LengthPl=tvsTee::lengthPl(r.l,tvsTee::defaultRadius(A),A);}
+        else if(typed&&r.type==tvsTee::Branch&&t.mode>=1){   // through the prolaz (C = A): both main sides, branch height = inlet height
+            r.second=0;w->SizeApr=A;w->SizeBpr=round?0:B;if(!round&&!w->ThisRoundotv)w->SizeBotv=B;branchHeight.push_back(nodes[t.node].id);}
         else if(typed&&r.type==tvsTee::Branch){
             if(t.port==0){if(!(r.second>0))r.second=w->SizeApr;w->SizeApr=A;w->SizeBpr=round?0:B;}   // C keeps its width
             else r.second=A;}
@@ -579,6 +590,7 @@ inline bool applyRun(const std::vector<tvsMove::Node>& nodes,int start,const Run
             const bool first=tvsTeeFit::planDistance(p->FirstPoint,at)<=tol,last=tvsTeeFit::planDistance(p->LastPoint,at)<=tol;
             if(!first&&!last)continue;p.close();prelazBehind(nodes[q].id,first,at,A,B,f);break;}
     }
+    for(size_t k=0;k<branchHeight.size();++k)if(!tvsTeePort::ensure(branchHeight[k],2))acutPrintf(L"\nTK-O: prelaz na ogranku nije umetnut (prekratak kanal?).");
     return true;
 }
 // TVS labels of the touched elements (current space) get their text again. Returns the count.

@@ -60,7 +60,7 @@ public:
         loading=true;
         auto fill=[&](int id,std::initializer_list<const wchar_t*> items,int cur){if(CComboBox* b=static_cast<CComboBox*>(GetDlgItem(id))){for(const wchar_t* s:items)b->AddString(s);b->SetCurSel(cur);}};
         fill(IdScope,{L"Cijela dionica do granica",L"Samo izabrani kanal",L"Od izabranog kanala prema strani 1",L"Od izabranog kanala prema strani 2",L"Samo izabrani kanal + prelaz na spoju"},c.scope);
-        fill(IdTee,{L"Nastavi (TK-O / TK-G: otvori njegov dijalog)",L"Stani na T komadu",L"Prelaz iza T komada (TK0 / štucna)"},c.tee);
+        fill(IdTee,{L"Nastavi (kroz prolaz TK-O iste dimenzije; inače dijalog T komada)",L"Stani na T komadu",L"Prelaz iza T komada (TK0 / štucna)"},c.tee);
         fill(IdEtaz,{L"Preračunaj etaž",L"Stani prije etaža"},c.etaz?0:1);
         fill(IdBypass,{L"Preračunaj obilazak (njegov dijalog)",L"Stani prije obilaska"},c.bypass?0:1);
         SetDlgItemText(IdInfo,banner);SetDlgItemText(IdCardTitle,L"Obuhvat u crtežu");SetDlgItemText(IdCardHint,L"Osnova trase");
