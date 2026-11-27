@@ -21,6 +21,7 @@
 #include "SizeFollow.h"
 #include "../geometry/DionicaPlan.h"
 #include "FanCommand.h"
+#include "Warnings.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -512,6 +513,7 @@ inline void sizes(AcDbDatabase* db,Net& net,tvsFlowNetwork::Result& r,std::vecto
 }
 inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDialog,double& total);
 inline void execute(UINT sizingDialog){
+    tvsWarn::Scope warnings(L"TVS_PROTOK – upozorenja");
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=0.1/f;
     ads_name picked;ads_point at;
@@ -537,7 +539,7 @@ inline void execute(UINT sizingDialog){
             if(r0<0)return;p0=fanCut().port;
             if(!fromRoot(db,n,r0,p0,sizingDialog,q[side]))return;}
         if(q[0]>0&&q[1]>0&&std::fabs(q[0]-q[1])>0.01*(q[0]>q[1]?q[0]:q[1]))
-            acutPrintf(L"\nTVS_PROTOK: UPOZORENJE – potis %.0f m³/h, usis %.0f m³/h: kroz ventilator prolazi jedan protok; provjerite krajnje elemente.",q[0],q[1]);
+            tvsWarn::add(L"TVS_PROTOK: ventilator – potis %.0f m³/h, usis %.0f m³/h. Kroz ventilator prolazi jedan protok; provjerite protoke krajnjih elemenata.",q[0],q[1]);
         else acutPrintf(L"\nTVS_PROTOK: ventilator – potis %.0f m³/h, usis %.0f m³/h.",q[0],q[1]);
         return;}
     double total=0;fromRoot(db,net,root,port,sizingDialog,total);
@@ -551,7 +553,7 @@ inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDial
     equipmentFlows(net,el,r,root,port,tol,L"TVS_PROTOK");
     if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return false;}
     total=r.total;
-    if(fanCut().port<0&&fanIn(net,r.reached)>=0)acutPrintf(L"\nTVS_PROTOK: u mreži je ventilator – za usis i potis posebno pokrenite TVS_PROTOK izborom ventilatora.");
+    if(fanCut().port<0&&fanIn(net,r.reached)>=0)tvsWarn::add(L"TVS_PROTOK: u mreži je ventilator – za usis i potis posebno pokrenite TVS_PROTOK izborom ventilatora.");
     // terminals without a flow
     std::vector<int> missing;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))missing.push_back(r.terminals[k]);
     int reached=0;for(size_t i=0;i<net.real;++i)if(r.reached[pieceOf(net,r,net.owner[i])])++reached;

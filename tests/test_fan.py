@@ -28,4 +28,9 @@ class Fan(unittest.TestCase):
   self.assertIn('compute(n,r0,tvsFlow::fanCut().port,k==0,',p)
   self.assertIn('book=tvsSheet::fanBook(tvsSheet::build(res[0],iu,ou,L"usis"),tvsSheet::build(res[1],ip,op,L"potis"),info,q[0],q[1],tag);',p)
   self.assertIn('if(static_cast<int>(i)==root&&net.linked[j]&&tvsFan::isFan(net.records[j]))continue;',p)
+ def test_warning_dialog(self):
+  w=text('TVS_Ventilation_ARX/Warnings.h');self.assertIn('MessageBoxW(adsw_acadMainWnd(),all.c_str(),title,MB_OK|MB_ICONWARNING|MB_SETFOREGROUND);',w)
+  p=text('TVS_Ventilation_ARX/PressureCommand.h');self.assertIn('tvsWarn::Scope warnings(L"TVS_PAD – upozorenja");',p);self.assertIn('if(missing)tvsWarn::add(',p)
+  self.assertLess(p.index('tvsWarn::show(L"TVS_PAD – upozorenja");'),p.index('tvsExcel::write(book)'))
+  f=text('TVS_Ventilation_ARX/FlowCommand.h');self.assertIn('tvsWarn::Scope warnings(L"TVS_PROTOK – upozorenja");',f);self.assertIn('tvsWarn::add(L"TVS_PROTOK: ventilator – potis',f)
 if __name__=='__main__':unittest.main()

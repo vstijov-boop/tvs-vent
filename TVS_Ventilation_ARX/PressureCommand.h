@@ -7,6 +7,7 @@
 //   ASHRAE data: the user's DuctPressDrop folder ashrae_data (Constants / Equation / Output /
 //   Input.csv, tables\*.TBL), chosen once by picking its Equation.csv (registry Software\TVS_Vent,
 //   AshraeData); not in the TVS_VENT repository. Without it: friction only, zeta typed in Excel.
+#include "Warnings.h"
 #include "FlowCommand.h"
 #include "ExcelWriter.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
@@ -96,13 +97,13 @@ inline bool compute(const tvsFlow::Net& net,int root,int port,bool odvod,tvsAshr
     if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return false;}
     total=r.total;
     if(tvsFlow::fanCut().port<0&&tvsFlow::fanIn(net,r.reached)>=0)
-        acutPrintf(L"\nTVS_PAD: u mreži je ventilator – izaberite ventilator da se usis i potis računaju posebno i saberu.");
+        tvsWarn::add(L"TVS_PAD: u mreži je ventilator – izaberite ventilator da se usis i potis računaju posebno i saberu.");
     int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;
-    if(missing)acutPrintf(L"\nTVS_PAD%ls: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",side,missing);
+    if(missing)tvsWarn::add(L"TVS_PAD%ls: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",side,missing);
     {   // flows written in the drawing (labels, Properties) vs the sums used here (user 2026-11-24): a reminder for TVS_PROTOK
         int stale=0;for(size_t i=0;i<net.real;++i){if(net.linked[i]&&!net.records[i].terminal())continue;
             const int o=tvsFlow::pieceOf(net,r,net.owner[i]);if(o>=0&&o<static_cast<int>(r.reached.size())&&r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>0.5)++stale;}
-        if(stale)acutPrintf(L"\nTVS_PAD%ls: protok upisan u crtežu se razlikuje od zbira krajnjih elemenata na %d elemenata – proračun koristi zbir; oznake i protoci u crtežu nisu ažurni (TVS_PROTOK ih upisuje).",side,stale);}
+        if(stale)tvsWarn::add(L"TVS_PAD%ls: protok upisan u crtežu se razlikuje od zbira krajnjih elemenata na %d elemenata – proračun koristi zbir; oznake i protoci u crtežu nisu ažurni (TVS_PROTOK ih upisuje).",side,stale);}
     std::vector<tvsPressure::Element> pe(net.bodies.size());
     for(size_t i=0;i<net.bodies.size();++i){if(!r.reached[i])continue;tvsPressure::Element& x=pe[i];
         x.flow=r.flow[i];x.parent=r.parent[i];x.entry=r.entry[i];x.via=r.via[i];
@@ -120,6 +121,7 @@ inline bool compute(const tvsFlow::Net& net,int root,int port,bool odvod,tvsAshr
 }
 inline void execute(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
+    tvsWarn::Scope warnings(L"TVS_PAD – upozorenja");
     const double f=tvsUnits::factor(db),tol=0.1/f;
     ads_name picked;ads_point at;
     if(acedEntSel(L"\nTVS_PAD: izaberite kraj mreže kod jedinice (kliknite blizu slobodnog kraja kanala) ili ventilator u mreži: ",picked,at)!=RTNORM)return;
@@ -174,10 +176,11 @@ inline void execute(){
             if(!compute(n,r0,tvsFlow::fanCut().port,k==0,data?&engine:nullptr,f,side[k],res[k],q[k]))return;
             report(res[k],side[k]);}
         if(q[0]>0&&q[1]>0&&std::fabs(q[0]-q[1])>0.01*(q[0]>q[1]?q[0]:q[1]))
-            acutPrintf(L"\nTVS_PAD: UPOZORENJE – usis %.0f m³/h, potis %.0f m³/h: kroz ventilator prolazi jedan protok (TVS_PROTOK).",q[0],q[1]);
+            tvsWarn::add(L"TVS_PAD: ventilator – usis %.0f m³/h, potis %.0f m³/h. Kroz ventilator prolazi jedan protok; provjerite protoke krajnjih elemenata (TVS_PROTOK).",q[0],q[1]);
         tvsPressure::Options ou;ou.exhaust=true;tvsPressure::Options op;op.exhaust=false;
         tvsSheet::Info iu=info,ip=info;iu.system=L"Usisna strana ventilatora – odvod (krajnji elementi → ventilator)";ip.system=L"Potisna strana ventilatora – dovod (ventilator → krajnji elementi)";
         book=tvsSheet::fanBook(tvsSheet::build(res[0],iu,ou,L"usis"),tvsSheet::build(res[1],ip,op,L"potis"),info,q[0],q[1],tag);}
+    tvsWarn::show(L"TVS_PAD – upozorenja");   // before Excel comes to the front
     acutPrintf(L"\nTVS_PAD: pravim Excel tabelu...");
     if(!tvsExcel::write(book)){acutPrintf(L"\nTVS_PAD: Excel nije dostupan na ovom računaru.");return;}
     acutPrintf(fan?L"\nTVS_PAD: tabela je otvorena u Excelu (nije sačuvana) – list „Ventilator“ sabira usis i potis. Unesite Δp krajnjih elemenata (žute ćelije).":L"\nTVS_PAD: tabela je otvorena u Excelu (nije sačuvana). Unesite Δp krajnjih elemenata (žute ćelije).");
