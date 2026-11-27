@@ -512,6 +512,10 @@ inline void sizes(AcDbDatabase* db,Net& net,tvsFlowNetwork::Result& r,std::vecto
     }
 }
 inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDialog,double& total);
+inline bool solveFrom(AcDbDatabase* db,Net& net,int root,int port,std::vector<tvsFlowNetwork::Element>& el,tvsFlowNetwork::Result& r,double& total);
+inline void changesOf(const Net& net,const tvsFlowNetwork::Result& r,std::vector<int>& change);
+inline bool writeFlows(AcDbDatabase* db,Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,const std::vector<int>& change,std::set<AcDbObjectId>& written);
+inline int relabel(Net& net,const std::set<AcDbObjectId>& written);
 inline void execute(UINT sizingDialog){
     tvsWarn::Scope warnings(L"TVS_PROTOK – upozorenja");
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
@@ -531,24 +535,41 @@ inline void execute(UINT sizingDialog){
             Net again;if(!read(db,tol,again))return;net=again;if(!rootOf(net,pickedId,w[0],w[1],root,port)||!fanAt(net,root,suction)||suction<0)return;}
         tvsFan::Labels labels;labels.show(net.records[root],suction,f);
         const AcDbObjectId fanId=net.nodes[root].id;double q[2]={0,0};
-        for(int side=0;side<2;++side){
-            acutPrintf(side==0?L"\n--- TVS_PROTOK: potisna strana ventilatora (dovod) ---":L"\n--- TVS_PROTOK: usisna strana ventilatora (odvod) ---");
-            FanScope scope(fanId,side==0?suction:1-suction);
-            Net n;if(!read(db,tol,n)){acutPrintf(L"\nTVS_PROTOK: crtež se ne može pročitati.");return;}
-            int r0=-1,p0=-1;for(size_t i=0;i<n.nodes.size();++i)if(n.nodes[i].id==fanId&&n.owner[i]==static_cast<int>(i))r0=static_cast<int>(i);
-            if(r0<0)return;p0=fanCut().port;
-            if(!fromRoot(db,n,r0,p0,sizingDialog,q[side]))return;}
+        Net side[2];std::vector<tvsFlowNetwork::Element> el[2];tvsFlowNetwork::Result res[2];std::vector<int> change[2];int rootOf2[2]={-1,-1},portOf2[2]={-1,-1};
+        const wchar_t* title[2]={L"\n--- TVS_PROTOK: potisna strana ventilatora (dovod) ---",L"\n--- TVS_PROTOK: usisna strana ventilatora (odvod) ---"};
+        for(int k=0;k<2;++k){
+            acutPrintf(L"%ls",title[k]);
+            FanScope scope(fanId,k==0?suction:1-suction);
+            if(!read(db,tol,side[k])){acutPrintf(L"\nTVS_PROTOK: crtež se ne može pročitati.");return;}
+            for(size_t i=0;i<side[k].nodes.size();++i)if(side[k].nodes[i].id==fanId&&side[k].owner[i]==static_cast<int>(i))rootOf2[k]=static_cast<int>(i);
+            if(rootOf2[k]<0)return;portOf2[k]=fanCut().port;
+            if(!solveFrom(db,side[k],rootOf2[k],portOf2[k],el[k],res[k],q[k]))return;
+            changesOf(side[k],res[k],change[k]);}
         if(q[0]>0&&q[1]>0&&std::fabs(q[0]-q[1])>0.01*(q[0]>q[1]?q[0]:q[1]))
             tvsWarn::add(L"TVS_PROTOK: ventilator – potis %.0f m³/h, usis %.0f m³/h. Kroz ventilator prolazi jedan protok; provjerite protoke krajnjih elemenata.",q[0],q[1]);
         else acutPrintf(L"\nTVS_PROTOK: ventilator – potis %.0f m³/h, usis %.0f m³/h.",q[0],q[1]);
+        const int n=static_cast<int>(change[0].size()+change[1].size());bool write=n>0;
+        if(!n)acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");
+        else{acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[160];
+            swprintf_s(prompt,160,L"\nUpisati protoke u %d elemenata (potis %d, usis %d)? [Da/Ne] <Da>: ",n,static_cast<int>(change[0].size()),static_cast<int>(change[1].size()));
+            const int k=acedGetKword(prompt,kw,8);if(k==RTCAN)return;
+            if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){write=false;acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");}}
+        if(write){int count=0,labels=0;
+            for(int k=0;k<2;++k){if(change[k].empty())continue;std::set<AcDbObjectId> written;
+                if(!writeFlows(db,side[k],res[k],el[k],change[k],written))return;count+=static_cast<int>(written.size());labels+=relabel(side[k],written);}
+            acutPrintf(L"\nTVS_PROTOK: upisan protok u %d elemenata; ažurirano oznaka %d.",count,labels);}
+        for(int k=0;k<2;++k){FanScope scope(fanId,portOf2[k]);acutPrintf(L"%ls",title[k]);
+            sizes(db,side[k],res[k],el[k],f,tol,sizingDialog,fanId,el[k][rootOf2[k]].ports[portOf2[k]]);}
         return;}
     double total=0;fromRoot(db,net,root,port,sizingDialog,total);
 }
 // TVS_PROTOK from the element `root`, its free port `port` (the unit). total: the flow summed there.
-inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDialog,double& total){
+// TVS_PROTOK parts (split 2026-11-27 for the fan: both sides solved first, one "Upisati" for both,
+// so an Esc / Ne at the discharge side no longer leaves the suction side unwritten)
+inline bool solveFrom(AcDbDatabase* db,Net& net,int root,int port,std::vector<tvsFlowNetwork::Element>& el,tvsFlowNetwork::Result& r,double& total){
     const double f=tvsUnits::factor(db),tol=0.1/f;total=0;
-    std::vector<tvsFlowNetwork::Element> el;elements(net,el);verticalJoints(net,el,tol);
-    tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
+    el.clear();elements(net,el);verticalJoints(net,el,tol);
+    r=tvsFlowNetwork::solve(el,root,port,tol);
     if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return false;}
     equipmentFlows(net,el,r,root,port,tol,L"TVS_PROTOK");
     if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return false;}
@@ -585,17 +606,15 @@ inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDial
             acutPrintf(L"\n    %ls X=%.0f Y=%.0f",name(net.nodes[r.open[k].first],!net.members[r.open[k].first].empty()),q.x*f,q.y*f);}
     }
     fastest(net,r,f);
-    // what changes
-    std::vector<int> change;
+    return true;
+}
+inline void changesOf(const Net& net,const tvsFlowNetwork::Result& r,std::vector<int>& change){
+    change.clear();
     for(size_t i=0;i<net.real;++i){const int o=pieceOf(net,r,net.owner[i]);if(net.linked[i]&&!net.records[i].terminal())continue;   // inline oprema keeps no flow; a split duct: its upstream piece
         if(r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>1e-6)change.push_back(static_cast<int>(i));}
-    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return true;}
-    {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
-     swprintf_s(prompt,120,L"\nUpisati protoke u %d elemenata? [Da/Ne] <Da>: ",static_cast<int>(change.size()));
-     const int k=acedGetKword(prompt,kw,8);
-     if(k==RTCAN)return false;
-     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return true;}}
-    std::set<AcDbObjectId> written;
+}
+inline bool writeFlows(AcDbDatabase* db,Net& net,const tvsFlowNetwork::Result& r,const std::vector<tvsFlowNetwork::Element>& el,const std::vector<int>& change,std::set<AcDbObjectId>& written){
+    const double f=tvsUnits::factor(db);
     {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return false;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
         if(net.linked[i]){   // linked terminal (oprema): the flow goes into its record (qTerminal), not into a duct
@@ -614,10 +633,27 @@ inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDial
             acutPrintf(L"\nTVS_PROTOK: element kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return false;}
         t->recordGraphicsModified();written.insert(net.nodes[i].id);}
      if(!tx.commit()){acutPrintf(L"\nTVS_PROTOK: izmjena nije sačuvana.");return false;}}
-    // TVS labels of the changed elements
+    return true;
+}
+inline int relabel(Net& net,const std::set<AcDbObjectId>& written){
     MleaderController controller;int labels=0;
     for(int k=0;k<net.labels.length();++k){AcDbObjectId linked;
         if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
+    return labels;
+}
+inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDialog,double& total){
+    const double f=tvsUnits::factor(db),tol=0.1/f;
+    std::vector<tvsFlowNetwork::Element> el;tvsFlowNetwork::Result r;
+    if(!solveFrom(db,net,root,port,el,r,total))return false;
+    std::vector<int> change;changesOf(net,r,change);
+    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return true;}
+    {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
+     swprintf_s(prompt,120,L"\nUpisati protoke u %d elemenata? [Da/Ne] <Da>: ",static_cast<int>(change.size()));
+     const int k=acedGetKword(prompt,kw,8);
+     if(k==RTCAN)return false;
+     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return true;}}
+    std::set<AcDbObjectId> written;if(!writeFlows(db,net,r,el,change,written))return false;
+    const int labels=relabel(net,written);
     acutPrintf(L"\nTVS_PROTOK: upisan protok u %d elemenata; ažurirano oznaka %d.",static_cast<int>(written.size()),labels);
     sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);
     return true;

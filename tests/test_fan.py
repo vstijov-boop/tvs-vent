@@ -21,7 +21,7 @@ class Fan(unittest.TestCase):
   self.assertIn('keepSuction(old,rec);',l)
  def test_sides(self):
   f=text('TVS_Ventilation_ARX/FlowCommand.h')
-  self.assertIn('out[i].ports[fanCut().port].x+=1e9;',f);self.assertIn('FanScope scope(fanId,side==0?suction:1-suction);',f)
+  self.assertIn('out[i].ports[fanCut().port].x+=1e9;',f);self.assertIn('FanScope scope(fanId,k==0?suction:1-suction);',f);self.assertIn('Upisati protoke u %d elemenata (potis %d, usis %d)?',f)
   self.assertIn('if(fanCut().port>=0&&net.nodes[root].id==fanCut().id)port=fanCut().port;',f)
   p=text('TVS_Ventilation_ARX/PressureCommand.h')
   self.assertIn('tvsFlow::FanScope scope(fanId,k==0?1-suction:suction);',p)
