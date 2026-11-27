@@ -45,7 +45,8 @@ inline int follow(tvsMove::Transaction& tx,const std::vector<tvsMove::Node>& nod
     // displacement of the network end at p (duct / fitting port, flex end); false: nothing moved there
     auto endMove=[&](const tvsMove::Point& p,tvsMove::Point& d){
         for(size_t k=0;k<bodies.size();++k){if(!moved(k))continue;
-            for(size_t q=0;q<bodies[k].ports.size();++q)if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],p,reach)){d=result.ports[k][q]-bodies[k].ports[q];return true;}}
+            for(size_t q=0;q<bodies[k].ports.size();++q)if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],p,reach)){d=result.ports[k][q]-bodies[k].ports[q];return true;}
+            if(k<nodes.size()&&tvsMove::followsOutlet(nodes[k],bodies[k],p,reach)){d=result.ports[k][1]-bodies[k].ports[1];return true;}}   // terminal on a koljeno gore / dolje
         for(size_t i=0;i<nodes.size();++i){if(!nodes[i].flex||nodes[i].ports.size()!=2)continue;
             for(int j=0;j<2;++j)if(tvsMoveGeometry::pointsNear(nodes[i].ports[j],p,reach)){tvsMove::Point to;if(flexEnd(i,j,to)){d=to-nodes[i].ports[j];return true;}}}
         return false;};

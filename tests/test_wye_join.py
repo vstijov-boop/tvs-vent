@@ -20,4 +20,10 @@ class WyeJoin(unittest.TestCase):
   self.assertIn('n.kind=2;n.segmented=true;',s);self.assertIn('inline bool segmentedPorts(const TVS_TAP* p,const Point& middle,Point ports[2]){',s)
   self.assertIn('(n.kind==2&&!n.segmented)',text('TVS_Ventilation_ARX/SizeFollow.h'))
   self.assertIn('nd.kind!=2||nd.segmented',text('TVS_Ventilation_ARX/FlowCommand.h'))
+ def test_vertical_elbow(self):
+  s=text('TVS_Ventilation_ARX/TVSMoveCommand.h')
+  self.assertIn('n.vertical=p->DuctType==DuctTypeStill&&(form==Form_Up||form==Form_Down);',s)
+  self.assertIn('fuseVertical(nodes,bodies,members,tol);',s);self.assertIn('if(riser)continue;',s)
+  self.assertIn('followsOutlet(nodes[k],bodies[k],nodes[i].ports[j],reach)',s)
+  self.assertIn('tvsMove::followsOutlet(nodes[k],bodies[k],p,reach)',text('TVS_Ventilation_ARX/EquipmentFollow.h'))
 if __name__=='__main__':unittest.main()

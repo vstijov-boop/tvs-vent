@@ -33,8 +33,9 @@ struct Node {
     Point middle;
     double a,b,elevation;
     bool round,flex;   // flex: flex crijevo (kind 0; bends, follows the network: followFlex)
+    bool vertical;    // koljeno gore / dolje (plan elbow faces MA / MC): rigid at a free end (fuseVertical)
     bool segmented;   // okruglo segmentno koljeno: kind 2 for TVS_MOVE / TVS_STRETCH only (resizing keeps it a boundary)
-    Node():kind(0),a(0),b(0),elevation(0),round(false),flex(false),segmented(false){}
+    Node():kind(0),a(0),b(0),elevation(0),round(false),flex(false),vertical(false),segmented(false){}
 };
 inline bool segmentedPorts(const TVS_TAP* p,const Point& middle,Point ports[2]);
 // the drawing's Radius or the rule (< 355: D, else D/2), whichever gives the drawn ports
@@ -93,6 +94,7 @@ inline bool describe(AcDbEntity* entity,Node& n){
         }else{
             // Read-only fallback only blocks ambiguous contacts; never move these fittings.
             n.ports.push_back(point(p->MA));n.ports.push_back(point(p->MC));
+            const int form=p->get_Form();n.vertical=p->DuctType==DuctTypeStill&&(form==Form_Up||form==Form_Down);
         }
     }else if(TVS_TRANS* p=TVS_TRANS::cast(entity)){
         n.middle=point(p->FirstPoint);n.elevation=p->Elev;
@@ -581,6 +583,37 @@ inline void fuseOffsets(const std::vector<Node>& nodes,std::vector<tvsMoveNetwor
 inline void fuseBypasses(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                          std::vector<std::vector<AcDbObjectId> >& members,double tol);
 // Network bodies for TVS_MOVE: an etaz is one rigid body (see fuseOffsets) and its members move together.
+// Koljeno gore / dolje at the end of a horizontal duct (user 2026-11-27: it blocked TVS_STRETCH /
+// TVS_MOVE, round and rectangular): one rigid body moving with that duct when nothing but a terminal
+// (oprema) or a flex sits on its vertical outlet. Ports: the face the duct touches and the outlet in
+// plan at the same level (flex / terminal on it follow by plan distance: followsOutlet). A riser on
+// the outlet (or an etaz / obilazak elbow) keeps it a fixed boundary as before.
+inline void fuseVertical(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
+                         const std::vector<std::vector<AcDbObjectId> >& members,double tol){
+    for(size_t i=0;i<nodes.size()&&i<bodies.size();++i){const Node& n=nodes[i];
+        if(!n.vertical||n.ports.size()!=2||!members[i].empty()||bodies[i].kind!=tvsMoveNetwork::Blocked)continue;
+        int face=-1,duct=-1,count=0;
+        for(int j=0;j<2;++j)for(size_t k=0;k<nodes.size();++k){const Node& d=nodes[k];
+            if(k==i||d.kind!=1||d.ports.size()!=2||std::fabs(d.ports[0].z-d.ports[1].z)>tol)continue;
+            for(int e=0;e<2;++e)if(tvsMoveGeometry::pointsNear(d.ports[e],n.ports[j],tol)){face=j;duct=static_cast<int>(k);++count;}}
+        if(count!=1)continue;
+        const Point out=n.ports[1-face];bool riser=false;
+        for(size_t k=0;k<nodes.size()&&!riser;++k){if(k==i||nodes[k].flex||isEquipment(nodes[k]))continue;
+            for(size_t j=0;j<nodes[k].ports.size();++j)if(tvsMoveGeometry::pointsNear(nodes[k].ports[j],out,tol)){riser=true;break;}}
+        if(riser)continue;
+        Point axis;if(!tvsMoveGeometry::unit(nodes[duct].ports[1]-nodes[duct].ports[0],axis))continue;
+        tvsMoveNetwork::Body b;b.kind=tvsMoveNetwork::Rigid;
+        b.ports.push_back(n.ports[face]);b.ports.push_back(Point(out.x,out.y,n.ports[face].z));
+        b.axes.push_back(axis);b.axes.push_back(axis);
+        const tvsMoveNetwork::Section sec=nodes[duct].sections.empty()?tvsMoveNetwork::Section(n.a,n.b,n.round,n.elevation):nodes[duct].sections[0];
+        b.sections.push_back(sec);b.sections.push_back(sec);
+        bodies[i]=b;
+    }
+}
+// a flex end / terminal on the vertical outlet of a moved koljeno gore / dolje (fuseVertical): plan distance
+inline bool followsOutlet(const Node& n,const tvsMoveNetwork::Body& b,const Point& p,double reach){
+    return n.vertical&&b.kind==tvsMoveNetwork::Rigid&&b.ports.size()==2&&std::hypot(b.ports[1].x-p.x,b.ports[1].y-p.y)<=reach;
+}
 inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork::Body>& bodies,
                       std::vector<std::vector<AcDbObjectId> >& members,double tol){
     bodies.clear();
@@ -595,6 +628,7 @@ inline void bodiesFor(const std::vector<Node>& nodes,std::vector<tvsMoveNetwork:
     for(size_t i=0;i<nodes.size();++i)if(nodes[i].flex){bodies[i].ports.clear();bodies[i].axes.clear();bodies[i].sections.clear();bodies[i].kind=tvsMoveNetwork::Blocked;}
     fuseOffsets(nodes,bodies,members,tol);
     fuseBypasses(nodes,bodies,members,tol);
+    fuseVertical(nodes,bodies,members,tol);
 }
 inline std::vector<char> carriedBy(const std::vector<Node>& nodes,const std::vector<std::vector<AcDbObjectId> >& members,const std::vector<int>& masks){
     std::vector<char> carried(nodes.size(),0);
@@ -631,7 +665,9 @@ inline int followFlex(Transaction& tx,const std::vector<Node>& nodes,const std::
             if(frame&&i<frame->size()&&(*frame)[i]>0&&((*frame)[i]&(1<<j))){to[j]=nodes[i].ports[j]+delta;changed=true;continue;}
             for(size_t k=0;k<bodies.size()&&k<result.masks.size()&&k<result.ports.size();++k){if(!result.masks[k]||k==i)continue;
                 for(size_t q=0;q<bodies[k].ports.size()&&q<result.ports[k].size();++q)
-                    if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],nodes[i].ports[j],reach)){to[j]=result.ports[k][q];changed=true;}}
+                    if(tvsMoveGeometry::pointsNear(bodies[k].ports[q],nodes[i].ports[j],reach)){to[j]=result.ports[k][q];changed=true;}
+                if(result.ports[k].size()==2&&followsOutlet(nodes[k],bodies[k],nodes[i].ports[j],reach)){   // flex on a koljeno gore / dolje
+                    const Point d=result.ports[k][1]-bodies[k].ports[1];to[j]=nodes[i].ports[j]+d;changed=true;}}
         }
         if(!changed)continue;
         TVS_Pipe* flex=TVS_Pipe::cast(tx.write(nodes[i].id));
