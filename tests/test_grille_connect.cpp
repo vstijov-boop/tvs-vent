@@ -111,6 +111,11 @@ int main(){
      // 80 mm before the closed end as drawn: centre 324.6 from the end, half of 490 = 245 fits
      const Duct shortD=duct(14733.47,6245.65,centre.x+200,6245.65,250,200);
      const Check k=validate(shortD,place(shortD,centre),c,o);assert(k.error==NearEnd&&eq(k.detail,245));
+     // user 2026-11-27: 489 x 190 grille turned with 489 across a 650 wide duct - only 95 along the axis
+     {const Duct wide=duct(0,0,500,0,650,150);Choice t=choice(Bottom,Direct,0,489,190);t.aAcross=1;
+      assert(validate(wide,place(wide,V(261,0)),t,o).error==Ok);
+      t.aAcross=0;assert(validate(wide,place(wide,V(261,0)),t,o).error==NearEnd);
+      t.aAcross=1;assert(validate(wide,place(wide,V(450,0)),t,o).error==NearEnd);}
      // over the duct but off-centre still counts as bottom; beyond the half width it is a side
      assert(place(d,V(centre.x,6245.65+120)).side==Bottom&&place(d,V(centre.x,6245.65+130)).side==Left);
      assert(place(d,V(centre.x,6245.65-130)).side==Right);}

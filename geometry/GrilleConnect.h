@@ -69,7 +69,9 @@ struct Choice {
     double stub;      // straight part of the branch (Lijevo / Desno)
     double a,b;bool round;   // branch / neck size; round: a = D
     int end;          // End: 0 = FirstPoint, 1 = LastPoint; stub = duct length to the grille (0 = keep)
-    Choice():side(Left),method(Tee),stub(0),a(0),b(0),round(false),end(-1){}
+    int aAcross;      // Dno: 1 = side a lies across the duct (the block turned so), 0 = along, -1 unknown
+                      // (the smaller side across); user 2026-11-27: 489 x 190 grille, 489 across a 650 duct
+    Choice():side(Left),method(Tee),stub(0),a(0),b(0),round(false),end(-1),aAcross(-1){}
 };
 struct Options {
     double collar;    // TK0: TVS_WYE LengthPl (TVS_SETTINGS T komad length)
@@ -163,7 +165,8 @@ inline Check validate(const Duct& d,const Place& p,const Choice& c,const Options
     if(bottom&&(p.t<0||p.t>l)){k.error=Outside;k.detail=p.t<0?-p.t:p.t-l;return k;}
     if(bottom){
         // neck in the bottom face: the smaller side across the duct, the larger along it
-        const double across=c.round?c.a:(c.a<c.b?c.a:c.b),along=c.round?c.a:(c.a<c.b?c.b:c.a);
+        double across=c.round?c.a:(c.a<c.b?c.a:c.b),along=c.round?c.a:(c.a<c.b?c.b:c.a);
+        if(!c.round&&c.aAcross>=0){across=c.aAcross?c.a:c.b;along=c.aAcross?c.b:c.a;}   // as the block lies
         if(across>d.width()+1e-9){k.error=TooWide;k.detail=d.width();return k;}
         const double need=along/2,shortSide=p.t<l-p.t?p.t:l-p.t;
         if(shortSide+1e-9<need){k.error=NearEnd;k.detail=need;return k;}

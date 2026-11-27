@@ -62,10 +62,10 @@ public:
     int side,method;double lengthMm,aMm,bMm;bool round;
     int end;double stubMm,endLengthMm;int shownSide;   // End: which free end; stored stub / current end duct length (mm)
     // context of the check (drawing units)
-    gc::Duct duct;gc::Place atInsert,atCentre;gc::Options options;double f;bool mainRound;
+    gc::Duct duct;gc::Place atInsert,atCentre;gc::Options options;double f;bool mainRound;int aAcross;
     CString banner,facts;bool loading;CFont bold,title;CBrush back,band,white;
     explicit Dialog(UINT idd):CAdUiBaseDialog(idd,NULL,NULL),side(gc::Left),method(gc::Tee),lengthMm(100),aMm(0),bMm(0),round(false),
-        end(-1),stubMm(100),endLengthMm(0),shownSide(-1),f(1),mainRound(false),loading(false){}
+        end(-1),stubMm(100),endLengthMm(0),shownSide(-1),f(1),mainRound(false),aAcross(-1),loading(false){}
     void enable(int id,bool on){if(CWnd* w=GetDlgItem(id))w->EnableWindow(on?TRUE:FALSE);}
     static int sideId(int k){return k==gc::End?IdEnd:IdLeft+k;}
     int sideSel(){for(int k=gc::Left;k<=gc::End;++k)if(IsDlgButtonChecked(sideId(k))==BST_CHECKED)return k;return gc::Left;}
@@ -116,7 +116,7 @@ public:
     virtual void OnOK(){
         if(!UpdateData(TRUE))return;
         gc::Choice c;c.side=sideSel();c.method=methodSel();c.round=roundSel();
-        c.stub=lengthMm/f;c.a=aMm/f;c.b=c.round?0:bMm/f;c.end=end;
+        c.stub=lengthMm/f;c.a=aMm/f;c.b=c.round?0:bMm/f;c.end=end;c.aAcross=aAcross;
         const gc::Check k=gc::validate(duct,c.side==gc::Bottom?atCentre:atInsert,c,options);
         if(k.error!=gc::Ok){
             CString m;m.Format(L"Priključenje nije moguće: %ls",gc::errorText(k.error));
@@ -342,6 +342,9 @@ inline void execute(UINT idd,double collar){
     else{dg.aMm=roundMm(footW);dg.bMm=dg.side==gc::Bottom?roundMm(footD):roundMm((roundDuct?A:B)*f);dg.round=false;}
     if(dg.round||!(dg.bMm>0))dg.bMm=roundMm((roundDuct?A:B)*f);
     dg.duct=duct;dg.atInsert=pi;dg.atCentre=pc;dg.options=o;dg.f=f;dg.mainRound=roundDuct;
+    {   // Dno: side A of the neck along the block's own x (the default A is its footprint width) - across or along the duct
+        const gc::V x(foot[1].x-foot[0].x,foot[1].y-foot[0].y),u=gc::sub(duct.p1,duct.p0);const double lx=std::hypot(x.x,x.y),lu=std::hypot(u.x,u.y);
+        dg.aAcross=lx>0&&lu>0?(std::fabs((x.x*u.x+x.y*u.y)/(lx*lu))<std::sqrt(0.5)?1:0):-1;}
     CString size;if(roundDuct)size.Format(L"Ø%.0f",A*f);else size.Format(L"%.0f×%.0f",A*f,B*f);
     dg.banner.Format(L"Blok „%ls“  ·  kanal %ls mm",name.c_str(),size.GetString());
     dg.facts.Format(L"Kanal dužine %.0f mm. Tačka priključenja (projekcija tačke umetanja) %.0f mm od početka kanala; blok %.0f mm %ls ose.%ls",
@@ -351,7 +354,7 @@ inline void execute(UINT idd,double collar){
     if(rc!=IDOK)return;
     const bool bottom=dg.side==gc::Bottom,atEnd=dg.side==gc::End;
     if(!bottom&&!atEnd)storeStubMm(dg.lengthMm);
-    gc::Choice c;c.side=dg.side;c.method=dg.method;c.round=dg.round;c.stub=dg.lengthMm/f;c.a=dg.aMm/f;c.b=dg.round?0:dg.bMm/f;c.end=dg.end;
+    gc::Choice c;c.side=dg.side;c.method=dg.method;c.round=dg.round;c.stub=dg.lengthMm/f;c.a=dg.aMm/f;c.b=dg.round?0:dg.bMm/f;c.end=dg.end;c.aAcross=dg.aAcross;
     const gc::Place& p=bottom?pc:pi;
     const gc::Check k=gc::validate(duct,p,c,o);
     if(k.error!=gc::Ok){acutPrintf(L"\nTVS_RESETKA: %ls. Ništa nije promijenjeno.",gc::errorText(k.error));return;}
