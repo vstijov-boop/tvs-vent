@@ -284,7 +284,7 @@ inline void walk(const std::vector<tvsMove::Node>& nodes,int start,const Sizes& 
             const tvsMove::Node& n=nodes[next];
             if(n.flex){stop(L"fleksibilno crijevo");break;}                    // D8
             const bool duct=plainDuct(e.object())&&n.kind==1,
-                elbow=plainElbow(e.object())&&(n.kind==2||(n.kind==0&&n.ports.size()==2&&convertibleElbow(e.object(),nodes[start].a,nodes[start].round)));
+                elbow=plainElbow(e.object())&&((n.kind==2&&!n.segmented)||((n.kind==0||n.segmented)&&n.ports.size()==2&&convertibleElbow(e.object(),nodes[start].a,nodes[start].round)));
             if(duct||elbow){
                 if(!same(n.a,n.b,n.round)||n.ports.size()!=2){stop(L"element druge dimenzije");break;}
                 seen.insert(next);(duct?run.ducts:run.elbows).push_back(next);

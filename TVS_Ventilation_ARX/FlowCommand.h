@@ -337,7 +337,7 @@ inline void planItems(const Net& net,const std::vector<int>& groups,double f,std
         AcDbObjectPointer<AcDbEntity> e(nd.id,AcDb::kForRead);if(e.openStatus()!=Acad::eOk)continue;
         if(nd.kind==1&&tvsSizeFollow::plainDuct(e.object())){it.kind=Duct;it.plain=it.ports.size()==2;}
         else if(const TVS_TAP* t=TVS_TAP::cast(e.object())){
-            if(nd.kind!=2||!tvsSizeFollow::plainElbow(e.object())||it.ports.size()!=2)continue;
+            if(nd.kind!=2||nd.segmented||!tvsSizeFollow::plainElbow(e.object())||it.ports.size()!=2)continue;
             it.kind=Elbow;it.middle=planUse::pt(t->MiddlePoint);it.sweep=t->Swectangle;
             const tvsSizeFollow::ElbowRule r=tvsSizeFollow::elbowRule(t,nd.round);
             if(nd.round){if(r.typeRound==RadiusTypeRound_RadiusVariable){it.rule=Variable;it.k=r.k;it.plain=true;}

@@ -33,8 +33,27 @@ struct Node {
     Point middle;
     double a,b,elevation;
     bool round,flex;   // flex: flex crijevo (kind 0; bends, follows the network: followFlex)
-    Node():kind(0),a(0),b(0),elevation(0),round(false),flex(false){}
+    bool segmented;   // okruglo segmentno koljeno: kind 2 for TVS_MOVE / TVS_STRETCH only (resizing keeps it a boundary)
+    Node():kind(0),a(0),b(0),elevation(0),round(false),flex(false),segmented(false){}
 };
+inline bool segmentedPorts(const TVS_TAP* p,const Point& middle,Point ports[2]);
+// the drawing's Radius or the rule (< 355: D, else D/2), whichever gives the drawn ports
+inline bool segmentedElbow(const TVS_TAP* p,const Point& middle,double rule,Point ports[2]){
+    const double r[2]={rule,p->Radius};
+    for(int k=0;k<2;++k)if(r[k]>0&&tvsMoveGeometry::elbowPorts(middle,Point(p->Startvector.x,p->Startvector.y,0),p->Swectangle,r[k]+p->SizeA/2,ports)
+        &&segmentedPorts(p,middle,ports))return true;
+    return false;
+}
+// Round segmented elbow (RadiusTypeRound_RadiusSpecific, TVS_TAP.cpp): its ports are the arc ends moved
+// outwards along the axes by the flange (45 mm below 630 mm, else 0); accepted only when they are the
+// drawn MA / MC (either order) - otherwise the elbow stays a fixed boundary as before.
+inline bool segmentedPorts(const TVS_TAP* p,const Point& middle,Point ports[2]){
+    const double flange=tvsUnits::mm(p->SizeA,p)<630?tvsUnits::drawing(45.0,p):0,tol=tvsUnits::drawing(0.5,p);
+    for(int k=0;k<2;++k){Point a;if(!tvsMoveGeometry::unit(ports[k]-middle,a))return false;ports[k]=ports[k]+a*flange;}
+    const Point ma=point(p->MA),mc=point(p->MC);
+    auto at=[&](const Point& x,const Point& y){return std::hypot(x.x-y.x,x.y-y.y)<=tol;};
+    return (at(ports[0],ma)&&at(ports[1],mc))||(at(ports[0],mc)&&at(ports[1],ma));
+}
 inline bool describe(AcDbEntity* entity,Node& n){
     TVS_Entity* tvs=TVS_Entity::cast(entity);if(!tvs)return false;
     n.id=entity->objectId();
@@ -63,6 +82,13 @@ inline bool describe(AcDbEntity* entity,Node& n){
             && tvsMoveGeometry::elbowPorts(n.middle,Point(p->Startvector.x,p->Startvector.y,0),
                 p->Swectangle,radius+p->SizeA/2,ports)){
             n.kind=2;n.ports.push_back(ports[0]);n.ports.push_back(ports[1]);
+            n.axes.push_back(ports[0]-n.middle);n.axes.push_back(ports[1]-n.middle);
+        }else if(p->DuctType==DuctTypeStill && p->get_Form()==Form_Direct && p->ThisRound && specific
+            && std::fabs(p->Startvector.z)<1e-8 && std::fabs(p->Normvector.z-1)<1e-8
+            && std::fabs(p->Normvector.x)<1e-8 && std::fabs(p->Normvector.y)<1e-8
+            && segmentedElbow(p,n.middle,radius,ports)){
+            // okruglo segmentno koljeno (plan 25): rigid like the others
+            n.kind=2;n.segmented=true;n.ports.push_back(ports[0]);n.ports.push_back(ports[1]);
             n.axes.push_back(ports[0]-n.middle);n.axes.push_back(ports[1]-n.middle);
         }else{
             // Read-only fallback only blocks ambiguous contacts; never move these fittings.
@@ -104,8 +130,14 @@ inline bool describe(AcDbEntity* entity,Node& n){
             // T komad TK-O / TK-G: drawn ports and widths (prolaz C, left branch, fixed collars).
             AcGePoint3d teePort[3];double teeWidth[3];
             if(p->teePorts(teePort,teeWidth))for(int k=0;k<3;++k){n.ports[k]=point(teePort[k]);n.sections[k].a=teeWidth[k];}
+            // kosa racva TK (branch at 45 deg) and racva Y45 (plan 25, user 2026-11-27): rigid with their
+            // real port directions (Y45: the branches at +-45 deg, the inlet along Vectotv)
+            tvsTee::Tee tee;AcGePoint3d o;AcGeVector3d ex,ey;
+            const bool shaped=p->teeShape(tee,o,ex,ey),angled=shaped&&tee.lateral>0;
+            if(angled&&tee.type==tvsTee::Pants){tvsTee::P lp[3],ld[3];tvsTee::wyePorts(tee,lp,ld);
+                for(int k=0;k<3;++k){Point a;if(tvsMoveGeometry::unit(Point(ex.x*ld[k].x+ey.x*ld[k].y,ex.y*ld[k].x+ey.y*ld[k].y,0),a))n.axes[k]=a;}}
             if(std::fabs(p->Vectpr.z)<1e-8&&std::fabs(p->Vectotv.z)<1e-8
-                &&std::fabs(mainAxis.dot(branchAxis))<1e-6)n.kind=4;
+                &&(angled||std::fabs(mainAxis.dot(branchAxis))<1e-6))n.kind=4;
         }
     }
     if(n.sections.empty())for(size_t i=0;i<n.ports.size();++i)

@@ -238,6 +238,7 @@ inline Previous findPrevious(const tvsEquipmentLinkCmd::Scene& scene,const tvsEq
     tvsTeeFit::Ports q;
     for(size_t k=0;k<scene.nodes.size()&&r.tee.isNull();++k){const tvsMove::Node& n=scene.nodes[k];if(n.kind!=4)continue;
         AcDbObjectPointer<TVS_WYE> w(n.id,AcDb::kForRead);if(w.openStatus()!=Acad::eOk)continue;
+        {tvsTeeData::Record rec;if(tvsTeeData::read(w.object(),rec)&&rec.neck>0&&w->ThisRoundpr&&w->ThisRoundotv&&rec.type!=tvsTee::Straight)continue;}   // kosa racva / Y45: never a grille's T komad
         const tvsTeeFit::Ports t=tvsTeeFit::ports(w.object());if(t.ok&&tvsTeeFit::planDistance(t.p[2],other)<=tol){r.tee=n.id;q=t;}}
     if(r.tee.isNull())return r;
     AcDbObjectId run[2];bool last[2]={false,false};AcGePoint3d farEnd[2];

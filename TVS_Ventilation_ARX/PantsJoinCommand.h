@@ -6,9 +6,12 @@
 // gets a longer straight inlet wall ("vrat", record neck); Pomjeri = one branch moved onto the
 // other's axis instead (Zamijeni: the other one). The result is drawn first and confirmed;
 // Ne: everything back. One command = one UNDO step.
+// Round ducts (user 2026-11-27, geometry/WyeJoin.h): two collinear ducts + a branch at 45 deg ->
+// kosa racva TK; inlet + two branches at +-45 deg -> racva Y45 (Soko). Same confirmation.
 #include "TVSMoveCommand.h"
 #include "SizeFollow.h"
 #include "../geometry/PantsJoin.h"
+#include "../geometry/WyeJoin.h"
 #include "../geometry/TeeShape.h"
 #include <vector>
 namespace tvsPantsJoinCmd {
@@ -74,16 +77,114 @@ inline bool draw(const Pick& in,const Pick br[2],const tvsPantsJoin::Plan& p,dou
     setEnd(br[1].id,p.branchNear[1],ports.p[0]);
     return true;
 }
+// The duct end nearest `to` goes there (one end of each duct, `end` from the plan).
+inline void placeEnds(const AcDbObjectId& tee,const Pick* duct[],const int end[],const tvsPantsJoin::V target[],int n){
+    tvsTeeFit::Ports ps;{AcDbObjectPointer<TVS_WYE> w(tee,AcDb::kForRead);if(w.openStatus()==Acad::eOk)ps=tvsTeeFit::ports(w.object());}
+    for(int k=0;k<n;++k){AcGePoint3d to(target[k].x,target[k].y,0);
+        if(ps.ok){int best=0;for(int j=1;j<3;++j)if(std::hypot(ps.p[j].x-to.x,ps.p[j].y-to.y)<std::hypot(ps.p[best].x-to.x,ps.p[best].y-to.y))best=j;to=ps.p[best];}
+        setEnd(duct[k]->id,end[k],to);}
+}
+inline AcDbObjectId newWye(const Pick& like,double sa,double ta,double L,const tvsPantsJoin::V& u,const tvsPantsJoin::V& v,const tvsPantsJoin::V& base,const tvsTeeData::Record& r){
+    AcGeVector3d vu(u.x,u.y,0),vv(v.x,v.y,0);AcGePoint3d b(base.x,base.y,like.first.z);double a1=sa,b1=0,a2=ta,b2=0,len=L;
+    TVS_WYE* w=TVS_WYE::add_new(a1,b1,a2,b2,len,vu,vv,b,true,true,false);
+    if(!w||w->objectId().isNull())return AcDbObjectId::kNull;
+    const AcDbObjectId id=w->objectId();
+    AcDbObjectPointer<TVS_WYE> o(id,AcDb::kForWrite);if(o.openStatus()!=Acad::eOk)return id;
+    {AcDbObjectPointer<TVS_Pipe> d(like.id,AcDb::kForRead);if(d.openStatus()==Acad::eOk){o->setPropertiesFrom(d.object());o->put_Flow(d->get_Flow());}}
+    o->put_Elevation(like.elev);
+    o->SizeApr=sa;o->SizeBpr=0;o->SizeAotv=ta;o->SizeBotv=0;o->ThisRoundpr=true;o->ThisRoundotv=true;
+    o->LengthPl=L;o->Vectpr=vu;o->Vectotv=vv;o->Basepoint=b;
+    if(tvsTeeData::write(o.object(),r)!=Acad::eOk){o->erase();return AcDbObjectId::kNull;}
+    o->recordGraphicsModified();return id;
+}
+inline const wchar_t* roundError(int e){
+    switch(e){
+    case tvsWyeJoin::NotAngled:return L"ogranci moraju biti pod 45° prema ulaznom kanalu";
+    case tvsWyeJoin::SameSide:return L"ogranci moraju biti na suprotnim stranama (Y45), odnosno glavni kanali sa obje strane ogranka (kosa račva)";
+    case tvsWyeJoin::BothJoined:return L"oba ogranka su dalje spojena, a nisu na mjestu za Y45 – pomjerite jedan (TVS_MOVE) pa ponovo";
+    case tvsWyeJoin::InletShort:return L"ulazni kanal je prekratak za račvu";
+    case tvsWyeJoin::BranchShort:return L"ogranak je prekratak (lice račve bi bilo iza njegovog kraja)";
+    case tvsWyeJoin::NearJoined:return L"kraj kanala kod račve je već spojen sa drugim elementom";
+    case tvsWyeJoin::MainSizes:return L"glavni kanal mora biti istog prečnika sa obje strane (prelaz poslije)";
+    case tvsWyeJoin::MainShort:return L"glavni kanal je prekratak za kosu račvu";
+    default:return L"kanali nisu prepoznati";}
+}
+inline bool confirm(const AcDbObjectId& tee,std::vector<Saved>& saved,const wchar_t* what){
+    acedUpdateDisplay();acutPrintf(L"\n%ls",what);
+    ACHAR kw[16]=L"";acedInitGet(0,L"Da Ne");const int k=acedGetKword(L"\nOvako spojiti? [Da/Ne] <Da>: ",kw,16);
+    if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Da")==0)){acutPrintf(L"\nTVS_SPOJ_TKG: spojeno (U vraća).");return true;}
+    AcDbObjectId t=tee;tvsSizeFollow::applying()=true;restore(saved,t);tvsSizeFollow::applying()=false;
+    acutPrintf(L"\nTVS_SPOJ_TKG: ništa nije promijenjeno.");return false;
+}
+// Okrugli kanali: kosa racva TK (dva kanala u jednoj osi + ogranak 45) ili racva Y45.
+inline void roundJoin(AcDbDatabase* db,const Pick pk[3]){
+    const double f=tvsUnits::factor(db),tol=0.1/f,deg=tvsTee::lateralDeg();
+    std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
+    if(!tvsMove::snapshot(db,nodes,labels)){acutPrintf(L"\nTVS_SPOJ_TKG: crtež se ne može pročitati.");return;}
+    tvsWyeJoin::Duct d[3];for(int k=0;k<3;++k){d[k].a=v2(pk[k].first);d[k].b=v2(pk[k].last);d[k].width=pk[k].a;}
+    auto joined=[&](int k,int end){return joinedAt(nodes,pk[k].id,end==0?pk[k].first:pk[k].last,tol);};
+    std::vector<Saved> saved;for(int k=0;k<3;++k){Saved x;x.id=pk[k].id;x.first=pk[k].first;x.last=pk[k].last;saved.push_back(x);}
+    int m[2],b=-1;
+    if(tvsWyeJoin::lateralParts(d,2.0/f,m,b)){   // kosa racva TK
+        const double A=pk[m[0]].a,w=pk[b].a;
+        if(w>A+1e-9){acutPrintf(L"\nTVS_SPOJ_TKG: ogranak (%.0f mm) je veći od kanala (%.0f mm).",w*f,A*f);return;}
+        tvsTeeData::Record r;const bool soko=tvsTeeFit::lateralRecord(r,A,w,f);
+        tvsTee::Tee t;t.type=tvsTee::Tap;t.round=true;t.A=A;t.C=A;t.w1=w;t.l=r.l;t.margin=r.radius2;t.lateral=deg;
+        double before=0,after=0;tvsTee::tapRun(t,before,after);const double L=tvsTee::lateralLengthPl(A,w,deg,r.l);
+        tvsWyeJoin::Duct mm[2]={d[m[0]],d[m[1]]};
+        tvsWyeJoin::Lateral p=tvsWyeJoin::lateral(mm,d[b],before,after,A/2+L,1.0,50.0/f);
+        if(p.error==tvsWyeJoin::Ok||p.error==tvsWyeJoin::NearJoined||p.error==tvsWyeJoin::MainShort||p.error==tvsWyeJoin::BranchShort){
+            mm[0].nearJoined=joined(m[0],p.nearEnd[0]);mm[1].nearJoined=joined(m[1],p.nearEnd[1]);tvsWyeJoin::Duct br=d[b];br.nearJoined=joined(b,p.nearEnd[2]);
+            p=tvsWyeJoin::lateral(mm,br,before,after,A/2+L,1.0,50.0/f);}
+        if(p.error!=tvsWyeJoin::Ok){acutPrintf(L"\nTVS_SPOJ_TKG: %ls.",roundError(p.error));return;}
+        tvsSizeFollow::applying()=true;
+        const AcDbObjectId tee=newWye(pk[m[0]],A,w,L,p.u,p.d,p.base,r);
+        if(tee.isNull()){tvsSizeFollow::applying()=false;acutPrintf(L"\nTVS_SPOJ_TKG: kosa račva nije napravljena.");return;}
+        const Pick* ducts[3]={&pk[m[p.up]],&pk[m[1-p.up]],&pk[b]};const int ends[3]={p.nearEnd[p.up],p.nearEnd[1-p.up],p.nearEnd[2]};
+        const tvsPantsJoin::V to[3]={p.run0,p.run1,p.face};placeEnds(tee,ducts,ends,to,3);
+        tvsSizeFollow::applying()=false;
+        wchar_t msg[200];swprintf_s(msg,L"Kosa račva TK 45° Ø%.0f / Ø%.0f (L=%.0f mm%ls).",A*f,w*f,(r.radius2*2+w*std::sqrt(2.0))*f,soko?L", Soko":L"");
+        confirm(tee,saved,msg);return;
+    }
+    // racva Y45: the first pick is the inlet
+    const double A=pk[0].a;tvsWyeJoin::Duct br[2]={d[1],d[2]};
+    if(pk[1].a>A+1e-9||pk[2].a>A+1e-9){acutPrintf(L"\nTVS_SPOJ_TKG: ogranak je veći od ulaza (Y45). Za kosu račvu izaberite dva kanala u istoj osi i ogranak.");return;}
+    tvsTeeData::Record r;double Lpl=0;tvsTeeFit::wyeRecord(r,A,pk[1].a,pk[2].a,f,Lpl);
+    tvsWyeJoin::Plan p=tvsWyeJoin::wye(d[0],br,r.radius2,r.l,1.0,50.0/f);
+    if(p.error==tvsWyeJoin::Degenerate||p.error==tvsWyeJoin::NotAngled||p.error==tvsWyeJoin::SameSide){
+        acutPrintf(L"\nTVS_SPOJ_TKG: %ls (prvi izabrani kanal je ulaz Y45; za kosu račvu: dva kanala u istoj osi + ogranak).",roundError(p.error));return;}
+    d[0].nearJoined=joined(0,p.inletNear);
+    for(int k=0;k<2;++k){br[k].nearJoined=joined(k+1,p.branchNear[k]);br[k].farJoined=joined(k+1,1-p.branchNear[k]);}
+    const int right=p.right;const double w1=pk[1+right].a,w2=pk[2-right].a;
+    const bool soko=tvsTeeFit::wyeRecord(r,A,w1,w2,f,Lpl);
+    {tvsTee::Tee t;t.type=tvsTee::Pants;t.round=true;t.A=A;t.w1=w1;t.w2=w2;t.l=r.l;t.margin=r.radius2;t.lateral=deg;
+     if(!tvsTee::valid(t)){acutPrintf(L"\nTVS_SPOJ_TKG: Y45 nije moguća – ogranci su premali za ulaz %.0f mm.",A*f);return;}}
+    p=tvsWyeJoin::wye(d[0],br,r.radius2,r.l,1.0,50.0/f);
+    if(p.error!=tvsWyeJoin::Ok){acutPrintf(L"\nTVS_SPOJ_TKG: %ls.",roundError(p.error));return;}
+    tvsSizeFollow::applying()=true;
+    if(p.moved>=0){AcDbObjectPointer<TVS_Pipe> q(pk[1+p.moved].id,AcDb::kForWrite);
+        if(q.openStatus()==Acad::eOk){AcGeVector3d sh(p.shift.x,p.shift.y,0);q->put_FirstPoint(q->FirstPoint+sh);q->put_Lastpoint(q->LastPoint+sh);q->recordGraphicsModified();}}
+    const AcDbObjectId tee=newWye(pk[0],w1,A,p.lengthPl,p.u,p.v,p.base,r);
+    if(tee.isNull()){AcDbObjectId none;restore(saved,none);tvsSizeFollow::applying()=false;acutPrintf(L"\nTVS_SPOJ_TKG: Y45 nije napravljena.");return;}
+    const Pick* ducts[3]={&pk[0],&pk[1],&pk[2]};const int ends[3]={p.inletNear,p.branchNear[0],p.branchNear[1]};
+    const tvsPantsJoin::V to[3]={p.inletPort,p.port[0],p.port[1]};placeEnds(tee,ducts,ends,to,3);
+    tvsSizeFollow::applying()=false;
+    if(p.moved>=0)acutPrintf(L"\nOgranak %d pomjeren duž ulaza za %.0f mm (na mjesto ose Y45).",p.moved+1,std::hypot(p.shift.x,p.shift.y)*f);
+    wchar_t msg[200];swprintf_s(msg,L"Račva Y45 Ø%.0f / Ø%.0f, Ø%.0f (L2 = %.0f mm%ls).",A*f,w1*f,w2*f,r.l*f,soko?L", Soko":L", nije u Soko tabeli");
+    confirm(tee,saved,msg);
+}
 inline void execute(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=0.1/f,l=tvsTeeData::collarMm()/f;
     Pick in,br[2];
     if(!pick(L"\nIzaberite ulazni kanal: ",in))return;
-    if(!pick(L"\nIzaberite prvi ogranak: ",br[0]))return;
-    if(!pick(L"\nIzaberite drugi ogranak: ",br[1]))return;
+    if(in.round)acutPrintf(L"\nOkrugli kanali: Y45 = ulaz + dva ogranka pod 45°; kosa račva = dva kanala u istoj osi + ogranak pod 45°.");
+    if(!pick(in.round?L"\nIzaberite drugi kanal: ":L"\nIzaberite prvi ogranak: ",br[0]))return;
+    if(!pick(in.round?L"\nIzaberite treći kanal: ":L"\nIzaberite drugi ogranak: ",br[1]))return;
     if(br[0].id==br[1].id||br[0].id==in.id||br[1].id==in.id){acutPrintf(L"\nTVS_SPOJ_TKG: izaberite tri različita kanala.");return;}
-    if(in.round||br[0].round||br[1].round){acutPrintf(L"\nTVS_SPOJ_TKG: TK-G je za pravougaone kanale.");return;}
     if(std::fabs(br[0].elev-in.elev)>1.0/f||std::fabs(br[1].elev-in.elev)>1.0/f){acutPrintf(L"\nTVS_SPOJ_TKG: kanali nisu na istoj koti (TVS_PROVJERA / Svojstva).");return;}
+    if(in.round&&br[0].round&&br[1].round){const Pick all[3]={in,br[0],br[1]};roundJoin(db,all);return;}   // kosa racva TK / Y45
+    if(in.round||br[0].round||br[1].round){acutPrintf(L"\nTVS_SPOJ_TKG: kanali moraju biti svi pravougaoni (TK-G) ili svi okrugli (Y45 / kosa račva).");return;}
     if(!tvsTee::pantsFeasible(in.a,br[0].a,br[1].a,l)){acutPrintf(L"\nTVS_SPOJ_TKG: ogranci su preuski za ulaz %.0f mm (TK-G nije moguć).",in.a*f);return;}
     std::vector<tvsMove::Node> nodes;AcDbObjectIdArray labels;
     if(!tvsMove::snapshot(db,nodes,labels)){acutPrintf(L"\nTVS_SPOJ_TKG: crtež se ne može pročitati.");return;}
