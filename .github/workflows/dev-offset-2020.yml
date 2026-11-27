@@ -121,9 +121,11 @@ jobs:
           name: dev-offset-integration-autocad-2020-logs
           path: build-logs/
           if-no-files-found: warn
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: success()
         with:
           name: DEV-INTEGRATION-offset-autocad-2020-x64
           path: dist-offset-dev/
           if-no-files-found: error
+          retention-days: 7

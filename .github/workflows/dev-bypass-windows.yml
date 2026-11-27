@@ -76,3 +76,4 @@ jobs:
           path: |
             bypass-windows-results/
             build-logs/
+          retention-days: 7

@@ -29,3 +29,4 @@ jobs:
         with:
           name: SDK-free-bypass-candidate-test-results
           path: bypass-test-results/
+          retention-days: 7
