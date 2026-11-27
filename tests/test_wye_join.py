@@ -13,7 +13,7 @@ class WyeJoin(unittest.TestCase):
  def test_command(self):
   s=text('TVS_Ventilation_ARX/PantsJoinCommand.h')
   self.assertIn('if(in.round&&br[0].round&&br[1].round){const Pick all[3]={in,br[0],br[1]};roundJoin(db,all);return;}',s)
-  self.assertIn('tvsWyeJoin::lateralParts(d,2.0/f,m,b)',s);self.assertIn('tvsWyeJoin::wye(d[0],br,r.radius2,r.l,1.0,50.0/f)',s)
+  self.assertIn('tvsWyeJoin::lateralParts(d,2.0/f,m,b)&&b!=0',s);self.assertIn('tvsWyeJoin::wye(d[0],br,r.radius2,r.l,1.0,50.0/f,-1,T)',s);self.assertIn('tvsTeeDialog::planElbow(tee,at,dir,turn,sec,pk[0].elev,f,exit,out)',s)
  def test_move(self):
   s=text('TVS_Ventilation_ARX/TVSMoveCommand.h')
   self.assertIn('&&(angled||std::fabs(mainAxis.dot(branchAxis))<1e-6))n.kind=4;',s)

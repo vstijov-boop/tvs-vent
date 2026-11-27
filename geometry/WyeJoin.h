@@ -28,13 +28,17 @@ struct Plan {
     int right;                 // input branch on the right of the flow (w1, TVS_WYE +Vectpr)
     V base,u,v;                // TVS_WYE: Basepoint = O of the right branch, Vectpr = u, Vectotv = v
     double lengthPl;           // TVS_WYE LengthPl = yO1 - w1/2
-    V inletPort,port[2];       // port[k]: face of input branch k
+    V inletPort,port[2];       // port[k]: where input branch k starts (the Y45 face, or the exit of its elbow)
+    bool elbow[2];V face[2],faceDir[2];   // branch k perpendicular to the inlet: koljeno 45 on the Y45 face
     int inletNear,branchNear[2];
-    Plan():error(Degenerate),moved(-1),right(0),lengthPl(0),inletNear(0){branchNear[0]=branchNear[1]=0;}
+    Plan():error(Degenerate),moved(-1),right(0),lengthPl(0),inletNear(0){branchNear[0]=branchNear[1]=0;elbow[0]=elbow[1]=false;}
 };
 // A: inlet diameter, w[k] = br[k].width; s: inlet straight; L2: Soko L2 (both branches);
 // tolDeg: angle tolerance; minDuct: shortest duct left; preferMoved: -1 automatic, 0 / 1.
-inline Plan wye(const Duct& in,const Duct br[2],double s,double L2,double tolDeg,double minDuct,int preferMoved=-1){
+// A branch perpendicular to the inlet (user's drawing 2026-11-27: inlet + two opposite branches at
+// right angles) gets a koljeno 45 on the Y45 face: T[k] = tangent length of its axis
+// ((R + w/2) tan 22.5); its duct line then lies (L2 + T) cos 45 beyond O_k along the inlet.
+inline Plan wye(const Duct& in,const Duct br[2],double s,double L2,double tolDeg,double minDuct,int preferMoved=-1,const double* T=0){
     Plan p;const double deg=45,c=std::cos(deg*3.14159265358979323846/180),tc=std::sin(tolDeg*3.14159265358979323846/180);
     if(len(in.b-in.a)<1e-9||len(br[0].b-br[0].a)<1e-9||len(br[1].b-br[1].a)<1e-9||!(in.width>0)||!(br[0].width>0)||!(br[1].width>0))return p;
     const V mid=(br[0].a+br[0].b+br[1].a+br[1].b)*0.25;
@@ -47,7 +51,8 @@ inline Plan wye(const Duct& in,const Duct br[2],double s,double L2,double tolDeg
         const double da=std::fabs(cross(br[k].a-inNear,d)),db=std::fabs(cross(br[k].b-inNear,d));
         p.branchNear[k]=da<=db?0:1;bn[k]=p.branchNear[k]==0?br[k].a:br[k].b;
         o[k]=unit((p.branchNear[k]==0?br[k].b:br[k].a)-bn[k]);
-        if(std::fabs(dot(o[k],d)-c)>tc){p.error=NotAngled;return p;}
+        p.elbow[k]=std::fabs(dot(o[k],d))<=tc&&T&&T[k]>=0;
+        if(!p.elbow[k]&&std::fabs(dot(o[k],d)-c)>tc){p.error=NotAngled;return p;}
         if(!meet(inNear,d,bn[k],o[k],t[k]))return p;
     }
     const bool r0=dot(o[0],ex)>0,r1=dot(o[1],ex)>0;
@@ -56,6 +61,7 @@ inline Plan wye(const Duct& in,const Duct br[2],double s,double L2,double tolDeg
     p.right=r0?0:1;const int left=1-p.right;
     const double w1=br[p.right].width,w2=br[left].width,A=in.width;
     double yO[2];yO[p.right]=tvsTee::wyeAxisY(A,w1,s,deg);yO[left]=tvsTee::wyeAxisY(A,w2,s,deg);
+    for(int k=0;k<2;++k)if(p.elbow[k])yO[k]+=(L2+T[k])*c;   // where the branch duct line crosses the inlet axis
     // which branch keeps its place: the other moves along d by (tface + yO_m) - t_m
     const double off01=(t[1]-yO[1])-(t[0]-yO[0]);   // inlet face of branch 1 minus that of branch 0
     int keep=0;
@@ -70,8 +76,13 @@ inline Plan wye(const Duct& in,const Duct br[2],double s,double L2,double tolDeg
     const double tface=t[keep]-yO[keep];
     p.inletPort=inNear+d*tface;
     p.u=ex;p.v=d*-1;
-    p.base=inNear+d*(tface+yO[p.right]);p.lengthPl=yO[p.right]-w1/2;
-    for(int k=0;k<2;++k)p.port[k]=inNear+d*(tface+yO[k])+o[k]*L2;
+    const double yR=yO[p.right]-(p.elbow[p.right]?(L2+T[p.right])*c:0);
+    p.base=inNear+d*(tface+yR);p.lengthPl=yR-w1/2;
+    for(int k=0;k<2;++k){
+        const double y=yO[k]-(p.elbow[k]?(L2+T[k])*c:0);
+        p.faceDir[k]=p.elbow[k]?unit(d+o[k]):o[k];
+        p.face[k]=inNear+d*(tface+y)+p.faceDir[k]*L2;
+        p.port[k]=p.elbow[k]?p.face[k]+p.faceDir[k]*T[k]+o[k]*T[k]:p.face[k];}
     if(dot(farIn-p.inletPort,d*-1)<minDuct){p.error=InletShort;return p;}
     for(int k=0;k<2;++k){const V f=(p.branchNear[k]==0?br[k].b:br[k].a)+(p.moved==k?p.shift:V());
         if(dot(f-p.port[k],o[k])<minDuct){p.error=BranchShort;return p;}}

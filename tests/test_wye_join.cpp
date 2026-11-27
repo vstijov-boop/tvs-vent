@@ -35,6 +35,18 @@ int main(){
     b2[0]=br[0];b2[1]=br[0];b2[1].a.y+=300;b2[1].b.y+=300;p=tvsWyeJoin::wye(in,b2,s,L2,1.0,50);check(p.error==tvsWyeJoin::SameSide,"same side");
     // inlet too short
     tvsWyeJoin::Duct shortIn=duct(V(0,540),V(0,560),200);p=tvsWyeJoin::wye(shortIn,br,s,L2,1.0,50);check(p.error==tvsWyeJoin::InletShort,"inlet short");
+    // user's drawing 2026-11-27: inlet along +x, two branches on one vertical line (perpendicular) -> Y45 + koljena 45
+    {tvsWyeJoin::Duct in2=duct(V(-3000,0),V(-500,0),200),b3[2];
+     b3[0]=duct(V(400,150),V(400,3000),150);b3[1]=duct(V(400,-150),V(400,-3000),150);
+     const double T[2]={50,50},L=205,yO2=tvsTee::wyeAxisY(200,150,40,45);
+     tvsWyeJoin::Plan q=tvsWyeJoin::wye(in2,b3,40,L,1.0,50,-1,T);
+     check(q.error==tvsWyeJoin::Ok&&q.elbow[0]&&q.elbow[1]&&q.moved==-1,"perpendicular: elbows");
+     check(q.right==1,"right = down");
+     near(q.port[0].x,400,1e-6,"exit on branch line 0");near(q.port[1].x,400,1e-6,"exit on branch line 1");
+     near(q.inletPort.x,400-(L+50)*r-yO2,1e-6,"inlet face");near(q.port[0].y,-q.port[1].y,1e-6,"symmetric");
+     near(q.face[0].x-q.inletPort.x,yO2+L*r,1e-6,"Y45 face");
+     near(q.base.x-q.inletPort.x,yO2,1e-6,"base = O");
+     check(tvsWyeJoin::wye(in2,b3,40,L,1.0,50).error==tvsWyeJoin::NotAngled,"no T: refused");}
     // kosa: main 0..1000 and 1000..3000 (gap free), branch at 45 from (1500, 300)
     tvsWyeJoin::Duct d3[3]={duct(V(0,0),V(1000,0),250),duct(V(3000,0),V(1200,0),250),duct(V(1600+10*r,10*r),V(1600+1500*r,1500*r),160)};
     int m[2],b=-1;check(tvsWyeJoin::lateralParts(d3,1.0,m,b)&&b==2&&m[0]==0&&m[1]==1,"parts");
