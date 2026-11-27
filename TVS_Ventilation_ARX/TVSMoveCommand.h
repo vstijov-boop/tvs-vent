@@ -108,10 +108,10 @@ inline bool describe(AcDbEntity* entity,Node& n){
         }
         n.ports.push_back(point(p->FirstPoint));n.ports.push_back(last);
         n.axes.push_back(Point(p->VectTr.x,p->VectTr.y,p->VectTr.z));n.axes.push_back(n.axes[0]);
-        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp1,p->SizeBp1,p->ThisRoundp1,p->Elev));
+        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp1,p->ThisRoundp1?0:p->SizeBp1,p->ThisRoundp1,p->Elev));
         // aligned in height (gore / dolje, TransAlignData.h): the axis at the end is Elev + endOffset
-        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp2,p->SizeBp2,p->ThisRoundp2,
-            p->Elev+tvsTransAlign::endOffset(tvsTransAlign::read(p),p->SizeAp1,p->SizeBp1,p->SizeAp2,p->SizeBp2)));
+        n.sections.push_back(tvsMoveNetwork::Section(p->SizeAp2,p->ThisRoundp2?0:p->SizeBp2,p->ThisRoundp2,
+            p->Elev+tvsTransAlign::endOffsetOf(tvsTransAlign::read(p),p)));
         Point direction;
         if(std::fabs(p->VectTr.z)<1e-8
             &&tvsMoveGeometry::unit(n.ports[1]-n.ports[0],direction))n.kind=3;

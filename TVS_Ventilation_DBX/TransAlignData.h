@@ -20,6 +20,11 @@ inline double endOffset(int align,double A1,double B1,double A2,double B2){
     const double d=(height(A1,B1)-height(A2,B2))/2;
     return align==Top?d:align==Bottom?-d:0;
 }
+// The same for a transition (TVS_TRANS): a round end has no height of its own - its SizeB may still
+// hold the height of an earlier rectangular size (Properties), so only the diameter counts (plan 29).
+template<class T> inline double endOffsetOf(int align,const T* t){
+    return endOffset(align,t->SizeAp1,t->ThisRoundp1?0:t->SizeBp1,t->SizeAp2,t->ThisRoundp2?0:t->SizeBp2);
+}
 inline int read(const AcDbObject* o){
     if(!o)return Axis;const AcDbObjectId dictId=o->extensionDictionary();if(dictId.isNull())return Axis;
     AcDbObjectPointer<AcDbDictionary> dict(dictId,AcDb::kForRead);if(dict.openStatus()!=Acad::eOk)return Axis;

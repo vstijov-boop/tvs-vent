@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 // Poravnanje prelaza po visini (TransAlignData.h): default for new transitions (TVS_SETTINGS,
 // per user in HKCU\Software\TVS_Vent), and TVS_PRELAZ_KOTA: after the alignment (or the heights)
 // of a transition changed, the axis at its end moves by a difference; the command asks which
@@ -35,7 +35,7 @@ inline void storePlan(int t){
     if(t<1||t>3)return;HKEY k=NULL;if(RegCreateKeyExW(HKEY_CURRENT_USER,regKey(),0,NULL,0,KEY_WRITE,NULL,&k,NULL)!=ERROR_SUCCESS)return;
     const DWORD v=static_cast<DWORD>(t);RegSetValueExW(k,L"TransPlan",0,REG_DWORD,reinterpret_cast<const BYTE*>(&v),sizeof(v));RegCloseKey(k);
 }
-inline double endOffset(const TVS_TRANS* t,int align){return tvsTransAlign::endOffset(align,t->SizeAp1,t->SizeBp1,t->SizeAp2,t->SizeBp2);}
+inline double endOffset(const TVS_TRANS* t,int align){return tvsTransAlign::endOffsetOf(align,t);}
 inline double endOffset(const TVS_TRANS* t){return endOffset(t,tvsTransAlign::read(t));}
 // State before a change: the end axis offset and the outlet (port 1) it had.
 struct Before {double offset;AcGePoint3d outlet;bool hasOutlet;Before():offset(0),hasOutlet(false){}};

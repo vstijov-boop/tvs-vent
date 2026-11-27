@@ -258,7 +258,7 @@ Adesk::Boolean TVS_TRANS::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
 	// TVS_KOTE: both ends (the end axis follows the alignment by height, TransAlignData.h)
 	tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.2, VectTr, Elev, SizeAp1, SizeBp1);
-	tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.8, VectTr, Elev + tvsTransAlign::endOffset(tvsTransAlign::read(this), SizeAp1, SizeBp1, SizeAp2, SizeBp2), SizeAp2, SizeBp2);
+	tvsLevelLabels::draw(mode, database(), FirstPoint + VectTr * 0.8, VectTr, Elev + tvsTransAlign::endOffsetOf(tvsTransAlign::read(this), this), SizeAp2, SizeBp2);
 	ClearEntitylist();
 	bool tt=false;
 	AcGeVector3d vec=AcGeVector3d(VectTr.y,-VectTr.x,VectTr.z);

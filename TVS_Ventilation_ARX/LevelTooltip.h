@@ -37,7 +37,7 @@ public:
             TVS_Entity* t=TVS_Entity::cast(e);
             if(TVS_TRANS* tr=TVS_TRANS::cast(e)){   // prelaz: both ends
                 const double f=tvsUnits::factor(e),h1=tvsTransAlign::height(tr->SizeAp1,tr->SizeBp1)/2,h2=tvsTransAlign::height(tr->SizeAp2,tr->SizeBp2)/2;
-                const double z2=tr->Elev+tvsTransAlign::endOffset(tvsTransAlign::read(tr),tr->SizeAp1,tr->SizeBp1,tr->SizeAp2,tr->SizeBp2);
+                const double z2=tr->Elev+tvsTransAlign::endOffsetOf(tvsTransAlign::read(tr),tr);
                 swprintf_s(text,L"TVS kote: pocetak gi %.0f / os %.0f / di %.0f, kraj gi %.0f / os %.0f / di %.0f mm (%ls)",
                     (tr->Elev+h1)*f,tr->Elev*f,(tr->Elev-h1)*f,(z2+h2)*f,z2*f,(z2-h2)*f,tvsTransAlign::name(tvsTransAlign::read(tr)));
                 if(tvsSpiro::applies(tr->database(),tr->SizeAp1,tr->ThisRoundp1,tr->SizeAp2,tr->ThisRoundp2,tr->getDuctType()==DuctTypeFlex)){   // spiro: sifra i proizvodna duzina
