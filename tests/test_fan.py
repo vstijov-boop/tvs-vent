@@ -16,7 +16,9 @@ class Fan(unittest.TestCase):
   l=text('TVS_Ventilation_ARX/EquipmentLinkCommand.h')
   self.assertIn('tvsFan::isFan(r)&&r.suction<0)tvsFan::chooseSide(linkedNow[k]);',l)
   self.assertIn('if(rowOf[k]>=0){if(rowDone.insert(rowOf[k]).second)linkRow(rowOf[k]);continue;}',l)
-  self.assertIn('lk::chain(feet,r,o.tol,parts)',l);self.assertIn('keepSuction(old,rec);',l)
+  self.assertIn('lk::chain(feet,r,o.tol,parts)',l);self.assertIn('if(leansWrong(r,index)){refuse(t,id,name,NotLeaning,0,false);',l)
+  self.assertIn('for(size_t k=0;k<lean.size();++k){out.push_back(lean[k]);index.push_back(-1);}',l);self.assertIn('if(lk::dot(dir,lk::sub(c,e.at))<=0)continue;',l)
+  self.assertIn('keepSuction(old,rec);',l)
  def test_sides(self):
   f=text('TVS_Ventilation_ARX/FlowCommand.h')
   self.assertIn('out[i].ports[fanCut().port].x+=1e9;',f);self.assertIn('FanScope scope(fanId,side==0?suction:1-suction);',f)

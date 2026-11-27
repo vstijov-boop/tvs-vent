@@ -38,7 +38,7 @@ namespace lk=tvsEquipmentLink;
 inline double& gapMm(){static double v=150;return v;}   // largest gap / overlap closed (Tolerancija)
 const double axisTolMm=25,minPieceMm=50,tolMm=1;
 // reasons of this command after the geometric ones (lk::Error)
-enum Extra {NotPlan=lk::errorCount,NoGeometry,Assembly,Locked,WriteFailed,NotInRow,reasonCount};
+enum Extra {NotPlan=lk::errorCount,NoGeometry,Assembly,Locked,WriteFailed,NotInRow,NotLeaning,reasonCount};
 inline const wchar_t* reasonText(int e){
     switch(e){
     case NotPlan:return L"blok nije u osnovi (3D rotacija)";
@@ -46,6 +46,7 @@ inline const wchar_t* reasonText(int e){
     case Assembly:return L"kanal je dio etaža / obilaska";
     case Locked:return L"kanal ili blok je na zaključanom sloju";
     case WriteFailed:return L"upis nije uspio";
+    case NotLeaning:return L"blok ne naliježe na susjedni povezani blok (razmak / preklop) – primaknite ga ili povežite cijeli niz zajedno";
     case NotInRow:return L"blokovi koji se dodiruju nisu jedan za drugim na osi kanala (niz opreme)";
     default:return lk::reasonText(e);
     }
@@ -96,8 +97,13 @@ inline bool footprint(const AcDbBlockReference* ref,std::vector<lk::Pt>& out){
     return true;
 }
 // The network of the current space: TVS elements (tvsMove::snapshot) and the ports of linked blocks.
-struct EquipPort {AcDbObjectId id;lk::Pt at;};
+// a port of a linked block; dir out of the block, size (mm) and level: a neighbour block can lean on it
+struct EquipPort {AcDbObjectId id;lk::Pt at;double dx,dy,a,b,level;bool round;EquipPort():dx(1),dy(0),a(0),b(0),level(0),round(false){}};
 struct Scene {std::vector<tvsMove::Node> nodes;std::vector<EquipPort> equipment;};
+inline void remember(Scene& s,const AcDbObjectId& id,const tvsEquipment::Record& r){
+    for(int k=0;k<r.ports&&k<2;++k){EquipPort p;p.id=id;p.at=lk::Pt(r.port[k].x,r.port[k].y);p.dx=r.port[k].dx;p.dy=r.port[k].dy;
+        p.a=r.a;p.b=r.round?0:r.b;p.round=r.round;p.level=r.port[k].z;s.equipment.push_back(p);}
+}
 inline bool readScene(AcDbDatabase* db,Scene& s){
     AcDbObjectIdArray labels;if(!tvsMove::snapshot(db,s.nodes,labels))return false;
     AcDbBlockTableRecordPointer space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return false;
@@ -105,7 +111,7 @@ inline bool readScene(AcDbDatabase* db,Scene& s){
     for(;!it->done();it->step()){AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk||id.objectClass()!=AcDbBlockReference::desc())continue;
         tvsEquipment::Record r;if(!tvsEquipmentStore::read(id,r))continue;
         {AcDbObjectPointer<AcDbBlockReference> b(id,AcDb::kForRead);if(b.openStatus()!=Acad::eOk||tvsEquipmentStore::detached(b.object(),r))continue;}   // moved / copied: its old ports are not taken
-        for(int k=0;k<r.ports&&k<2;++k){EquipPort p;p.id=id;p.at=lk::Pt(r.port[k].x,r.port[k].y);s.equipment.push_back(p);}}
+        remember(s,id,r);}
     delete it;return true;
 }
 inline bool isDuct(const tvsMove::Node& n){return n.ports.size()==2&&(n.kind==1||n.flex)&&n.id.objectClass()==TVS_Pipe::desc();}
@@ -135,6 +141,33 @@ inline void ductsNear(const Scene& s,const AcDbObjectId& self,const std::vector<
         for(size_t q=0;q<s.equipment.size();++q)
             if(s.equipment[q].id!=self&&lk::length(lk::sub(p,s.equipment[q].at))<=tol)++out[k].others[e];
     }
+    // a linked block next to this one (user 2026-11-27: FV linked first, then the fan): its port facing
+    // this block is a "duct" lying inside that block (index -1, never trimmed / cut: only Touching);
+    // the real ducts behind that block are not candidates
+    std::vector<lk::Duct> lean;std::vector<AcDbObjectId> behind;
+    for(size_t q=0;q<s.equipment.size();++q){const EquipPort& e=s.equipment[q];if(e.id==self||!(e.a>0))continue;
+        const lk::Pt dir(e.dx,e.dy);if(lk::length(dir)<1e-9||lk::length(lk::sub(e.at,c))>radius+reach)continue;
+        if(lk::dot(dir,lk::sub(c,e.at))<=0)continue;   // its port must face this block
+        lk::Duct d;d.p0=e.at;d.p1=lk::sub(e.at,lk::mul(dir,(1000.0/f)/lk::length(dir)));d.round=e.round;d.flex=false;d.level=e.level;d.a=e.a;d.b=e.round?0:e.b;
+        for(size_t j=0;j<s.nodes.size();++j)for(size_t m=0;m<s.nodes[j].ports.size();++m)
+            if(lk::length(lk::sub(e.at,lk::Pt(s.nodes[j].ports[m].x,s.nodes[j].ports[m].y)))<=tol){++d.others[0];break;}
+        for(size_t m=0;m<s.equipment.size();++m)if(m!=q&&s.equipment[m].id!=self&&s.equipment[m].id!=e.id&&lk::length(lk::sub(e.at,s.equipment[m].at))<=tol)++d.others[0];
+        d.others[1]=1;lean.push_back(d);behind.push_back(e.id);}
+    if(lean.empty())return;
+    for(size_t k=out.size();k-->0;){bool hidden=false;
+        for(int e=0;e<2&&!hidden;++e){const lk::Pt p=e==0?out[k].p0:out[k].p1;
+            for(size_t q=0;q<s.equipment.size()&&!hidden;++q){bool lean2=false;for(size_t b=0;b<behind.size();++b)if(behind[b]==s.equipment[q].id)lean2=true;
+                if(lean2&&lk::length(lk::sub(p,s.equipment[q].at))<=tol)hidden=true;}}
+        if(hidden){out.erase(out.begin()+k);index.erase(index.begin()+k);}}
+    for(size_t k=0;k<out.size();++k)for(int e=0;e<2;++e)if(out[k].partner[e]>=0)out[k].partner[e]=-1;   // indices changed; partners recomputed below
+    for(size_t k=0;k<out.size();++k)for(int e=0;e<2;++e){const lk::Pt p=e==0?out[k].p0:out[k].p1;
+        for(size_t m=0;m<out.size();++m)if(m!=k&&(lk::length(lk::sub(p,out[m].p0))<=tol||lk::length(lk::sub(p,out[m].p1))<=tol))out[k].partner[e]=static_cast<int>(m);}
+    for(size_t k=0;k<lean.size();++k){out.push_back(lean[k]);index.push_back(-1);}
+}
+// a link that would trim / cut the leaning "duct" of a neighbour block (index -1): the faces must touch
+inline bool leansWrong(const lk::Result& r,const std::vector<int>& index){
+    for(size_t k=0;k<r.edits.size();++k)if(r.edits[k].duct>=0&&r.edits[k].duct<static_cast<int>(index.size())&&index[r.edits[k].duct]<0)return true;
+    return r.linkCase==lk::Cut&&r.cutDuct>=0&&r.cutDuct<static_cast<int>(index.size())&&index[r.cutDuct]<0;
 }
 // Free vertical outlets of elbows Gore / Dolje (TVS_TAP Form_Up / Form_Down, 90 deg) within `reach` of
 // the base point: outlet centre in plan as OffsetService::describe / RoundElbow.h compute it (rectangular:
@@ -241,7 +274,7 @@ inline bool applyRow(const std::vector<AcDbObjectId>& blockIds,const lk::Result&
         s.nodes[index[r.cutDuct]].ports[1]=tvsMove::point(keep);
         piece.id=pieceId;piece.ports[0]=tvsMove::point(first);piece.ports[1]=tvsMove::point(last);s.nodes.push_back(piece);}
     for(size_t m=0;m<blockIds.size()&&m<recs.size();++m)
-        for(int k=0;k<recs[m].ports&&k<2;++k){EquipPort p;p.id=blockIds[m];p.at=lk::Pt(recs[m].port[k].x,recs[m].port[k].y);s.equipment.push_back(p);}
+        remember(s,blockIds[m],recs[m]);
     return true;
 }
 inline void forget(Scene& s,const AcDbObjectId& id){
@@ -334,12 +367,13 @@ inline void execute(){
             ids.push_back(blocks[k]);names.push_back(name);recs.push_back(rec);olds.push_back(old);was.push_back(w);known.push_back(w||d);
             feet.push_back(rowFoot[k]);all.insert(all.end(),rowFoot[k].begin(),rowFoot[k].end());}
         for(size_t m=0;m<ids.size();++m)if(was[m])forget(scene,ids[m]);
-        auto back=[&](){for(size_t m=0;m<ids.size();++m)if(was[m])for(int p=0;p<olds[m].ports&&p<2;++p){EquipPort e;e.id=ids[m];e.at=lk::Pt(olds[m].port[p].x,olds[m].port[p].y);scene.equipment.push_back(e);}};
+        auto back=[&](){for(size_t m=0;m<ids.size();++m)if(was[m])remember(scene,ids[m],olds[m]);};
         lk::Options o=base;o.expect=lk::Inline;o.bottom=false;
         std::vector<lk::Duct> ducts;std::vector<int> index;
         ductsNear(scene,ids[0],all,4*o.gap+o.tol,o.tol,f,ducts,index);
         const lk::Result r=lk::link(all,ducts,o);
         if(r.error!=lk::Ok||r.ports!=2||r.twin){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],r.error!=lk::Ok?r.error:static_cast<int>(lk::MissingSide),r.detail*f,false);back();return;}
+        if(leansWrong(r,index)){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],NotLeaning,0,false);back();return;}
         std::vector<lk::ChainPart> parts;
         if(!lk::chain(feet,r,o.tol,parts)){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],NotInRow,0,false);back();return;}
         std::vector<AcDbObjectId> touched=ids;
@@ -393,7 +427,7 @@ inline void execute(){
             wchar_t prompt[300];swprintf_s(prompt,L"\nBlok %ls preko kanala: [Dno/Linija] <Linija>: ",name.c_str());
             acedInitGet(0,L"Dno Linija");ACHAR kw[16]=L"";const int rc=acedGetKword(prompt,kw,16);
             if(rc!=RTNORM&&rc!=RTNONE){stop=true;
-                if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
+                if(wasLinked)remember(scene,id,old);
                 break;}
             const bool dno=rc==RTNORM&&_wcsicmp(kw,L"Dno")==0;
             tvsEquipment::Record d;d.kind=dno?tvsEquipment::Grille:tvsEquipment::Other;d.ports=dno?1:2;
@@ -406,8 +440,9 @@ inline void execute(){
         }
         if(r.error!=lk::Ok){
             refuse(t,id,name,r.error,r.detail*f,all);
-            if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
+            if(wasLinked)remember(scene,id,old);
             continue;}
+        if(leansWrong(r,index)){refuse(t,id,name,NotLeaning,0,false);if(wasLinked)remember(scene,id,old);continue;}
         // preflight: every element written can be written
         std::vector<AcDbObjectId> touched(1,id);
         for(size_t e=0;e<r.edits.size();++e)touched.push_back(scene.nodes[index[r.edits[e].duct]].id);
@@ -415,7 +450,7 @@ inline void execute(){
         bool assembly=false;for(size_t e=1;e<touched.size();++e)if(inAssembly(touched[e]))assembly=true;
         if(assembly||!tvsAction::writable(touched)){
             refuse(t,id,name,assembly?Assembly:Locked,0,false);
-            if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
+            if(wasLinked)remember(scene,id,old);
             continue;}
         if(!known)rec.kind=r.twin?tvsEquipment::Diffuser:r.ports==1?tvsEquipment::Grille:tvsEquipment::Other;
         rec.twin=r.twin;   // linijski difuzor: 2 priključka na kutiji (Equipment.h)
@@ -432,7 +467,7 @@ inline void execute(){
         AcDbObjectId piece;
         if(!apply(id,r,index,scene,rec,piece)){
             refuse(t,id,name,WriteFailed,0,false);
-            if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
+            if(wasLinked)remember(scene,id,old);
             continue;}
         if(r.ports==2&&!r.twin)++t.inl;else ++t.term;
         linkedNow.push_back(id);
