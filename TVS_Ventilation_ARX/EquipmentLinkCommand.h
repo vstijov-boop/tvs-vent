@@ -20,6 +20,7 @@
 #include "BuildTransaction.h"
 #include "EquipmentStore.h"
 #include "EquipmentDialog.h"
+#include "FanCommand.h"
 #include "resource.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../geometry/EquipmentLink.h"
@@ -28,6 +29,7 @@
 #include <dbents.h>
 #include <cmath>
 #include <map>
+#include <functional>
 #include <set>
 #include <string>
 #include <vector>
@@ -36,7 +38,7 @@ namespace lk=tvsEquipmentLink;
 inline double& gapMm(){static double v=150;return v;}   // largest gap / overlap closed (Tolerancija)
 const double axisTolMm=25,minPieceMm=50,tolMm=1;
 // reasons of this command after the geometric ones (lk::Error)
-enum Extra {NotPlan=lk::errorCount,NoGeometry,Assembly,Locked,WriteFailed,reasonCount};
+enum Extra {NotPlan=lk::errorCount,NoGeometry,Assembly,Locked,WriteFailed,NotInRow,reasonCount};
 inline const wchar_t* reasonText(int e){
     switch(e){
     case NotPlan:return L"blok nije u osnovi (3D rotacija)";
@@ -44,6 +46,7 @@ inline const wchar_t* reasonText(int e){
     case Assembly:return L"kanal je dio etaža / obilaska";
     case Locked:return L"kanal ili blok je na zaključanom sloju";
     case WriteFailed:return L"upis nije uspio";
+    case NotInRow:return L"blokovi koji se dodiruju nisu jedan za drugim na osi kanala (niz opreme)";
     default:return lk::reasonText(e);
     }
 }
@@ -198,8 +201,16 @@ inline TVS_Pipe* newPiece(TVS_Pipe* p,const AcGePoint3d& first){
     return n;
 }
 // One block: geometry decided (r), writes ducts + record in one transaction. false: nothing changed.
+inline bool applyRow(const std::vector<AcDbObjectId>& blockIds,const lk::Result& r,const std::vector<int>& index,
+                     Scene& s,const std::vector<tvsEquipment::Record>& recs,AcDbObjectId& pieceId);
 inline bool apply(const AcDbObjectId& blockId,const lk::Result& r,const std::vector<int>& index,
                   Scene& s,const tvsEquipment::Record& rec,AcDbObjectId& pieceId){
+    return applyRow(std::vector<AcDbObjectId>(1,blockId),r,index,s,std::vector<tvsEquipment::Record>(1,rec),pieceId);
+}
+// One block, or a row of blocks touching one another (niz opreme): the duct edits of r, every
+// block its record, in one transaction. false: nothing changed.
+inline bool applyRow(const std::vector<AcDbObjectId>& blockIds,const lk::Result& r,const std::vector<int>& index,
+                     Scene& s,const std::vector<tvsEquipment::Record>& recs,AcDbObjectId& pieceId){
     tvsAction::Transaction tx;if(!tx.good())return false;
     for(size_t k=0;k<r.edits.size();++k){const lk::EndEdit& e=r.edits[k];
         TVS_Pipe* p=TVS_Pipe::cast(tx.open(s.nodes[index[e.duct]].id,AcDb::kForWrite));if(!p)return false;
@@ -218,9 +229,10 @@ inline bool apply(const AcDbObjectId& blockId,const lk::Result& r,const std::vec
         if(p->put_Lastpoint(keep)!=Acad::eOk)return false;
         p->recordGraphicsModified();
     }
-    AcDbObject* b=tx.open(blockId,AcDb::kForWrite);
-    tvsEquipment::Record anchored=rec;if(b)tvsEquipmentStore::anchor(b,anchored);   // where it was linked (moved / copied later = odvojen)
-    if(!b||tvsEquipmentStore::write(b,anchored)!=Acad::eOk)return false;
+    for(size_t k=0;k<blockIds.size()&&k<recs.size();++k){
+        AcDbObject* b=tx.open(blockIds[k],AcDb::kForWrite);
+        tvsEquipment::Record anchored=recs[k];if(b)tvsEquipmentStore::anchor(b,anchored);   // where it was linked (moved / copied later = odvojen)
+        if(!b||tvsEquipmentStore::write(b,anchored)!=Acad::eOk)return false;}
     if(!tx.commit())return false;
     // the scene follows (next blocks of this command)
     for(size_t k=0;k<r.edits.size();++k){const lk::EndEdit& e=r.edits[k];tvsMove::Node& n=s.nodes[index[e.duct]];
@@ -228,7 +240,8 @@ inline bool apply(const AcDbObjectId& blockId,const lk::Result& r,const std::vec
     if(r.linkCase==lk::Cut){tvsMove::Node piece=s.nodes[index[r.cutDuct]];
         s.nodes[index[r.cutDuct]].ports[1]=tvsMove::point(keep);
         piece.id=pieceId;piece.ports[0]=tvsMove::point(first);piece.ports[1]=tvsMove::point(last);s.nodes.push_back(piece);}
-    for(int k=0;k<rec.ports&&k<2;++k){EquipPort p;p.id=blockId;p.at=lk::Pt(rec.port[k].x,rec.port[k].y);s.equipment.push_back(p);}
+    for(size_t m=0;m<blockIds.size()&&m<recs.size();++m)
+        for(int k=0;k<recs[m].ports&&k<2;++k){EquipPort p;p.id=blockIds[m];p.at=lk::Pt(recs[m].port[k].x,recs[m].port[k].y);s.equipment.push_back(p);}
     return true;
 }
 inline void forget(Scene& s,const AcDbObjectId& id){
@@ -286,8 +299,67 @@ inline void execute(){
     lk::Options base;base.tol=tolMm/f;base.axisTol=axisTolMm/f;base.gap=gapMm()/f;base.minPiece=minPieceMm/f;base.bottom=true;
     std::map<std::wstring,int> answered;   // Dno / Linija per block name (when writeDefault did not keep it)
     bool stop=false;
+    std::vector<AcDbObjectId> linkedNow;   // fans among them: usis / potis asked at the end
+    // ventilator: a relinked fan keeps its suction side on the port at the same place
+    auto keepSuction=[&](const tvsEquipment::Record& old,tvsEquipment::Record& rec){
+        rec.suction=-1;if(rec.kind!=tvsEquipment::Fan||old.suction<0||old.ports!=2||rec.ports!=2)return;
+        const tvsEquipment::Port& o=old.port[old.suction];const double so=old.mmPerUnit>0?old.mmPerUnit:1,sn=rec.mmPerUnit>0?rec.mmPerUnit:1;
+        double best=-1;for(int k=0;k<2;++k){const double d=std::hypot(rec.port[k].x*sn-o.x*so,rec.port[k].y*sn-o.y*so);if(best<0||d<best){best=d;rec.suction=k;}}};
+    // niz opreme (stavka 27, user 2026-11-27: kanal - FV - ventilator - FV - kanal): selected blocks whose
+    // footprints touch, none a terminal by its kind, are linked together as one row (lk::chain)
+    std::vector<std::vector<lk::Pt> > rowFoot(blocks.size());std::vector<int> rowOf(blocks.size(),-1);
+    {std::vector<int> parent(blocks.size());for(size_t k=0;k<blocks.size();++k)parent[k]=static_cast<int>(k);
+     std::function<int(int)> root=[&](int x){while(parent[x]!=x){parent[x]=parent[parent[x]];x=parent[x];}return x;};
+     for(size_t k=0;k<blocks.size();++k){AcDbObjectPointer<AcDbBlockReference> ref(blocks[k],AcDb::kForRead);if(ref.openStatus()!=Acad::eOk||ref->ownerId()!=db->currentSpaceId())continue;
+        if(std::fabs(std::fabs(ref->normal().z)-1)>1e-6)continue;
+        {AcDbBlockTableRecordPointer btr(ref->blockTableRecord(),AcDb::kForRead);if(btr.openStatus()!=Acad::eOk||btr->isFromExternalReference()||btr->isLayout())continue;}
+        tvsEquipment::Record old;const bool was=tvsEquipmentStore::read(ref.object(),old);
+        if(was&&!relink&&!tvsEquipmentStore::detached(ref.object(),old))continue;
+        const std::wstring name=blockName(blocks[k],ref->blockTableRecord());tvsEquipment::Record def;
+        const int kind=was?old.kind:tvsEquipmentStore::readDefault(db,name.c_str(),def)?def.kind:-1;
+        if(kind>=0&&tvsEquipment::terminalKind(kind))continue;
+        if(!footprint(ref.object(),rowFoot[k]))rowFoot[k].clear();}
+     for(size_t i=0;i<blocks.size();++i)for(size_t j=i+1;j<blocks.size();++j)
+        if(rowFoot[i].size()>=3&&rowFoot[j].size()>=3&&lk::touching(rowFoot[i],rowFoot[j],base.tol))parent[root(static_cast<int>(i))]=root(static_cast<int>(j));
+     std::map<int,int> size;for(size_t k=0;k<blocks.size();++k)if(rowFoot[k].size()>=3)++size[root(static_cast<int>(k))];
+     for(size_t k=0;k<blocks.size();++k)if(rowFoot[k].size()>=3&&size[root(static_cast<int>(k))]>1)rowOf[k]=root(static_cast<int>(k));}
+    auto linkRow=[&](int row){
+        std::vector<AcDbObjectId> ids;std::vector<std::wstring> names;std::vector<tvsEquipment::Record> recs,olds;std::vector<char> was,known;
+        std::vector<std::vector<lk::Pt> > feet;std::vector<lk::Pt> all;
+        for(size_t k=0;k<blocks.size();++k){if(rowOf[k]!=row)continue;
+            AcDbObjectPointer<AcDbBlockReference> ref(blocks[k],AcDb::kForRead);if(ref.openStatus()!=Acad::eOk)return;
+            const std::wstring name=blockName(blocks[k],ref->blockTableRecord());tvsEquipment::Record old,def;
+            const bool w=tvsEquipmentStore::read(ref.object(),old),d=tvsEquipmentStore::readDefault(db,name.c_str(),def);
+            tvsEquipment::Record rec=w?old:d?def:tvsEquipment::Record();if(!w&&!d)rec.kind=tvsEquipment::Other;
+            ids.push_back(blocks[k]);names.push_back(name);recs.push_back(rec);olds.push_back(old);was.push_back(w);known.push_back(w||d);
+            feet.push_back(rowFoot[k]);all.insert(all.end(),rowFoot[k].begin(),rowFoot[k].end());}
+        for(size_t m=0;m<ids.size();++m)if(was[m])forget(scene,ids[m]);
+        auto back=[&](){for(size_t m=0;m<ids.size();++m)if(was[m])for(int p=0;p<olds[m].ports&&p<2;++p){EquipPort e;e.id=ids[m];e.at=lk::Pt(olds[m].port[p].x,olds[m].port[p].y);scene.equipment.push_back(e);}};
+        lk::Options o=base;o.expect=lk::Inline;o.bottom=false;
+        std::vector<lk::Duct> ducts;std::vector<int> index;
+        ductsNear(scene,ids[0],all,4*o.gap+o.tol,o.tol,f,ducts,index);
+        const lk::Result r=lk::link(all,ducts,o);
+        if(r.error!=lk::Ok||r.ports!=2||r.twin){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],r.error!=lk::Ok?r.error:static_cast<int>(lk::MissingSide),r.detail*f,false);back();return;}
+        std::vector<lk::ChainPart> parts;
+        if(!lk::chain(feet,r,o.tol,parts)){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],NotInRow,0,false);back();return;}
+        std::vector<AcDbObjectId> touched=ids;
+        for(size_t e=0;e<r.edits.size();++e)touched.push_back(scene.nodes[index[r.edits[e].duct]].id);
+        if(r.linkCase==lk::Cut)touched.push_back(scene.nodes[index[r.cutDuct]].id);
+        bool assembly=false;for(size_t e=ids.size();e<touched.size();++e)if(inAssembly(touched[e]))assembly=true;
+        if(assembly||!tvsAction::writable(touched)){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],assembly?Assembly:Locked,0,false);back();return;}
+        for(size_t m=0;m<ids.size();++m){tvsEquipment::Record& rec=recs[m];
+            rec.version=1;rec.ports=2;rec.twin=false;rec.mmPerUnit=f;rec.round=r.round;rec.a=r.a;rec.b=r.round?0:r.b;rec.lengthMm=parts[m].length*f;
+            rec.port[0]=parts[m].port[0];rec.port[1]=parts[m].port[1];rec.mount=tvsEquipment::AtEnd;keepSuction(olds[m],rec);}
+        AcDbObjectId piece;
+        if(!applyRow(ids,r,index,scene,recs,piece)){for(size_t m=0;m<ids.size();++m)refuse(t,ids[m],names[m],WriteFailed,0,false);back();return;}
+        t.inl+=static_cast<int>(ids.size());t.ends+=static_cast<int>(r.edits.size());if(r.linkCase==lk::Cut)++t.cuts;
+        std::wstring list;for(size_t m=0;m<names.size();++m){if(m)list+=L" – ";list+=names[m];}
+        acutPrintf(L"\n  niz opreme povezan zajedno: %ls.",list.c_str());
+        for(size_t m=0;m<ids.size();++m){linkedNow.push_back(ids[m]);if(!known[m]){t.unset.push_back(ids[m]);t.unsetNames.insert(names[m]);}}};
+    std::set<int> rowDone;
     for(size_t k=0;k<blocks.size()&&!stop;++k){
         const AcDbObjectId id=blocks[k];
+        if(rowOf[k]>=0){if(rowDone.insert(rowOf[k]).second)linkRow(rowOf[k]);continue;}
         std::vector<lk::Pt> block;lk::Pt at;std::wstring name;tvsEquipment::Record old;bool wasLinked=false;int reason=lk::Ok;
         {AcDbObjectPointer<AcDbBlockReference> ref(id,AcDb::kForRead);if(ref.openStatus()!=Acad::eOk)continue;
          if(ref->ownerId()!=db->currentSpaceId())continue;
@@ -351,6 +423,7 @@ inline void execute(){
         rec.lengthMm=r.ports==2&&!r.twin?r.length*f:0;
         for(int p=0;p<2;++p)rec.port[p]=p<r.ports?r.port[p]:tvsEquipment::Port();
         rec.mount=r.ports==1?r.mount:tvsEquipment::AtEnd;
+        keepSuction(old,rec);
         bool neckGuessed=false;
         if(rec.mount==tvsEquipment::Bottom){   // neck: default of the name, else kept from an earlier link, else the footprint
             if(hasDefault&&def.neckA>0){rec.neckA=def.neckA;rec.neckB=def.neckB;rec.neckRound=def.neckRound;}
@@ -362,6 +435,7 @@ inline void execute(){
             if(wasLinked){for(int p=0;p<old.ports&&p<2;++p){EquipPort e;e.id=id;e.at=lk::Pt(old.port[p].x,old.port[p].y);scene.equipment.push_back(e);}}
             continue;}
         if(r.ports==2&&!r.twin)++t.inl;else ++t.term;
+        linkedNow.push_back(id);
         if(r.twin)acutPrintf(L"\n  blok %ls [%ls]: 2 priključka na kutiji (linijski difuzor) – protok Q/2 po priključku, pad pritiska difuzora za ukupni Q na obje putanje.",
             name.c_str(),handleText(id).c_str());
         t.ends+=static_cast<int>(r.edits.size());if(r.linkCase==lk::Cut)++t.cuts;
@@ -392,6 +466,9 @@ inline void execute(){
         if(rc==RTNONE||(rc==RTNORM&&_wcsicmp(kw,L"Da")==0))tvsEquipmentDialog::run(IDD_EQUIPMENT,t.unset);
         else if(rc==RTNORM)acutPrintf(L"\n  vrsta se može podesiti kasnije: TVS_OPREMA_SVOJSTVA („Primijeni na sve blokove ovog naziva“).");
     }
+    // ventilatori: usis / potis by hand with the temporary labels (no attributes in the blocks)
+    if(!stop)for(size_t k=0;k<linkedNow.size();++k){tvsEquipment::Record r;
+        if(tvsFan::inlineRecord(linkedNow[k],r)&&tvsFan::isFan(r)&&r.suction<0)tvsFan::chooseSide(linkedNow[k]);}
 }
 // TVS_OPREMA_ODVEZI: the record goes, the block and the ducts stay as they are.
 inline void unlink(){

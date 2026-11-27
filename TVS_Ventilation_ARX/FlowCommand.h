@@ -20,6 +20,7 @@
 #include "SizingDialog.h"
 #include "SizeFollow.h"
 #include "../geometry/DionicaPlan.h"
+#include "FanCommand.h"
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -136,6 +137,22 @@ inline bool read(AcDbDatabase* db,double tol,Net& net){
     splitBottom(net,tvsUnits::factor(db),tol);   // rešetka na dnu: the duct split at the tap point
     return true;
 }
+// Ventilator u mreži (user 2026-11-27): TVS_PROTOK / TVS_PAD started on a fan compute each side on
+// its own - the fan's port on the other side is "cut" (moved far away, so nothing touches it) and is
+// the root port: the walk goes out through the side's port only. id: the fan block, port: the cut one.
+struct FanCut {AcDbObjectId id;int port;FanCut():port(-1){}};
+inline FanCut& fanCut(){static FanCut c;return c;}
+struct FanScope {FanScope(const AcDbObjectId& id,int port){fanCut().id=id;fanCut().port=port;}~FanScope(){fanCut()=FanCut();}};
+// the picked element is a linked fan with its suction port chosen
+inline bool fanAt(const Net& net,int i,int& suction){
+    suction=-1;if(i<0||i>=static_cast<int>(net.linked.size())||!net.linked[i])return false;
+    const tvsEquipment::Record& r=net.records[i];if(!tvsFan::isFan(r))return false;suction=r.suction;return true;
+}
+// a fan somewhere in the reached part of the network (started elsewhere: its sides would mix)
+inline int fanIn(const Net& net,const std::vector<char>& reached){
+    for(size_t i=0;i<net.linked.size()&&i<reached.size();++i)if(net.linked[i]&&reached[i]&&tvsFan::isFan(net.records[i]))return static_cast<int>(i);
+    return -1;
+}
 // whole: the drawing as it is (split ducts with their own ports, no pieces / tap junctions) - for
 // the joint checks of "Primijeni"
 inline void elements(const Net& net,std::vector<tvsFlowNetwork::Element>& out,bool whole=false){
@@ -146,6 +163,8 @@ inline void elements(const Net& net,std::vector<tvsFlowNetwork::Element>& out,bo
         const std::vector<tvsMoveGeometry::Point>& ps=whole&&i<net.whole.size()&&!net.whole[i].empty()?net.whole[i]:net.bodies[i].ports;
         for(size_t p=0;p<ps.size();++p){const tvsMoveGeometry::Point& q=ps[p];out[i].ports.push_back(tvsFlowNetwork::P(q.x,q.y,q.z));}
         out[i].flow=!whole&&i<net.piece.size()&&net.piece[i]>=0?0:net.old[i];   // a duct piece has no flow of its own
+        if(!whole&&fanCut().port>=0&&net.linked[i]&&net.nodes[i].id==fanCut().id&&fanCut().port<static_cast<int>(out[i].ports.size())){
+            out[i].ports[fanCut().port].x+=1e9;out[i].ports[fanCut().port].y+=1e9;}   // the other side of the fan: left out
     }
 }
 // koljeno gore / dolje: its ports carry the elevation in z, the duct ends often do not; joined
@@ -485,11 +504,13 @@ inline void sizes(AcDbDatabase* db,Net& net,tvsFlowNetwork::Result& r,std::vecto
         Net again;if(!read(db,tol,again)){acutPrintf(L"\nTVS_PROTOK: crtež se ne može ponovo pročitati.");return;}
         net=again;int root=-1,port=-1;
         if(!rootOf(net,rootId,rootPoint.x,rootPoint.y,root,port)){acutPrintf(L"\nTVS_PROTOK: početni element mreže više ne postoji.");return;}
+        if(fanCut().port>=0&&net.nodes[root].id==fanCut().id)port=fanCut().port;   // ventilator: the same side again
         elements(net,el);verticalJoints(net,el,tol);r=tvsFlowNetwork::solve(el,root,port,tol);
         equipmentFlows(net,el,r,root,port,tol,L"TVS_PROTOK",true);
         if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
     }
 }
+inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDialog,double& total);
 inline void execute(UINT sizingDialog){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=0.1/f;
@@ -502,11 +523,35 @@ inline void execute(UINT sizingDialog){
     ads_point w;if(tvsCoordinates::transformPoint(at,1,0,w)!=RTNORM)return;
     int root=-1,port=-1;   // a split duct (rešetka na dnu): the piece with the nearest end
     if(!rootOf(net,pickedId,w[0],w[1],root,port)){acutPrintf(L"\nTVS_PROTOK: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
+    int suction=-1;
+    if(fanAt(net,root,suction)){   // ventilator u mreži: potisna strana (dovod), pa usisna (odvod)
+        if(suction<0){acutPrintf(L"\nTVS_PROTOK: ventilatoru nije određen usis (TVS_VENTILATOR).");if(!tvsFan::chooseSide(net.nodes[root].id))return;
+            Net again;if(!read(db,tol,again))return;net=again;if(!rootOf(net,pickedId,w[0],w[1],root,port)||!fanAt(net,root,suction)||suction<0)return;}
+        tvsFan::Labels labels;labels.show(net.records[root],suction,f);
+        const AcDbObjectId fanId=net.nodes[root].id;double q[2]={0,0};
+        for(int side=0;side<2;++side){
+            acutPrintf(side==0?L"\n--- TVS_PROTOK: potisna strana ventilatora (dovod) ---":L"\n--- TVS_PROTOK: usisna strana ventilatora (odvod) ---");
+            FanScope scope(fanId,side==0?suction:1-suction);
+            Net n;if(!read(db,tol,n)){acutPrintf(L"\nTVS_PROTOK: crtež se ne može pročitati.");return;}
+            int r0=-1,p0=-1;for(size_t i=0;i<n.nodes.size();++i)if(n.nodes[i].id==fanId&&n.owner[i]==static_cast<int>(i))r0=static_cast<int>(i);
+            if(r0<0)return;p0=fanCut().port;
+            if(!fromRoot(db,n,r0,p0,sizingDialog,q[side]))return;}
+        if(q[0]>0&&q[1]>0&&std::fabs(q[0]-q[1])>0.01*(q[0]>q[1]?q[0]:q[1]))
+            acutPrintf(L"\nTVS_PROTOK: UPOZORENJE – potis %.0f m³/h, usis %.0f m³/h: kroz ventilator prolazi jedan protok; provjerite krajnje elemente.",q[0],q[1]);
+        else acutPrintf(L"\nTVS_PROTOK: ventilator – potis %.0f m³/h, usis %.0f m³/h.",q[0],q[1]);
+        return;}
+    double total=0;fromRoot(db,net,root,port,sizingDialog,total);
+}
+// TVS_PROTOK from the element `root`, its free port `port` (the unit). total: the flow summed there.
+inline bool fromRoot(AcDbDatabase* db,Net& net,int root,int port,UINT sizingDialog,double& total){
+    const double f=tvsUnits::factor(db),tol=0.1/f;total=0;
     std::vector<tvsFlowNetwork::Element> el;elements(net,el);verticalJoints(net,el,tol);
     tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
-    if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
+    if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return false;}
     equipmentFlows(net,el,r,root,port,tol,L"TVS_PROTOK");
-    if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
+    if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return false;}
+    total=r.total;
+    if(fanCut().port<0&&fanIn(net,r.reached)>=0)acutPrintf(L"\nTVS_PROTOK: u mreži je ventilator – za usis i potis posebno pokrenite TVS_PROTOK izborom ventilatora.");
     // terminals without a flow
     std::vector<int> missing;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))missing.push_back(r.terminals[k]);
     int reached=0;for(size_t i=0;i<net.real;++i)if(r.reached[pieceOf(net,r,net.owner[i])])++reached;
@@ -515,21 +560,21 @@ inline void execute(UINT sizingDialog){
     if(!missing.empty()){
         acedInitGet(0,L"Unos Nastavi");ACHAR kw[16]=L"";
         const int k=acedGetKword(L"\nKrajnji elementi bez protoka [Unos/Nastavi] <Unos>: ",kw,16);
-        if(k==RTCAN)return;
+        if(k==RTCAN)return false;
         if(k==RTNONE||(k==RTNORM&&_wcsicmp(kw,L"Unos")==0)){
             for(size_t m=0;m<missing.size();++m){const int i=missing[m];
                 const tvsMoveGeometry::Point c=centre(el[i]);tvsCheck::zoom(c.x,c.y,3000.0/f);tvsCheck::select(idsOf(net,i));
                 acedInitGet(RSG_NONEG,L"Kraj");double q=0;wchar_t prompt[160];
                 swprintf_s(prompt,160,L"\n%d/%d %ls – protok [m³/h] ili [Kraj] <preskoči>: ",static_cast<int>(m)+1,static_cast<int>(missing.size()),name(net,i));
                 const int g=acedGetReal(prompt,&q);
-                if(g==RTCAN)return;
+                if(g==RTCAN)return false;
                 if(g==RTKWORD)break;
                 if(g==RTNORM)el[i].flow=q;
             }
             r=tvsFlowNetwork::solve(el,root,port,tol);closedEnds(net,r,root);
-            if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return;}
+            if(r.error!=tvsFlowNetwork::Ok){problem(net,r,f);return false;}
             int still=0;for(size_t k2=0;k2<r.terminals.size();++k2)if(!(el[r.terminals[k2]].flow>0))++still;
-            acutPrintf(L"\nTVS_PROTOK: ukupno %.0f m³/h; krajnjih elemenata bez protoka %d.",r.total,still);
+            acutPrintf(L"\nTVS_PROTOK: ukupno %.0f m³/h; krajnjih elemenata bez protoka %d.",r.total,still);total=r.total;
         }
     }
     if(!r.open.empty()){
@@ -542,14 +587,14 @@ inline void execute(UINT sizingDialog){
     std::vector<int> change;
     for(size_t i=0;i<net.real;++i){const int o=pieceOf(net,r,net.owner[i]);if(net.linked[i]&&!net.records[i].terminal())continue;   // inline oprema keeps no flow; a split duct: its upstream piece
         if(r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>1e-6)change.push_back(static_cast<int>(i));}
-    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return;}
+    if(change.empty()){acutPrintf(L"\nTVS_PROTOK: protoci u crtežu su već tačni.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return true;}
     {acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";wchar_t prompt[120];
      swprintf_s(prompt,120,L"\nUpisati protoke u %d elemenata? [Da/Ne] <Da>: ",static_cast<int>(change.size()));
      const int k=acedGetKword(prompt,kw,8);
-     if(k==RTCAN)return;
-     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return;}}
+     if(k==RTCAN)return false;
+     if(k==RTNORM&&_wcsicmp(kw,L"Ne")==0){acutPrintf(L"\nProtoci nisu upisani; brzine po izračunatim protocima.");sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);return true;}}
     std::set<AcDbObjectId> written;
-    {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return;}
+    {tvsMove::Transaction tx;if(!tx.good()){acutPrintf(L"\nTVS_PROTOK: izmjena nije moguća.");return false;}
      for(size_t k=0;k<change.size();++k){const int i=change[k];
         if(net.linked[i]){   // linked terminal (oprema): the flow goes into its record (qTerminal), not into a duct
             tvsEquipment::Record rec=net.records[i];rec.qTerminal=r.flow[pieceOf(net,r,net.owner[i])];
@@ -559,19 +604,20 @@ inline void execute(UINT sizingDialog){
                 tvsEquipment::Record whole;if(!tvsEquipmentStore::read(net.nodes[i].id,whole))continue;whole.qTerminal=sum;rec=whole;}
             AcDbEntity* b=tx.write(net.nodes[i].id);
             if(!b||tvsEquipmentStore::write(b,rec)!=Acad::eOk){const tvsMoveGeometry::Point c=centre(el[net.owner[i]]);
-                acutPrintf(L"\nTVS_PROTOK: oprema kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return;}
+                acutPrintf(L"\nTVS_PROTOK: oprema kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return false;}
             written.insert(net.nodes[i].id);continue;}
         TVS_Entity* t=TVS_Entity::cast(tx.write(net.nodes[i].id));
         if(!t||t->put_Flow(r.flow[pieceOf(net,r,net.owner[i])])!=Acad::eOk){
             const tvsMoveGeometry::Point c=centre(el[net.owner[i]]);
-            acutPrintf(L"\nTVS_PROTOK: element kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return;}
+            acutPrintf(L"\nTVS_PROTOK: element kod X=%.0f Y=%.0f se ne može mijenjati (zaključan sloj?). Ništa nije upisano.",c.x*f,c.y*f);return false;}
         t->recordGraphicsModified();written.insert(net.nodes[i].id);}
-     if(!tx.commit()){acutPrintf(L"\nTVS_PROTOK: izmjena nije sačuvana.");return;}}
+     if(!tx.commit()){acutPrintf(L"\nTVS_PROTOK: izmjena nije sačuvana.");return false;}}
     // TVS labels of the changed elements
     MleaderController controller;int labels=0;
     for(int k=0;k<net.labels.length();++k){AcDbObjectId linked;
         if(controller.checkIfMLead(net.labels[k])&&controller.getObjectId(net.labels[k],linked)&&written.count(linked)&&controller.recalculateMleader(net.labels[k]))++labels;}
     acutPrintf(L"\nTVS_PROTOK: upisan protok u %d elemenata; ažurirano oznaka %d.",static_cast<int>(written.size()),labels);
     sizes(db,net,r,el,f,tol,sizingDialog,net.nodes[root].id,el[root].ports[port]);
+    return true;
 }
 }

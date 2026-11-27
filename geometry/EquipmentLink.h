@@ -334,4 +334,44 @@ inline Result link(const std::vector<Pt>& block,const Pt& base,const std::vector
     }
     return link(block,ducts,o);
 }
+// Blocks in a row on one duct axis (user 2026-11-27: kanal - FV - ventilator - FV - kanal): link()
+// is called once with the corners of all of them (ducts only at the two ends of the row); then every
+// block gets its own ports where it meets its neighbours. blocks: footprints; r: the inline result of
+// that link (ports 2). out[k]: ports of block k (port[0] towards r.port[0]) and its length; false
+// when the blocks do not follow one another along the axis (gap or overlap > tol, or one beside).
+// Two footprints (convex, in plan) touch or overlap: a corner of one within tol of the other (inside,
+// or near an edge), or edges crossing.
+inline bool touching(const std::vector<Pt>& a,const std::vector<Pt>& b,double tol){
+    if(a.size()<3||b.size()<3)return false;
+    struct In {static bool inside(const std::vector<Pt>& poly,const Pt& q,double t){
+        int pos=0,neg=0;for(size_t k=0;k<poly.size();++k){const Pt& u=poly[k];const Pt& v=poly[(k+1)%poly.size()];
+            const Pt e=sub(v,u);const double l=length(e);if(l<=0)continue;const double c=cross(e,sub(q,u))/l;
+            if(c>t)++pos;else if(c<-t)++neg;}
+        return pos==0||neg==0;}};
+    for(size_t k=0;k<a.size();++k)if(In::inside(b,a[k],tol))return true;
+    for(size_t k=0;k<b.size();++k)if(In::inside(a,b[k],tol))return true;
+    return false;
+}
+struct ChainPart {tvsEquipment::Port port[2];double length;};
+inline bool chain(const std::vector<std::vector<Pt> >& blocks,const Result& r,double tol,std::vector<ChainPart>& out){
+    out.clear();if(r.error!=Ok||r.ports!=2||r.twin||blocks.size()<2)return false;
+    const Pt u(r.ux,r.uy),n(-r.uy,r.ux),o(r.port[0].x,r.port[0].y);
+    std::vector<double> lo(blocks.size()),hi(blocks.size());std::vector<int> order;
+    for(size_t k=0;k<blocks.size();++k){if(blocks[k].size()<3)return false;
+        double a=0,b=0,c=0,d=0;
+        for(size_t j=0;j<blocks[k].size();++j){const Pt q=sub(blocks[k][j],o);const double s=dot(q,u),t=dot(q,n);
+            if(j==0||s<a){a=s;}if(j==0||s>b){b=s;}if(j==0||t<c){c=t;}if(j==0||t>d){d=t;}}
+        if(c>tol||d<-tol)return false;   // the axis misses this block
+        lo[k]=a;hi[k]=b;order.push_back(static_cast<int>(k));}
+    for(size_t i=1;i<order.size();++i)for(size_t j=i;j>0&&lo[order[j]]<lo[order[j-1]];--j){const int x=order[j];order[j]=order[j-1];order[j-1]=x;}
+    if(std::fabs(lo[order.front()])>tol||std::fabs(hi[order.back()]-r.length)>tol)return false;
+    for(size_t i=1;i<order.size();++i)if(std::fabs(lo[order[i]]-hi[order[i-1]])>tol)return false;
+    out.resize(blocks.size());
+    for(size_t i=0;i<order.size();++i){const int k=order[i];
+        const double s0=i==0?0:hi[order[i-1]],s1=i+1==order.size()?r.length:hi[k];   // shared faces: one point
+        ChainPart& c=out[k];c.length=s1-s0;
+        for(int e=0;e<2;++e){tvsEquipment::Port& p=c.port[e];const Pt q=add(o,mul(u,e==0?s0:s1));
+            p.x=q.x;p.y=q.y;p.z=r.port[0].z;p.dx=e==0?-u.x:u.x;p.dy=e==0?-u.y:u.y;}}
+    return true;
+}
 }

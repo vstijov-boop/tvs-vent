@@ -17,7 +17,7 @@ class Pressure(unittest.TestCase):
  def test_command(self):
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/PressureCommand.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   c=text('TVS_Ventilation_ARX/PressureCommand.h')
-  self.assertIn('tvsFlowNetwork::solve(el,root,port,tol)',c);self.assertIn('tvsExcel::write(tvsSheet::build(res,info,o))',c)
+  self.assertIn('tvsFlowNetwork::solve(el,root,port,tol)',c);self.assertIn('book=tvsSheet::build(res,info,o);',c);self.assertIn('tvsExcel::write(book)',c)
   self.assertIn('L"AshraeData"',c);self.assertIn('[Dovod/Odvod/Podaci]',c);self.assertNotIn('put_',c)   # nothing written into the drawing
   self.assertIn('TVS_PAD, TVS_PAD',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'));self.assertIn('#include "PressureCommand.h"',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
   self.assertIn('tvsPad::execute();',text('TVS_Ventilation_ARX/commands/NewCommands.inl'))

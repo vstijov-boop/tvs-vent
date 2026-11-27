@@ -104,3 +104,12 @@ Do sada komande nisu vidjele povezane blokove, pa je blok čiji su se kanali pom
 - **oprema u liniji** (2 priključka) je kruto tijelo mreže: TVS_MOVE je gura kao fiting, TVS_STRETCH je pomjera kad okvir obuhvati oba priključka (okvir koji je presijeca = „Okvir presijeca fiting“);
 - **terminali** (rešetka, difuzor, polovine linijskog difuzora) idu sa krajem kanala / flex-a na kom su; rešetka na dnu ide sa kanalom kad se kanal pomjera cio; linijski difuzor čiji se priključci ne pomjeraju jednako ostaje (poruka, odvojen);
 - zapis bloka (priključci, tačka povezivanja) se ažurira u istoj transakciji – blok ostaje povezan (zelen). TVS_ALIGN i obični MOVE / STRETCH AutoCAD-a: kao do sada.
+
+### Niz opreme – blok uz blok (27.11., plan 27)
+Izabrani blokovi koji se dodiruju (npr. kanal – FV – ventilator – FV – kanal), a nijedan po vrsti nije terminal, povezuju se zajedno: kanali se traže samo na dva kraja niza (isto pravilo kao za jedan blok u liniji – dodir, skraćenje / produženje, presijecanje), pa svaki blok dobija svoje priključke tamo gdje se sastaje sa susjedom (`tvsEquipmentLink::chain`). Blokovi koji se dodiruju a nisu jedan za drugim na osi: odbijeni („niz opreme“). Treba izabrati cijeli niz (povezan blok uz nepovezan još nije podržan).
+
+### Ventilator u mreži (27.11.)
+Vrsta „Ventilator“ (oznaka V-xx), blok u liniji. Usis i potis bez atributa u bloku: poslije povezivanja (TVS_OPREMA) ili sa **TVS_VENTILATOR** na priključcima se prikažu privremeni natpisi USIS / POTIS i strelica vazduha, [Prihvati/Zamijeni]; upisuje se u zapis (`usis=0/1`). Ponovno povezivanje zadržava stranu (priključak na istom mjestu).
+- **TVS_PROTOK** izborom ventilatora: potisna strana (dovod), pa usisna (odvod), svaka od svojih krajnjih elemenata; na kraju poređenje protoka (upozorenje ako se razlikuju > 1 %).
+- **TVS_PAD** izborom ventilatora: usis kao odvod, potis kao dovod (bez pitanja Dovod/Odvod); Excel: list „Ventilator“ (Q, Δp mreže, za ventilator po strani i ukupno) + Dionice / Fitinzi / Šema za usis i za potis. Sam ventilator nema gubitak; FV i druga oprema u liniji ulaze u svoju stranu.
+- Pokrenuto sa kraja mreže u kojoj je ventilator: računa se kao do sada, uz upozorenje da se izabere ventilator.

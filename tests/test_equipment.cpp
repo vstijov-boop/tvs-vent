@@ -36,6 +36,9 @@ int main(){
      Record d;assert(parse(format(c),d)&&d.model==Curve&&d.curve.size()==3&&d.curve[2].first==1500&&d.curve[2].second==200);
      Record one;one.model=Curve;one.curve.push_back(std::make_pair(750.0,50.0));assert(std::fabs(loss(one,1500,0)-200)<1e-9);}
     // anchor: moved / copied after linking
+    {Record a;a.kind=Fan;a.suction=1;Record b;assert(parse(format(a),b)&&b.kind==Fan&&b.suction==1);
+     Record c;assert(parse(format(Record()),c)&&c.suction==-1);
+     Record t;t.ports=1;t.suction=0;Record u;assert(parse(format(t),u)&&u.suction==-1);}
     {Record a;a.anchored=true;a.ax=100;a.ay=200;a.arot=0.5;Record b;assert(parse(format(a),b)&&b.anchored&&b.ax==100&&b.ay==200&&b.arot==0.5);
      assert(!detached(b,100,200,0.5,1e-4)&&detached(b,100.01,200,0.5,1e-4)&&detached(b,100,200,0.6,1e-4)&&!detached(b,100,200,0.5+6.283185307179586,1e-4));
      Record old;assert(!detached(old,5,5,1,1e-4));}

@@ -85,31 +85,60 @@ inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
             t.kind=tvsPressure::Equipment;t.equipment=rec;return true;}}
     t.kind=tvsPressure::Other;return true;
 }
+// One network from the element `root`, its free port `port` (the unit): flows, elements, the calculation.
+// side: L"" or L" (usis)" / L" (potis)" in the messages. total: the flow at the root.
+inline bool compute(const tvsFlow::Net& net,int root,int port,bool odvod,tvsAshrae::Engine* engine,double f,const wchar_t* side,tvsPressure::Result& res,double& total){
+    const double tol=0.1/f;
+    std::vector<tvsFlowNetwork::Element> el;tvsFlow::elements(net,el);
+    tvsFlow::verticalJoints(net,el,tol);   // koljeno gore / dolje: joined with the duct in plan (its ports carry the elevation in z)
+    tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
+    tvsFlow::equipmentFlows(net,el,r,root,port,tol,L"TVS_PAD");   // oprema: terminal flows from the records
+    if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return false;}
+    total=r.total;
+    if(tvsFlow::fanCut().port<0&&tvsFlow::fanIn(net,r.reached)>=0)
+        acutPrintf(L"\nTVS_PAD: u mreži je ventilator – izaberite ventilator da se usis i potis računaju posebno i saberu.");
+    int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;
+    if(missing)acutPrintf(L"\nTVS_PAD%ls: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",side,missing);
+    {   // flows written in the drawing (labels, Properties) vs the sums used here (user 2026-11-24): a reminder for TVS_PROTOK
+        int stale=0;for(size_t i=0;i<net.real;++i){if(net.linked[i]&&!net.records[i].terminal())continue;
+            const int o=tvsFlow::pieceOf(net,r,net.owner[i]);if(o>=0&&o<static_cast<int>(r.reached.size())&&r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>0.5)++stale;}
+        if(stale)acutPrintf(L"\nTVS_PAD%ls: protok upisan u crtežu se razlikuje od zbira krajnjih elemenata na %d elemenata – proračun koristi zbir; oznake i protoci u crtežu nisu ažurni (TVS_PROTOK ih upisuje).",side,stale);}
+    std::vector<tvsPressure::Element> pe(net.bodies.size());
+    for(size_t i=0;i<net.bodies.size();++i){if(!r.reached[i])continue;tvsPressure::Element& x=pe[i];
+        x.flow=r.flow[i];x.parent=r.parent[i];x.entry=r.entry[i];x.via=r.via[i];
+        for(size_t p=0;p<net.bodies[i].ports.size();++p)x.at.push_back(xy(net.bodies[i].ports[p],f));
+        for(size_t j=0;j<net.nodes.size();++j){if(net.owner[j]!=static_cast<int>(i))continue;
+            if(static_cast<int>(i)==root&&net.linked[j]&&tvsFan::isFan(net.records[j]))continue;   // the fan itself: no loss
+            tvsPressure::Part t;if(part(net.nodes[j],f,t))x.parts.push_back(t);}
+        if(net.bodies[i].sections.size()==net.bodies[i].ports.size())for(size_t p=0;p<net.bodies[i].sections.size();++p)x.ports.push_back(section(net.bodies[i].sections[p],f));
+        else if(x.parts.size()==1)x.ports=x.parts[0].sections;
+        else if(!x.parts.empty()&&!x.parts[0].sections.empty())x.ports.assign(x.at.size(),x.parts[0].sections[0]);}
+    tvsPressure::Options o;o.exhaust=odvod;
+    tvsPressure::Calculator calc(engine,o);
+    res=calc.run(pe,root);
+    return true;
+}
 inline void execute(){
     AcDbDatabase* db=acdbHostApplicationServices()->workingDatabase();if(!db)return;
     const double f=tvsUnits::factor(db),tol=0.1/f;
     ads_name picked;ads_point at;
-    if(acedEntSel(L"\nTVS_PAD: izaberite kraj mreže kod jedinice (kliknite blizu slobodnog kraja kanala): ",picked,at)!=RTNORM)return;
+    if(acedEntSel(L"\nTVS_PAD: izaberite kraj mreže kod jedinice (kliknite blizu slobodnog kraja kanala) ili ventilator u mreži: ",picked,at)!=RTNORM)return;
     AcDbObjectId pickedId;if(acdbGetObjectId(pickedId,picked)!=Acad::eOk)return;
     tvsFlow::Net net;
     if(!tvsFlow::read(db,tol,net)){acutPrintf(L"\nTVS_PAD: crtež se ne može pročitati (objekat otvoren u drugoj komandi?).");return;}
     ads_point w;if(tvsCoordinates::transformPoint(at,1,0,w)!=RTNORM)return;
     int root=-1,port=-1;   // a split duct (rešetka na dnu): the piece with the nearest end
     if(!tvsFlow::rootOf(net,pickedId,w[0],w[1],root,port)){acutPrintf(L"\nTVS_PAD: izabrani objekat nije TVS kanal ili fiting mreže.");return;}
-    std::vector<tvsFlowNetwork::Element> el;tvsFlow::elements(net,el);
-    tvsFlow::verticalJoints(net,el,tol);   // koljeno gore / dolje: joined with the duct in plan (its ports carry the elevation in z)
-    tvsFlowNetwork::Result r=tvsFlowNetwork::solve(el,root,port,tol);
-    tvsFlow::equipmentFlows(net,el,r,root,port,tol,L"TVS_PAD");   // oprema: terminal flows from the records
-    if(r.error!=tvsFlowNetwork::Ok){tvsFlow::problem(net,r,f);return;}
-    int missing=0;for(size_t k=0;k<r.terminals.size();++k)if(!(el[r.terminals[k]].flow>0))++missing;
-    if(missing)acutPrintf(L"\nTVS_PAD: krajnjih elemenata bez protoka: %d (TVS_PROTOK ih unosi); njihove dionice imaju Q = 0.",missing);
-    {   // flows written in the drawing (labels, Properties) vs the sums used here (user 2026-11-24): a reminder for TVS_PROTOK
-        int stale=0;for(size_t i=0;i<net.real;++i){if(net.linked[i]&&!net.records[i].terminal())continue;
-            const int o=tvsFlow::pieceOf(net,r,net.owner[i]);if(o>=0&&o<static_cast<int>(r.reached.size())&&r.reached[o]&&std::fabs(r.flow[o]-net.old[i])>0.5)++stale;}
-        if(stale)acutPrintf(L"\nTVS_PAD: protok upisan u crtežu se razlikuje od zbira krajnjih elemenata na %d elemenata – proračun koristi zbir; oznake i protoci u crtežu nisu ažurni (TVS_PROTOK ih upisuje).",stale);}
-    // system and data
+    int suction=-1;const bool fan=tvsFlow::fanAt(net,root,suction);
+    if(fan&&suction<0){acutPrintf(L"\nTVS_PAD: ventilatoru nije određen usis.");if(!tvsFan::chooseSide(net.nodes[root].id))return;
+        tvsFlow::Net again;if(!tvsFlow::read(db,tol,again))return;net=again;if(!tvsFlow::rootOf(net,pickedId,w[0],w[1],root,port)||!tvsFlow::fanAt(net,root,suction)||suction<0)return;}
+    // system and data (ventilator: usis = odvod, potis = dovod, nothing to choose)
     std::wstring dir=folder();
     for(;;){
+        if(fan){acedInitGet(0,L"Nastavi Podaci");ACHAR kw[16]=L"";
+            const int k=acedGetKword(L"\nVentilator: usis = odvod, potis = dovod [Nastavi/Podaci] <Nastavi>: ",kw,16);if(k==RTCAN)return;
+            if(k==RTNORM&&_wcsicmp(kw,L"Podaci")==0){std::wstring d;if(pickFolder(d)){dir=d;storeFolder(d);}continue;}
+            break;}
         acedInitGet(0,L"Dovod Odvod Podaci");ACHAR kw[16]=L"";wchar_t prompt[200];
         swprintf_s(prompt,200,L"\nSistem [Dovod/Odvod/Podaci] <%ls>: ",exhaust()?L"Odvod":L"Dovod");
         const int k=acedGetKword(prompt,kw,16);if(k==RTCAN)return;
@@ -121,26 +150,36 @@ inline void execute(){
         acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";const int k=acedGetKword(L"\nIzabrati ga sada (Equation.csv u ashrae_data)? [Da/Ne] <Da>: ",kw,8);if(k==RTCAN)return;
         if(k!=RTNORM||_wcsicmp(kw,L"Ne")!=0){std::wstring d;if(pickFolder(d)){dir=d;storeFolder(d);}}}
     if(!dir.empty()){data=engine.load(reader(dir));if(!data)acutPrintf(L"\nTVS_PAD: u folderu %ls nema Constants / Equation / Output.csv – samo trenje, ζ unosite u Excelu (opcija Podaci).",dir.c_str());}
-    // elements
-    std::vector<tvsPressure::Element> pe(net.bodies.size());
-    for(size_t i=0;i<net.bodies.size();++i){if(!r.reached[i])continue;tvsPressure::Element& x=pe[i];
-        x.flow=r.flow[i];x.parent=r.parent[i];x.entry=r.entry[i];x.via=r.via[i];
-        for(size_t p=0;p<net.bodies[i].ports.size();++p)x.at.push_back(xy(net.bodies[i].ports[p],f));
-        for(size_t j=0;j<net.nodes.size();++j){if(net.owner[j]!=static_cast<int>(i))continue;tvsPressure::Part t;if(part(net.nodes[j],f,t))x.parts.push_back(t);}
-        if(net.bodies[i].sections.size()==net.bodies[i].ports.size())for(size_t p=0;p<net.bodies[i].sections.size();++p)x.ports.push_back(section(net.bodies[i].sections[p],f));
-        else if(x.parts.size()==1)x.ports=x.parts[0].sections;
-        else if(!x.parts.empty()&&!x.parts[0].sections.empty())x.ports.assign(x.at.size(),x.parts[0].sections[0]);}
-    tvsPressure::Options o;o.exhaust=exhaust();
-    tvsPressure::Calculator calc(data?&engine:nullptr,o);
-    const tvsPressure::Result res=calc.run(pe,root);
-    // workbook
-    tvsSheet::Info info;info.system=o.exhaust?L"Odvod (od jedinice prema krajnjim elementima)":L"Dovod (od jedinice prema krajnjim elementima)";
+    tvsSheet::Info info;
     {const ACHAR* name=NULL;if(db->getFilename(name)==Acad::eOk&&name){std::wstring n(name);const size_t s=n.find_last_of(L"\\/");info.project=s==std::wstring::npos?n:n.substr(s+1);}}
     {SYSTEMTIME t;GetLocalTime(&t);wchar_t d[16];swprintf_s(d,16,L"%02d.%02d.%04d",t.wDay,t.wMonth,t.wYear);info.date=d;}
     if(data)info.source=dir;
-    int computed=0,typed=0;for(size_t k=0;k<res.f.size();++k)(res.f[k].ok?computed:typed)++;
-    acutPrintf(L"\nTVS_PAD: dionica %d, fitinga %d (ASHRAE %d, za unos %d). Pravim Excel tabelu...",static_cast<int>(res.d.size()),static_cast<int>(res.f.size()),computed,typed);
-    if(!tvsExcel::write(tvsSheet::build(res,info,o))){acutPrintf(L"\nTVS_PAD: Excel nije dostupan na ovom računaru.");return;}
-    acutPrintf(L"\nTVS_PAD: tabela je otvorena u Excelu (nije sačuvana). Unesite Δp krajnjih elemenata (žute ćelije).");
+    auto report=[&](const tvsPressure::Result& res,const wchar_t* side){int computed=0,typed=0;for(size_t k=0;k<res.f.size();++k)(res.f[k].ok?computed:typed)++;
+        acutPrintf(L"\nTVS_PAD%ls: dionica %d, fitinga %d (ASHRAE %d, za unos %d).",side,static_cast<int>(res.d.size()),static_cast<int>(res.f.size()),computed,typed);};
+    tvsSheet::Workbook book;
+    if(!fan){
+        tvsPressure::Result res;double q=0;if(!compute(net,root,port,exhaust(),data?&engine:nullptr,f,L"",res,q))return;
+        tvsPressure::Options o;o.exhaust=exhaust();
+        info.system=o.exhaust?L"Odvod (od jedinice prema krajnjim elementima)":L"Dovod (od jedinice prema krajnjim elementima)";
+        report(res,L"");book=tvsSheet::build(res,info,o);}
+    else{   // ventilator u mreži: usis (odvod) and potis (dovod) on their own, the fan needs the sum
+        tvsFan::Labels labels;labels.show(net.records[root],suction,f);
+        const AcDbObjectId fanId=net.nodes[root].id;const std::wstring tag=net.records[root].tag;
+        tvsPressure::Result res[2];double q[2]={0,0};const wchar_t* side[2]={L" (usis)",L" (potis)"};
+        for(int k=0;k<2;++k){
+            tvsFlow::FanScope scope(fanId,k==0?1-suction:suction);   // usis: the potis port is cut, and the other way
+            tvsFlow::Net n;if(!tvsFlow::read(db,tol,n)){acutPrintf(L"\nTVS_PAD: crtež se ne može pročitati.");return;}
+            int r0=-1;for(size_t i=0;i<n.nodes.size();++i)if(n.nodes[i].id==fanId&&n.owner[i]==static_cast<int>(i))r0=static_cast<int>(i);
+            if(r0<0)return;
+            if(!compute(n,r0,tvsFlow::fanCut().port,k==0,data?&engine:nullptr,f,side[k],res[k],q[k]))return;
+            report(res[k],side[k]);}
+        if(q[0]>0&&q[1]>0&&std::fabs(q[0]-q[1])>0.01*(q[0]>q[1]?q[0]:q[1]))
+            acutPrintf(L"\nTVS_PAD: UPOZORENJE – usis %.0f m³/h, potis %.0f m³/h: kroz ventilator prolazi jedan protok (TVS_PROTOK).",q[0],q[1]);
+        tvsPressure::Options ou;ou.exhaust=true;tvsPressure::Options op;op.exhaust=false;
+        tvsSheet::Info iu=info,ip=info;iu.system=L"Usisna strana ventilatora – odvod (krajnji elementi → ventilator)";ip.system=L"Potisna strana ventilatora – dovod (ventilator → krajnji elementi)";
+        book=tvsSheet::fanBook(tvsSheet::build(res[0],iu,ou,L"usis"),tvsSheet::build(res[1],ip,op,L"potis"),info,q[0],q[1],tag);}
+    acutPrintf(L"\nTVS_PAD: pravim Excel tabelu...");
+    if(!tvsExcel::write(book)){acutPrintf(L"\nTVS_PAD: Excel nije dostupan na ovom računaru.");return;}
+    acutPrintf(fan?L"\nTVS_PAD: tabela je otvorena u Excelu (nije sačuvana) – list „Ventilator“ sabira usis i potis. Unesite Δp krajnjih elemenata (žute ćelije).":L"\nTVS_PAD: tabela je otvorena u Excelu (nije sačuvana). Unesite Δp krajnjih elemenata (žute ćelije).");
 }
 }

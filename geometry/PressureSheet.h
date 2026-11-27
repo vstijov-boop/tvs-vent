@@ -35,7 +35,7 @@ struct Sheet {
     int columns()const{size_t c=0;for(size_t i=0;i<cells.size();++i)if(cells[i].size()>c)c=cells[i].size();return static_cast<int>(c);}
     void format(const Format& f){formats.push_back(f);}
 };
-struct Workbook {std::vector<Sheet> sheets;};
+struct Workbook {std::vector<Sheet> sheets;int netRow,fanRow;Workbook():netRow(0),fanRow(0){}};   // Dionice: rows of "Dp mreze" / "Za ventilator" (column D)
 inline long rgb(int r,int g,int b){return r|(g<<8)|(b<<16);}   // Excel COLORREF (BGR)
 inline std::wstring col(int c){std::wstring s;while(c>0){const int m=(c-1)%26;s.insert(s.begin(),static_cast<wchar_t>(L'A'+m));c=(c-1)/26;}return s;}
 inline std::wstring cell(int c,int r){return col(c)+std::to_wstring(r);}
@@ -52,11 +52,14 @@ inline std::wstring lambdaFormula(const std::wstring& re,const std::wstring& k,c
 }
 // columns of "Dionice"
 enum {cNo=1,cFrom,cTo,cQ,cDim,cA,cB,cDh,cL,cK,cV,cPd,cRe,cLambda,cR,cRL,cZeta,cZ,cTerm,cDp,cCum,cMax,cOver,cCrit,cLast=cCrit};
-inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPressure::Options& o){
+// tag: suffix of the sheet names (ventilator u mrezi: "usis" / "potis" - two sets in one workbook)
+inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPressure::Options& o,const std::wstring& tag=std::wstring()){
     Workbook wb;wb.sheets.resize(3);
+    const std::wstring nD=tag.empty()?L"Dionice":L"Dionice "+tag,nF=tag.empty()?L"Fitinzi":L"Fitinzi "+tag,nS=tag.empty()?L"\u0160ema":L"\u0160ema "+tag;
+    const std::wstring rD=tag.empty()?nD+L"!":L"'"+nD+L"'!",rF=tag.empty()?nF+L"!":L"'"+nF+L"'!";
     const long navy=rgb(0x1F,0x3A,0x5F),blue=rgb(0x31,0x59,0x7F),grey=rgb(0x5B,0x6B,0x7F),yellow=rgb(0xFF,0xF4,0xC2),pink=rgb(0xFD,0xEC,0xEA),red=rgb(0xC0,0x39,0x2B);
     // ---- Dionice ----
-    Sheet& s=wb.sheets[0];s.name=L"Dionice";
+    Sheet& s=wb.sheets[0];s.name=nD;
     s.put(1,1,text(L"TVS_VENT \u00B7 Pad pritiska po dionicama"));{Format f;f.range=L"A1";f.bold=true;f.size=14;f.font=navy;s.format(f);}
     const int tRow=6,rhoRow=7,nuRow=8;   // t typed by the user (smoke extraction: hot gas); rho, nu from t
     const std::wstring infoRows[][2]={{L"Projekat",info.project},{L"Sistem",info.system},{L"Datum",info.date}};
@@ -97,9 +100,9 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         s.put(row,cLambda,lambdaFormula(cell(cRe,row),cell(cK,row),cell(cDh,row)));   // follows t (Re)
         s.put(row,cR,L"=IF("+cell(cDh,row)+L">0,"+cell(cLambda,row)+L"/("+cell(cDh,row)+L"/1000)*"+cell(cPd,row)+L",0)");
         s.put(row,cRL,L"="+cell(cR,row)+L"*"+cell(cL,row));
-        s.put(row,cZeta,L"=SUMIF(Fitinzi!$A:$A,"+cell(cNo,row)+L",Fitinzi!$E:$E)");
+        s.put(row,cZeta,L"=SUMIF("+rF+L"$A:$A,"+cell(cNo,row)+L","+rF+L"$E:$E)");
         s.put(row,cZ,L"="+cell(cZeta,row)+L"*"+cell(cPd,row));
-        if(d.terminal)s.put(row,cTerm,termRow[i]?L"=Fitinzi!$H$"+std::to_wstring(termRow[i]):std::wstring(L"0"));
+        if(d.terminal)s.put(row,cTerm,termRow[i]?L"="+rF+L"$H$"+std::to_wstring(termRow[i]):std::wstring(L"0"));
         s.put(row,cDp,L"="+cell(cRL,row)+L"+"+cell(cZ,row)+L"+"+cell(cTerm,row));
         s.put(row,cCum,d.parent<0?L"="+cell(cDp,row):L"="+cell(cDp,row)+L"+"+cell(cCum,first+d.parent));
         std::wstring mx=L"=MAX("+cell(cCum,row);for(size_t k=0;k<d.children.size();++k)mx+=L","+cell(cMax,first+d.children[k]);s.put(row,cMax,mx+L")");
@@ -122,6 +125,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
         s.put(b+2,1,text(L"Rezerva, %"));s.put(b+2,4,L"10");
         // no reserve on the terminal elements (as DuctPressDrop): max over the rows of (cum - kraj) * (1 + rez) + kraj
         const std::wstring U=cell(cCum,first)+L":"+cell(cCum,last),S=cell(cTerm,first)+L":"+cell(cTerm,last);
+        wb.netRow=b+1;wb.fanRow=b+3;
         s.put(b+3,1,text(L"Za ventilator, Pa"));s.put(b+3,4,L"=SUMPRODUCT(MAX(("+U+L"-"+S+L")*(1+"+cell(4,b+2)+L"/100)+"+S+L"))");
         {Format f;f.range=cell(1,b+1)+L":"+cell(1,b+3);f.bold=true;f.size=10;f.font=blue;s.format(f);}
         {Format f;f.range=cell(4,b+1)+L":"+cell(4,b+3);f.number=L"0.0";f.bold=true;f.size=10;f.align=2;s.format(f);}
@@ -140,7 +144,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
     const double widths[]={9,6,6,8,11,6,6,6,7,6,7,7,9,8,7,7,6,7,9,10,10,8,8,9};
     s.widths.assign(widths,widths+cLast);s.hidden.push_back(cRe);s.hidden.push_back(cMax);s.freeze=cell(2,first);
     // ---- Fitinzi ----
-    Sheet& f=wb.sheets[1];f.name=L"Fitinzi";
+    Sheet& f=wb.sheets[1];f.name=nF;
     const wchar_t* fh[]={L"Dionica",L"Element",L"Opis",L"Dimenzija",L"\u03B6 (pd dionice)",L"Izvor",L"C (izvor)",L"\u0394p, Pa",L"Napomena"};
     for(int c=1;c<=9;++c)f.put(1,c,text(fh[c-1]));
     {Format x;x.range=L"A1:I1";x.bold=true;x.font=rgb(255,255,255);x.fill=navy;x.align=1;x.border=true;x.size=10;x.wrap=true;f.format(x);}
@@ -152,7 +156,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
             if(x.ok)f.put(row,8,num(x.dp,1));else{Format y;y.range=L"H"+std::to_wstring(row);y.fill=yellow;f.format(y);}
             continue;}
         f.put(row,5,num(x.zeta,4));
-        f.put(row,8,L"=E"+std::to_wstring(row)+L"*INDEX(Dionice!$"+col(cPd)+L":$"+col(cPd)+L",MATCH(A"+std::to_wstring(row)+L",Dionice!$A:$A,0))");
+        f.put(row,8,L"=E"+std::to_wstring(row)+L"*INDEX("+rD+L"$"+col(cPd)+L":$"+col(cPd)+L",MATCH(A"+std::to_wstring(row)+L","+rD+L"$A:$A,0))");
         if(!x.ok){Format y;y.range=L"E"+std::to_wstring(row);y.fill=yellow;f.format(y);}}
     const int fl=1+static_cast<int>(order.size());
     if(fl>=2){Format x;x.range=L"A2:I"+std::to_wstring(fl);x.border=true;x.size=10;f.format(x);
@@ -165,7 +169,7 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
     {Format x;x.range=L"A"+std::to_wstring(fl+2);x.italic=true;x.size=9;x.font=grey;f.format(x);}
     const double fw[]={8,18,30,12,10,14,9,9,45};f.widths.assign(fw,fw+9);f.freeze=L"A2";
     // ---- Sema ----
-    Sheet& g=wb.sheets[2];g.name=L"\u0160ema";g.onePage=true;
+    Sheet& g=wb.sheets[2];g.name=nS;g.onePage=true;
     g.put(1,1,text(L"Jednolinijska \u0161ema mre\u017Ee (osnova)"));{Format x;x.range=L"A1";x.bold=true;x.size=14;x.font=navy;g.format(x);}
     g.put(2,1,text(L"crveno: kriti\u010Dna grana pri izvozu \u00B7 isprekidano: fleks \u00B7 broj: dionica \u00B7 J jedinica, T T komad, P promjena, K kraj"));
     {Format x;x.range=L"A2";x.italic=true;x.size=9;x.font=grey;g.format(x);}
@@ -189,6 +193,37 @@ inline Workbook build(const tvsPressure::Result& r,const Info& info,const tvsPre
             for(int k=0;k<2;++k){bool dup=false;for(size_t j=0;j<seen.size();++j)if(seen[j]==names[k])dup=true;if(dup)continue;seen.push_back(names[k]);
                 Label t;t.x=X(at[k].x)+4;t.y=Y(at[k].y)-13;t.text=k==1&&!d.tag.empty()?d.tag:names[k];t.size=8;t.color=grey;t.bold=false;g.labels.push_back(t);}}
     }
+    return wb;
+}
+// Ventilator u mrezi: "Ventilator" (summary) + the sheets of the suction side (odvod) and of the
+// discharge side (dovod); the fan needs the sum of the two "Za ventilator" (each with its reserve).
+inline Workbook fanBook(const Workbook& suction,const Workbook& discharge,const Info& info,double qSuction,double qDischarge,const std::wstring& tag){
+    Workbook wb;wb.sheets.resize(1);Sheet& s=wb.sheets[0];s.name=L"Ventilator";
+    const long navy=rgb(0x1F,0x3A,0x5F),blue=rgb(0x31,0x59,0x7F),grey=rgb(0x5B,0x6B,0x7F),pink=rgb(0xFD,0xEC,0xEA);
+    s.put(1,1,text(L"TVS_VENT \u00B7 Ventilator u mre\u017Ei"+(tag.empty()?std::wstring():L" "+tag)));{Format f;f.range=L"A1";f.bold=true;f.size=14;f.font=navy;s.format(f);}
+    const std::wstring infoRows[][2]={{L"Projekat",info.project},{L"Datum",info.date}};
+    for(int i=0;i<2;++i){s.put(3+i,1,text(infoRows[i][0]));s.put(3+i,2,text(infoRows[i][1]));}
+    const int h=6;const wchar_t* head[]={L"Strana",L"Q, m\u00B3/h",L"\u0394p mre\u017Ee, Pa",L"Za ventilator, Pa"};
+    for(int c=0;c<4;++c)s.put(h,c+1,text(head[c]));
+    {Format f;f.range=cell(1,h)+L":"+cell(4,h);f.bold=true;f.wrap=true;f.border=true;f.align=1;f.font=blue;s.format(f);}
+    const Workbook* side[2]={&suction,&discharge};const wchar_t* name[2]={L"Usis (odvod)",L"Potis (dovod)"};const double q[2]={qSuction,qDischarge};
+    for(int k=0;k<2;++k){const int row=h+1+k;const std::wstring ref=L"'"+side[k]->sheets[0].name+L"'!";
+        s.put(row,1,text(name[k]));s.put(row,2,num(q[k],0));
+        s.put(row,3,side[k]->netRow?L"="+ref+L"$D$"+std::to_wstring(side[k]->netRow):std::wstring(L"0"));
+        s.put(row,4,side[k]->fanRow?L"="+ref+L"$D$"+std::to_wstring(side[k]->fanRow):std::wstring(L"0"));}
+    const int tot=h+3;s.put(tot,1,text(L"Ventilator ukupno"));s.put(tot,3,L"=C"+std::to_wstring(h+1)+L"+C"+std::to_wstring(h+2));s.put(tot,4,L"=D"+std::to_wstring(h+1)+L"+D"+std::to_wstring(h+2));
+    {Format f;f.range=cell(1,h+1)+L":"+cell(4,tot);f.border=true;f.size=10;s.format(f);}
+    {Format f;f.range=cell(2,h+1)+L":"+cell(2,tot);f.number=L"#,##0";f.align=2;s.format(f);}
+    {Format f;f.range=cell(3,h+1)+L":"+cell(4,tot);f.number=L"0.0";f.align=2;s.format(f);}
+    {Format f;f.range=cell(1,tot)+L":"+cell(4,tot);f.bold=true;f.fill=pink;s.format(f);}
+    int w=tot+2;
+    if(qSuction>0&&qDischarge>0&&std::fabs(qSuction-qDischarge)>0.01*(qSuction>qDischarge?qSuction:qDischarge)){
+        s.put(w++,1,text(L"Upozorenje: protok usisa i potisa se razlikuje \u2013 kroz ventilator prolazi jedan protok; provjerite krajnje elemente (TVS_PROTOK)."));
+        Format f;f.range=cell(1,w-1);f.bold=true;f.font=rgb(0xC0,0x39,0x2B);s.format(f);}
+    s.put(w,1,text(L"Usisna strana je ra\u010Dunata kao odvod (krajnji elementi \u2192 ventilator), potisna kao dovod (ventilator \u2192 krajnji elementi). Rezerva i \u0394p krajnjih elemenata se unose na listovima svake strane; ukupno se sabira samo."));
+    {Format f;f.range=cell(1,w);f.italic=true;f.size=9;f.font=grey;s.format(f);}
+    const double widths[]={22,12,14,16};s.widths.assign(widths,widths+4);
+    for(int k=0;k<2;++k)for(size_t j=0;j<side[k]->sheets.size();++j)wb.sheets.push_back(side[k]->sheets[j]);
     return wb;
 }
 }

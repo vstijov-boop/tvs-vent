@@ -85,6 +85,7 @@
 #include "PressureCommand.h"
 #include "DpdExportCommand.h"
 #include "EquipmentLinkCommand.h"
+#include "FanCommand.h"   // TVS_VENTILATOR: usis / potis ventilatora u mreži
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
 #include "EquipmentDialog.h"   // TVS_OPREMA_SVOJSTVA: svojstva povezanih blokova opreme
@@ -418,6 +419,7 @@ ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_RESETKA
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_DPD_IZVOZ, TVS_DPD_IZVOZ, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OPREMA, TVS_OPREMA, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_OPREMA_ODVEZI, TVS_OPREMA_ODVEZI, ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET, NULL)
+ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_VENTILATOR, TVS_VENTILATOR, ACRX_CMD_MODAL, NULL)
 
 //old
 ACED_ARXCOMMAND_ENTRY_AUTO(CTVS_Ventilation_ARXApp, Ventilation_ARX, TVS_PIPE, TVS_PIPE, ACRX_CMD_MODAL, NULL)

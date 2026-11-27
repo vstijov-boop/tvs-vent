@@ -22,6 +22,17 @@ static Duct duct(double x0,double y0,double x1,double y1,double a=400,double b=2
 static Pt along(double cx,double cy,double dist,double deg){return Pt(cx+dist*std::cos(deg*PI/180),cy+dist*std::sin(deg*PI/180));}
 int main(){
     Options o;   // mm drawing: tol 1, axis 25, gap 150, min piece 50
+    // ---- a row of blocks (FV 55 - ventilator 800 - FV 55) between two ducts ----
+    {std::vector<Duct> d;d.push_back(duct(0,0,1000,0));d.push_back(duct(1910,0,3000,0));
+     std::vector<std::vector<Pt> > row;row.push_back(box(1027.5,0,55,700,0));row.push_back(box(1455,0,800,800,0));row.push_back(box(1882.5,0,55,700,0));
+     std::vector<Pt> all;for(size_t k=0;k<row.size();++k)all.insert(all.end(),row[k].begin(),row[k].end());
+     Result r=link(all,d,o);assert(r.error==Ok&&r.ports==2&&eq(r.length,910));
+     std::vector<ChainPart> c;assert(chain(row,r,o.tol,c)&&c.size()==3);
+     assert(at(c[0].port[0],1000,0)&&at(c[0].port[1],1055,0)&&at(c[1].port[0],1055,0)&&at(c[1].port[1],1855,0)&&at(c[2].port[1],1910,0));
+     assert(eq(c[1].length,800)&&c[1].port[0].dx==-1&&c[1].port[1].dx==1);
+     assert(touching(row[0],row[1],o.tol)&&touching(row[1],row[2],o.tol)&&!touching(row[0],row[2],o.tol));
+     assert(!touching(box(0,0,100,100,0),box(103,0,100,100,0),1)&&touching(box(0,0,100,100,0),box(100.5,0,100,100,0),1));
+     std::vector<std::vector<Pt> > gap=row;gap[1]=box(1460,0,790,800,0);assert(!chain(gap,r,o.tol,c));}
     // ---- case 1: inline, both pieces touch the faces (block 500 long at x 1000..1500) ----
     {std::vector<Duct> d;d.push_back(duct(0,0,1000,0));d.push_back(duct(1500,0,3000,0));
      Result r=link(box(1250,0,500,450,0),d,o);

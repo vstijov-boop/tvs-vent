@@ -217,6 +217,14 @@ int main(int argc,char** argv){
 yes(s.at(6,2)==L"20"&&s.at(7,2).find(L"=101325/(287.05*($B$6+273.15))")==0&&s.at(12,tvsSheet::cLambda).find(L"=IF(M12<=0")==0,"t, rho and lambda formulas");
         yes(s.hidden.size()==2&&s.hidden[0]==tvsSheet::cRe,"Re hidden");
     yes(!wb.sheets[2].strokes.empty()&&wb.sheets[2].strokes.size()==r.lines.size(),"schematic lines");
+    // ventilator u mrezi: two tagged sets and the summary sheet
+    {tvsSheet::Workbook u=tvsSheet::build(r,info,o,L"usis"),p=tvsSheet::build(r,info,o,L"potis");
+     yes(u.sheets[0].name==L"Dionice usis"&&u.sheets[1].name==L"Fitinzi usis"&&u.sheets[0].at(12,tvsSheet::cZeta)==L"=SUMIF('Fitinzi usis'!$A:$A,A12,'Fitinzi usis'!$E:$E)","tagged sheets");
+     yes(u.fanRow>0&&u.sheets[0].at(u.fanRow,1)==L"'Za ventilator, Pa","fan row");
+     tvsSheet::Workbook fb=tvsSheet::fanBook(u,p,info,1000,1000,L"V-01");
+     yes(fb.sheets.size()==7&&fb.sheets[0].name==L"Ventilator"&&fb.sheets[1].name==L"Dionice usis"&&fb.sheets[4].name==L"Dionice potis","fan book sheets");
+     yes(fb.sheets[0].at(7,4)==L"='Dionice usis'!$D$"+std::to_wstring(u.fanRow)&&fb.sheets[0].at(9,4)==L"=D7+D8","fan sum");
+     tvsSheet::Workbook diff=tvsSheet::fanBook(u,p,info,1000,800,L"");yes(diff.sheets[0].at(11,1).find(L"Upozorenje")!=std::wstring::npos,"flow warning");}
     bool dashed=false;for(size_t k=0;k<wb.sheets[2].strokes.size();++k)dashed|=wb.sheets[2].strokes[k].dash;yes(dashed,"flex dashed");
     if(argc>=3){   // real ASHRAE data: the same network, workbook dumped for the preview
         const std::string dir=argv[1];

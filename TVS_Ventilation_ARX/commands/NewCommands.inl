@@ -171,6 +171,13 @@
         syncTVSGlobalUnits();
         tvsEquipmentLinkCmd::unlink();
     }
+    // TVS_VENTILATOR: a linked inline block becomes a fan; its suction side (usis) chosen with temporary labels.
+    static void Ventilation_ARXTVS_VENTILATOR(void)
+    {
+        if (ActivationErrorMessage() != pError_Ok) return;
+        syncTVSGlobalUnits();
+        tvsFan::execute();
+    }
     // TVS_SPOJ_TKO: inlet, prolaz and branch duct joined by a TK-O (BranchJoinCommand.h).
     static void Ventilation_ARXTVS_SPOJ_TKO(void)
     {

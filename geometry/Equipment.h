@@ -22,7 +22,10 @@
 #include <vector>
 namespace tvsEquipment {
 
-enum Kind {Other=0,FlowDamper=1,FireDamper=2,Cav=3,Vav=4,Silencer=5,Grille=6,Diffuser=7,Hood=8,Louvre=9};
+enum Kind {Other=0,FlowDamper=1,FireDamper=2,Cav=3,Vav=4,Silencer=5,Grille=6,Diffuser=7,Hood=8,Louvre=9,Fan=10};
+// Fan (ventilator u mrezi, user 2026-11-27): inline, `suction` = the port on the suction side (usis),
+// the other one is potis. TVS_PROTOK / TVS_PAD started on it split the network there: the suction
+// side is computed as odvod, the discharge side as dovod; the fan needs the sum of both.
 enum Model {NoLoss=0,FixedDp=1,Zeta=2,Nominal=3,Curve=4};
 // Curve (user 2026-11-23, VAV / CAV / diffusers): catalogue points (Q m3/h, dp Pa); between two
 // points dp is interpolated linearly in Q^2 (dp ~ Q^2 inside a regulator / terminal), outside the
@@ -42,7 +45,7 @@ enum Mount {AtEnd=0,Bottom=1};
 // (half(): ports = 1, half = 0 / 1, qTerminal / 2; loss() evaluates a half at twice its flow);
 // the specification counts the block once.
 
-inline int kindCount(){return 10;}
+inline int kindCount(){return 11;}
 // Names shown in the dialogs / specification (BCS, \u escapes keep this file ASCII).
 inline const wchar_t* kindName(int k){
     switch(k){
@@ -55,6 +58,7 @@ inline const wchar_t* kindName(int k){
     case Diffuser:return L"Difuzor";
     case Hood:return L"Krovna kapa";
     case Louvre:return L"Protivki\u0161na \u017ealuzina";
+    case Fan:return L"Ventilator";
     default:return L"Ostala oprema";
     }
 }
@@ -63,7 +67,7 @@ inline const wchar_t* tagPrefix(int k){
     switch(k){
     case FlowDamper:return L"RP";case FireDamper:return L"PPK";case Cav:return L"CAV";case Vav:return L"VAV";
     case Silencer:return L"PB";case Grille:return L"R";case Diffuser:return L"D";case Hood:return L"KK";
-    case Louvre:return L"PZ";default:return L"OP";
+    case Louvre:return L"PZ";case Fan:return L"V";default:return L"OP";
     }
 }
 // Kinds that normally sit at a free end (1 port). A record may still differ (ports decides).
@@ -98,8 +102,9 @@ struct Record {
     bool neckRound;
     bool twin;            // terminal with 2 ports on the box (see above); persisted as twin=1
     int half;             // -1; 0 / 1: one connection of a twin terminal (made by half(), never stored)
+    int suction;          // Fan: the port on the suction side (0 / 1), -1 not chosen; persisted as usis=k
     Record():version(1),kind(Other),ports(2),mmPerUnit(1),round(false),a(0),b(0),lengthMm(0),
-             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),anchored(false),ax(0),ay(0),arot(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false),twin(false),half(-1){}
+             model(NoLoss),dp(0),zeta(0),dpNominal(0),qNominal(0),qTerminal(0),anchored(false),ax(0),ay(0),arot(0),mount(AtEnd),neckA(0),neckB(0),neckRound(false),twin(false),half(-1),suction(-1){}
     bool terminal()const{return ports==1||twin;}
 };
 
@@ -165,6 +170,7 @@ inline std::wstring format(const Record& r){
     put(L"dpn",num(r.dpNominal));put(L"qn",num(r.qNominal));put(L"q",num(r.qTerminal));
     if(r.mount!=AtEnd)put(L"mount",num(r.mount));
     if(r.twin&&r.ports==2)put(L"twin",num(1));
+    if(r.suction>=0&&r.ports==2)put(L"usis",num(r.suction));
     if(r.neckA>0){put(L"na",num(r.neckA));put(L"nb",num(r.neckB));put(L"nr",num(r.neckRound?1:0));}
     if(r.anchored)put(L"anc",num(r.ax)+L","+num(r.ay)+L","+num(r.arot));
     if(!r.curve.empty()){std::wstring c;for(size_t i=0;i<r.curve.size();++i){if(i)c+=L",";c+=num(r.curve[i].first)+L":"+num(r.curve[i].second);}put(L"curve",c);}
@@ -206,6 +212,7 @@ inline bool parse(const std::wstring& s,Record& r){
         else if(key==L"q"&&n)r.qTerminal=v;
         else if(key==L"mount"&&n)r.mount=v==Bottom?Bottom:AtEnd;
         else if(key==L"twin"&&n)r.twin=v!=0;
+        else if(key==L"usis"&&n)r.suction=v==1?1:0;
         else if(key==L"na"&&n)r.neckA=v;
         else if(key==L"nb"&&n)r.neckB=v;
         else if(key==L"nr"&&n)r.neckRound=v!=0;
@@ -230,7 +237,7 @@ inline bool parse(const std::wstring& s,Record& r){
     }
     if(r.kind<0||r.kind>=kindCount())r.kind=Other;
     if(r.model<NoLoss||r.model>Curve)r.model=NoLoss;
-    if(r.ports!=2)r.twin=false;
+    if(r.ports!=2){r.twin=false;r.suction=-1;}
     return any&&r.version==1;
 }
 }
