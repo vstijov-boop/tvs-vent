@@ -14,6 +14,6 @@ class RoundTap(unittest.TestCase):
   for f in ('TVS_Ventilation_ARX/FlowCommand.h','TVS_Ventilation_ARX/SizeFollow.h','TVS_Ventilation_ARX/TeeTypeDialog.h'):
    self.assertIn('tvsTeeCommand::tapRecord(',text(f),f)
   self.assertIn('tee.cone = ThisRoundotv && tvsTee::isCone(r.second, SizeAotv, r.l)',text('TVS_Ventilation_DBX/TVS_WYE.cpp'))
-  self.assertIn('Konusna štucna SR5-12',text('TVS_Ventilation_ARX/SPEC.cpp'))
+  self.assertIn('Konusna štucna, okrugli ogranak',text('TVS_Ventilation_ARX/SPEC.cpp'))
   self.assertIn('tvsTee::isCone(rec.second,p->SizeAotv,rec.l)',text('TVS_Ventilation_ARX/PressureCommand.h'))
 if __name__=='__main__':unittest.main()

@@ -8,6 +8,7 @@
 #include "SPEC.h"
 #include "TablePresentation.h"
 #include "../TVS_Ventilation_DBX/SheetMetal.h"
+#include "../geometry/AshraeKeys.h"   // plan 9: ASHRAE key in the name (before the macros below: TeePants ...)
 
 #include <cmath>
 #include<iostream>
@@ -27,6 +28,13 @@ using namespace std;
 #define TypeInt 0
 #define TypeDouble1 1
 #define TypeDouble2 2
+// plan 9 (2026-11-28): "<name>, ASHRAE SR4-1 / ER4-1" (dovod / odvod; one key when both are the same)
+static void appendAshrae(ACHAR* name, size_t size, const std::wstring& key)
+{
+	if (key.empty()) return;
+	wcscat_s(name, size, L", ");
+	wcscat_s(name, size, key.c_str());
+}
 
 #pragma once
 
@@ -239,6 +247,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 					appendLable(Swectangle);
 					appendLable(grad);
 					appendLable(_T(")"));
+					appendAshrae(name, 512, tvsPressure::elbowSpec(tvsPressure::Section(SizeA, SizeB, SizeB == 0), Swectangle));
 					setParam1(1, TypeDouble1);
 					setParam2(Area, TypeDouble2);
 				}
@@ -320,7 +329,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 						if (tee.type == tvsTee::Tap) {   // stucna SR5-3: A x B / w x b (L=)
 							status = TeeTap; Extra = mm.l;
 							const bool roundBranch = pWye->ThisRoundotv;   // A x B / D: kutija D x D, prikljucak D
-							setName(roundBranch ? (tee.cone > 0 ? L"Konusna štucna SR5-12, okrugli ogranak" : L"Valjkasta štucna SR5-11, okrugli ogranak") : L"Štucna 45° SR5-3");
+							setName(roundBranch ? (tee.cone > 0 ? L"Konusna štucna, okrugli ogranak" : L"Valjkasta štucna, okrugli ogranak") : L"Štucna 45°");   // the ASHRAE key follows (plan 9)
 							setLable(SizeA); appendLable(_T("x")); appendLable(SizeB); appendLable(_T(" / "));
 							if (roundBranch) { appendLable(d); appendLable(SizeA2); }
 							else { appendLable(SizeA2); appendLable(_T("x")); appendLable(SizeA3); }
@@ -346,6 +355,15 @@ bool SPEC::add(AcDbEntity * pEnt)
 						Area = branchTee ? tvsTee::area(mm, SizeB, SizeA3) : tvsTee::area(mm, SizeA3, SizeB);
 						}
 					}
+				}
+				{   // ASHRAE: common = the run (pr), branch = otv; TK0 plain, TK-O / TK-G / stucna, kosa TK / Y45 (wye)
+					const int keyTee = status == TeeBranch ? 1 : status == TeePants ? 2 : status == TeeTap ? 3 : 0;
+					tvsTee::Tee shape; AcGePoint3d so; AcGeVector3d sx, sy;
+					const bool known = pWye->teeShape(shape, so, sx, sy);
+					const bool lateral = known && shape.lateral > 0 && pWye->ThisRoundpr && pWye->ThisRoundotv;
+					const bool cone = known && shape.cone > 0;
+					appendAshrae(name, 512, tvsPressure::junctionSpec(lateral ? (shape.type == tvsTee::Pants ? 2 : 3) : keyTee,
+						tvsPressure::Section(SizeA, SizeB, pWye->ThisRoundpr), tvsPressure::Section(SizeA2, SizeA3, pWye->ThisRoundotv), cone, lateral));
 				}
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);
@@ -426,6 +444,7 @@ bool SPEC::add(AcDbEntity * pEnt)
 				appendLable(_T(" (L="));
 				appendLable(tvsUnits::mm(pTrans->LengthTr, pTrans));
 				appendLable(_T(" mm)"));
+				appendAshrae(name, 512, tvsPressure::transitionSpec(tvsPressure::Section(SizeA, SizeB, SizeB == 0), tvsPressure::Section(SizeA2, SizeA3, SizeA3 == 0)));
 				setParam1(1, TypeDouble1);
 				setParam2(Area, TypeDouble2);
 			}

@@ -32,6 +32,7 @@
 //   (cep, no row). The grille's own loss is its terminal "dp kraj. elem."; in the schematic the
 //   branch is a short stub across the duct (tapStub) with the grille's tag.
 #include "AshraeEngine.h"
+#include "AshraeKeys.h"   // Section, TeeType, elbowKey / transitionKey / junctionKey
 #include "Equipment.h"
 #include <cmath>
 #include <cwchar>
@@ -39,10 +40,8 @@
 #include <string>
 #include <vector>
 namespace tvsPressure {
-struct Section {double a,b;bool round;Section():a(0),b(0),round(false){}Section(double x,double y,bool r):a(x),b(y),round(r){}};
 struct XY {double x,y;XY():x(0),y(0){}XY(double a,double b):x(a),y(b){}};
 enum PartKind {Other=0,Duct=1,Elbow=2,Transition=3,Tee=4,Equipment=5,BottomTap=6};   // BottomTap: resetka na dnu (see above)
-enum TeeType {TeePlain=0,TeeBranch=1,TeePants=2,TeeTap=3};   // TK0, TK-O, TK-G, stucna (TeeData.h)
 struct Part {
     int kind;bool flex;
     double length;        // mm: duct, prelaz; elbow: the axis arc (computed when 0); BottomTap: the closed duct end beyond it (DPD export, 0 none)
@@ -97,28 +96,6 @@ inline void hydraulics(Dionica& d,const Options& o){
     d.rough=d.flex?o.flexRough:o.rough;d.dh=hydraulic(d.s);const double s=area(d.s);
     d.v=s>0?std::fabs(d.flow)/3600.0/s:0;d.pd=o.rho*d.v*d.v/2;d.re=d.v*d.dh/1000.0/o.nu;
     d.lambda=lambdaOf(d.re,d.rough,d.dh);d.r=d.dh>0?d.lambda/(d.dh/1000.0)*d.pd:0;
-}
-// ---- ASHRAE keys (the user's mapping) ----
-inline std::string elbowKey(const Section& s,double angle){
-    if(!s.round)return "CR3-1";
-    if(std::fabs(angle-90)<=7.5)return s.a<=250?"CD3-2":"CD3-21";
-    if(std::fabs(angle-45)<=7.5&&s.a<=250)return "CD3-4";
-    return std::string();
-}
-inline std::string transitionKey(bool exhaust,const Section& up,const Section& down){
-    if(up.round&&down.round)return exhaust?"ED4-1":"SD4-1";
-    if(up.round)return exhaust?"ED4-2":"SR4-3";     // round -> rectangular
-    if(down.round)return exhaust?"ER4-3":"SD4-2";   // rectangular -> round
-    const bool oneSide=std::fabs(up.a-down.a)<0.5||std::fabs(up.b-down.b)<0.5;
-    return exhaust?(oneSide?"ER4-1":"ER4-2"):(oneSide?"SR4-1":"SR4-2");
-}
-inline std::string junctionKey(bool exhaust,int tee,const Section& common,const Section& branch,bool cone=false,bool lateral=false){
-    if(common.round&&branch.round&&lateral)return exhaust?"ED5-2":"SD5-1";   // kosa stucna: wye 45; Y45 (TeePants): each leg as its branch
-    if(common.round)return branch.round?(exhaust?"ED5-3":"SD5-9"):std::string();
-    if(tee==TeePants)return exhaust?"ER5-4":"SR5-14";
-    if(branch.round)return exhaust?"ER5-2":cone?"SR5-12":"SR5-11";   // round tap: cylindrical / conical
-    if(exhaust)return tee==TeeTap?"ER5-3":"ER5-1";   // stucna: 45 deg entry branch (ASHRAE: Ab/Ac = 0.5, As = Ac)
-    return tee==TeePlain?"SR5-5":tee==TeeBranch?"SR5-1":"SR5-13";   // TK0 plain tee, TK-O smooth radius, stucna 45 deg entry
 }
 // ---- ASHRAE inputs (as DuctPressDrop services/ashrae/seeding.py) ----
 inline double dimOf(const Section& s,char d){if(d=='D')return s.round?s.a:0;if(d=='W')return s.round?0:s.a;if(d=='H')return s.round?0:s.b;return 0;}

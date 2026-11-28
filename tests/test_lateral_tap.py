@@ -11,7 +11,7 @@ class Lateral(unittest.TestCase):
   w=text('TVS_Ventilation_DBX/TVS_WYE.cpp');self.assertIn('tee.lateral = r.neck;',w)
   c=text('TVS_Ventilation_ARX/commands/ConnectHelpers.inl');self.assertIn('return ConnectLateral(pPipe1, pPipe2);',c);self.assertIn('tvsTeeFit::lateralRecord(r, A, w, f);',c);self.assertIn('return ConnectLateral(pPipe1, pPipe2, true);',c);self.assertIn('tvsTeeDialog::planElbow(wyeId, face, d, turn, sec,',c)
   dh=text('TVS_Ventilation_ARX/commands/DrawHelpers.inl');self.assertIn('return roundTeeDuringDrawing(A1, A2, pipi, pt1); }',dh);self.assertIn(': lateralDuringDrawing(A1, A2, pipi, pt1);',dh);self.assertIn('[Koljeno/Bez] <Koljeno>',dh)
-  p=text('geometry/PressureDrop.h');self.assertIn('return exhaust?"ED5-2":"SD5-1";',p)
+  p=text('geometry/AshraeKeys.h');self.assertIn('return exhaust?"ED5-2":"SD5-1";',p)
   self.assertIn('t.lateral=(rec.type==tvsTee::Tap||rec.type==tvsTee::Pants)&&rec.neck>0',text('TVS_Ventilation_ARX/PressureCommand.h'))
   for f in ('SizeFollow.h','FlowCommand.h','TeeEditDialog.h'):self.assertIn('tvsTeeFit::lateralLength(',text('TVS_Ventilation_ARX/'+f))
   self.assertIn('Kosa račva TK 45° (Soko)',text('TVS_Ventilation_ARX/SPEC.cpp'))
