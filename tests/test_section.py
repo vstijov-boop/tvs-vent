@@ -10,6 +10,13 @@ CPP=r"""
 using namespace tvsSection;
 static bool near(double a,double b,double e=1e-9){return std::fabs(a-b)<=e;}
 int main(){
+ // plan 7: elbow axis = true arc (90 deg, R 500: corner (0,0), ports (-500,0) and (0,500), centre (-500,500))
+ {const std::vector<P> a=elbowAxis(P(-500,0),P(0,0),P(0,500),12);assert(a.size()==13);
+  for(size_t k=0;k<a.size();++k)assert(near(std::hypot(a[k].x+500,a[k].y-500),500,1e-6));
+  assert(near(a.front().x,-500)&&near(a.back().y,500));
+  const std::vector<P> s30=elbowAxis(P(-500,0),P(0,0),P(500*std::cos(3.14159265358979323846/6),500*std::sin(3.14159265358979323846/6)),6);   // 30 deg turn
+  const double R=500/std::tan(3.14159265358979323846/12);for(size_t k=0;k<s30.size();++k)assert(near(std::hypot(s30[k].x+500,s30[k].y-R),R,1e-6));
+  assert(elbowAxis(P(-1,0),P(0,0),P(1,0),8).size()==2);}
  // duct along x at y=0 (400x200, axis z=2500); section line along y through x=1000
  Member d;d.a=P(0,0);d.b=P(2000,0);d.A1=d.A2=400;d.B1=d.B2=200;d.z=2500;d.tag=1;
  Cut c;assert(cut(P(1000,-500),P(1000,1500),d,c));
@@ -118,6 +125,7 @@ class Section(unittest.TestCase):
   e=entry_source()
   self.assertIn('Ventilation_ARX, TVS_PRESJEK, TVS_PRESJEK, ACRX_CMD_MODAL',e);self.assertIn('tvsSectionDialog::run(IDD_SECTION);',e)
   s=(ROOT/'TVS_Ventilation_ARX/SectionCommand.h').read_text(encoding='utf-8-sig')
+  self.assertIn('trueElbows&&tap&&n.ports.size()==2',s)
   self.assertIn('const int n=build(btr.object(),p);refreshReferences(btr.object());',s,'Osvjezi rebuilds the block from stored parameters')
   self.assertIn('const short types[]={1,1,10,10,70,40,40,40};',s)
   self.assertIn('const double th=0.7*p.scale/f',s,'1:50 in mm -> 35')

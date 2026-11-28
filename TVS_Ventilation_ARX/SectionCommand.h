@@ -53,7 +53,9 @@ inline AcDbObjectId textStyle(AcDbDatabase* db){
 // axis z at its ends from the assembly record (rise). Vertical elbows (Gore / Nadolje): one
 // member between their ports, end elevations taken from the elements they join.
 // ids (optional): object id of every element, ids[tag - 1].
-inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out,std::vector<AcDbObjectId>* ids=NULL){
+// trueElbows (P1 cross-section, plan 7): plan elbows as members along their axis arc; the
+// longitudinal profile (Profile.h) keeps the two chords from the corner it develops.
+inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out,std::vector<AcDbObjectId>* ids=NULL,bool trueElbows=false){
     AcDbObjectPointer<AcDbBlockTableRecord> space(db->currentSpaceId(),AcDb::kForRead);if(space.openStatus()!=Acad::eOk)return;
     AcDbBlockTableRecordIterator* it=NULL;if(space->newIterator(it)!=Acad::eOk)return;
     const double f=tvsUnits::factor(db),tol=2.0/f;
@@ -84,6 +86,12 @@ inline void members(AcDbDatabase* db,std::vector<tvsSection::Member>& out,std::v
             else if(tap&&tap->get_Form()!=Form_Direct){   // vertical elbow
                 add(n.ports[0],n.ports[1],n.sections[0],n.sections[1]);out.back().sloped=true;out.back().bend=true;
                 bends.push_back(out.size()-1);bendElev.push_back(n.elevation);
+            }
+            else if(trueElbows&&tap&&n.ports.size()==2){   // plan elbow: members along its true axis arc (plan 7)
+                const std::vector<tvsSection::P> axis=tvsSection::elbowAxis(tvsSection::P(n.ports[0].x,n.ports[0].y),
+                    tvsSection::P(n.middle.x,n.middle.y),tvsSection::P(n.ports[1].x,n.ports[1].y),12);
+                for(size_t j=0;j+1<axis.size();++j){tvsMove::Point a=n.ports[0],b=n.ports[0];a.x=axis[j].x;a.y=axis[j].y;b.x=axis[j+1].x;b.y=axis[j+1].y;
+                    add(a,b,n.sections[0],n.sections[1]);}
             }
             else for(size_t j=0;j<n.ports.size();++j)add(n.middle,n.ports[j],n.sections[j],n.sections[j]);
         }
@@ -166,7 +174,7 @@ inline int build(AcDbBlockTableRecord* btr,const Params& p){
     }
     const AcDbObjectId layerId=layer(db),style=textStyle(db);
     const double th=0.7*p.scale/f,gap=0.5*th;   // section labels: 0.7 mm x scale (1:50 -> 35 mm)
-    std::vector<tvsSection::Member> net;members(db,net);
+    std::vector<tvsSection::Member> net;members(db,net,NULL,true);
     const tvsSection::P a(p.p1.x,p.p1.y),b(p.p2.x,p.p2.y);
     const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(a,b,net,p.flip,2.0/f);
     const double L=p.p1.distanceTo(p.p2),margin=(std::max)(500/f,6*th),H=p.ceiling-p.floor;

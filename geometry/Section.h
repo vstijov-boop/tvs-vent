@@ -22,6 +22,23 @@ struct Member {P a,b,dir;double A1,B1,A2,B2;bool round;double z,za,zb;bool slope
     double zAt(double u)const{return sloped?za+(zb-za)*u:z;}
     double planLength()const{return std::sqrt((b.x-a.x)*(b.x-a.x)+(b.y-a.y)*(b.y-a.y));}
     bool vertical(double tol)const{return planLength()<=tol&&sloped&&std::fabs(zb-za)>tol;}};
+// Plan elbow axis (plan 7, 2026-11-28: "detalji koljena u presjeku"): the true arc from port a
+// to port b, tangent to a-m and b-m at the ports (m = the corner point), as n + 1 points - a
+// rational quadratic Bezier with weight cos(sweep / 2), exact for a circular arc (equal legs).
+// Members along it: a cut through the elbow lies on the arc (not on the chords to the corner)
+// and the elbow seen in depth spans its real footprint. Degenerate (straight) -> {a, b}.
+inline std::vector<P> elbowAxis(const P& a,const P& m,const P& b,int n){
+    std::vector<P> out;const P u(a.x-m.x,a.y-m.y),v(b.x-m.x,b.y-m.y);
+    const double lu=std::sqrt(u.x*u.x+u.y*u.y),lv=std::sqrt(v.x*v.x+v.y*v.y);
+    if(n<1||lu<1e-9||lv<1e-9){out.push_back(a);out.push_back(b);return out;}
+    double c=(u.x*v.x+u.y*v.y)/(lu*lv);c=c>1?1:c<-1?-1:c;
+    const double corner=std::acos(c),sweep=3.14159265358979323846-corner;
+    if(sweep<1e-6||corner<1e-6){out.push_back(a);out.push_back(b);return out;}   // straight / folded back
+    const double w=std::cos(sweep/2);
+    for(int k=0;k<=n;++k){const double t=double(k)/n,b0=(1-t)*(1-t),b1=2*t*(1-t)*w,b2=t*t,den=b0+b1+b2;
+        out.push_back(P((b0*a.x+b1*m.x+b2*b.x)/den,(b0*a.y+b1*m.y+b2*b.y)/den));}
+    return out;
+}
 struct Cut {double s,w,h,A,B,z,sinA;bool round;int tag;Cut():s(0),w(0),h(0),A(0),B(0),z(0),sinA(1),round(false),tag(0){}};
 // Section line p1 -> p2 against one member. s = distance from p1 along the line. In the
 // section the duct appears A / sin(angle) wide (oblique cut), limited to 5 A.

@@ -219,7 +219,7 @@ inline void cross(UINT idd,const ads_point* first){
     {   // side and depth by dragging (as before); the dialog shows the depth and can change it
         tvsSectionCmd::DepthJig jig(p.p1,p.p2);if(jig.drag()!=AcEdJig::kNormal)return;p.flip=jig.flip;p.depth=jig.depth<1.0/f?0:jig.depth;}
     Setup s;fill(s,db,0);s.letter=tvsSectionCmd::nextLetter(db);s.depthM=p.depth*f/1000;s.lengthDU=p.p1.distanceTo(p.p2);
-    {std::vector<tvsSection::Member>& net=s.net;tvsSectionCmd::members(db,net);s.a=tvsSection::P(p.p1.x,p.p1.y);s.b=tvsSection::P(p.p2.x,p.p2.y);s.flip=p.flip;
+    {std::vector<tvsSection::Member>& net=s.net;tvsSectionCmd::members(db,net,NULL,true);s.a=tvsSection::P(p.p1.x,p.p1.y);s.b=tvsSection::P(p.p2.x,p.p2.y);s.flip=p.flip;
      const std::vector<tvsSection::Cut> cuts=tvsSection::cuts(s.a,s.b,net,p.flip,2.0/f);
      for(size_t i=0;i<cuts.size();++i){tvsSectionSketch::Box x;x.s=cuts[i].s;x.z=cuts[i].z;x.w=cuts[i].w;x.h=cuts[i].h;x.round=cuts[i].round;s.boxes.push_back(x);}
      s.count=static_cast<int>(cuts.size());}
