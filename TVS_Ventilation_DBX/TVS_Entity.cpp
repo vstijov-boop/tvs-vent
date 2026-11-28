@@ -28,6 +28,7 @@
 #include "OffsetAssemblyData.h"
 #include "BypassAssemblyData.h"
 #include <limits>
+#include <cmath>
 #endif
 #include "TVS_Entity.h"
 #include "TVS_Pipe.h"
@@ -106,6 +107,13 @@ bool TVS_Entity::getSheetMetal(double &areaM2, double &thicknessMm, double &mass
             // TK-O: run height b, branch b2; TK-G: inlet = TVS branch (b2), outlets = TVS run (b).
             areaM2 = tee.type != tvsTee::Pants ? tvsTee::area(mm, b, b2) : tvsTee::area(mm, b2, b);
             largest = tvsSheetMetal::larger(largest, tvsSheetMetal::larger(mm.C, mm.w2));
+        }
+        // krstasti komad / XK (plan 26): + the second branch collar (round: pi d L, rectangular: 2 (a + b) L)
+        AcGePoint3d xp; AcGeVector3d xd; double xa = 0, xb = 0; bool xr = true;
+        if (p->crossPort(xp, xd, xa, xb, xr)) {
+            const double ax = xa*f, bx = xr ? 0.0 : xb*f, reach = std::sqrt((xp.x-p->Basepoint.x)*(xp.x-p->Basepoint.x)+(xp.y-p->Basepoint.y)*(xp.y-p->Basepoint.y))*f - a/2;
+            const double L = reach > length ? reach : length;
+            areaM2 += (xr ? 3.14159265358979323846*ax : 2*(ax+bx))*L/1e6;
         }
     }
     else return false;

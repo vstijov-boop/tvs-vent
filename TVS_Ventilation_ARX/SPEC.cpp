@@ -356,6 +356,23 @@ bool SPEC::add(AcDbEntity * pEnt)
 						}
 					}
 				}
+				{   // krstasti komad / XK (plan 26): the second branch opposite the first one (area: TVS_Entity::getSheetMetal)
+					AcGePoint3d xp; AcGeVector3d xd; double xa = 0, xb = 0; bool xr = true;
+					if (pWye->crossPort(xp, xd, xa, xb, xr)) {
+						const double f = tvsUnits::factor(pWye), a2 = xa * f, b2 = xb * f;
+						if (status == TeeTap) {   // XK: D / d1, d2 (L=) - kosa racva TK with the second branch
+							setName(L"Kosa račva XK 45° (Soko), okrugla");
+							setLable(d); appendLable(SizeA); appendLable(_T(" / ")); appendLable(d); appendLable(SizeA2);
+							appendLable(_T(", ")); appendLable(d); appendLable(a2);
+						} else {                   // TK0: krstasti komad D - d1 / d2 (L=)
+							setName(L"Krstasti komad (Soko)");
+							if (SizeB == 0) setLable(d); else setLable(_T("")); appendLable(SizeA); if (SizeB > 0) { appendLable(_T("x")); appendLable(SizeB); }
+							appendLable(_T(" - ")); if (SizeA3 == 0) appendLable(d); appendLable(SizeA2); if (SizeA3 > 0) { appendLable(_T("x")); appendLable(SizeA3); }
+							appendLable(_T(" / ")); if (xr) appendLable(d); appendLable(a2); if (!xr) { appendLable(_T("x")); appendLable(b2); }
+							appendLable(_T(" (L=")); appendLable(tvsUnits::mm(pWye->LengthPl, pWye)); appendLable(_T(" mm)"));
+						}
+					}
+				}
 				{   // ASHRAE: common = the run (pr), branch = otv; TK0 plain, TK-O / TK-G / stucna, kosa TK / Y45 (wye)
 					const int keyTee = status == TeeBranch ? 1 : status == TeePants ? 2 : status == TeeTap ? 3 : 0;
 					tvsTee::Tee shape; AcGePoint3d so; AcGeVector3d sx, sy;

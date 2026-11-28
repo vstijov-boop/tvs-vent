@@ -48,6 +48,7 @@
 
 #include "TVS_Entity.h"
 #include "TeeData.h"
+#include "TeeCross.h"   // krstasti komad / XK: the second branch (plan 26)
 //-----------------------------------------------------------------------------
 class DLLIMPEXP TVS_WYE : public TVS_Entity {
 
@@ -196,6 +197,9 @@ public:
 	// TK-O / TK-G drawn ports in the TVS order (run start, run end, branch) and their widths;
 	// false for a plain T (nominal TVS ports apply).
 	bool teePorts(AcGePoint3d ports[3], double widths[3]) const;
+	// Krstasti komad (TK0) / XK (kosa racva TK) - TeeCross.h: the second branch opposite the first:
+	// its port (TVS port 3), direction out of the fitting and size. false: an ordinary T komad.
+	bool crossPort(AcGePoint3d &port, AcGeVector3d &dir, double &a, double &b, bool &round) const;
 
 	////////////////////////////////////
 	virtual void getName(CString &unit);

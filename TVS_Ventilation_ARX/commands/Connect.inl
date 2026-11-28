@@ -1,8 +1,10 @@
 ﻿	// K4: both ducts are chosen by id; the old loops compared pointers of closed objects and
 	// passed pointers closed in the loop. The ducts must be writable (locked layer -> stop).
-	static bool selectTwoPipes(AcDbObjectId& id1, AcDbObjectId& id2, ads_point pt1, ads_point pt2)
+	// tee (TVS_CONNECTW, plan 26): the second pick may be a T komad (krstasti komad / XK) - *tee = true.
+	static bool selectTwoPipes(AcDbObjectId& id1, AcDbObjectId& id2, ads_point pt1, ads_point pt2, bool* tee = NULL)
 	{
-		const ACHAR* prompts[2] = { _T("\nIzaberite prvi kanal: "), _T("\nIzaberite drugi kanal: ") };
+		if (tee) *tee = false;
+		const ACHAR* prompts[2] = { _T("\nIzaberite prvi kanal: "), tee ? _T("\nIzaberite drugi kanal (ili T komad – krstasti komad / XK): ") : _T("\nIzaberite drugi kanal: ") };
 		AcDbObjectId* ids[2] = { &id1, &id2 };
 		double* pts[2] = { pt1, pt2 };
 		for (int k = 0; k < 2; ++k)
@@ -14,6 +16,7 @@
 				AcDbObjectId id;
 				if (acdbGetObjectId(id, e) != Acad::eOk || id.isNull()) continue;
 				AcDbObjectPointer<TVS_Pipe> p(id, AcDb::kForWrite);
+				if (p.openStatus() == Acad::eNotThatKindOfClass && k == 1 && tee && id.objectClass() == TVS_WYE::desc()) { id2 = id; *tee = true; break; }
 				if (p.openStatus() == Acad::eNotThatKindOfClass) continue;
 				if (p.openStatus() != Acad::eOk) { acutPrintf(_T("\nObjekat je zaključan")); return false; }
 				if (k == 1 && id == id1) { acutPrintf(_T("\nIzabran je isti kanal")); continue; }
@@ -41,7 +44,10 @@
 		ads_point pt1, pt2;
 		AcDbObjectId id1, id2;
 		AcDbEntity *pEnt1 = NULL, *pEnt2 = NULL;
-		if (!selectTwoPipes(id1, id2, pt1, pt2) || !entitiesOf(id1, id2, pEnt1, pEnt2)) return;
+		bool tee = false;
+		if (!selectTwoPipes(id1, id2, pt1, pt2, &tee)) return;
+		if (tee) { tvsTeeCrossCmd::connect(id1, id2); return; }   // krstasti komad / XK (plan 26)
+		if (!entitiesOf(id1, id2, pEnt1, pEnt2)) return;
 		ConnectWithWye(pEnt1, pEnt2, pt1, pt2);
 	}
 

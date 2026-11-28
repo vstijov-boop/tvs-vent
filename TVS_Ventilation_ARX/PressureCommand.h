@@ -76,6 +76,9 @@ inline bool part(const tvsMove::Node& n,double f,tvsPressure::Part& t){
         if(n.ports.size()==3){const tvsPressure::XY m(p->Basepoint.x*f,p->Basepoint.y*f);t.line.clear();
             if(t.tee==tvsPressure::TeePants){t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}
             else{t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}}
+        if(n.ports.size()==4){const tvsPressure::XY m(p->Basepoint.x*f,p->Basepoint.y*f);t.line.clear();   // krstasti komad / XK
+            t.line.push_back(xy(n.ports[0],f));t.line.push_back(m);t.line.push_back(xy(n.ports[2],f));t.line.push_back(m);
+            t.line.push_back(xy(n.ports[3],f));t.line.push_back(m);t.line.push_back(xy(n.ports[1],f));}
         return true;}
     if(const AcDbBlockReference* b=AcDbBlockReference::cast(e.object())){   // oprema (EquipmentNodes.h): loss from its record
         tvsEquipment::Record rec;if(tvsEquipmentStore::read(b,rec)){

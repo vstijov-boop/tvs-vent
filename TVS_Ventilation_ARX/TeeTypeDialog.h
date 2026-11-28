@@ -550,6 +550,14 @@ inline bool writable(const Source& s){
 }
 inline bool open(const AcDbObjectId& id,UINT idd){
     Source s;if(!readSource(id,s)){acutPrintf(L"\nIzabrani objekat nije TVS T-komad.");return false;}
+    {AcGePoint3d xp;AcGeVector3d xd;double xa=0,xb=0;bool xr=true;bool cross=false;   // krstasti komad / XK (plan 26)
+     {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);cross=w.openStatus()==Acad::eOk&&w->crossPort(xp,xd,xa,xb,xr);}
+     if(cross){acedInitGet(0,L"Da Ne");ACHAR kw[8]=L"";
+        const int rc=acedGetKword(L"\nKrstasti komad / XK: tip se ovdje ne mijenja. Ukloniti drugi ogranak (kanal na njemu ostaje slobodan)? [Da/Ne] <Ne>: ",kw,8);
+        if(rc==RTNORM&&_wcsicmp(kw,L"Da")==0){AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForWrite);
+            if(w.openStatus()==Acad::eOk&&tvsTeeCross::write(w.object(),NULL)==Acad::eOk)acutPrintf(L"\nDrugi ogranak uklonjen – ostaje T komad.");
+            else acutPrintf(L"\nDrugi ogranak nije uklonjen (zaključan sloj?).");}
+        return true;}}
     {tvsTeeData::Record r;AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);
      if(w.openStatus()==Acad::eOk&&tvsTeeData::read(w.object(),r)&&r.type==tvsTee::Tap&&r.neck>0){   // kosa stucna: the branch is at 45 deg
         acutPrintf(L"\nKosa štucna 45°: tip se ovdje ne mijenja (ogranak je pod uglom). Za drugi spoj obrišite je i spojite ponovo.");return true;}
@@ -593,6 +601,8 @@ inline bool forSelection(const ads_name sset,UINT idd){
     Adesk::Int32 n=0;if(acedSSLength(sset,&n)!=RTNORM||n!=1)return false;
     ads_name e;if(acedSSName(sset,0,e)!=RTNORM)return false;AcDbObjectId id;if(acdbGetObjectId(id,e)!=Acad::eOk)return false;
     if(id.objectClass()!=TVS_WYE::desc())return false;
+    {AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);AcGePoint3d xp;AcGeVector3d xd;double xa=0,xb=0;bool xr=true;   // krstasti komad / XK: the general dialog
+     if(w.openStatus()==Acad::eOk&&w->crossPort(xp,xd,xa,xb,xr))return false;}
     {tvsTeeData::Record r;AcDbObjectPointer<TVS_WYE> w(id,AcDb::kForRead);   // Y45: the general dialog (diameters)
      if(w.openStatus()==Acad::eOk&&tvsTeeData::read(w.object(),r)&&tvsTeeFit::isWye(w.object(),r))return false;}
     return open(id,idd);

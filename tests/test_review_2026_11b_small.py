@@ -53,7 +53,7 @@ class OffsetProofSplit(unittest.TestCase):
 class K4Connect(unittest.TestCase):
  def test_connect_by_id(self):
   c=text('TVS_Ventilation_ARX/commands/Connect.inl')
-  self.assertIn('static bool selectTwoPipes(',c);self.assertEqual(c.count('selectTwoPipes(id1, id2, pt1, pt2)'),2)
+  self.assertIn('static bool selectTwoPipes(',c);self.assertEqual(c.count('selectTwoPipes(id1, id2, pt1, pt2)'),1);self.assertEqual(c.count('selectTwoPipes(id1, id2, pt1, pt2, &tee)'),1)
   self.assertNotIn('ConnectWithWye(pEnt1, pEnt2, pt1, pt2);\n\t}\n\n\tstatic void Ventilation_ARXTVS_CONNECTT(void)\n\t{\n\t\tif (ActivationErrorMessage() != pError_Ok) return;\n\t\tsyncTVSGlobalUnits();\n\t\tif (!currentLayerWritable()) return;\n\t\t// Add',c)
   self.assertEqual(c.count('{'),c.count('}'))
   h=text('TVS_Ventilation_ARX/commands/ConnectHelpers.inl')

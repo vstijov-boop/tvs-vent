@@ -58,6 +58,8 @@ struct TVS_WYE:TVS_Entity {
     bool tk; tvsTee::Tee shapeValue;   // stub of TVS_WYE::teeShape (record read)
     TVS_WYE():tk(false){}
     bool teeShape(tvsTee::Tee& t,AcGePoint3d&,AcGeVector3d&,AcGeVector3d&) const {t=shapeValue;return tk;}
+    AcGePoint3d Basepoint;
+    bool crossPort(AcGePoint3d&,AcGeVector3d&,double&,double&,bool&) const {return false;}   // krstasti komad (plan 26)
     CAST(TVS_WYE)
 };
 namespace tvsUnits { double factor(const TVS_Entity *p) { return p->units; }

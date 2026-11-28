@@ -406,9 +406,34 @@ private:
                 const std::wstring extra=notes(keep);if(!extra.empty())f.note+=L"; "+extra;}
             r.f.push_back(f);}
     }
+    // Krstasti komad / XK (plan 26, 2026-11-28; TVS port 3 = the second branch): ASHRAE has no cross,
+    // so each branch is a T komad of its own (common Qc, its Qb, straight Qc - Qb), the prolaz a T
+    // komad with both branches together (Qb = Qb1 + Qb2, the first branch's section). Air in
+    // through a branch: not standard (rows without C).
+    void crossJunction(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,const std::vector<int>& of,Result& r,int i){
+        const Element& x=e[i];const Part& t=x.parts[0];
+        const std::wstring type=t.lateral?L"XK":L"krstasti komad";
+        if(x.entry>=2){for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];
+                add(r,of[c],i,L"T komad",type+L", ulaz kroz ogranak \u2013 nestandardno",port(x,e[c].via),std::string(),std::map<std::string,double>(),false,0);}
+            return;}
+        const Section& common=port(x,x.entry);const int straight=x.entry==0?1:0;
+        double q[4]={0,0,0,0};int child[4]={-1,-1,-1,-1};
+        for(size_t k=0;k<kids[i].size();++k){const int c=kids[i][k];if(e[c].via>=0&&e[c].via<4){q[e[c].via]=e[c].flow;child[e[c].via]=c;}}
+        const std::string key=junctionKey(o_.exhaust,t.tee,common,port(x,2),t.cone,t.lateral);
+        const bool have=eng_&&!key.empty()&&eng_->has(key);
+        for(int leg=0;leg<4;++leg){const int c=child[leg];if(c<0||leg==x.entry)continue;
+            const bool main=leg==straight;std::map<std::string,double> in;
+            std::wstring note=type+(main?L", prolaz":L", ogranak")+L"; krstasti: ASHRAE nema krsta \u2013 ra\u010Dunato kao T komad po ogranku";
+            if(have){
+                if(main)in=seedJunction(eng_->params(key),common,port(x,2),port(x,straight),x.flow,q[2]+q[3],q[straight]);
+                else in=seedJunction(eng_->params(key),common,port(x,leg),port(x,straight),x.flow,q[leg],x.flow-q[leg]);}
+            if(child[straight]<0&&!main)note+=L", prolaz zatvoren (\u010Dep)";
+            add(r,of[c],i,main?L"T komad \u2013 prolaz":L"T komad \u2013 ogranak",note,port(x,leg),key,in,main,0);}
+    }
     void junction(const std::vector<Element>& e,const std::vector<std::vector<int> >& kids,const std::vector<int>& of,Result& r,int i){
         const Element& x=e[i];const Part& t=x.parts[0];if(x.ports.size()<3)return;
         const bool pants=t.tee==TeePants;
+        if(x.ports.size()==4&&!pants){crossJunction(e,kids,of,r,i);return;}
         static const wchar_t* names[]={L"TK0",L"TK-O",L"TK-G",L"\u0161tucna"};const std::wstring type=pants&&t.lateral?std::wstring(L"Y45"):t.tee>=0&&t.tee<=3?names[t.tee]:L"T";
         if(!pants&&x.entry==2){bullhead(e,kids,of,r,i,type);return;}   // air in through the ogranak, out both ways
         if(pants?x.entry!=2:x.entry==2){

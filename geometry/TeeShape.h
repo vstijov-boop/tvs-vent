@@ -248,6 +248,28 @@ inline bool shape(const Tee& t,Shape& out){
     }
     return true;
 }
+// XK (Soko "Spiro XK", plan 26, 2026-11-28): the kosa racva TK with a second 45 deg branch w2 on the
+// -x side, the mirror of the first one (same place on the main, leaning downstream), w2 <= w1.
+// Adds it to the shape of the kosa racva: the -x main wall opens at its footprint, its walls, the
+// curve to the main (two lines), the face and its axis. face / dir: the port of the second branch.
+inline bool lateralSecond(const Tee& t,double w2,Shape& out,P* face=0,P* dir=0){
+    if(!(t.type==Tap&&t.lateral>0&&w2>0&&w2<=t.w1+1e-9))return false;
+    const double a=t.A/2,f=t.flange,th=t.lateral*pi()/180;double before,after;tapRun(t,before,after);const double Lr=before+after;
+    const P B(0,before),d(-std::sin(th),std::cos(th)),n(-std::cos(th),-std::sin(th));   // mirrored: x -> -x
+    const double s=lateralReach(t.A,w2,t.lateral,t.l);double y0,y1;lateralFootprint(t.A,w2,t.lateral,y0,y1);
+    const P up(B.x+n.x*w2/2+d.x*s,B.y+n.y*w2/2+d.y*s),down(B.x-n.x*w2/2+d.x*s,B.y-n.y*w2/2+d.y*s),mid(B.x+d.x*s,B.y+d.y*s);
+    for(size_t k=0;k<out.lines.size();++k){const Seg& g=out.lines[k];   // the -x wall: open at the footprint
+        if(std::fabs(g.a.x+a)<1e-9&&std::fabs(g.b.x+a)<1e-9&&std::fabs(g.a.y)<1e-9&&std::fabs(g.b.y-Lr)<1e-9){
+            out.lines[k]=Seg(P(-a,0),P(-a,before+y0));out.lines.push_back(Seg(P(-a,before+y1),P(-a,Lr)));break;}}
+    out.lines.push_back(Seg(P(-a,before+y0),up));out.lines.push_back(Seg(P(-a,before+y1),down));
+    {const double r=w2/2<a?w2/2:a,x=std::sqrt(a*a-r*r),tt=x/std::sin(th);const P apex(B.x+d.x*tt,B.y+d.y*tt);
+     out.lines.push_back(Seg(P(-a,before+y0),apex));out.lines.push_back(Seg(apex,P(-a,before+y1)));}
+    out.lines.push_back(Seg(P(up.x+n.x*f,up.y+n.y*f),P(down.x-n.x*f,down.y-n.y*f)));
+    out.axis.push_back(Seg(P(-a,before+(y0+y1)/2),mid));
+    if(face)*face=mid;
+    if(dir)*dir=d;
+    return true;
+}
 // Sheet area, m2 (all sizes mm). b = duct height of run/inlet, bb = height of the branches.
 // Branch = quarter of an elbow (Rc = R - w/2) + straight collar; run of TK-O by mean
 // perimeter A->C over L minus the branch opening; inlet collar of TK-G.

@@ -49,7 +49,7 @@ inline void execute(){
         std::vector<End> ends;bool other=false;
         for(size_t j=0;j<others.size()&&!other;++j){if(others[j]==elbows[k])continue;
             AcDbObjectPointer<TVS_Entity> o(others[j],AcDb::kForRead);if(o.openStatus()!=Acad::eOk)continue;
-            AcGePoint3d q[3];const int m=tvsPortGrip::points(o.object(),q);
+            AcGePoint3d q[4];const int m=tvsPortGrip::points(o.object(),q);
             for(int i=0;i<m;++i)for(int p=0;p<2;++p)if(std::hypot(q[i].x-was[p].x,q[i].y-was[p].y)<=tol)other=true;}
         if(other){++blocked;continue;}
         for(size_t j=0;j<ducts.size();++j){AcDbObjectPointer<TVS_Pipe> d(ducts[j],AcDb::kForRead);if(d.openStatus()!=Acad::eOk)continue;

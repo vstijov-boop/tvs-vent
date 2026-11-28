@@ -23,6 +23,7 @@
 //----- TVS_WYE.cpp : Implementation of TVS_WYE
 //-----------------------------------------------------------------------------
 #include "StdAfx.h"
+#include <algorithm>
 #include "TransformGuard.h"
 #include "PortGrips.h"
 #include "LevelLabels.h"
@@ -238,12 +239,16 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 
 
 	Gimme7Points();
+	// krstasti komad / XK (plan 26): the second branch opposite the first one
+	AcGePoint3d xPort; AcGeVector3d xDir; double xA = 0, xB = 0; bool xRound = true;
+	const bool cross = crossPort(xPort, xDir, xA, xB, xRound);
 	// T komad TK-O / TK-G: drawn from geometry/TeeShape.h (as the dynamic block "T komad").
 	{
 		tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;
 		if (!This1D && teeShape(tee, o, ex, ey)) {
 			tvsTee::Shape shape;
 			if (tvsTee::shape(tee, shape)) {
+				if (cross && tee.lateral > 0) tvsTee::lateralSecond(tee, xA, shape);   // XK
 				auto world = [&](const tvsTee::P& q) { return o + ex * q.x + ey * q.y; };
 				const bool ccw = ex.crossProduct(ey).z > 0;
 				for (size_t j = 0; j < shape.lines.size(); ++j)
@@ -259,16 +264,18 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 				if (tee.lateral > 0) {
 					for (size_t j = 0; j < shape.axis.size(); ++j) {
 						AcDbLine* ax = new AcDbLine(world(shape.axis[j].a), world(shape.axis[j].b)); setCenterProperty(ax); }
-					AcGePoint3d ports[3]; double widths[3];
+					AcGePoint3d ports[4]; double widths[4];
 					if (teePorts(ports, widths)) {
+						const int count = cross && tee.type == tvsTee::Tap ? 4 : 3;   // XK: the second branch too
+						if (count == 4) { ports[3] = xPort; widths[3] = xA; }
 						const tvsSpiro::Settings ss = tvsSpiro::read(database());
 						const double f = tvsUnits::factor(database()), bead = 5.0 / f;
-						AcGeVector3d dirs[3] = { -ey, ey, Vectotv }; dirs[2].z = 0; dirs[2].normalize();
+						AcGeVector3d dirs[4] = { -ey, ey, Vectotv, xDir }; dirs[2].z = 0; dirs[2].normalize();
 						if (tee.type == tvsTee::Pants) {   // Y45: out of each port
 							tvsTee::P lp[3], ld[3]; tvsTee::wyePorts(tee, lp, ld);
 							for (int k = 0; k < 3; ++k) { dirs[k] = ex * ld[k].x + ey * ld[k].y; dirs[k].z = 0; dirs[k].normalize(); }
 						}
-						for (int k = 0; k < 3; ++k) {
+						for (int k = 0; k < count; ++k) {
 							const AcGeVector3d dir = dirs[k], n(-dir.y, dir.x, 0); const double r = widths[k] / 2; const AcGePoint3d P = ports[k];
 							setThinProperty(new AcDbLine(P - dir * bead + n * r, P - dir * bead - n * r));
 							const double sp = (tvsSpiro::spigot(widths[k] * f) - ss.cMm) / f;
@@ -331,6 +338,13 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 
 	setWipeoutProperty(mode,pLn2);
 		if (This1D==false) pLn2->setConstantWidth(SizeAotv+WipeoutLength*2);
+		if (cross) {   // krstasti komad: the second branch
+			AcDbPolyline *pLn3 = new AcDbPolyline(2);
+			const AcGePoint3d m2 = Basepoint + xDir * (SizeApr / 2);
+			pLn3->addVertexAt(0, AcGePoint2d(m2.x, m2.y)); pLn3->addVertexAt(1, AcGePoint2d(xPort.x, xPort.y));
+			setWipeoutProperty(mode, pLn3);
+			if (This1D == false) pLn3->setConstantWidth(xA + WipeoutLength * 2);
+		}
 
 
 
@@ -374,6 +388,17 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 			AcDbPolyline* side = new AcDbPolyline;
 			for (int i = 2; i < 8; i++) side->addVertexAt(i - 2, AcGePoint2d(massforarray2[i].x, massforarray2[i].y));
 			setMainProperty(side);
+		} else if (cross) {
+			// krstasti komad (plan 26): the far wall A-B opens for the second branch (mirror of D-E-F-G)
+			AcGeVector3d u = Vectpr; u.z = 0; u.normalize();
+			const AcGePoint3d m2 = Basepoint + xDir * (SizeApr / 2);
+			const double h2 = xA / 2, Lb = LengthPl;
+			const AcGePoint3d q[12] = { pA, m2 - u * h2, m2 - u * h2 + xDir * Lb, m2 + u * h2 + xDir * Lb, m2 + u * h2,
+				pB, pC, pD, pE, pF, pG, pH };
+			AcDbPolyline* pLn = new AcDbPolyline;
+			for (int i = 0; i < 12; i++) pLn->addVertexAt(i, AcGePoint2d(q[i].x, q[i].y));
+			pLn->setClosed(true);
+			setMainProperty(pLn);
 		} else {
 		AcDbPolyline*pLn=new AcDbPolyline;
 		for (int i=0;i<8; i++)
@@ -382,6 +407,31 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 		}
 		pLn->setClosed(true);
 		setMainProperty(pLn);
+		}
+		if (cross) {   // krstasti komad: where the second branch meets the main, its centre line
+			AcGeVector3d u = Vectpr; u.z = 0; u.normalize();
+			const AcGePoint3d m2 = Basepoint + xDir * (SizeApr / 2);
+			const double h2 = xA / 2, R = SizeApr / 2;
+			if (ThisRoundpr && xRound) {   // saddle in plan: across the main at s, sqrt(R^2 - r^2 + s^2) from its axis
+				AcDbPolyline* saddle = new AcDbPolyline;
+				const int N = 16;
+				for (int k = 0; k <= N; ++k) {
+					const double t = -h2 + xA * k / N, off = std::sqrt((std::max)(0.0, R * R - h2 * h2 + t * t));
+					const AcGePoint3d q = Basepoint + u * t + xDir * off;
+					saddle->addVertexAt(k, AcGePoint2d(q.x, q.y));
+				}
+				setMainProperty(saddle);
+				setCenterProperty(new AcDbLine(Basepoint, xPort));
+			} else if (ThisRoundpr) {      // rectangular branch on the round main
+				const double off = std::sqrt((std::max)(0.0, R * R - xB * xB / 4));
+				AcDbPolyline* edge = new AcDbPolyline;
+				const AcGePoint3d q[4] = { m2 - u * h2, Basepoint - u * h2 + xDir * off, Basepoint + u * h2 + xDir * off, m2 + u * h2 };
+				for (int i = 0; i < 4; i++) edge->addVertexAt(i, AcGePoint2d(q[i].x, q[i].y));
+				setMainProperty(edge);
+			} else {
+				setMainProperty(new AcDbLine(m2 - u * h2, m2 + u * h2));
+				if (xRound) setCenterProperty(new AcDbLine(m2, xPort));
+			}
 		}
 		if (ThisRoundpr==true)//начало dпр-круглый
 		{
@@ -512,6 +562,7 @@ Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 		massforarray[1]=pA5;
 		AcDbLine * pLn5=new AcDbLine (massforarray[0],massforarray[1]);
 		setMainProperty(pLn5);
+		if (cross) setMainProperty(new AcDbLine(Basepoint, xPort));   // krstasti komad: the second branch
 
 	}
 
@@ -1288,6 +1339,28 @@ bool TVS_WYE::teePorts(AcGePoint3d ports[3], double widths[3]) const
 		widths[0] = tee.w2; widths[1] = tee.w1; widths[2] = tee.A;
 	}
 	return true;
+}
+
+bool TVS_WYE::crossPort(AcGePoint3d &port, AcGeVector3d &dir, double &a, double &b, bool &round) const
+{
+	tvsTeeCross::Record x;
+	if (!tvsTeeCross::read(this, x)) return false;
+	AcGeVector3d u = Vectpr, v = Vectotv; u.z = v.z = 0;
+	if (u.length() < 1e-12 || v.length() < 1e-12) return false;
+	u.normalize(); v.normalize();
+	tvsTeeData::Record r;
+	if (!tvsTeeData::read(this, r)) {   // TK0: krstasti komad, perpendicular, opposite the branch
+		if (x.a > SizeAotv + 2 * LengthPl - 1e-9 || tvsTeeOpenEnds::read(this)) return false;   // inside the run (TVS_CONNECTW asks for <= the first)
+		dir = -v; port = Basepoint + dir * (SizeApr / 2 + LengthPl);
+		a = x.a; b = x.round ? 0 : x.b; round = x.round; return true;
+	}
+	tvsTee::Tee tee; AcGePoint3d o; AcGeVector3d ex, ey;   // XK: the kosa racva TK mirrored
+	if (r.type != tvsTee::Tap || !x.round || !teeShape(tee, o, ex, ey) || !(tee.lateral > 0)) return false;
+	tvsTee::Shape s; tvsTee::P f, d;
+	if (!tvsTee::shape(tee, s) || !tvsTee::lateralSecond(tee, x.a, s, &f, &d)) return false;
+	port = o + ex * f.x + ey * f.y; port.z = Basepoint.z;
+	dir = ex * d.x + ey * d.y; dir.z = 0; if (dir.length() < 1e-12) return false; dir.normalize();
+	a = x.a; b = 0; round = true; return true;
 }
 
 void TVS_WYE::getName(CString &unit)

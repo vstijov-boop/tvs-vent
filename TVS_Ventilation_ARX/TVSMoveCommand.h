@@ -140,6 +140,10 @@ inline bool describe(AcDbEntity* entity,Node& n){
                 for(int k=0;k<3;++k){Point a;if(tvsMoveGeometry::unit(Point(ex.x*ld[k].x+ey.x*ld[k].y,ex.y*ld[k].x+ey.y*ld[k].y,0),a))n.axes[k]=a;}}
             if(std::fabs(p->Vectpr.z)<1e-8&&std::fabs(p->Vectotv.z)<1e-8
                 &&(angled||std::fabs(mainAxis.dot(branchAxis))<1e-6))n.kind=4;
+            // krstasti komad / XK (plan 26, TeeCross.h): TVS port 3 = the second branch
+            {AcGePoint3d xp;AcGeVector3d xd;double xa=0,xb=0;bool xr=true;Point a;
+             if(p->crossPort(xp,xd,xa,xb,xr)&&tvsMoveGeometry::unit(Point(xd.x,xd.y,0),a)){
+                n.ports.push_back(point(xp));n.axes.push_back(a);n.sections.push_back(tvsMoveNetwork::Section(xa,xr?0:xb,xr,p->Elev));}}
         }
     }
     if(n.sections.empty())for(size_t i=0;i<n.ports.size();++i)

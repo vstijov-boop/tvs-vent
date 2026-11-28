@@ -136,7 +136,7 @@
 		tvsTrace::Scope trace_("drawFromPort");
 		const int choice = portGripMenu();
 		if (choice == 0) { acutPrintf(_T("\nOdustano.")); return; }
-		tvsPortGrip::Port P[3]; int n = 0; double elev = 0; AcDbDatabase* db = NULL;
+		tvsPortGrip::Port P[4]; int n = 0; double elev = 0; AcDbDatabase* db = NULL;
 		{
 			AcDbEntity* e = NULL;
 			if (acdbOpenAcDbEntity(e, id, AcDb::kForRead) != Acad::eOk) return;

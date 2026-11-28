@@ -25,7 +25,8 @@ struct Port {AcGePoint3d p;AcGeVector3d dir;double a,b;bool round;Port():a(0),b(
 inline double plan(const AcGePoint3d& a,const AcGePoint3d& b){return std::hypot(a.x-b.x,a.y-b.y);}
 inline bool unit(AcGeVector3d v,AcGeVector3d& out){v.z=0;if(v.length()<1e-12)return false;out=v.normal();return true;}
 // Ports of a fitting usable for drawing on (plan); count, 0 when none.
-inline int ports(const TVS_Entity* e,Port out[3]){
+// out: room for 4 (krstasti komad / XK: TVS port 3, the second branch)
+inline int ports(const TVS_Entity* e,Port out[4]){
     if(const TVS_TAP* t=TVS_TAP::cast(e)){
         if(t->Form!=Form_Direct||std::fabs(std::fabs(t->Normvector.z)-1)>1e-9)return 0;
         const AcGePoint3d end[2]={t->MA,t->MC};
@@ -50,15 +51,16 @@ inline int ports(const TVS_Entity* e,Port out[3]){
             for(int k=0;k<3;++k){AcGeVector3d d=ex*ld[k].x+ey*ld[k].y;if(!unit(d,dir[k]))return 0;}}}
         for(int k=0;k<3;++k){out[k].p=p[k];out[k].dir=dir[k];out[k].a=wd[k];
             out[k].round=k<2?w->ThisRoundpr:w->ThisRoundotv;out[k].b=out[k].round?0:(k<2?w->SizeBpr:w->SizeBotv);}
+        Port& x=out[3];if(w->crossPort(x.p,x.dir,x.a,x.b,x.round))return 4;   // krstasti komad / XK
         return 3;
     }
     return 0;
 }
 // Every connection point of another TVS element (duct ends, fitting ports, elbow ends of any form).
-inline int points(const TVS_Entity* e,AcGePoint3d out[3]){
+inline int points(const TVS_Entity* e,AcGePoint3d out[4]){
     if(const TVS_Pipe* p=TVS_Pipe::cast(e)){out[0]=p->FirstPoint;out[1]=p->LastPoint;return 2;}
     if(const TVS_TAP* t=TVS_TAP::cast(e)){out[0]=t->MA;out[1]=t->MC;return 2;}
-    Port q[3];const int n=ports(e,q);for(int k=0;k<n;++k)out[k]=q[k].p;return n;
+    Port q[4];const int n=ports(e,q);for(int k=0;k<n;++k)out[k]=q[k].p;return n;
 }
 // All connection points of the space, on a grid; rebuilt at most every 1.5 s (grips are asked in
 // bursts when fittings are selected, so a selection of many fittings scans the drawing once).
@@ -75,7 +77,7 @@ inline void rebuild(const AcDbObjectId& spaceId,double tol){
     for(;!it->done();it->step()){
         AcDbObjectId id;if(it->getEntityId(id)!=Acad::eOk)continue;
         AcDbEntity* e=NULL;if(acdbOpenAcDbEntity(e,id,AcDb::kForRead)!=Acad::eOk)continue;
-        if(const TVS_Entity* o=TVS_Entity::cast(e)){AcGePoint3d q[3];const int n=points(o,q);
+        if(const TVS_Entity* o=TVS_Entity::cast(e)){AcGePoint3d q[4];const int n=points(o,q);
             for(int k=0;k<n;++k)c.grid[cellKey(q[k].x,q[k].y,c.cell)].push_back(std::make_pair(id,q[k]));}
         e->close();
     }
@@ -92,7 +94,7 @@ inline bool isFree(const TVS_Entity* self,const AcGePoint3d& at,double tol){
 // Appends the connector grips of the free ports (call from the new-style subGetGripPoints).
 inline void add(const TVS_Entity* e,AcDbGripDataPtrArray& grips,double viewUnit){
     if(!e->database())return;
-    Port q[3];const int n=ports(e,q);if(n==0)return;
+    Port q[4];const int n=ports(e,q);if(n==0)return;
     const double tol=2.0/tvsUnits::factor(e->database());
     for(int k=0;k<n;++k){
         if(!isFree(e,q[k].p,tol))continue;
