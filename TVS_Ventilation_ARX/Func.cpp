@@ -1318,6 +1318,7 @@ void func::Change(ads_name &sset)
 		if (dg.DoModal() != IDOK) return;   // Odustani: ništa se ne mijenja
 
 	}
+	int heightsKept = 0;   // plan 22: TK-O / TK-G heights put back to the ulaz
 	int skipped = 0;   // elements on a locked layer (open for write refused)
 
 
@@ -1467,6 +1468,7 @@ void func::Change(ads_name &sset)
 						if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
 						if (cSizeB2 == false) Wyeie->put_SizeBotv(SizeB2);
 						if (cLengthW == false) Wyeie->put_Length(LengthW);
+						if ((cSizeB == false || cSizeB2 == false) && tvsTeeEdit::keepHeights(Wyeie)) ++heightsKept;   // plan 22: one height (ulaz)
 						tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
@@ -1506,6 +1508,7 @@ void func::Change(ads_name &sset)
 		}
 	}
 	if (skipped) acutPrintf(_T("\nNije promijenjeno %d elemenata (zaključan sloj)."), skipped);
+	if (heightsKept) acutPrintf(_T("\nTK-O / TK-G: visina ogranaka i prolaza = visina ulaza (T komada: %d)."), heightsKept);
 }
 
 
@@ -1830,6 +1833,7 @@ void func::Change(AcDbEntity *pEnt)
 		if (dg.DoModal() != IDOK) return;   // Odustani (dvoklik): ništa se ne mijenja
 
 	}
+	int heightsKept = 0;   // plan 22: TK-O / TK-G heights put back to the ulaz
 
 
 	bool cSizeA = true;
@@ -1965,6 +1969,7 @@ void func::Change(AcDbEntity *pEnt)
 			if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
 			if (cSizeB2 == false) Wyeie->put_SizeBotv(SizeB2);
 			if (cLengthW == false) Wyeie->put_Length(LengthW);
+			if ((cSizeB == false || cSizeB2 == false) && tvsTeeEdit::keepHeights(Wyeie)) ++heightsKept;   // plan 22: one height (ulaz)
 			tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
@@ -2000,6 +2005,7 @@ void func::Change(AcDbEntity *pEnt)
 
 		pEnt->close();
 	}
+	if (heightsKept) acutPrintf(_T("\nTK-O / TK-G: visina ogranaka i prolaza = visina ulaza (T komada: %d)."), heightsKept);
 }
 
 

@@ -95,6 +95,7 @@ dgAllEdit::dgAllEdit(CWnd *pParent /*=NULL*/, HINSTANCE hInstance /*=NULL*/) : C
 , ElevMid(FALSE)
 , ElevDown(FALSE)
 , TeeType(0)
+, TeeHeightFree(true)   // until OnShowWindow decides (DDX fills the fields first)
 , TransVert(-1)
 , TransPlan(-1)
 , TeeSecond(_T(""))
@@ -259,8 +260,16 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 	if (TeeType == 1 || TeeType == 2)
 	{
 		SetDlgItemTextW(IDC_TeeSecondLabel, TeeType == 1 ? L"Prolaz C" : L"Lijevi ogr.");
-		if (TeeType == 1) { SetDlgItemTextW(IDC_LabelSizeA2, L"Ogr. Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ogr. Hotv"); }
-		else { SetDlgItemTextW(IDC_LabelSizeA, L"Desni ogr."); SetDlgItemTextW(IDC_LabelSizeA2, L"Ulaz Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ulaz Hotv"); }
+		// Plan 22: one height, that of the ulaz - the other height field is read only and follows it
+		// (TK-O: ulaz = pr, ogranak Hotv follows Hpr; TK-G: ulaz = otv, ogranci Hpr follow Hotv).
+		// Round (Y45: heights 0) or mixed (empty): nothing locked.
+		CString hUlaz; (TeeType == 1 ? fSizeB : fSizeB2).GetWindowTextW(hUlaz);
+		const bool rect = tvsDecimal::value(hUlaz) > 0;
+		if (TeeType == 1) { SetDlgItemTextW(IDC_LabelSizeA2, L"Ogr. Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, rect ? L"Ogr. H = ulaz" : L"Ogr. Hotv"); if (rect) fSizeB2.SetReadOnly(TRUE); }
+		else { SetDlgItemTextW(IDC_LabelSizeA, L"Desni ogr."); SetDlgItemTextW(IDC_LabelSizeA2, L"Ulaz Dotv"); SetDlgItemTextW(IDC_LabelSizeB2, L"Ulaz Hotv");
+			if (rect) { SetDlgItemTextW(10002, L"Ogr. H = ulaz"); fSizeB.SetReadOnly(TRUE); } }
+		TeeHeightFree = !rect;
+		FollowTeeHeight();
 	}
 	else
 	{
@@ -373,7 +382,19 @@ void dgAllEdit::OnShowWindow(BOOL bShow, UINT nStatus)
 
 void dgAllEdit::RefreshPreview()
 {
+	FollowTeeHeight();   // SizeB2 changed: TK-G ogranci follow the ulaz
 	if (CWnd* w = GetDlgItem(IDC_TransPreview)) w->Invalidate(FALSE);
+}
+
+// Plan 22: TK-O ogranak height = Hpr (ulaz), TK-G ogranci height = Hotv (ulaz); text copied as typed.
+void dgAllEdit::FollowTeeHeight()
+{
+	if ((TeeType != 1 && TeeType != 2) || TeeHeightFree) return;
+	if (!fSizeB.GetSafeHwnd() || !fSizeB2.GetSafeHwnd()) return;
+	CEdit& from = TeeType == 1 ? fSizeB : fSizeB2;
+	CEdit& to = TeeType == 1 ? fSizeB2 : fSizeB;
+	CString a, b; from.GetWindowTextW(a); to.GetWindowTextW(b);
+	if (a != b) to.SetWindowTextW(a);
 }
 
 void dgAllEdit::OnDrawItem(int id, LPDRAWITEMSTRUCT item)
@@ -391,6 +412,7 @@ void dgAllEdit::OnDrawItem(int id, LPDRAWITEMSTRUCT item)
 
 void dgAllEdit::ChangeSizeA()
 {
+	if (TeeType == 1) FollowTeeHeight();   // Hpr changed: the TK-O ogranak follows
 	RefreshPreview();
 
 	double pSpeed, pFlow, pI, pDp, pSizeA, pSizeB;

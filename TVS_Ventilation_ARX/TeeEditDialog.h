@@ -29,6 +29,17 @@ struct Gather {
     CString text()const{CString s;if(commonType()&&!mixedSecond)s=tvsNumeric::exact(second).c_str();return s;}
 };
 inline void prepare(dgAllEdit& dg,const Gather& g){dg.TeeType=g.commonType();dg.TeeSecond=g.text();}
+// Plan 22 (pravilo TVS_TK_TIP, 10. 11.): a rectangular TK-O / TK-G has one height, that of the ulaz
+// (TK-O: the run pr, TK-G: the inlet otv); the ogranci / prolaz only change their width. In the
+// Svojstva dialog the other height field is locked and follows the ulaz; here, after the generic
+// fields (a mixed selection can still type it), the height is put back to the ulaz. true: changed.
+inline bool keepHeights(TVS_WYE* w){
+    if(w->ThisRoundpr||w->ThisRoundotv)return false;
+    tvsTeeData::Record r;if(!tvsTeeData::read(w,r))return false;
+    if(r.type==tvsTee::Branch&&std::fabs(w->SizeBotv-w->SizeBpr)>1e-9){w->put_SizeBotv(w->SizeBpr);return true;}
+    if(r.type==tvsTee::Pants&&std::fabs(w->SizeBpr-w->SizeBotv)>1e-9){w->put_SizeBpr(w->SizeBotv);return true;}
+    return false;
+}
 // Called with the element open for write, after the generic fields were applied.
 inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChanged,bool widthA2Changed,bool lengthChanged){
     if(!g.commonType())return;

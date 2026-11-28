@@ -210,10 +210,12 @@ public:
 
 	// T komad TK-O / TK-G (TeeEditDialog.h): 0 = none or mixed, 1 = TK-O, 2 = TK-G
 	int TeeType;
+	bool TeeHeightFree;       // round / mixed: heights not followed
 	int TransVert;   // prelaz po visini: 0 osa, 1 gore, 2 dolje, -1 razno / bez prelaza
 	int TransPlan;   // prelaz u tlocrtu: TransType 1 simetricno, 2 desno, 3 lijevo, -1 razno
 	CString TeeSecond;
 	CEdit fTeeSecond;
+	void FollowTeeHeight();   // plan 22: TK-O / TK-G one height (ulaz)
 
 	bool Tpipe;
 	bool Twye;

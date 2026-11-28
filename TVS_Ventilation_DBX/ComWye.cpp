@@ -266,6 +266,15 @@ STDMETHODIMP CComWye::get_SizeB(double *pVal)
 	return S_OK;
 }
 
+// TK-O / TK-G type of a rectangular tee (0: TK0, stucna, round / Y45 - heights free)
+static int tvsComWyeType(const TVS_WYE* w)
+{
+	if (!w || w->ThisRoundpr || w->ThisRoundotv) return 0;
+	tvsTeeData::Record r;
+	if (!tvsTeeData::read(w, r)) return 0;
+	return r.type == tvsTee::Branch || r.type == tvsTee::Pants ? r.type : 0;
+}
+
 STDMETHODIMP CComWye::put_SizeB(double newVal)
 {
 	// TODO: Add your implementation code here
@@ -279,7 +288,11 @@ STDMETHODIMP CComWye::put_SizeB(double newVal)
 	newVal /= tvsUnits::factor(pSq.operator->());
 
 
+	// Plan 22: a rectangular TK-O / TK-G has one height, that of the ulaz (TK-O: pr, TK-G: otv)
+	const int teeType = tvsComWyeType(pSq.operator->());
+	if (teeType == tvsTee::Pants) { acutPrintf(L"\nTK-G: visina ogranaka = visina ulaza; mijenja se SizeB2 (ulaz)."); return S_OK; }
 	pSq->put_SizeBpr(newVal);
+	if (teeType == tvsTee::Branch) { pSq->put_SizeBotv(newVal); Fire_Notification(DISPID_SizeB2); }   // ogranak follows
 	Fire_Notification(DISPID_SizeB);
 
 	return S_OK;
@@ -348,7 +361,10 @@ STDMETHODIMP CComWye::put_SizeB2(double newVal)
 	newVal /= tvsUnits::factor(pSq.operator->());
 
 
+	const int teeType = tvsComWyeType(pSq.operator->());   // plan 22, see put_SizeB
+	if (teeType == tvsTee::Branch) { acutPrintf(L"\nTK-O: visina ogranka = visina ulaza; mijenja se SizeB (ulaz)."); return S_OK; }
 	pSq->put_SizeBotv(newVal);
+	if (teeType == tvsTee::Pants) { pSq->put_SizeBpr(newVal); Fire_Notification(DISPID_SizeB); }   // ogranci follow
 	Fire_Notification(DISPID_SizeB2);
 
 	return S_OK;
