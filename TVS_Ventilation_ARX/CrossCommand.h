@@ -46,29 +46,49 @@ inline bool connect(const AcDbObjectId& pipeId,const AcDbObjectId& teeId){
     // XK and a duct perpendicular to the main: koljeno 45 on the second branch (as TVS_CONNECTW
     // Upravni / kosa racva with its koljeno) - the duct axis through the koljeno exit.
     const bool elbow=lateral&&std::fabs(dd.dotProduct(u))<1e-3;
-    AcGeVector3d axis=xd;AcGePoint3d start=xp;double T=0;
+    // Not on the axis of the koljeno exit (user 28. 11.): a 45 deg duct between the branch and the
+    // koljeno takes the difference - the perpendicular duct may lie farther down the main, never closer.
+    AcGeVector3d axis=xd;AcGePoint3d start=xp,elbowAt=xp;double T=0,Ld=0;
     if(elbow){axis=xd-u*xd.dotProduct(u);axis.normalize();
         double radius=globalTapRadiusConst;
         if(globalRadiusTypeRound==RadiusTypeRound_RadiusVariable)radius=a2*globalTapRadiusVariableParameter;
         else if(globalRadiusTypeRound==RadiusTypeRound_RadiusSpecific)radius=a2*f<355?a2:a2/2;
-        T=(radius+a2/2)*std::tan(3.14159265358979323846/8);start=xp+xd*T+axis*T;}
+        T=(radius+a2/2)*std::tan(3.14159265358979323846/8);
+        const double xu=xd.dotProduct(u),c=(e0.x-xp.x)*u.x+(e0.y-xp.y)*u.y;
+        if(std::fabs(xu)<1e-9){tvsTeeCross::write(t,NULL);return refuse(L"drugi ogranak nije pod uglom prema kanalu.");}
+        Ld=c/xu-T;
+        if(Ld<-tol){tvsTeeCross::write(t,NULL);wchar_t s[240];
+            swprintf_s(s,L"okomiti kanal je preblizu – njegova osa treba da bude bar %.0f mm dalje niz kanal (drugi ogranak 45° + koljeno 45°).",-Ld*std::fabs(xu)*f);
+            return refuse(s);}
+        if(Ld<tol)Ld=0;
+        elbowAt=xp+xd*Ld;start=elbowAt+xd*T+axis*T;}
     auto along=[&](const AcGePoint3d& q){return (q.x-start.x)*axis.x+(q.y-start.y)*axis.y;};
     auto side=[&](const AcGePoint3d& q){return (q.x-start.x)*axis.y-(q.y-start.y)*axis.x;};
     const bool firstNear=along(e0)<along(e1);const AcGePoint3d nearEnd=firstNear?e0:e1,farEnd=firstNear?e1:e0;
     if(std::fabs(side(e0))>tol||std::fabs(side(e1))>tol){tvsTeeCross::write(t,NULL);
-        if(elbow&&std::fabs(side(e0)-side(e1))<=tol){wchar_t s[240];
-            swprintf_s(s,L"osa kanala treba da bude %.0f mm %ls (drugi ogranak XK + koljeno 45°) – pomjerite kanal pa ponovite.",std::fabs(side(e0))*f,
-                (axis.x*u.y-axis.y*u.x)*side(e0)>0?L"bliže početku T komada":L"dalje niz kanal");
-            return refuse(s);}
         return refuse(lateral?L"kanal nije ni na osi drugog ogranka (45°) ni okomit na kanal kroz koljeno 45°.":L"kanal nije na osi drugog ogranka (naspram prvog, okomito na kanal).");}
     if(!(along(farEnd)>tol)){tvsTeeCross::write(t,NULL);return refuse(L"kanal je sa pogrešne strane T komada ili je prekratak.");}
     if(!elbow&&along(nearEnd)<-(t->SizeApr/2+t->LengthPl)){tvsTeeCross::write(t,NULL);return refuse(L"kanal ulazi u T komad – skratite ga ili izaberite drugi.");}
     const double gap=along(nearEnd),elev=d->Elev;
+    double likeA=d->SizeA,likeB=d->SizeB;const bool likeRound=d->ThisRound,like1D=d->This1D;   // for the 45 deg duct
+    const AcDbObjectId layerId=d->layerId();const AcCmColor colour=d->color();const AcDb::LineWeight weight=d->lineWeight();
+    const AcDbObjectId linetypeId=d->linetypeId();const double ltScale=d->linetypeScale();const int ductType=d->getDuctType();
+    const bool wipe=d->get_Wipeout(),grani=d->get_Grani();const double flow=d->get_Flow();
     w.close();p.close();   // planElbow opens the T komad itself
+    if(elbow&&Ld>0){   // the 45 deg duct from the branch to the koljeno
+        AcGePoint3d a(xp.x,xp.y,nearEnd.z),b(elbowAt.x,elbowAt.y,nearEnd.z);
+        TVS_Pipe* np=TVS_Pipe::add_new(a,b,likeA,likeB,like1D,likeRound);
+        const AcDbObjectId nid=np?np->objectId():AcDbObjectId::kNull;
+        AcDbObjectPointer<TVS_Pipe> q(nid,AcDb::kForWrite);
+        if(q.openStatus()!=Acad::eOk){AcDbObjectPointer<TVS_WYE> back(teeId,AcDb::kForWrite);if(back.openStatus()==Acad::eOk)tvsTeeCross::write(back.object(),NULL);
+            return refuse(L"kanal pod 45° nije napravljen – T komad ostaje kako je bio.");}
+        q->put_Elevation(elev);q->setDuctType(ductType);q->put_Wipeout(wipe);q->put_Grani(grani);q->put_Flow(flow);
+        q->setLayer(layerId);q->setColor(colour);q->setLineWeight(weight);q->setLinetype(linetypeId);q->setLinetypeScale(ltScale);
+        q->recordGraphicsModified();}
     if(elbow){
         tvsTeeDialog::Section sec;sec.a=a2;sec.b=0;sec.round=true;AcGePoint3d exit;AcGeVector3d out;
         const double turn=(xd.x*axis.y-xd.y*axis.x)>0?3.14159265358979323846/4:-3.14159265358979323846/4;
-        if(!tvsTeeDialog::planElbow(teeId,xp,xd,turn,sec,elev,f,exit,out)){
+        if(!tvsTeeDialog::planElbow(teeId,elbowAt,xd,turn,sec,elev,f,exit,out)){
             AcDbObjectPointer<TVS_WYE> back(teeId,AcDb::kForWrite);if(back.openStatus()==Acad::eOk)tvsTeeCross::write(back.object(),NULL);
             return refuse(L"koljeno 45° nije napravljeno – T komad ostaje kako je bio.");}
         start=exit;}
@@ -78,6 +98,7 @@ inline bool connect(const AcDbObjectId& pipeId,const AcDbObjectId& teeId){
         acutPrintf(L"\nKrstasti komad: kraj kanala nije pomjeren (zaključan sloj?) – spojite ga ručno.");
      else q->recordGraphicsModified();}
     acutPrintf(lateral?L"\nKosa račva TK -> XK: drugi ogranak Ø%.0f%ls.":L"\nT komad -> krstasti komad: drugi ogranak %.0f%ls.",a2*f,elbow?L" + koljeno 45°":L"");
+    if(Ld>0)acutPrintf(L" Kanal pod 45°: %.0f mm.",Ld*f);
     if(std::fabs(gap)>tol)acutPrintf(L" Kraj kanala pomjeren na priključak (%.0f mm).",-gap*f);
     return true;
 }
