@@ -1463,6 +1463,7 @@ void func::Change(ads_name &sset)
 
 
 						///
+						const tvsTeeEdit::CrossFollow crossFollow(Wyeie);   // krstasti komad: the duct on the second branch
 						if (cSizeA == false) Wyeie->put_SizeApr(SizeA);
 						if (cSizeB == false) Wyeie->put_SizeBpr(SizeB);
 						if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
@@ -1470,6 +1471,7 @@ void func::Change(ads_name &sset)
 						if (cLengthW == false) Wyeie->put_Length(LengthW);
 						if ((cSizeB == false || cSizeB2 == false) && tvsTeeEdit::keepHeights(Wyeie)) ++heightsKept;   // plan 22: one height (ulaz)
 						tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
+			crossFollow.apply(Wyeie);
 						//if (cFlow==false) Tapie->put_Flow(Flow);
 
 						if (cD1 == false) Wyeie->put_This1D(D1);
@@ -1964,6 +1966,7 @@ void func::Change(AcDbEntity *pEnt)
 
 
 			///
+			const tvsTeeEdit::CrossFollow crossFollow(Wyeie);   // krstasti komad: the duct on the second branch
 			if (cSizeA == false) Wyeie->put_SizeApr(SizeA);
 			if (cSizeB == false) Wyeie->put_SizeBpr(SizeB);
 			if (cSizeA2 == false) Wyeie->put_SizeAotv(SizeA2);
@@ -1971,6 +1974,7 @@ void func::Change(AcDbEntity *pEnt)
 			if (cLengthW == false) Wyeie->put_Length(LengthW);
 			if ((cSizeB == false || cSizeB2 == false) && tvsTeeEdit::keepHeights(Wyeie)) ++heightsKept;   // plan 22: one height (ulaz)
 			tvsTeeEdit::apply(Wyeie, teeGather, dg, cSizeA == false, cSizeA2 == false, cLengthW == false);
+			crossFollow.apply(Wyeie);
 			//if (cFlow==false) Tapie->put_Flow(Flow);
 
 			if (cD1 == false) Wyeie->put_This1D(D1);

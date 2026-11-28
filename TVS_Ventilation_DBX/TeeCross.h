@@ -28,6 +28,12 @@ inline bool read(const AcDbObject* o,Record& r){
     if(!ok||!(r.a>0)||(!r.round&&!(r.b>0))){r=Record();return false;}
     return true;
 }
+// The record is there (valid or not) - TVS_POPRAVI.
+inline bool present(const AcDbObject* o){
+    if(!o)return false;const AcDbObjectId dictId=o->extensionDictionary();if(dictId.isNull())return false;
+    AcDbObjectPointer<AcDbDictionary> dict(dictId,AcDb::kForRead);if(dict.openStatus()!=Acad::eOk)return false;
+    return dict->has(key());
+}
 // Object open for write; uses the active transaction when there is one. r = NULL removes the record.
 inline Acad::ErrorStatus write(AcDbObject* o,const Record* r){
     if(!o||!o->isWriteEnabled())return Acad::eInvalidInput;
@@ -39,7 +45,10 @@ inline Acad::ErrorStatus write(AcDbObject* o,const Record* r){
     else es=acdbOpenObject(dict,o->extensionDictionary(),AcDb::kForWrite);
     if(es!=Acad::eOk||!dict)return es==Acad::eOk?Acad::eNotThatKindOfClass:es;
     AcDbObjectId id;const bool exists=dict->getAt(key(),id)==Acad::eOk;
-    if(!r){if(exists)es=dict->remove(key());}
+    if(!r){if(exists){es=dict->remove(key());   // and erase the xrecord (no orphan left in the drawing)
+            if(es==Acad::eOk){AcDbObject* gone=NULL;
+                if(managed){if(tm->getObject(gone,id,AcDb::kForWrite)==Acad::eOk&&gone)gone->erase();}
+                else if(acdbOpenObject(gone,id,AcDb::kForWrite)==Acad::eOk){gone->erase();gone->close();}}}}
     else{AcDbXrecord* rec=NULL;
         if(exists){if(managed){raw=NULL;es=tm->getObject(raw,id,AcDb::kForWrite);rec=AcDbXrecord::cast(raw);}else es=acdbOpenObject(rec,id,AcDb::kForWrite);}
         else{rec=new AcDbXrecord();es=dict->setAt(key(),rec,id);if(es!=Acad::eOk){delete rec;rec=NULL;}else if(managed)es=tm->addNewlyCreatedDBRObject(rec,true);}

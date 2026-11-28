@@ -28,6 +28,14 @@ class Cross(unittest.TestCase):
   self.assertIn('#include "CrossCommand.h"',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/CrossCommand.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   self.assertIn('Ukloniti drugi ogranak',text('TVS_Ventilation_ARX/TeeTypeDialog.h'))
+  rp=text('TVS_Ventilation_ARX/RepairCommand.h')   # TVS_POPRAVI: a record that cannot be drawn is removed
+  self.assertIn('if(tvsTeeCross::present(w)){AcGePoint3d xp;AcGeVector3d xd;double xa,xb;bool xr;if(!w->crossPort(xp,xd,xa,xb,xr))out.cross.push_back(id);}',rp)
+  self.assertIn('if(tvsTeeCross::write(t.object(),NULL)==Acad::eOk)++n;',rp)
+  self.assertIn('gone->erase();',text('TVS_Ventilation_DBX/TeeCross.h'))
+  f=text('TVS_Ventilation_ARX/Func.cpp')   # Svojstva: the duct on the second branch follows
+  self.assertEqual(f.count('const tvsTeeEdit::CrossFollow crossFollow(Wyeie);'),2);self.assertEqual(f.count('crossFollow.apply(Wyeie);'),2)
+  self.assertLess(f.index('const tvsTeeEdit::CrossFollow crossFollow(Wyeie);'),f.index('if (cSizeA == false) Wyeie->put_SizeApr(SizeA);'))
+  self.assertIn('struct CrossFollow {',text('TVS_Ventilation_ARX/TeeEditDialog.h'))
   x=text('TVS_Ventilation_ARX/CrossCommand.h')   # XK + koljeno 45 for a duct perpendicular to the main (user 28. 11.)
   self.assertIn('const bool elbow=lateral&&std::fabs(dd.dotProduct(u))<1e-3;',x);self.assertIn('elbowAt=xp+xd*Ld;start=elbowAt+xd*T+axis*T;',x);self.assertIn('Ld=c/xu-T;',x);self.assertIn('TVS_Pipe::add_new(a,b,likeA,likeB,like1D,likeRound);',x)
   self.assertIn('tvsTeeDialog::planElbow(teeId,elbowAt,xd,turn,sec,elev,f,exit,out)',x);self.assertLess(x.index('w.close();p.close();'),x.index('tvsTeeDialog::planElbow('))

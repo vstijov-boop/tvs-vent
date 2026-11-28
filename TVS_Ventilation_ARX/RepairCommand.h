@@ -11,6 +11,8 @@
 //  5. ravni T komad (TK0) bočne rešetke iz starijeg builda: ogranak T komada je kanal koji na drugom
 //     kraju ima priključak rešetke / difuzora -> zapis TVS_TEE_OPEN_V1 (bez poprečnih linija na
 //     krajevima, kao TVS_RESETKA od 24.11.).
+//  6. zapis krstastog komada / XK (TVS_TEE_X1, 28.11.) koji se ne može nacrtati – nevažeći brojevi,
+//     T komad promijenjen u TK-O / TK-G / štucnu, prvi ogranak suziti ispod drugog -> uklonjen (ostaje T komad).
 // Samo navodi (izabrani na kraju): elementi sa nevažećom geometrijom (NaN, dimenzija <= 0).
 #include "TVSMoveCommand.h"
 #include "EquipmentStore.h"
@@ -18,6 +20,7 @@
 #include "TeeNeighbours.h"
 #include "../TVS_Ventilation_DBX/TeeOpenEnds.h"
 #include "../TVS_Ventilation_DBX/TeeData.h"
+#include "../TVS_Ventilation_DBX/TeeCross.h"
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "../geometry/TeeShape.h"
 #include "../geometry/EquipmentFlow.h"
@@ -27,9 +30,9 @@ namespace tvsRepair {
 inline bool bad(double v){return !std::isfinite(v);}
 inline bool badPoint(const AcGePoint3d& p){return bad(p.x)||bad(p.y)||bad(p.z);}
 struct Found {
-    std::vector<AcDbObjectId> tapSecond,teeRecord,connector,anchor,detached,geometry,openEnds;
+    std::vector<AcDbObjectId> tapSecond,teeRecord,connector,anchor,detached,geometry,openEnds,cross;
     int connectors;Found():connectors(0){}
-    bool any()const{return !tapSecond.empty()||!teeRecord.empty()||!connector.empty()||!anchor.empty()||!openEnds.empty();}
+    bool any()const{return !tapSecond.empty()||!teeRecord.empty()||!connector.empty()||!anchor.empty()||!openEnds.empty()||!cross.empty();}
 };
 // A connector target that is not a live TVS element.
 inline bool deadTarget(const AcDbObjectId& id){
@@ -63,6 +66,7 @@ inline void scan(AcDbDatabase* db,Found& out){
                 if(out.connector.empty()||out.connector.back()!=id)out.connector.push_back(id);}
         }
         if(TVS_WYE* w=TVS_WYE::cast(e)){
+            if(tvsTeeCross::present(w)){AcGePoint3d xp;AcGeVector3d xd;double xa,xb;bool xr;if(!w->crossPort(xp,xd,xa,xb,xr))out.cross.push_back(id);}
             tvsTeeData::Record r;
             if(tvsTeeData::read(w,r)){
                 if(teeRecordBad(r))out.teeRecord.push_back(id);
@@ -118,6 +122,8 @@ inline int fix(const Found& w){
         if(tvsEquipmentStore::write(b.object(),r)==Acad::eOk)++n;}
     for(size_t k=0;k<w.openEnds.size();++k){AcDbObjectPointer<TVS_WYE> t(w.openEnds[k],AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
         if(tvsTeeOpenEnds::write(t.object(),true)==Acad::eOk)++n;}
+    for(size_t k=0;k<w.cross.size();++k){AcDbObjectPointer<TVS_WYE> t(w.cross[k],AcDb::kForWrite);if(t.openStatus()!=Acad::eOk)continue;
+        if(tvsTeeCross::write(t.object(),NULL)==Acad::eOk)++n;}
     return n;
 }
 inline void execute(){
@@ -129,6 +135,7 @@ inline void execute(){
     acutPrintf(L"\n  konektori prema obrisanom / nepostojećem objektu: %d (elemenata %d)",w.connectors,static_cast<int>(w.connector.size()));
     acutPrintf(L"\n  oprema povezana starijim buildom (upisuje se tačka povezivanja): %d",static_cast<int>(w.anchor.size()));
     acutPrintf(L"\n  ravni T komadi bočnih rešetaka (crtaju se bez poprečnih linija na krajevima): %d",static_cast<int>(w.openEnds.size()));
+    acutPrintf(L"\n  zapisi krstastog komada / XK koji se ne mogu nacrtati (uklanjaju se, ostaje T komad): %d",static_cast<int>(w.cross.size()));
     if(!w.detached.empty())acutPrintf(L"\n  oprema pomjerena poslije povezivanja (ponovo TVS_OPREMA): %d",static_cast<int>(w.detached.size()));
     if(!w.geometry.empty())acutPrintf(L"\n  elementi sa nevažećom geometrijom (NaN / dimenzija <= 0) – samo navedeni, izabrani na kraju: %d",static_cast<int>(w.geometry.size()));
     if(w.any()){

@@ -8,6 +8,7 @@
 #include "../TVS_Ventilation_DBX/DrawingUnits.h"
 #include "dgAllEdit.h"
 #include "TeeNeighbours.h"
+#include "TeePort.h"   // krstasti komad: the duct on the second branch
 #include "../geometry/NumericField.h"
 #include <map>
 #include <cwchar>
@@ -40,6 +41,20 @@ inline bool keepHeights(TVS_WYE* w){
     if(r.type==tvsTee::Pants&&std::fabs(w->SizeBpr-w->SizeBotv)>1e-9){w->put_SizeBpr(w->SizeBotv);return true;}
     return false;
 }
+// Krstasti komad / XK (plan 26): the duct on the second branch follows its port when the T komad
+// is edited here (a wider main moves the port). Made before the generic fields, applied after.
+struct CrossFollow {
+    bool on;AcDbObjectId duct;int end;AcGePoint3d was;
+    explicit CrossFollow(const TVS_WYE* w):on(false),end(-1){AcGeVector3d d;double a=0,b=0;bool r=true;
+        if(!w->crossPort(was,d,a,b,r))return;
+        const tvsTeePort::Neighbour n=tvsTeePort::at(w,was,1.0/tvsUnits::factor(w));
+        if(n.kind==1&&(n.end==0||n.end==1)){duct=n.id;end=n.end;on=true;}}
+    void apply(const TVS_WYE* w)const{if(!on)return;AcGePoint3d p;AcGeVector3d d;double a=0,b=0;bool r=true;
+        if(!w->crossPort(p,d,a,b,r)||tvsTeeFit::planDistance(p,was)<1e-9)return;
+        AcDbObjectPointer<TVS_Pipe> q(duct,AcDb::kForWrite);if(q.openStatus()!=Acad::eOk)return;
+        const AcGePoint3d to(p.x,p.y,end==0?q->FirstPoint.z:q->LastPoint.z);
+        if((end==0?q->put_FirstPoint(to):q->put_Lastpoint(to))==Acad::eOk)q->recordGraphicsModified();}
+};
 // Called with the element open for write, after the generic fields were applied.
 inline void apply(TVS_WYE* w,const Gather& g,const dgAllEdit& dg,bool widthAChanged,bool widthA2Changed,bool lengthChanged){
     if(!g.commonType())return;
