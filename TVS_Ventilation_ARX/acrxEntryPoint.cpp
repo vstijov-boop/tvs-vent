@@ -86,9 +86,9 @@
 #include "DpdExportCommand.h"
 #include "EquipmentLinkCommand.h"
 #include "FanCommand.h"   // TVS_VENTILATOR: usis / potis ventilatora u mreži
-#include "CrossCommand.h"   // krstasti komad / XK (TVS_CONNECTW: kanal pa T komad)
 #include "ExportCommand.h"
 #include "TeeTypeDialog.h"
+#include "CrossCommand.h"   // krstasti komad / XK (TVS_CONNECTW: kanal pa T komad)
 #include "EquipmentDialog.h"   // TVS_OPREMA_SVOJSTVA: svojstva povezanih blokova opreme
 #include "EquipmentCaption.h"  // TVS_NATPIS: natpis opreme (+ povezan / - nije povezan)
 #include "GrilleCommand.h"   // TVS_RESETKA: priključenje rešetke (T komad + ogranak ili dno kanala)

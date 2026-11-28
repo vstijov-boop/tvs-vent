@@ -28,4 +28,8 @@ class Cross(unittest.TestCase):
   self.assertIn('#include "CrossCommand.h"',text('TVS_Ventilation_ARX/acrxEntryPoint.cpp'))
   self.assertTrue((ROOT/'TVS_Ventilation_ARX/CrossCommand.h').read_bytes().startswith(b'\xef\xbb\xbf'))
   self.assertIn('Ukloniti drugi ogranak',text('TVS_Ventilation_ARX/TeeTypeDialog.h'))
+  x=text('TVS_Ventilation_ARX/CrossCommand.h')   # XK + koljeno 45 for a duct perpendicular to the main (user 28. 11.)
+  self.assertIn('const bool elbow=lateral&&std::fabs(dd.dotProduct(u))<1e-3;',x);self.assertIn('start=xp+xd*T+axis*T;',x)
+  self.assertIn('tvsTeeDialog::planElbow(teeId,xp,xd,turn,sec,elev,f,exit,out)',x);self.assertLess(x.index('w.close();p.close();'),x.index('tvsTeeDialog::planElbow('))
+  a=text('TVS_Ventilation_ARX/acrxEntryPoint.cpp');self.assertLess(a.index('#include "TeeTypeDialog.h"'),a.index('#include "CrossCommand.h"'))
 if __name__=='__main__':unittest.main()
