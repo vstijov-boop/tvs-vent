@@ -95,8 +95,14 @@ bool MleaderController::setTextMessage(const AcDbObjectId &MLeaderId, const CStr
 
 	AcDbMText *pMtext = pEnt->mtext();
 	if (pMtext) {
-		pMtext->setContents(textMessage.GetString());
-		pEnt->setMText(pMtext);
+		// unchanged text: no write (each write is an undo record and a regen of the label)
+		ACHAR* old = pMtext->contents();
+		const bool same = old && textMessage.Compare(old) == 0;
+		if (old) acutDelString(old);
+		if (!same) {
+			pMtext->setContents(textMessage.GetString());
+			pEnt->setMText(pMtext);
+		}
 		delete pMtext;
 	}
 

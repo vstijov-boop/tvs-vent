@@ -187,8 +187,8 @@ bool HeatFloor::getSimilarInsideFigureAtDistance( const AcGePoint3dArray  &arr,d
 	double area1,area2;
 	plineright->getArea(area1);
 	plineleft->getArea(area2);
-	if (area2>area1) func::drawEntity(plineright);
-	else func::drawEntity(plineleft);
+	if (area2>area1) {func::drawEntity(plineright);delete plineleft;}
+	else {func::drawEntity(plineleft);delete plineright;}   // the other one was leaked
 	
 	AcDbPolyline *plineinside=new AcDbPolyline;
 	plineinside->setClosed(true);

@@ -183,7 +183,7 @@ Acad::ErrorStatus TVS_TAP::dwgInFields(AcDbDwgFiler *pFiler) {
 		checkTypeRoundTap();
 		setRadius();
 
-		ListOfEntity.removeAll();
+		ClearEntitylist();   // delete, not just forget (leak)
 		double  Lx, Ly, Nx, Ny;
 		//change in future
 		Nx = Startvector.x;

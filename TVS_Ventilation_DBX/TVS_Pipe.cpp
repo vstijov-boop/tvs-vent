@@ -461,6 +461,7 @@ setWipeoutProperty(mode,wPline);
 		AcDbLine * pLine=new AcDbLine(FirstPoint,LastPoint);
 		if (DuctType==DuctTypeStill) {setMainProperty(pLine); }
 		if (DuctType==DuctTypeFlex) {setZigzagProperty(pLine); }
+		if (DuctType!=DuctTypeStill&&DuctType!=DuctTypeFlex) delete pLine;   // not drawn: was leaked
 		
 	}
 
@@ -619,8 +620,8 @@ for each (AcDbEntity * var in ListOfEntity)
 // default:break;
 // }
 
-AcDbLine * pLine=new AcDbLine(FirstPoint,LastPoint);
-	er=pLine->getOsnapPoints(osnapMode,gsSelectionMark,pickPoint,
+AcDbLine axisLine(FirstPoint,LastPoint);   // on the stack: a new AcDbLine leaked at every osnap query (cursor over a duct)
+	er=axisLine.getOsnapPoints(osnapMode,gsSelectionMark,pickPoint,
 	lastPoint,viewXform,snapPoints,geomIds);
 	return (Acad::eOk);
 }
@@ -1376,8 +1377,7 @@ Acad::ErrorStatus TVS_Pipe::put_Lastpoint(AcGePoint3d newVal)
 Adesk::Boolean TVS_FlexDuct::subWorldDraw (AcGiWorldDraw *mode) {
 		assertReadEnabled () ;
 		AcGePoint3dArray arr, arr1, arr2;
-		ListOfEntity.removeAll();
-		ListOfWipeout.removeAll();
+		ClearEntitylist();   // delete the previous drawing (removeAll leaked it at every regen - user 2026-11-28: drawing slows down)
 		arr.append(AcGePoint3d(FirstPoint));
 		arr.append(AcGePoint3d(flexmidpoint));
 		arr.append(AcGePoint3d(LastPoint));
@@ -1388,7 +1388,7 @@ Adesk::Boolean TVS_FlexDuct::subWorldDraw (AcGiWorldDraw *mode) {
 	
 		double AParam, midParam, BParam;
 		setCenterProperty(pEnt);
-			ListOfEntity.append(pEnt);
+		// (already in the list: set...Property appends - a second entry was deleted twice)
 		mode->geometry().draw(pEnt);
 
 
@@ -1412,7 +1412,7 @@ Adesk::Boolean TVS_FlexDuct::subWorldDraw (AcGiWorldDraw *mode) {
 		arr1=getPointsForSpline(100,pEnt,SizeA/2);
 				AcDbSpline * pEnt1=new AcDbSpline(arr1,startvect,endvect);
 				setMainProperty(pEnt1);
-		ListOfEntity.append(pEnt1);
+		// (already in the list: set...Property appends - a second entry was deleted twice)
 		mode->geometry().draw(pEnt1);
 
 
@@ -1430,7 +1430,7 @@ Adesk::Boolean TVS_FlexDuct::subWorldDraw (AcGiWorldDraw *mode) {
 		arr2=getPointsForSpline(100,pEnt,-SizeA/2);
 				AcDbSpline * pEnt2=new AcDbSpline(arr2,startvect,endvect);
 		setMainProperty(pEnt2);
-		ListOfEntity.append(pEnt2);
+		// (already in the list: set...Property appends - a second entry was deleted twice)
 		mode->geometry().draw(pEnt2);
 
 		return Adesk::kTrue;

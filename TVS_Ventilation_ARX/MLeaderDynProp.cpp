@@ -59,7 +59,9 @@ AcString GetFormatString(VARIANT *l_selection)
 					if (l_unkn != NULL)
 					{
 						IAcadObject *l_base = 0;
-						if (!SUCCEEDED(l_unkn->QueryInterface(IID_IAcadObject, (void **)&l_base)))
+						const HRESULT l_qi = l_unkn->QueryInterface(IID_IAcadObject, (void **)&l_base);
+						l_unkn->Release(); l_unkn = 0;   // SafeArrayGetElement AddRef-s it: was never released
+						if (!SUCCEEDED(l_qi))
 						{
 							continue;
 						}
@@ -90,6 +92,7 @@ AcString GetFormatString(VARIANT *l_selection)
 										}
 									}
 								}
+								if (rb) acutRelRb(rb);   // leaked at every selection shown in the palette
 							}
 						}
 					}
@@ -127,7 +130,9 @@ void PutFormatString(VARIANT *l_selection, AcString res)
 					if (l_unkn != NULL)
 					{
 						IAcadObject *l_base = 0;
-						if (!SUCCEEDED(l_unkn->QueryInterface(IID_IAcadObject, (void **)&l_base)))
+						const HRESULT l_qi = l_unkn->QueryInterface(IID_IAcadObject, (void **)&l_base);
+						l_unkn->Release(); l_unkn = 0;   // SafeArrayGetElement AddRef-s it: was never released
+						if (!SUCCEEDED(l_qi))
 						{
 							continue;
 						}

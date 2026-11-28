@@ -231,8 +231,7 @@ void TVS_WYE::unappended (const AcDbObject *pDbObj) {
 Adesk::Boolean TVS_WYE::subWorldDraw (AcGiWorldDraw *mode) {
 	assertReadEnabled () ;
 	tvsLevelLabels::draw(mode, database(), Basepoint, Vectpr, Elev, SizeApr, SizeBpr);   // TVS_KOTE
-		ListOfEntity.removeAll();
-		ListOfWipeout.removeAll();
+	ClearEntitylist();   // delete the previous drawing (removeAll leaked it at every regen - user 2026-11-28: drawing slows down)
 	AcGePoint3d massforarray[2];
 	AcGePoint3d massforarray2[8];
 

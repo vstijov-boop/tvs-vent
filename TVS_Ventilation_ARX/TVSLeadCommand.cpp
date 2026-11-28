@@ -78,6 +78,7 @@ void TVSCommandLead::createMLeader(const CString &message, const AcGePoint3d &pt
 	pEnt->setDoglegDirection(leader, side);
 
 	pEnt->setMText(mText);
+	delete mText;   // setMText copies it: the original leaked with every label
 
 	PostToModelSpace(pEnt);
 	//PostToModelSpace(mText);

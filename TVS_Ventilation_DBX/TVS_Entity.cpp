@@ -143,6 +143,7 @@ TVS_Entity::TVS_Entity () : AcDbCurve () {
 }
 
 TVS_Entity::~TVS_Entity () {
+	ClearEntitylist();   // the last drawing's lines / polylines (osnap copy): leaked with every object freed before
 }
 
 //-----------------------------------------------------------------------------
